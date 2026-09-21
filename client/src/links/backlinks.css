@@ -1,0 +1,104 @@
+/*
+ * "Linked mentions" (Links D, GRO-2193) — owned by BacklinksSection.tsx (the feature-CSS
+ * convention). The block sits INSIDE the editor's scroller, after the Crepe host, and repeats
+ * `.editor-instance`'s content column so it lines up with the note's text and scrolls with it,
+ * and draws no hairline of its own (YAZ-1680, after YAZ-1675 did the same for Comments).
+ * Header affordance mirrors the view-group / ViewTabs chevron: one stroked SVG, rotated -90°
+ * while collapsed. Colours are app theme tokens only, so dark mode follows for free.
+ */
+
+.backlinks {
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 0 48px;
+}
+
+.backlinks__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 0;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+
+.backlinks__header:hover {
+  color: var(--fg);
+}
+
+.backlinks__chevron {
+  flex: none;
+  transition: transform 120ms ease;
+}
+
+.backlinks__header[aria-expanded='false'] .backlinks__chevron {
+  transform: rotate(-90deg);
+}
+
+.backlinks__title {
+  font-weight: 600;
+}
+
+.backlinks__count {
+  font-weight: 400;
+}
+
+.backlinks__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 4px 0 0 20px;
+  list-style: none;
+}
+
+.backlinks__entry {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.backlinks__note {
+  padding: 2px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  border-radius: 4px;
+}
+
+.backlinks__note:hover {
+  background: var(--bg-hover);
+}
+
+.backlinks__snippet {
+  padding: 2px 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+  color: var(--fg-muted);
+  border-radius: 4px;
+}
+
+.backlinks__snippet:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+/* The mention itself — the raw `[[…]]` match, highlighted inside its line. */
+.backlinks__match {
+  color: var(--fg);
+  background: var(--accent-soft);
+  border-radius: 3px;
+}
+
+/* One quiet bar while an entry's file is being read (no spinner, no layout jump). */
+.backlinks__skeleton {
+  width: 40%;
+  height: 12px;
+  margin: 4px;
+  border-radius: 4px;
+  background: var(--bg-side);
+}

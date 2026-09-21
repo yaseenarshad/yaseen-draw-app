@@ -1,0 +1,979 @@
+<title>Folder Pages Mockup</title>
+<!--
+  ═══════════════════════════════════════════════════════════════════════════════════
+  INTERACTIVE MOCKUP — the folder-page architecture (Linear: YAZ-812 under YAZ-796)
+  ═══════════════════════════════════════════════════════════════════════════════════
+
+  Every piece below is tagged with the decision it implements. Index of pieces:
+
+  [D1] Two concepts only: pages (with a `folder_pages` membership column on the card)
+       and folder pages (pages with a database attached). page_type does not exist here.
+  [D2] Contents are COMPUTED from memberships. Nothing membership-related is stored
+       in the folder page; the folder page's file would hold only view config + prose.
+  [D3] One set, two skins: the contents block toggles Outline ⇄ Table. Same rows.
+  [D4] Both views are editable with write-through to the cards:
+       - outline "+ Link a page…" row: tagging writes membership onto the TARGET's card
+       - removing a bullet = explicit un-membership gesture with confirm
+       - table cells edit single card properties (existing app behavior)
+       - table "New" / outline create-new stamp membership on the new page
+  [D5] Ordering: membership is truth (cards); order is presentation (view config).
+       Outline rows drag to reorder; unplaced/new pages append at the bottom.
+  [D6] Sub-bullets: a member that is itself a folder page nests (expand chevron),
+       recursively, with an ancestor-repeat cycle guard.
+  [D7] Multi-membership: CAC lives in Metrics AND Meta Ads; problems live in
+       Problems AND their function. One card fact per membership, no duplicates stored.
+  [D8] Uncategorized: computed view of pages with zero memberships. Creating a page
+       with no context lands there. No orphans.
+  [D9] "Turn into folder page": any page can become one (⋯ menu). The marker is the
+       attached database view (+ a folder_page flag on the card).
+  [D10] Schema per folder page: each folder page defines its own table columns; a page
+       in two databases shows different columns in each; mixed-shape rows show blanks.
+  [D11] Properties panel (YAZ-748): every page shows its card; the "Folder pages" row
+       edits the same memberships from the page side (two-way by construction).
+  [D12] Sidebar Topics tree = nested folder-page memberships rooted at Home; the Files
+       tab shows the dumb parking bins for contrast (YAZ-797/799). Search/filter row
+       intentionally omitted per Yasin (this mock is about folder pages).
+
+  Visual language lifted from the real app (client/src/app.css, views/views.css):
+  tokens --bg/--bg-side/--fg/--accent/etc., .tree__row, .view-table, .ctx-menu,
+  .confirm, view-tab underline idiom, system font stack, 13px chrome / 16px editor.
+  ═══════════════════════════════════════════════════════════════════════════════════
+-->
+<style>
+  /* ───────── app tokens, verbatim from client/src/app.css ───────── */
+  :root {
+    --bg: #ffffff;
+    --bg-side: #f6f6f7;
+    --fg: #1f1f1f;
+    --fg-muted: #7a7a7a;
+    --border: #e4e4e7;
+    --accent: #5b6cff;
+    --accent-soft: #eef0ff;
+    --danger: #d64545;
+    --warn: #c98a1a;
+    --ok: #3a9d5d;
+    --bg-hover: #eeeef0;
+    --bg-hover-row: #e9e9ec;
+    --fg-dir: #444444;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --bg: #1e1e1e;
+      --bg-side: #262626;
+      --fg: #dadada;
+      --fg-muted: #8f8f8f;
+      --border: #3a3a3a;
+      --accent: #7c8aff;
+      --accent-soft: #2c3050;
+      --danger: #e06c6c;
+      --warn: #d9a13c;
+      --ok: #4fb573;
+      --bg-hover: #333336;
+      --bg-hover-row: #303034;
+      --fg-dir: #b8b8bd;
+    }
+  }
+  :root[data-theme='dark'] {
+    --bg: #1e1e1e;
+    --bg-side: #262626;
+    --fg: #dadada;
+    --fg-muted: #8f8f8f;
+    --border: #3a3a3a;
+    --accent: #7c8aff;
+    --accent-soft: #2c3050;
+    --danger: #e06c6c;
+    --warn: #d9a13c;
+    --ok: #4fb573;
+    --bg-hover: #333336;
+    --bg-hover-row: #303034;
+    --fg-dir: #b8b8bd;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    height: 100vh;
+    overflow: hidden;
+    font-family: var(--font);
+    font-size: 14px;
+    color: var(--fg);
+    background: var(--bg);
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+
+  .app { display: flex; height: 100%; overflow: hidden; }
+
+  /* ───────── sidebar (mirrors .sidebar / .tree from app.css) ───────── */
+  .sidebar {
+    width: 270px;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-side);
+    border-right: 1px solid var(--border);
+    user-select: none;
+  }
+  .sidebar__header {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    padding: 12px 14px 8px;
+  }
+  .sidebar__root-name { font-weight: 600; font-size: 13px; }
+  .sidebar__root-hint { font-size: 11px; color: var(--fg-muted); }
+
+  /* [D12] Lens tabs — chrome v2 Row 1 (search/filter Row 2 intentionally omitted here) */
+  .lens-tabs { display: flex; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--border); }
+  .lens-tab {
+    padding: 5px 10px 6px;
+    font-size: 12.5px;
+    color: var(--fg-muted);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .lens-tab:hover { color: var(--fg); background: var(--bg-hover); border-radius: 4px 4px 0 0; }
+  .lens-tab--active { color: var(--fg); font-weight: 600; border-bottom-color: var(--accent); }
+
+  .sidebar__body { flex: 1; overflow: auto; padding: 6px 4px 24px; }
+  .sidebar__note {
+    margin: 4px 10px 8px; font-size: 11px; line-height: 1.45; color: var(--fg-muted);
+  }
+
+  .tree { list-style: none; margin: 0; padding: 0; }
+  .tree__row {
+    display: flex; align-items: center; gap: 4px; width: 100%;
+    padding: 3px 8px; font-size: 13px; line-height: 1.5; text-align: left;
+    border-radius: 4px; color: var(--fg);
+  }
+  .tree__row:hover { background: var(--bg-hover-row); }
+  .tree__row--dir { color: var(--fg-dir); }
+  .tree__row--active { background: var(--accent-soft); color: var(--accent); }
+  .tree__row--muted { color: var(--fg-muted); font-style: italic; }
+  .tree__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tree__count { margin-left: auto; font-size: 11px; color: var(--fg-muted); }
+  .tree__chevron { flex: none; width: 10px; height: 10px; position: relative; }
+  .tree__chevron::before {
+    content: ''; position: absolute; left: 3px; top: 2px; width: 5px; height: 5px;
+    border-right: 1.5px solid var(--fg-muted); border-bottom: 1.5px solid var(--fg-muted);
+    transform: rotate(-45deg); transition: transform 0.12s;
+  }
+  .tree__chevron--open::before { transform: rotate(45deg); top: 0; }
+  .tree__chevron--none::before { display: none; }
+  /* [D9] folder-page glyph — the app's 2×2 base glyph, now marking folder pages */
+  .tree__glyph { flex: none; width: 12px; height: 12px; margin-right: 2px; color: var(--fg-muted); }
+  .tree__row--active .tree__glyph { color: inherit; }
+
+  /* ───────── editor pane ───────── */
+  .editor { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .editor-host { flex: 1; min-height: 0; overflow-y: auto; }
+  .editor-instance { width: 100%; max-width: 900px; margin: 0 auto; padding: 28px 48px 120px; }
+
+  .doc-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
+  .doc-title { font-size: 1.802em; font-weight: 700; line-height: 1.3; margin: 0; }
+  .fp-chip {
+    flex: none; display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; font-size: 11px; font-weight: 600;
+    color: var(--accent); background: var(--accent-soft); border-radius: 10px;
+  }
+  .doc-menu-btn {
+    margin-left: auto; padding: 2px 8px; font-size: 16px; color: var(--fg-muted); border-radius: 5px;
+  }
+  .doc-menu-btn:hover { color: var(--fg); background: var(--bg-hover); }
+
+  /* [D11] properties panel — the YAZ-748 surface */
+  .props {
+    margin: 12px 0 4px; border-top: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .props__row {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 4px 0; border-bottom: 1px solid var(--border);
+    min-height: 28px;
+  }
+  .props__key {
+    flex: none; width: 130px; padding-top: 2px;
+    color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .props__val { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding-top: 1px; }
+  .props__text { cursor: text; border-radius: 4px; padding: 1px 4px; margin-left: -4px; }
+  .props__text:hover { background: var(--bg-hover); }
+  .props__text--empty { color: var(--fg-muted); font-style: italic; }
+  .props__input {
+    width: 100%; padding: 2px 4px; margin-left: -4px;
+    border: 1px solid var(--accent); border-radius: 4px;
+    font: inherit; font-size: 13px; background: var(--bg); color: var(--fg); outline: none;
+  }
+  .mem-chip {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 1px 7px; font-size: 12px;
+    color: var(--accent); background: var(--accent-soft); border-radius: 5px;
+    cursor: pointer;
+  }
+  .mem-chip:hover { text-decoration: underline; }
+  .mem-chip__x { color: var(--fg-muted); font-size: 12px; padding: 0 1px; text-decoration: none !important; }
+  .mem-chip__x:hover { color: var(--danger); }
+  .mem-add {
+    padding: 1px 7px; font-size: 12px; color: var(--fg-muted);
+    border: 1px dashed var(--border); border-radius: 5px;
+  }
+  .mem-add:hover { color: var(--accent); border-color: var(--accent); }
+  .props__flag { font-family: var(--mono); font-size: 12px; color: var(--fg-muted); }
+
+  /* prose body */
+  .prose { font-size: 16px; line-height: 1.5; margin-top: 14px; }
+  .prose p { margin: 0; padding: 4px 0; }
+  .wl { color: var(--accent); cursor: pointer; }
+  .wl:hover { text-decoration: underline; }
+
+  /* ───────── the contents block [D2][D3] ───────── */
+  .contents { margin-top: 22px; }
+  .contents__bar {
+    display: flex; align-items: center; gap: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid var(--border); font-size: 13px;
+  }
+  /* view toggle — the app's view-tab idiom (2px accent underline) */
+  .view-tab {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 8px; font-size: 13px; color: var(--fg-muted);
+    border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
+  }
+  .view-tab:hover { background: var(--bg-side); border-radius: 4px 4px 0 0; }
+  .view-tab--active { color: var(--fg); border-bottom-color: var(--accent); }
+  .contents__count { margin-left: auto; color: var(--fg-muted); font-size: 12px; white-space: nowrap; }
+  .contents__new { padding: 4px 8px; font-size: 12px; color: var(--fg); border-radius: 4px; }
+  .contents__new:hover { background: var(--bg-side); }
+
+  /* outline view [D4][D5][D6] */
+  .oul { list-style: none; margin: 8px 0 0; padding: 0; }
+  .oul .oul { margin: 0; }
+  .ou-row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 3px 6px; border-radius: 4px; font-size: 15px; line-height: 1.5;
+  }
+  .ou-row:hover { background: var(--bg-hover-row); }
+  .ou-row--drop-above { box-shadow: inset 0 2px 0 var(--accent); }
+  .ou-row--drop-below { box-shadow: inset 0 -2px 0 var(--accent); }
+  .ou-indent { flex: none; }
+  .ou-chevron { flex: none; width: 14px; height: 14px; position: relative; cursor: pointer; border-radius: 3px; }
+  .ou-chevron:hover { background: var(--bg-hover); }
+  .ou-chevron::before {
+    content: ''; position: absolute; left: 5px; top: 4px; width: 5px; height: 5px;
+    border-right: 1.5px solid var(--fg-muted); border-bottom: 1.5px solid var(--fg-muted);
+    transform: rotate(-45deg); transition: transform 0.12s;
+  }
+  .ou-chevron--open::before { transform: rotate(45deg); top: 3px; }
+  .ou-bullet { flex: none; width: 14px; text-align: center; color: var(--fg-muted); font-size: 13px; cursor: grab; }
+  .ou-link { color: var(--accent); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ou-link:hover { text-decoration: underline; }
+  .ou-sub { font-size: 12px; color: var(--fg-muted); margin-left: 6px; white-space: nowrap; }
+  .ou-x {
+    margin-left: auto; flex: none; padding: 0 6px; font-size: 13px; color: transparent; border-radius: 4px;
+  }
+  .ou-row:hover .ou-x { color: var(--fg-muted); }
+  .ou-x:hover { color: var(--danger) !important; background: var(--bg-hover); }
+
+  /* [D4] the tag-a-page row */
+  .ou-add { display: flex; align-items: center; gap: 6px; padding: 4px 6px; position: relative; }
+  .ou-add__bullet { flex: none; width: 14px; text-align: center; color: var(--fg-muted); font-size: 13px; opacity: .5; }
+  .ou-add__input {
+    flex: 1; max-width: 340px; padding: 2px 6px; border: 1px solid transparent; border-radius: 4px;
+    font: inherit; font-size: 14px; background: transparent; color: var(--fg); outline: none;
+  }
+  .ou-add__input::placeholder { color: var(--fg-muted); opacity: .8; }
+  .ou-add__input:focus { border-color: var(--accent); background: var(--bg); }
+
+  /* picker dropdown (shared by outline add + membership add) — ctx-menu idiom */
+  .picker {
+    position: absolute; z-index: 45; min-width: 240px; max-height: 240px; overflow-y: auto;
+    padding: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+  .picker__item {
+    display: flex; align-items: center; gap: 6px; width: 100%;
+    padding: 6px 10px; border-radius: 5px; font-size: 13px; text-align: left;
+  }
+  .picker__item:hover, .picker__item--sel { background: var(--accent-soft); }
+  .picker__item small { color: var(--fg-muted); }
+  .picker__create { color: var(--accent); }
+
+  /* table view [D3][D10] — mirrors .view-table */
+  .view-table-wrap { margin-top: 8px; overflow: auto; }
+  .view-table { border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: 13px; min-width: 100%; }
+  .view-table th, .view-table td {
+    padding: 3px 8px; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap;
+    border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  }
+  .view-table th:last-child, .view-table td:last-child { border-right: none; }
+  .view-table thead th { font-weight: 600; color: var(--fg-muted); background: var(--bg); }
+  .view-table tbody td { height: 28px; }
+  .view-table td[data-edit] { cursor: text; }
+  .view-table td[data-edit]:hover { background: var(--bg-hover-row); }
+  .view-table__link { color: var(--accent); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; text-align: left; max-width: 100%; }
+  .view-table__link:hover { text-decoration: underline; }
+  .view-table td .mem-chip { cursor: pointer; margin-right: 3px; }
+  .cell-input {
+    width: 100%; padding: 1px 4px; border: 1px solid var(--accent); border-radius: 3px;
+    font: inherit; font-size: 13px; background: var(--bg); color: var(--fg); outline: none;
+  }
+  .cell-empty { color: var(--fg-muted); }
+
+  /* files lens */
+  .file-note { margin: 2px 10px 10px; font-size: 11px; line-height: 1.45; color: var(--fg-muted); }
+
+  /* ───────── overlays: confirm (app idiom) + menu + guide ───────── */
+  .confirm-overlay {
+    position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+    background: rgba(0, 0, 0, 0.25);
+  }
+  .confirm {
+    width: 360px; padding: 16px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  }
+  .confirm__text { margin: 0 0 14px; font-size: 13px; line-height: 1.5; }
+  .confirm__actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .confirm__btn { padding: 5px 12px; font-size: 13px; border: 1px solid var(--border); border-radius: 6px; }
+  .confirm__btn:hover { background: var(--accent-soft); }
+  .confirm__btn--danger { color: var(--danger); }
+
+  .ctx-menu {
+    position: fixed; z-index: 55; min-width: 180px; padding: 4px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+  .ctx-menu__item {
+    display: block; width: 100%; padding: 6px 10px; border-radius: 5px; font-size: 13px; text-align: left;
+  }
+  .ctx-menu__item:hover { background: var(--accent-soft); }
+  .ctx-overlay { position: fixed; inset: 0; z-index: 54; }
+
+  /* the guide */
+  .guide-fab {
+    position: fixed; right: 16px; bottom: 16px; z-index: 50;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-weight: 700; font-size: 15px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.2);
+  }
+  .guide-panel {
+    position: fixed; right: 16px; bottom: 58px; z-index: 50; width: 380px; max-height: 70vh; overflow-y: auto;
+    padding: 16px 18px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0,0,0,.2); font-size: 13px; line-height: 1.55;
+  }
+  .guide-panel h3 { margin: 0 0 8px; font-size: 14px; }
+  .guide-panel ol { margin: 6px 0; padding-left: 20px; }
+  .guide-panel li { margin-bottom: 7px; }
+  .guide-panel b { color: var(--accent); }
+  .guide-panel .muted { color: var(--fg-muted); font-size: 12px; }
+</style>
+
+<div class="app" id="app"></div>
+<button class="guide-fab" data-action="toggle-guide" title="What to try">?</button>
+<div id="overlays"></div>
+
+<script>
+'use strict';
+/* ════════════════════════════════════════════════════════════════════════
+   DATA — the in-memory vault. [D1] Each page: { name, isFolder, memberships,
+   props, prose }. Folder pages add: { columns, order, view }. Membership is
+   the ONLY categorization; there is no page_type anywhere in this file.
+   Seeded to mirror the real business-wiki vault.
+   ════════════════════════════════════════════════════════════════════════ */
+const P = {};
+function seed(name, o = {}) {
+  P[name] = {
+    name,
+    isFolder: !!o.fp,
+    memberships: o.in || [],          // [D1] the card's folder_pages column
+    props: o.props || {},             // other card facts
+    prose: o.prose || '',
+    // folder-page extras (view config — presentation, not truth [D5])
+    columns: o.columns || [],
+    order: o.order || [],             // manual outline order; unplaced append at bottom
+    view: 'outline',
+  };
+}
+
+/* folder pages */
+seed('Home', { fp: true, order: ['Functions', 'Channels', 'Metrics', 'Problems'],
+  prose: 'The business wiki. Start with Functions if you are new.' });
+seed('Functions', { fp: true, in: ['Home'], order: ['1 Lead Gen', '2 Lead Nurture'] });
+seed('Channels', { fp: true, in: ['Home'] });
+seed('Metrics', { fp: true, in: ['Home'], columns: ['owner', 'formula', 'cadence'],
+  order: ['Customer Acquisition Cost', 'Cost per Lead', 'Churn Rate'] });
+seed('Problems', { fp: true, in: ['Home'], columns: ['tag'] });
+seed('Meta Ads', { fp: true, in: ['Channels'], columns: ['owner', 'formula'],
+  order: ['Campaign Structure', 'Customer Acquisition Cost'],
+  prose: 'Our paid social motion. Campaign structure first, then creative testing.' });
+seed('1 Lead Gen', { fp: true, in: ['Functions'], order: ['1.1 Cross-Channel', '1.2 Paid'] });
+seed('1.1 Cross-Channel', { fp: true, in: ['1 Lead Gen'], columns: ['tag'] });
+seed('1.2 Paid', { fp: true, in: ['1 Lead Gen'], columns: ['tag'] });
+seed('2 Lead Nurture', { fp: true, in: ['Functions'] });
+
+/* normal pages — note the multi-memberships [D7] */
+seed('Customer Acquisition Cost', { in: ['Metrics', 'Meta Ads'],
+  props: { owner: 'RevOps / Finance', formula: '(S&M costs) / (new customers)', cadence: 'Monthly' },
+  prose: 'Total cost to acquire a new customer. Watch it alongside [[LTV to CAC Ratio]] — and for paid social, read it against [[Meta Ads]] spend.' });
+seed('Cost per Lead', { in: ['Metrics', 'Meta Ads'],
+  props: { owner: 'Growth', formula: 'Adspend / leads', cadence: 'Weekly' } });
+seed('Churn Rate', { in: ['Metrics'],
+  props: { owner: 'CS', formula: 'Lost MRR / starting MRR', cadence: 'Monthly' } });
+seed('LTV to CAC Ratio', { in: ['Metrics'],
+  props: { owner: 'RevOps / Finance', formula: 'LTV / CAC', cadence: 'Quarterly' } });
+seed('Lead-to-Opportunity Conversion Rate', { in: ['Metrics'],
+  props: { owner: 'RevOps', formula: 'Opps / leads', cadence: 'Monthly' } });
+seed('Lead Scoring', { in: ['Problems', '1.1 Cross-Channel'],
+  props: { tag: 'revenue driver' },
+  prose: 'All inbound leads are treated the same — reps waste time on low-fit leads and miss high-fit ones. Directly moves [[Lead-to-Opportunity Conversion Rate]].' });
+seed('Lead Routing & SLA', { in: ['Problems', '1.1 Cross-Channel'], props: { tag: 'revenue driver' } });
+seed('ICP Definition', { in: ['Problems', '1.1 Cross-Channel'], props: { tag: 'foundation' } });
+seed('Landing Page Conversion', { in: ['Problems', '1.2 Paid'], props: { tag: 'optimization' } });
+seed('Campaign Structure', { in: ['Meta Ads'],
+  prose: 'How the ad account is organized: one campaign per funnel stage, budget at the campaign level.' });
+/* [D8] a stray — belongs nowhere, lives in Uncategorized until tagged */
+seed('Quarterly Planning Notes', { in: [],
+  prose: 'Loose notes from the Q3 planning call. Tag me into a folder page and I leave Uncategorized.' });
+
+/* the dumb parking bins, for the Files lens [D12] — location is meaningless, shown for contrast */
+const BIN = (n) => {
+  const p = P[n];
+  if (p.isFolder) return n === 'Home' ? '' : 'folder pages';
+  if (p.memberships.includes('Metrics')) return 'metrics';
+  if (p.memberships.includes('Problems')) return 'problems';
+  if (p.memberships.includes('Meta Ads')) return 'concepts';
+  return '(root)';
+};
+
+/* ════════════════════════════════════════════════════════════════════════
+   DERIVED — [D2] contents are computed, never stored.
+   ════════════════════════════════════════════════════════════════════════ */
+const members = (fpName) =>
+  Object.values(P).filter((p) => p.memberships.includes(fpName)).map((p) => p.name);
+
+/* [D5] placed rows first (view-config order), unplaced appended at the bottom */
+function orderedMembers(fp) {
+  const set = members(fp.name);
+  const placed = fp.order.filter((n) => set.includes(n));
+  const rest = set.filter((n) => !placed.includes(n));
+  return placed.concat(rest);
+}
+const uncategorized = () =>
+  Object.values(P).filter((p) => !p.isFolder && p.memberships.length === 0).map((p) => p.name);
+
+/* ════════════════════════════════════════════════════════════════════════
+   STATE + tiny helpers
+   ════════════════════════════════════════════════════════════════════════ */
+const S = {
+  lens: 'topics',
+  open: 'Home',
+  expanded: new Set(['Home', 'Functions', 'Metrics']),   // sidebar tree
+  ouExpanded: new Set(),                                   // in-document outline nesting [D6]
+  guide: true,
+  confirm: null,   // {text, onYes}
+  menu: null,      // {x, y, items:[{label, action}]}
+  drag: null,
+};
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const el = (id) => document.getElementById(id);
+
+/* ════════════════════════════════════════════════════════════════════════
+   MUTATIONS — every one of these is a CARD write in the real app [D4].
+   ════════════════════════════════════════════════════════════════════════ */
+function addMembership(pageName, fpName) {
+  const p = P[pageName];
+  if (!p || p.memberships.includes(fpName) || pageName === fpName) return;
+  p.memberships.push(fpName);          // writes folder_pages on PAGE's card
+  render();
+}
+function removeMembership(pageName, fpName) {
+  const p = P[pageName];
+  p.memberships = p.memberships.filter((m) => m !== fpName);
+  P[fpName].order = P[fpName].order.filter((n) => n !== pageName); // order entry becomes stale → drop
+  render();
+}
+function createPage(name, fpName) {   // [D4] creation stamps membership; [D8] no context → Uncategorized
+  if (P[name]) { addMembership(name, fpName); return; }
+  seed(name, { in: fpName ? [fpName] : [] });
+  render();
+}
+function turnIntoFolderPage(name) {   // [D9]
+  P[name].isFolder = true;
+  render();
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   RENDER
+   ════════════════════════════════════════════════════════════════════════ */
+function glyphSvg() { // the app's 2×2 base glyph, reused as the folder-page marker [D9]
+  return '<svg class="tree__glyph" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3">' +
+    '<rect x="1" y="1" width="4" height="4" rx="1"/><rect x="7" y="1" width="4" height="4" rx="1"/>' +
+    '<rect x="1" y="7" width="4" height="4" rx="1"/><rect x="7" y="7" width="4" height="4" rx="1"/></svg>';
+}
+
+/* ── sidebar: Topics tree = nested memberships rooted at Home [D12][D6] ── */
+function treeRows(name, depth, ancestry) {
+  const p = P[name];
+  const isOpen = S.expanded.has(name);
+  const kids = p.isFolder ? orderedMembers(p) : [];
+  const active = S.open === name;
+  let h = `<li><button class="tree__row ${p.isFolder ? 'tree__row--dir' : ''} ${active ? 'tree__row--active' : ''}"
+      style="padding-left:${8 + depth * 14}px" data-action="open" data-name="${esc(name)}">
+      <span class="tree__chevron ${kids.length ? (isOpen ? 'tree__chevron--open' : '') : 'tree__chevron--none'}"
+        data-action="tree-toggle" data-name="${esc(name)}"></span>
+      ${p.isFolder ? glyphSvg() : ''}
+      <span class="tree__label">${esc(name)}</span>
+      ${p.isFolder ? `<span class="tree__count">${kids.length}</span>` : ''}
+    </button></li>`;
+  if (isOpen && kids.length) {
+    for (const k of kids) {
+      if (ancestry.includes(k)) continue; // [D6] cycle guard
+      h += treeRows(k, depth + 1, ancestry.concat(name));
+    }
+  }
+  return h;
+}
+
+function sidebarHtml() {
+  let body = '';
+  if (S.lens === 'topics') {
+    const unc = uncategorized();
+    body = `
+      <div class="sidebar__note">Topics — folder pages, nested by membership. A page under two folder pages appears under both; the file never moves. Order = each folder page's outline order.</div>
+      <ul class="tree">${treeRows('Home', 0, [])}</ul>
+      <ul class="tree" style="margin-top:10px">
+        <li><button class="tree__row tree__row--muted ${S.open === '__unc__' ? 'tree__row--active' : ''}" data-action="open" data-name="__unc__">
+          <span class="tree__chevron tree__chevron--none"></span>
+          <span class="tree__label">Uncategorized</span><span class="tree__count">${unc.length}</span>
+        </button></li>
+      </ul>`;
+  } else {
+    /* Files lens: the dumb bins [D12] — parking only, shown for contrast */
+    const bins = {};
+    Object.keys(P).forEach((n) => { const b = BIN(n); (bins[b] = bins[b] || []).push(n); });
+    body = `<div class="file-note">Files — the parking bins on disk. One shallow bin per kind, no meaning: moving a file changes nothing above. You'd rarely come here (lost pages, images, plumbing).</div><ul class="tree">`;
+    for (const b of Object.keys(bins).sort()) {
+      if (b === '') continue;
+      body += `<li><button class="tree__row tree__row--dir"><span class="tree__chevron tree__chevron--open"></span><span class="tree__label">${esc(b)}/</span></button></li>`;
+      for (const n of bins[b].sort()) {
+        body += `<li><button class="tree__row ${S.open === n ? 'tree__row--active' : ''}" style="padding-left:22px" data-action="open" data-name="${esc(n)}"><span class="tree__chevron tree__chevron--none"></span><span class="tree__label">${esc(n)}.md</span></button></li>`;
+      }
+    }
+    body += `<li><button class="tree__row ${S.open === 'Home' ? 'tree__row--active' : ''}" data-action="open" data-name="Home"><span class="tree__chevron tree__chevron--none"></span><span class="tree__label">Home.md</span></button></li></ul>`;
+  }
+  return `
+    <aside class="sidebar">
+      <div class="sidebar__header">
+        <span class="sidebar__root-name">business-wiki</span>
+        <span class="sidebar__root-hint">mockup</span>
+      </div>
+      <div class="lens-tabs">
+        <button class="lens-tab ${S.lens === 'topics' ? 'lens-tab--active' : ''}" data-action="lens" data-lens="topics">Topics</button>
+        <button class="lens-tab ${S.lens === 'files' ? 'lens-tab--active' : ''}" data-action="lens" data-lens="files">Files</button>
+      </div>
+      <div class="sidebar__body">${body}</div>
+    </aside>`;
+}
+
+/* ── prose with [[wikilinks]] ── */
+function proseHtml(text) {
+  if (!text) return '';
+  const html = esc(text).replace(/\[\[([^\]]+)\]\]/g, (m, n) =>
+    `<span class="wl" data-action="open" data-name="${esc(n)}">${esc(n)}</span>`);
+  return `<div class="prose"><p>${html}</p></div>`;
+}
+
+/* ── properties panel [D11] ── */
+function propsHtml(p) {
+  const memChips = p.memberships.map((m) =>
+    `<span class="mem-chip" data-action="open" data-name="${esc(m)}">${esc(m)}
+       <button class="mem-chip__x" data-action="unmember" data-page="${esc(p.name)}" data-fp="${esc(m)}" title="Remove from ${esc(m)}">×</button>
+     </span>`).join('');
+  let rows = `
+    <div class="props__row">
+      <div class="props__key">Folder pages</div>
+      <div class="props__val" style="position:relative">${memChips}
+        <button class="mem-add" data-action="mem-add" data-page="${esc(p.name)}">+ add</button>
+        <span id="mem-picker-slot"></span>
+      </div>
+    </div>`;
+  if (p.isFolder) {
+    rows += `<div class="props__row"><div class="props__key">folder_page</div>
+      <div class="props__val"><span class="props__flag">true — has a database view attached</span></div></div>`;
+  }
+  for (const k of Object.keys(p.props)) {
+    rows += `<div class="props__row"><div class="props__key">${esc(k)}</div>
+      <div class="props__val"><span class="props__text" data-action="edit-prop" data-page="${esc(p.name)}" data-key="${esc(k)}">${esc(p.props[k])}</span></div></div>`;
+  }
+  return `<div class="props">${rows}</div>`;
+}
+
+/* ── outline view [D4][D5][D6] ── */
+function outlineRows(fp, list, depth, ancestry) {
+  let h = '';
+  for (const n of list) {
+    const m = P[n];
+    if (!m) continue;
+    const nested = m.isFolder && !ancestry.includes(n);
+    const key = fp.name + '>' + n;
+    const openSub = S.ouExpanded.has(key);
+    h += `<li class="ou-row" draggable="${depth === 0}" data-drag="${depth === 0 ? esc(n) : ''}" data-fp="${esc(fp.name)}">
+      <span class="ou-indent" style="width:${depth * 22}px"></span>
+      ${nested
+        ? `<span class="ou-chevron ${openSub ? 'ou-chevron--open' : ''}" data-action="ou-toggle" data-key="${esc(key)}"></span>`
+        : `<span style="width:14px;flex:none"></span>`}
+      <span class="ou-bullet" title="${depth === 0 ? 'Drag to reorder — order lives in this view, not on any card' : ''}">•</span>
+      <span class="ou-link" data-action="open" data-name="${esc(n)}">${esc(n)}</span>
+      ${m.isFolder ? `<span class="ou-sub">${members(n).length}</span>` : ''}
+      ${depth === 0 ? `<button class="ou-x" data-action="unmember" data-page="${esc(n)}" data-fp="${esc(fp.name)}" title="Remove from ${esc(fp.name)}">×</button>` : ''}
+    </li>`;
+    if (nested && openSub) {
+      h += outlineRows(fp, orderedMembers(P[n]), depth + 1, ancestry.concat(fp.name, n));
+    }
+  }
+  return h;
+}
+
+function contentsHtml(fp) {
+  const list = orderedMembers(fp);
+  let body;
+  if (fp.view === 'outline') {
+    body = `<ul class="oul" id="outline-root">${outlineRows(fp, list, 0, [])}
+      <li class="ou-add">
+        <span style="width:14px;flex:none"></span>
+        <span class="ou-add__bullet">•</span>
+        <input class="ou-add__input" id="ou-add-input" placeholder="+ Link a page… (type to tag — writes membership onto that page's card)" autocomplete="off">
+        <span id="ou-picker-slot"></span>
+      </li>
+    </ul>`;
+  } else {
+    /* table view [D3][D10]: same computed set, view-table skin, columns from THIS folder page */
+    const cols = fp.columns;
+    let rows = '';
+    for (const n of list) {
+      const m = P[n];
+      let tds = `<td><button class="view-table__link" data-action="open" data-name="${esc(n)}">${esc(n)}</button></td>`;
+      for (const c of cols) {
+        const v = m.props[c];
+        tds += `<td data-edit data-page="${esc(n)}" data-key="${esc(c)}">${v ? esc(v) : '<span class="cell-empty">—</span>'}</td>`;
+      }
+      const others = m.memberships.filter((x) => x !== fp.name);
+      tds += `<td>${others.map((o) => `<span class="mem-chip" data-action="open" data-name="${esc(o)}">${esc(o)}</span>`).join('') || '<span class="cell-empty">—</span>'}</td>`;
+      rows += `<tr>${tds}</tr>`;
+    }
+    body = `<div class="view-table-wrap"><table class="view-table">
+      <colgroup><col style="width:230px">${cols.map(() => '<col style="width:170px">').join('')}<col style="width:180px"></colgroup>
+      <thead><tr><th>Name</th>${cols.map((c) => `<th>${esc(c)}</th>`).join('')}<th>Also in</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>`;
+  }
+  return `
+    <div class="contents">
+      <div class="contents__bar">
+        <button class="view-tab ${fp.view === 'outline' ? 'view-tab--active' : ''}" data-action="view" data-view="outline">Outline</button>
+        <button class="view-tab ${fp.view === 'table' ? 'view-tab--active' : ''}" data-action="view" data-view="table">Table</button>
+        <button class="contents__new" data-action="fp-new" data-fp="${esc(fp.name)}">+ New</button>
+        <span class="contents__count">${list.length} pages · computed from memberships</span>
+      </div>
+      ${body}
+    </div>`;
+}
+
+/* ── the open document ── */
+function docHtml() {
+  if (S.open === '__unc__') {
+    const unc = uncategorized();
+    return `<div class="editor-instance">
+      <div class="doc-title-row"><h1 class="doc-title">Uncategorized</h1>
+        <span class="fp-chip">computed</span></div>
+      <div class="prose"><p style="color:var(--fg-muted)">Pages that belong to no folder page yet. Nothing can get lost — a page with zero memberships always shows here. Tag it somewhere and it leaves. <em>(You cannot delete this view; it is not a page.)</em></p></div>
+      <ul class="oul" style="margin-top:16px">${unc.map((n) => `
+        <li class="ou-row"><span style="width:14px;flex:none"></span><span class="ou-bullet">•</span>
+        <span class="ou-link" data-action="open" data-name="${esc(n)}">${esc(n)}</span></li>`).join('') ||
+        '<li class="ou-row"><span style="color:var(--fg-muted);font-size:13px">Empty — every page belongs somewhere. 🎉</span></li>'}
+      </ul></div>`;
+  }
+  const p = P[S.open];
+  if (!p) return '<div class="editor-instance"></div>';
+  return `<div class="editor-instance">
+    <div class="doc-title-row">
+      <h1 class="doc-title">${esc(p.name)}</h1>
+      ${p.isFolder ? `<span class="fp-chip">${glyphSvg()} Folder page</span>` : ''}
+      <button class="doc-menu-btn" data-action="doc-menu" data-name="${esc(p.name)}" title="Page menu">⋯</button>
+    </div>
+    ${propsHtml(p)}
+    ${proseHtml(p.prose)}
+    ${p.isFolder ? contentsHtml(p) : ''}
+  </div>`;
+}
+
+/* ── overlays ── */
+function overlaysHtml() {
+  let h = '';
+  if (S.confirm) {
+    h += `<div class="confirm-overlay" data-action="confirm-dismiss">
+      <div class="confirm">
+        <p class="confirm__text">${S.confirm.text}</p>
+        <div class="confirm__actions">
+          <button class="confirm__btn" data-action="confirm-no">Cancel</button>
+          <button class="confirm__btn confirm__btn--danger" data-action="confirm-yes">Remove</button>
+        </div></div></div>`;
+  }
+  if (S.menu) {
+    h += `<div class="ctx-overlay" data-action="menu-close"></div>
+      <div class="ctx-menu" style="left:${S.menu.x}px;top:${S.menu.y}px">
+      ${S.menu.items.map((i) => `<button class="ctx-menu__item" data-action="${i.action}" data-name="${esc(S.menu.name)}">${i.label}</button>`).join('')}
+      </div>`;
+  }
+  if (S.guide) {
+    h += `<div class="guide-panel">
+      <h3>Folder pages — what to try</h3>
+      <ol>
+        <li><b>One set, two skins:</b> open <b>Metrics</b>, toggle Outline ⇄ Table. Same pages, same order.</li>
+        <li><b>Tag, tag, tag:</b> on a folder page's outline, type in the <b>+ Link a page…</b> row (try "Churn" on Meta Ads). Picking writes the membership onto <em>that page's</em> card — check its Folder pages row after.</li>
+        <li><b>Multi-membership:</b> Customer Acquisition Cost is in <b>Metrics</b> and <b>Meta Ads</b> — find it under both in the sidebar, with different columns in each table.</li>
+        <li><b>Two-way:</b> open <b>CAC</b> → its "Folder pages" chips add/remove the same memberships from the page side.</li>
+        <li><b>Ordering is presentation:</b> drag bullets on Metrics' outline. Order lives in the view; new pages append at the bottom.</li>
+        <li><b>Remove ≠ delete:</b> hover a bullet, hit ×. Confirm sheet; the page keeps its other homes or moves to Uncategorized.</li>
+        <li><b>No orphans:</b> see <b>Uncategorized</b> at the bottom of the sidebar; tag "Quarterly Planning Notes" somewhere and watch it leave.</li>
+        <li><b>Any page can grow up:</b> open <b>Campaign Structure</b> → ⋯ → <b>Turn into folder page</b>. It gets the chip, a contents block, and nests in the tree.</li>
+        <li><b>New from context:</b> + New on a folder page stamps membership; sub-bullets expand nested folder pages (Functions → 1 Lead Gen → 1.1 Cross-Channel).</li>
+        <li><b>Files tab:</b> the dumb bins, for contrast — location means nothing.</li>
+      </ol>
+      <p class="muted">Search/filter row intentionally omitted (locked separately — YAZ-739/750). Decisions doc: Linear YAZ-812. In-memory only; refresh resets.</p>
+    </div>`;
+  }
+  return h;
+}
+
+function render() {
+  el('app').innerHTML = sidebarHtml() + `<main class="editor"><div class="editor-host">${docHtml()}</div></main>`;
+  el('overlays').innerHTML = overlaysHtml();
+  wireAddInput();
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   PICKER — shared by the outline add-row and the properties "+ add".
+   Filters live without re-render (keeps input focus). [D4]
+   ════════════════════════════════════════════════════════════════════════ */
+function pickerCandidates(q, excludeFp) {
+  const needle = q.trim().toLowerCase();
+  const out = [];
+  for (const p of Object.values(P)) {
+    if (excludeFp && (p.name === excludeFp || p.memberships.includes(excludeFp))) continue;
+    if (!needle || p.name.toLowerCase().includes(needle)) out.push(p.name);
+  }
+  out.sort((a, b) => {
+    const ap = a.toLowerCase().startsWith(needle) ? 0 : 1;
+    const bp = b.toLowerCase().startsWith(needle) ? 0 : 1;
+    return ap - bp || a.localeCompare(b);
+  });
+  return out.slice(0, 8);
+}
+function renderPicker(slot, q, fpName, mode) {
+  // mode 'tag': add q-page to fpName. mode 'mem': add fpName(=picked fp) to page q? handled by caller.
+  const cands = mode === 'mem'
+    ? Object.values(P).filter((x) => x.isFolder && x.name !== q && !P[q].memberships.includes(x.name))
+        .map((x) => x.name).filter((n) => !slot.dataset.q || n.toLowerCase().includes(slot.dataset.q.toLowerCase())).slice(0, 8)
+    : pickerCandidates(q, fpName);
+  let h = '<div class="picker" style="top:26px;left:0">';
+  for (const c of cands) {
+    h += `<button class="picker__item" data-pick="${esc(c)}">${P[c].isFolder ? glyphSvg() : ''}${esc(c)}
+      <small>${mode === 'mem' ? 'folder page' : (P[c].isFolder ? 'folder page' : '')}</small></button>`;
+  }
+  if (mode !== 'mem' && q.trim() && !P[q.trim()]) {
+    h += `<button class="picker__item picker__create" data-pick-create="${esc(q.trim())}">+ Create "${esc(q.trim())}" here</button>`;
+  }
+  h += '</div>';
+  slot.innerHTML = cands.length || (mode !== 'mem' && q.trim() && !P[q.trim()]) ? h : '';
+}
+
+function wireAddInput() {
+  const input = el('ou-add-input');
+  if (!input) return;
+  const slot = el('ou-picker-slot');
+  const fpName = S.open;
+  input.addEventListener('input', () => renderPicker(slot, input.value, fpName, 'tag'));
+  input.addEventListener('focus', () => renderPicker(slot, input.value, fpName, 'tag'));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const first = slot.querySelector('[data-pick],[data-pick-create]');
+      if (first && first.dataset.pick) addMembership(first.dataset.pick, fpName);
+      else if (first && first.dataset.pickCreate) createPage(first.dataset.pickCreate, fpName);
+      else if (input.value.trim()) createPage(input.value.trim(), fpName);
+    }
+    if (e.key === 'Escape') { slot.innerHTML = ''; input.blur(); }
+  });
+  slot.addEventListener('mousedown', (e) => {
+    const pick = e.target.closest('[data-pick]');
+    const create = e.target.closest('[data-pick-create]');
+    if (pick) { addMembership(pick.dataset.pick, fpName); }
+    if (create) { createPage(create.dataset.pickCreate, fpName); }
+    e.preventDefault();
+  });
+}
+
+/* membership "+ add" picker on the properties panel [D11] */
+function openMemPicker(pageName, anchor) {
+  const slot = el('mem-picker-slot');
+  if (!slot) return;
+  slot.style.position = 'relative';
+  const input = document.createElement('input');
+  input.className = 'ou-add__input';
+  input.style.maxWidth = '160px';
+  input.placeholder = 'folder page…';
+  const pk = document.createElement('span');
+  slot.replaceChildren(input, pk);
+  const draw = () => {
+    slot.dataset.q = input.value;
+    pk.style.position = 'absolute';
+    renderPicker(pk, pageName, pageName, 'mem');
+  };
+  input.addEventListener('input', draw);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') render();
+    if (e.key === 'Enter') { const f = pk.querySelector('[data-pick]'); if (f) addMembership(pageName, f.dataset.pick); }
+  });
+  pk.addEventListener('mousedown', (e) => {
+    const pick = e.target.closest('[data-pick]');
+    if (pick) addMembership(pageName, pick.dataset.pick);
+    e.preventDefault();
+  });
+  input.focus();
+  draw();
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   EVENTS — one delegated handler; every action tagged in the DOM.
+   ════════════════════════════════════════════════════════════════════════ */
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-action]');
+  if (!t) return;
+  const a = t.dataset.action;
+
+  if (a === 'open') { S.open = t.dataset.name; if (P[S.open] && P[S.open].isFolder) S.expanded.add(S.open); render(); }
+  if (a === 'lens') { S.lens = t.dataset.lens; render(); }
+  if (a === 'tree-toggle') {
+    e.stopPropagation();
+    const n = t.dataset.name;
+    S.expanded.has(n) ? S.expanded.delete(n) : S.expanded.add(n);
+    render();
+  }
+  if (a === 'ou-toggle') {
+    const k = t.dataset.key;
+    S.ouExpanded.has(k) ? S.ouExpanded.delete(k) : S.ouExpanded.add(k);
+    render();
+  }
+  if (a === 'view') { P[S.open].view = t.dataset.view; render(); }   // [D3]
+
+  if (a === 'unmember') {           // [D4] explicit gesture + confirm — remove ≠ delete
+    e.stopPropagation();
+    const page = t.dataset.page, fp = t.dataset.fp;
+    const left = P[page].memberships.filter((m) => m !== fp);
+    S.confirm = {
+      text: `Remove <b>${esc(page)}</b> from <b>${esc(fp)}</b>?<br><br>
+        <span style="color:var(--fg-muted)">The page is not deleted — its file stays put. ${
+          left.length ? 'It remains in: ' + left.map(esc).join(', ') + '.' : 'It has no other folder pages, so it moves to <b>Uncategorized</b>.'}</span>`,
+      onYes: () => removeMembership(page, fp),
+    };
+    render();
+  }
+  if (a === 'confirm-yes') { const fn = S.confirm.onYes; S.confirm = null; fn(); }
+  if (a === 'confirm-no') { S.confirm = null; render(); }
+  if (a === 'confirm-dismiss' && e.target === t) { S.confirm = null; render(); }
+
+  if (a === 'fp-new') {             // [D4] New-from-context stamps membership
+    const fp = t.dataset.fp;
+    const name = prompt(`New page in "${fp}" — it will be created with folder_pages: [[${fp}]] stamped on its card:`);
+    if (name && name.trim()) { createPage(name.trim(), fp); S.open = name.trim(); render(); }
+  }
+  if (a === 'doc-menu') {           // [D9]
+    const r = t.getBoundingClientRect();
+    const p = P[t.dataset.name];
+    S.menu = {
+      x: Math.min(r.left, innerWidth - 200), y: r.bottom + 4, name: t.dataset.name,
+      items: p.isFolder
+        ? [{ label: 'Folder page ✓ (has a database view)', action: 'menu-close' }]
+        : [{ label: 'Turn into folder page', action: 'menu-fp' }],
+    };
+    render();
+  }
+  if (a === 'menu-fp') { const n = S.menu.name; S.menu = null; turnIntoFolderPage(n); }
+  if (a === 'menu-close') { S.menu = null; render(); }
+  if (a === 'mem-add') { openMemPicker(t.dataset.page, t); }
+  if (a === 'toggle-guide') { S.guide = !S.guide; render(); }
+});
+
+/* table cell editing [D4] — click a cell, edit, commit writes ONE card key */
+document.addEventListener('click', (e) => {
+  const td = e.target.closest('td[data-edit]');
+  if (!td || td.querySelector('input')) return;
+  const page = td.dataset.page, key = td.dataset.key;
+  const input = document.createElement('input');
+  input.className = 'cell-input';
+  input.value = P[page].props[key] || '';
+  td.replaceChildren(input);
+  input.focus();
+  const commit = () => { P[page].props[key] = input.value; render(); };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') input.blur();
+    if (ev.key === 'Escape') { input.removeEventListener('blur', commit); render(); }
+  });
+});
+
+/* inline property editing on the panel [D11] */
+document.addEventListener('click', (e) => {
+  const span = e.target.closest('.props__text');
+  if (!span) return;
+  const page = span.dataset.page, key = span.dataset.key;
+  const input = document.createElement('input');
+  input.className = 'props__input';
+  input.value = P[page].props[key] || '';
+  span.replaceWith(input);
+  input.focus();
+  const commit = () => { P[page].props[key] = input.value; render(); };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') input.blur();
+    if (ev.key === 'Escape') { input.removeEventListener('blur', commit); render(); }
+  });
+});
+
+/* drag-to-reorder the outline [D5] — updates the VIEW's order config only */
+document.addEventListener('dragstart', (e) => {
+  const row = e.target.closest('[data-drag]');
+  if (!row || !row.dataset.drag) return;
+  S.drag = row.dataset.drag;
+  e.dataTransfer.effectAllowed = 'move';
+});
+document.addEventListener('dragover', (e) => {
+  const row = e.target.closest('[data-drag]');
+  if (!row || !S.drag || row.dataset.drag === S.drag) return;
+  e.preventDefault();
+  document.querySelectorAll('.ou-row--drop-above,.ou-row--drop-below').forEach((r) =>
+    r.classList.remove('ou-row--drop-above', 'ou-row--drop-below'));
+  const rect = row.getBoundingClientRect();
+  row.classList.add(e.clientY < rect.top + rect.height / 2 ? 'ou-row--drop-above' : 'ou-row--drop-below');
+});
+document.addEventListener('drop', (e) => {
+  const row = e.target.closest('[data-drag]');
+  if (!row || !S.drag) return;
+  e.preventDefault();
+  const fp = P[S.open];
+  const list = orderedMembers(fp).filter((n) => n !== S.drag);
+  const rect = row.getBoundingClientRect();
+  const idx = list.indexOf(row.dataset.drag) + (e.clientY < rect.top + rect.height / 2 ? 0 : 1);
+  list.splice(idx, 0, S.drag);
+  fp.order = list;            // presentation only — no card changed [D5]
+  S.drag = null;
+  render();
+});
+document.addEventListener('dragend', () => {
+  S.drag = null;
+  document.querySelectorAll('.ou-row--drop-above,.ou-row--drop-below').forEach((r) =>
+    r.classList.remove('ou-row--drop-above', 'ou-row--drop-below'));
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && (S.confirm || S.menu)) { S.confirm = null; S.menu = null; render(); }
+});
+
+render();
+</script>

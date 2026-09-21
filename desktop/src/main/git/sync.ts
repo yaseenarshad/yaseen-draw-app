@@ -1,0 +1,186 @@
+import path from 'node:path'
+import type { GithubSyncStatus } from '@shared/types'
+import { detectRepo } from './detect'
+import { git, GIT_TIMEOUT_CODE, installGitHint, resolveGit, type GitResult } from './exec'
+
+/**
+ * One sync pass (YAZ-1081, 2B): everything "make this vault and its GitHub remote agree" means,
+ * as a single async function of a root that answers with a `GithubSyncStatus` and never throws.
+ *
+ * The order is fixed and load-bearing — commit, fetch, rebase, push:
+ *   - COMMIT FIRST so the rebase has a clean tree to move. Nothing here ever stashes; a stash is
+ *     a place work can be forgotten, and this app's promise is that the user's notes are always
+ *     on disk exactly as they left them.
+ *   - REBASE, never merge. Two machines editing different notes replay cleanly and the history
+ *     stays a line anyone can read in the GitHub UI.
+ *   - A rebase that CONFLICTS is aborted immediately (the lossless rule, YAZ-1081): git puts the
+ *     working tree back byte-for-byte and the pass reports `attention/conflict`. We would rather
+ *     stop and say so than leave a vault sitting in a half-finished rebase with `<<<<<<<` markers
+ *     inside the user's prose. Resolution is a later issue and a deliberate, visible act.
+ *
+ * Every failure is CLASSIFIED rather than thrown (`classifyGitFailure`), because the three kinds
+ * want three different responses: offline is not the user's problem (retry quietly), auth is
+ * (say so once), anything else is worth showing verbatim. `syncPass` is stateless — the cadence,
+ * the retries and the debounce all live in `manager.ts`.
+ */
+
+/** How many file names a commit subject lists before it summarises the rest. */
+const SUBJECT_FILES = 3
+
+/**
+ * The network budget of a flush pass (YAZ-1111): quitting must never sit out the full 30s wall,
+ * so the one network call a flush still makes — the push — gets this cap instead.
+ */
+const FLUSH_PUSH_TIMEOUT_MS = 5_000
+
+/**
+ * The commit subject for a sync commit: `sync: a.md, b.md, c.md +4 more`, or a bare `sync` when
+ * there is nothing to name. Basenames only — a subject is a glance, not an audit trail, and the
+ * full paths are in the diff. Nothing here is interpolated into a shell (see `exec.ts`), so a
+ * file called `; rm -rf ~` is just a boring string.
+ */
+export function commitMessage(dirtyFiles: readonly string[]): string {
+  const names = dirtyFiles.map((f) => path.basename(f)).filter((n) => n !== '')
+  if (names.length === 0) return 'sync'
+  const rest = names.length - SUBJECT_FILES
+  const head = names.slice(0, SUBJECT_FILES).join(', ')
+  return rest > 0 ? `sync: ${head} +${rest} more` : `sync: ${head}`
+}
+
+/**
+ * Auth is checked BEFORE offline (a deliberate ordering, not the list order): git wraps almost
+ * every remote failure — expired token included — in the generic `unable to access` /
+ * `Could not read from remote repository` envelope, so an offline-first check would file a dead
+ * SSH key as "no network" and retry it silently forever instead of telling the user to sign in.
+ * The auth needles are specific enough that a genuinely offline machine never matches them.
+ *
+ * `403` is matched on a word boundary so an abbreviated SHA like `1a403bc` in a push rejection
+ * cannot masquerade as an HTTP status.
+ */
+const AUTH_PATTERNS = [/authentication failed/i, /permission denied/i, /publickey/i, /could not read username/i, /terminal prompts disabled/i, /\b403\b/]
+
+const OFFLINE_PATTERNS = [/could not resolve host/i, /unable to access/i, /could not read from remote repository/i, /connection refused/i, /connection timed out/i, /network is unreachable/i]
+
+/** git's own way of saying "I don't know who you are" — the hint block names `user.name`. */
+const IDENTITY_PATTERNS = [/tell me who you are/i, /empty ident/i, /user\.name/i]
+
+/** A commit that had nothing staged after `add -A` (e.g. every dirty path was ignored) is not a failure. */
+const NOTHING_TO_COMMIT = /nothing to commit|no changes added/i
+
+/**
+ * Which of the three failure kinds a non-zero git run is. Pure and exported so the classification
+ * can be unit-tested against real git output without a network, which is the only way to test it
+ * honestly — you cannot make a CI box lose DNS on demand.
+ *
+ * A timeout counts as offline: `exec.ts` already fails fast on a credential prompt
+ * (`GIT_TERMINAL_PROMPT=0`), so a run that hits the 30 s wall is a stalled transfer, not a lock.
+ */
+export function classifyGitFailure(res: GitResult): 'offline' | 'auth' | 'other' {
+  if (res.code === GIT_TIMEOUT_CODE) return 'offline'
+  const text = `${res.stderr}\n${res.stdout}`
+  if (AUTH_PATTERNS.some((p) => p.test(text))) return 'auth'
+  if (OFFLINE_PATTERNS.some((p) => p.test(text))) return 'offline'
+  return 'other'
+}
+
+/**
+ * The one line worth showing a user out of a failed run: git's own `fatal:`/`error:` line when
+ * there is one, else the first non-blank line, else a bare exit code. Progress chatter and the
+ * four-line "make sure you have the correct access rights" epilogue are noise here.
+ */
+function firstMeaningfulLine(res: GitResult): string {
+  const lines = `${res.stderr}\n${res.stdout}`
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l !== '')
+  return lines.find((l) => /^(fatal|error):/i.test(l)) ?? lines[0] ?? `git exited ${res.code}`
+}
+
+type RepoRef = GithubSyncStatus['repo']
+
+/** offline → `pending` (the manager retries on its own clock); auth → say so; anything else → verbatim. */
+function fromFailure(root: string, repo: RepoRef, res: GitResult): GithubSyncStatus {
+  const message = firstMeaningfulLine(res)
+  const kind = classifyGitFailure(res)
+  if (kind === 'offline') return { root, state: 'pending', message, repo }
+  if (kind === 'auth') return { root, state: 'attention', attention: 'auth', message, repo }
+  return { root, state: 'attention', attention: 'error', message, repo }
+}
+
+/**
+ * `flush: true` is the quit variant (YAZ-1111): the commit — local and instant — always happens,
+ * but the fetch/rebase half is SKIPPED (we are leaving; rebasing now serves nobody, and the next
+ * open does it anyway) and the push gets a short cap instead of the 30s wall, so a half-dead
+ * network can never make quitting feel frozen. A push the remote rejects (it was ahead) is fine:
+ * the commit is safe locally and the next open rebases and pushes it.
+ */
+export async function syncPass(root: string, opts?: { candidates?: readonly string[]; flush?: boolean }): Promise<GithubSyncStatus> {
+  // No git binary is a CLASSIFICATION, never an exception: a Mac without the Command Line Tools
+  // or a PC without Git for Windows is an ordinary machine, and the app must be able to say
+  // "install it" (`installGitHint`, per OS) rather than crash a pass.
+  const bin = await resolveGit(opts?.candidates)
+  if (bin === null) {
+    return { root, state: 'attention', attention: 'no-git', message: installGitHint() }
+  }
+
+  const facts = await detectRepo(bin, root)
+  const repo: RepoRef = { remoteUrl: facts.remoteUrl, branch: facts.branch }
+  // Not a repo, or a repo nobody wired to GitHub: `off`, not an error. This is the resting state
+  // of every vault that has never been set up, and the settings panel still gets the facts.
+  if (!facts.isRepo || facts.remoteUrl === null) return { root, state: 'off', repo }
+
+  // ---------- 1. local edits become one commit ----------
+  if (facts.dirty) {
+    const staged = await git(bin, root, ['add', '-A'])
+    if (staged.code !== 0) return fromFailure(root, repo, staged)
+    const committed = await git(bin, root, ['commit', '-m', commitMessage(facts.dirtyFiles)])
+    if (committed.code !== 0 && !NOTHING_TO_COMMIT.test(`${committed.stdout}\n${committed.stderr}`)) {
+      // A machine with no `user.name`/`user.email` cannot commit at all, and no amount of retrying
+      // changes that — it is a one-time setup step, so it gets its own attention state.
+      if (IDENTITY_PATTERNS.some((p) => p.test(`${committed.stderr}\n${committed.stdout}`))) {
+        return { root, state: 'attention', attention: 'no-identity', message: 'git has no name or email configured for this machine', repo }
+      }
+      return { root, state: 'attention', attention: 'error', message: firstMeaningfulLine(committed), repo }
+    }
+  }
+
+  // ---------- 2. learn what the remote has (skipped on flush — see the doc comment) ----------
+  const flush = opts?.flush === true
+  if (!flush) {
+    const fetched = await git(bin, root, ['fetch', 'origin'])
+    if (fetched.code !== 0) return fromFailure(root, repo, fetched)
+  }
+
+  // `--left-right --count @{u}...HEAD` prints "<behind>\t<ahead>" in one call. The command FAILING
+  // is itself the answer to a different question: a branch with no upstream (never pushed), which
+  // has nothing to rebase onto and everything to push.
+  const counts = await git(bin, root, ['rev-list', '--left-right', '--count', '@{u}...HEAD'])
+  const hasUpstream = counts.code === 0
+  let behind = 0
+  let ahead = 1 // no upstream ⇒ treat the branch as unpushed
+  if (hasUpstream) {
+    const [b = '', a = ''] = counts.stdout.trim().split(/\s+/)
+    behind = Number.parseInt(b, 10) || 0
+    ahead = Number.parseInt(a, 10) || 0
+  }
+
+  // ---------- 3. replay our commits on top of theirs (never a merge, never a stash) ----------
+  if (behind > 0 && !flush) {
+    const rebased = await git(bin, root, ['rebase', '@{u}'])
+    if (rebased.code !== 0) {
+      // The lossless rule. `--abort` restores the pre-rebase tree AND HEAD; its own exit code is
+      // ignored on purpose — if even the abort failed there is nothing further this pass can do,
+      // and `attention/conflict` is still the right thing to put in front of the user.
+      await git(bin, root, ['rebase', '--abort'])
+      return { root, state: 'attention', attention: 'conflict', message: 'the same lines changed on two machines — nothing was lost, but this needs a human', repo }
+    }
+  }
+
+  // ---------- 4. publish ----------
+  if (ahead > 0) {
+    const pushed = await git(bin, root, hasUpstream ? ['push'] : ['push', '-u', 'origin', 'HEAD'], flush ? { timeoutMs: FLUSH_PUSH_TIMEOUT_MS } : {})
+    if (pushed.code !== 0) return fromFailure(root, repo, pushed)
+  }
+
+  return { root, state: 'synced', repo }
+}

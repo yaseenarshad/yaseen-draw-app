@@ -1,0 +1,103 @@
+/* CMD+F (YAZ-968 engine, YAZ-969 bar): the highlight tokens and the bar's own pill.
+
+   The highlights are inline decorations findInPage.ts paints on the matches; the tokens live on
+   :root beside app.css's palette and swap under [data-theme='dark'] the same way — dimmer there,
+   so the text under a wash of yellow stays readable on a near-black surface. */
+:root {
+  --find-match-bg: rgba(255, 213, 0, 0.35);
+  --find-match-active-bg: #ffd400;
+}
+
+[data-theme='dark'] {
+  --find-match-bg: rgba(255, 213, 0, 0.22);
+  --find-match-active-bg: #e6bf00;
+}
+
+.find-match {
+  background: var(--find-match-bg);
+  border-radius: 2px;
+}
+
+/* The active match is solid, so its text carries its own dark colour in BOTH themes. */
+.find-match--active {
+  background: var(--find-match-active-bg);
+  color: #1f1f1f;
+}
+
+/* A zero-height dock keeps the floating bar out of document flow. Notes anchor to their page;
+   outlines stick to their outer editor scroller so the bar follows the reader through the view. */
+.find-bar-dock {
+  z-index: 3;
+  height: 0;
+  pointer-events: none;
+}
+
+.find-bar-dock--note {
+  position: absolute;
+  top: 8px;
+  right: 0;
+  left: 0;
+}
+
+.find-bar-dock--outline {
+  position: sticky;
+  top: 8px;
+}
+
+.find-bar {
+  position: absolute;
+  top: 0;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 4px 3px 10px;
+  font-size: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  pointer-events: auto;
+}
+
+.find-bar__input {
+  width: 150px;
+  padding: 2px 0;
+  font: inherit;
+  color: var(--fg);
+  background: none;
+  border: 0;
+  outline: none;
+}
+
+.find-bar__count {
+  flex: none;
+  padding: 0 6px;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.find-bar__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: var(--fg-muted);
+  border-radius: 5px;
+}
+
+.find-bar__btn:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+.find-bar__btn--prev svg {
+  transform: rotate(180deg);
+}
+
+.find-bar__btn--close {
+  font-size: 15px;
+  line-height: 1;
+}

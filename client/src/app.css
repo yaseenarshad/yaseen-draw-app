@@ -1,0 +1,2005 @@
+:root {
+  --bg: #ffffff;
+  --bg-side: #f6f6f7;
+  --fg: #1f1f1f;
+  --fg-muted: #7a7a7a;
+  --border: #e4e4e7;
+  --accent: #5b6cff;
+  --accent-soft: #eef0ff;
+  /* A voice that is not yours (a comment carrying `by`, YAZ-1472): violet, so it never reads as the accent. */
+  --agent: #7c3aed;
+  --agent-soft: #f1eaff;
+  --danger: #d64545;
+  --warn: #c98a1a;
+  --ok: #3a9d5d;
+  /* Hover washes on the sidebar chrome (header/cog) and on tree rows. */
+  --bg-hover: #eeeef0;
+  --bg-hover-row: #e9e9ec;
+  /* Directory rows in the tree: a touch softer than --fg. */
+  --fg-dir: #444444;
+  --reveal-bg: #ffe36e;
+  --reveal-fg: #2d2500;
+  /* `==highlight==` wash (YAZ-1480): translucent, so text colour and selection show through in both themes. */
+  --mark-bg: rgba(255, 213, 0, 0.4);
+  --mark-bg-green: rgba(80, 200, 120, 0.35);
+  --mark-bg-blue: rgba(80, 160, 255, 0.35);
+  --mark-bg-pink: rgba(255, 120, 180, 0.35);
+  /* Amber notice family: conflict bar + rename banner — the two that ask for a decision. (The
+     link-notice toast left it for the context menu's surface tokens, YAZ-1674: it confirms as
+     often as it warns.) */
+  --notice-fg: #6b4e00;
+  --notice-bg: #fff7df;
+  --notice-border: #f1e2ad;
+  --notice-btn-border: #e2cf8a;
+  --notice-btn-bg: #fffdf5;
+  --notice-btn-bg-hover: #ffffff;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+}
+
+/* Dark palette (Desktop K, GRO-2218): the SAME tokens, near-black surfaces. App.tsx resolves the
+   Appearance setting (System follows the OS live) and stamps data-theme="light"|"dark" on <html>;
+   the Crepe frame vars swap alongside (editor/crepeTheme.ts). WINDOW_BG in
+   desktop/src/main/theme.ts mirrors --bg — change one, change both. */
+[data-theme='dark'] {
+  --bg: #1e1e1e;
+  --bg-side: #262626;
+  --fg: #dadada;
+  --fg-muted: #8f8f8f;
+  --border: #3a3a3a;
+  --accent: #7c8aff;
+  --accent-soft: #2c3050;
+  --agent: #a78bfa;
+  --agent-soft: #2e2547;
+  --danger: #e06c6c;
+  --warn: #d9a13c;
+  --ok: #4fb573;
+  --bg-hover: #333336;
+  --bg-hover-row: #303034;
+  --fg-dir: #b8b8bd;
+  --reveal-bg: #d9b72a;
+  --reveal-fg: #1e1900;
+  --notice-fg: #e6c878;
+  --notice-bg: #3a300f;
+  --notice-border: #5c4d1d;
+  --notice-btn-border: #6a5a24;
+  --notice-btn-bg: #45390f;
+  --notice-btn-bg-hover: #52431c;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.app {
+  --content-max-width: 1040px;
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+.app[data-content-width='medium'] {
+  --content-max-width: 1440px;
+}
+
+.app[data-content-width='full'] {
+  --content-max-width: none;
+}
+
+/* ---------- editor ---------- */
+
+.editor {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* The note's scroller. Stacked blocks live inside it: `.page-header` (block ZERO since YAZ-918 —
+   ⚡ YAZ-888's title and ⚡ YAZ-883's properties panel sharing one row), `.editor-mount`, where
+   CrepeHost appends its `.editor-instance`, and — for markdown files — the folder page's
+   contents block and the "Linked mentions" section (Links D, GRO-2193; styled by
+   links/backlinks.css), all of which therefore scroll WITH the note. */
+.editor-host {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* Optional sideways slack under zoom (YAZ-1710 D15): the page still reflows on screen, but a
+     zero-height runner wider than the scroller adds blank room on the right so the view can be
+     dragged left when deep bullets drift right. `--zoom-slack` is MEASURED by Editor.tsx — how far
+     the deepest bullet moved because of the zoom — so a full drag parks it where it sits at 100%
+     and never further; 0 at 100% and for a note with no bullets. */
+  overflow-x: auto;
+  /* The page's ONE tail (YAZ-1680): the blocks below the note stack flush, and whichever is last
+     still ends 64px above the bottom — each block used to carry this itself, so every pair of
+     blocks sat 64px apart. */
+  padding-bottom: 64px;
+}
+
+.editor-host::after {
+  content: '';
+  display: block;
+  height: 0;
+  width: calc(100% + var(--zoom-slack, 0px));
+}
+
+/* Document zoom lives on the CONTENT, never on a shell (YAZ-1710 D14). The scroller carries the
+   number as `--document-zoom`; every block's column shell (max-width / margin auto / 48px gutter)
+   stays in unzoomed px so the five blocks keep one aligned column, and only what is inside a shell
+   scales. The body is the special case: Crepe appends its floating chrome (toolbar, slash menu,
+   link tooltip, block handle) beside `.ProseMirror` inside `.milkdown`, so the zoom sits on the
+   ProseMirror node itself and that chrome stays at 100% — floating-ui then positions it in
+   unzoomed space, which is the only space it gets right. The properties panel is `display: contents`
+   and is NOT listed a second time: zoom propagates through its computed style to its pieces, so a
+   second rule on those pieces zoomed the chip twice (6B1). */
+.editor-host > :not(.editor-mount) > *,
+.editor-instance .milkdown > .ProseMirror {
+  zoom: var(--document-zoom, 1);
+}
+
+/* The header ROW (YAZ-918): ⚡ YAZ-888's title and ⚡ YAZ-883's properties panel share one line —
+   the row owns the content column both blocks used to declare for themselves. The panel
+   DISSOLVES into the row (display: contents): its header becomes a chevron+count chip at the
+   row's right edge, and its expanded body wraps onto its own full-width line UNDER the title —
+   opening exactly where the old stacked panel lived, from a trigger that lives on the right. */
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 24px;
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 8px 48px 0;
+}
+
+/* The title item (⚡ YAZ-888, at the editor's own h1 scale — GRO-2009): GROWS to fill the row
+   (the chip's margin-left: auto still parks it at the right edge), so the rename field —
+   width: 100% of this box — keeps the title's full breadth while editing. The 16px base, not
+   the app's 14px, lands the em scale on exactly the size the note's own `# H1` renders at. */
+.page-header .page-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 16px;
+}
+
+.page-header .frontmatter-panel {
+  display: contents;
+}
+
+.page-header .frontmatter-panel__header {
+  margin-left: auto;
+}
+
+.page-header .frontmatter-panel__body {
+  flex: 1 1 100%;
+}
+
+.page-header .frontmatter-panel__count {
+  font-size: 12px;
+}
+
+/* Folder pages (YAZ-919): the outline IS the document — the body editor above it is gone.
+   Title, then contents, nothing else. (The divider this rule used to cancel is gone at the
+   source since YAZ-1680: no block under a note draws a hairline.) */
+.editor-host:has(.folder-page-contents) .editor-mount {
+  display: none;
+}
+
+.page-title__text {
+  margin: 0;
+  padding: 2px 4px;
+  margin-left: -4px;
+  /* The hover wash hugs the words (YAZ-918), not the row the flex header hands the title. */
+  width: fit-content;
+  max-width: 100%;
+  font-size: 1.802em;
+  font-weight: 700;
+  line-height: 1.3;
+  border-radius: 4px;
+  cursor: text;
+}
+
+/* A wash on hover says "this is editable" without a control of its own; Home has no such offer. */
+.page-title__text:hover {
+  background: var(--bg-hover);
+}
+
+.page-title__text--home:hover {
+  background: none;
+  cursor: default;
+}
+
+.page-title__input {
+  width: 100%;
+  padding: 2px 4px;
+  margin-left: -4px;
+  font-family: inherit;
+  font-size: 1.802em;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  outline: none;
+  /* A textarea now (YAZ-918): wraps like the rendered title and grows to fit — no scrollbar,
+     no drag handle, no sideways tunnel. */
+  display: block;
+  field-sizing: content;
+  resize: none;
+  overflow: hidden;
+}
+
+/* The properties panel (⚡ YAZ-883, folded into the header row by YAZ-918): its box dissolved
+   (`display: contents` above), so only its PIECES carry styles now. Collapsed it is one small
+   muted chip — chevron + properties glyph + bare count, the words in its tooltip (YAZ-1758) —
+   deliberately SUBORDINATE to the title beside it, since most pages have nothing to say here.
+   Header affordance is the backlinks / view-group chevron, rotated -90° while collapsed.
+   Expanded it is TYPED ROWS by default (⚡ YAZ-884) with the raw textarea as the fallback
+   under them. */
+.frontmatter-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.frontmatter-panel__header:hover {
+  color: var(--fg);
+}
+
+.frontmatter-panel__chevron {
+  flex: none;
+  transition: transform 120ms ease;
+}
+
+.frontmatter-panel__header[aria-expanded='false'] .frontmatter-panel__chevron {
+  transform: rotate(-90deg);
+}
+
+/* The bare count rides along plain beside the glyph (YAZ-1758); the words are the tooltip's. */
+.frontmatter-panel__count {
+  font-weight: 400;
+}
+
+.frontmatter-panel__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0 0 20px;
+}
+
+/* The property search (YAZ-1473): the views' own box, one full-width line above the rows. */
+.frontmatter-panel__body > .column-search,
+.frontmatter-panel__body > .column-search__empty {
+  align-self: stretch;
+}
+.frontmatter-panel__body > .column-search {
+  padding: 5px 9px;
+  font-size: 13px;
+}
+
+/* Typed rows (⚡ YAZ-884), the DEFAULT expanded view: one line per key, the name in a fixed
+   column so the values line up, everything else riding at the end of the row. Deliberately
+   flat — this is a list of properties, not a table. */
+.frontmatter-panel__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.frontmatter-panel__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 34px;
+  font-size: 13px;
+}
+
+.frontmatter-panel__key {
+  flex: none;
+  width: min(180px, 38%);
+  padding: 6px 5px;
+  box-sizing: border-box;
+  overflow: hidden;
+  color: var(--fg-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.frontmatter-panel__value {
+  min-height: 32px;
+  padding: 2px 0;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* The read-only marker: a row with no editor says WHY, and points at the mode that can hold it. */
+.frontmatter-panel__chip {
+  flex: none;
+  padding: 0 5px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.frontmatter-panel__new,
+.frontmatter-panel__footer {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.frontmatter-panel__name {
+  width: 150px;
+}
+
+/* Raw YAML is code: monospace, so indentation reads as the structure it is. */
+.frontmatter-panel__text {
+  width: 100%;
+  min-height: 92px;
+  padding: 8px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fg);
+  background: var(--bg-side);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  resize: vertical;
+}
+
+.frontmatter-panel__text:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.frontmatter-panel__error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.frontmatter-panel__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.frontmatter-panel__btn {
+  padding: 3px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+.frontmatter-panel__btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.frontmatter-panel__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Content column: centred, wide on large windows, fills the host on narrow ones (GRO-2007). */
+.editor-instance {
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  /* No lead-in of its own (YAZ-918): the properties panel left this slot for the title row, so
+     the gap under the title is ProseMirror's 16px + the first paragraph's 4px — nothing more. */
+  padding: 0 48px 120px;
+}
+
+/* A folder page's body is a short preamble between Properties and its contents block — not a
+   document with an end (YAZ-909, tightened by YAZ-917): the column's 32px lead-in and 120px tail
+   collapse to ZERO, and so does ProseMirror's 16px halo below — the paragraph's own 4px rhythm is
+   all the air a preamble needs. Ordinary notes keep everything. */
+.editor-host:has(.folder-page-contents) .editor-mount > .editor-instance {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.editor-host:has(.folder-page-contents) .editor-mount .milkdown .ProseMirror {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.editor-instance .milkdown {
+  --crepe-color-background: transparent;
+}
+
+/* Obsidian default typography (GRO-2009): system font stack, 16px / 1.5 body, Obsidian heading scale.
+   Overrides Crepe's frame theme (Rubik/Noto Serif → serif fallback) via its own custom properties.
+   Line height and block gap come from the settings panel via App's CSS vars (GRO-2024). */
+.editor-instance .milkdown {
+  --crepe-base-font-size: 16px;
+  --crepe-font-default: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --crepe-font-title: var(--crepe-font-default);
+  --crepe-font-code: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  line-height: var(--edit-line-height, 1.5);
+}
+
+/* Highlight mark (YAZ-1480): `==text==` → <mark>. Every Crepe surface (editor, hover preview, outline), not just the main editor. */
+.milkdown .ProseMirror mark {
+  background: var(--mark-bg);
+  color: inherit;
+}
+.milkdown .ProseMirror mark.highlight-green { background: var(--mark-bg-green); }
+.milkdown .ProseMirror mark.highlight-blue { background: var(--mark-bg-blue); }
+.milkdown .ProseMirror mark.highlight-pink { background: var(--mark-bg-pink); }
+
+/* A lit swatch (🔒 D5) reads as a pressed button, one step darker than hover — the dot's fill IS its colour,
+   so Crepe's "active = primary-coloured icon" cue only reached the 0.35-opacity outline and was too easy to miss. */
+.milkdown .milkdown-toolbar .toolbar-item.active[data-toolbar-item^='highlight'] {
+  background: var(--crepe-color-selected);
+}
+
+/* Crepe's reset gives paragraphs line-height 1.5 and 4px vertical padding; the padding is
+   what reads as "space between blocks" (lists included — each bullet's text is a paragraph). */
+.editor-instance .milkdown .ProseMirror p {
+  line-height: var(--edit-line-height, 1.5);
+  padding: var(--edit-block-gap, 4px) 0;
+}
+
+.editor-instance .milkdown .ProseMirror h1,
+.editor-instance .milkdown .ProseMirror h2,
+.editor-instance .milkdown .ProseMirror h3,
+.editor-instance .milkdown .ProseMirror h4,
+.editor-instance .milkdown .ProseMirror h5,
+.editor-instance .milkdown .ProseMirror h6 {
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* Heading margins scale with the block-gap setting (GRO-2071): Crepe's stock margins
+   (32/28/24/20/16/16px) are exactly 8/7/6/5/4/4 × the 4px default gap, so the Default
+   preset is pixel-identical to Crepe. bullets.css derives its heading-row label offsets
+   from the same calc — change one, change both. */
+.editor-instance .milkdown .ProseMirror h1 {
+  font-size: 1.802em;
+  font-weight: 700;
+  margin-top: calc(var(--edit-block-gap, 4px) * 8);
+}
+
+/* A heading BETWEEN blocks earns its lead-in; the document's FIRST block does not (YAZ-918,
+   selector fixed twice in YAZ-932 — probe-verified) — it sits on the title row's own gap,
+   exactly like a first paragraph. The outline editor wraps its blocks in `.content-dom`,
+   so both the direct note block and the wrapped outline block are covered. */
+.editor-instance .milkdown .ProseMirror > :first-child,
+.editor-instance .milkdown .ProseMirror > .content-dom > :first-child {
+  margin-top: 0;
+}
+
+.editor-instance .milkdown .ProseMirror h2 {
+  font-size: 1.602em;
+  margin-top: calc(var(--edit-block-gap, 4px) * 7);
+}
+
+.editor-instance .milkdown .ProseMirror h3 {
+  font-size: 1.424em;
+  margin-top: calc(var(--edit-block-gap, 4px) * 6);
+}
+
+.editor-instance .milkdown .ProseMirror h4 {
+  font-size: 1.266em;
+  margin-top: calc(var(--edit-block-gap, 4px) * 5);
+}
+
+.editor-instance .milkdown .ProseMirror h5 {
+  font-size: 1.125em;
+  margin-top: calc(var(--edit-block-gap, 4px) * 4);
+}
+
+.editor-instance .milkdown .ProseMirror h6 {
+  font-size: 1em;
+  margin-top: calc(var(--edit-block-gap, 4px) * 4);
+}
+
+/* Inside a bullet a heading is an outline row, not a document section (GRO-2071, Roam model):
+   uniform rhythm — the same gap padding as any block, no extra margin. The document-rhythm
+   margins above only apply to headings outside lists. bullets.css heading-row label sizes
+   mirror this padding — change one, change both. */
+.editor-instance .milkdown .ProseMirror li h1,
+.editor-instance .milkdown .ProseMirror li h2,
+.editor-instance .milkdown .ProseMirror li h3,
+.editor-instance .milkdown .ProseMirror li h4,
+.editor-instance .milkdown .ProseMirror li h5,
+.editor-instance .milkdown .ProseMirror li h6 {
+  margin-top: 0;
+  padding: var(--edit-block-gap, 4px) 0;
+}
+
+/* Crepe's reset pads `.milkdown .ProseMirror` by 60px 120px; the column above owns the gutters.
+   overflow must stay visible (GRO-2078): a TOP-LEVEL item's fold chevron (`.outline-toggle`,
+   left: -18px) hangs outside the ProseMirror box — `overflow: hidden` clipped it into an
+   invisible, unclickable ghost, stranding any folded top-level bullet. Wide blocks are already
+   contained per-block (tables/code below), so nothing else needs the clip. */
+.editor-instance .milkdown .ProseMirror {
+  padding: 16px 0;
+  overflow: visible;
+}
+
+/* Wide blocks scroll inside the column instead of widening it. */
+.editor-instance .milkdown .milkdown-table-block,
+.editor-instance .milkdown .milkdown-code-block {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* The block handle's plus is noise — Enter at line end does the same (GRO-2025).
+   First .operation-item is the plus, last is the 6-dot drag handle (Crepe renders exactly two). */
+.editor-instance .milkdown .milkdown-block-handle .operation-item:first-child {
+  display: none;
+}
+
+/* Over a guide-line strip or a fold chevron the handle yields (GRO-2081, blockHandleGate.ts):
+   pointer-events off so the click lands on the affordance beneath. */
+.editor-instance .milkdown .milkdown-block-handle.mdapp-handle-muted {
+  pointer-events: none;
+  opacity: 0 !important;
+}
+
+.editor-msg {
+  margin: 48px auto;
+  color: var(--fg-muted);
+  text-align: center;
+}
+
+.editor-msg--error {
+  color: var(--danger);
+}
+
+/* ---------- welcome (C2, GRO-2164): shown while this window has no folder ---------- */
+
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: min(440px, 90%);
+  margin: auto;
+  padding-bottom: 8vh;
+}
+
+.welcome__title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.welcome__empty {
+  margin: 0;
+  color: var(--fg-muted);
+}
+
+.welcome__recents {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* One recent folder: name + last-opened on the first line, full path beneath. */
+.welcome__recent {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1px 12px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  text-align: left;
+}
+
+.welcome__recent:hover:not(:disabled) {
+  background: var(--bg-side);
+}
+
+.welcome__recent:disabled {
+  cursor: default;
+}
+
+.welcome__recent-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.welcome__recent-when {
+  align-self: center;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.welcome__recent-when--missing {
+  color: var(--danger);
+}
+
+.welcome__recent-path {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- status chips: sync (YAZ-1081 D5) then save, top-right of the editor ---------- */
+
+/* Reserve a fixed-size row so document magnification cannot overlap its controls. */
+.status-chips {
+  position: relative;
+  min-height: 34px;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  padding: 5px 16px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---------- save indicator ---------- */
+
+.save-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  user-select: none;
+}
+
+.save-indicator__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.save-indicator--unsaved .save-indicator__dot {
+  background: var(--warn);
+}
+
+.save-indicator--saving .save-indicator__dot {
+  background: var(--accent);
+  animation: pulse 0.9s ease-in-out infinite;
+}
+
+.save-indicator--error {
+  color: var(--danger);
+}
+
+.save-indicator--error .save-indicator__dot {
+  background: var(--danger);
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* ---------- sync indicator (YAZ-1081 3A) ----------
+   The save chip's dot-plus-label idiom and tokens, but a real <button>: the chip IS the
+   one-click sync, so status and action are the same affordance. Button reset first — the
+   default border/background/font would break the row it shares with SaveIndicator. */
+
+.sync-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--fg-muted);
+  user-select: none;
+  cursor: pointer;
+}
+
+.sync-indicator:hover {
+  color: var(--fg);
+}
+
+.sync-indicator:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.sync-indicator__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.sync-indicator--pending .sync-indicator__dot {
+  background: var(--warn);
+}
+
+.sync-indicator--syncing .sync-indicator__dot {
+  background: var(--accent);
+  animation: pulse 0.9s ease-in-out infinite;
+}
+
+.sync-indicator--attention {
+  color: var(--danger);
+}
+
+.sync-indicator--attention .sync-indicator__dot {
+  background: var(--danger);
+}
+
+/* Off is not a failure — it is a vault nobody switched on; it reads as quiet, not broken. */
+.sync-indicator--off {
+  opacity: 0.6;
+}
+
+.sync-indicator--off .sync-indicator__dot {
+  background: var(--fg-muted);
+}
+
+/* ---------- conflict bar ---------- */
+
+.conflict-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--notice-fg);
+  background: var(--notice-bg);
+  border-bottom: 1px solid var(--notice-border);
+}
+
+.conflict-bar button {
+  padding: 3px 10px;
+  border: 1px solid var(--notice-btn-border);
+  border-radius: 4px;
+  background: var(--notice-btn-bg);
+}
+
+.conflict-bar button:hover {
+  background: var(--notice-btn-bg-hover);
+}
+
+/* ---------- link notice (E1): the window's one passive toast, self-dismissing ----------
+   BOTTOM-LEFT since YAZ-1674 (D10), in the context menu's own language — surface, border,
+   radius, shadow — instead of the amber warning family: it confirms as often as it warns
+   ("Copied path", "Pasted 2 items"), and a warning-coloured "yes" read wrong. The rename banner and the
+   conflict bar keep amber: they ask for a decision. The tokens swap with the theme. */
+
+.link-notice {
+  position: fixed;
+  left: 16px;
+  /* Above the sidebar footer (the settings button) at any window height — its own variable, see `.sidebar__footer`. */
+  bottom: calc(var(--sidebar-footer-h) + 12px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 360px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  animation: link-notice-in 120ms ease-out both;
+}
+
+/* The glyph (D10 amended): 16px, `currentColor`, never shrinks against a long line. */
+.link-notice__icon {
+  flex: none;
+  opacity: 0.8;
+}
+
+/* The text is its own box so a long line ellipsises — on the flex container it never would. */
+.link-notice__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes link-notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- external-rename banner (Links E1c, GRO-2242): the passive confirm-first bar ----------
+   The amber top-center toast (the link-notice's OLD idiom — that one moved bottom-left, YAZ-1674)
+   with two actions; it lingers until Update/Dismiss. */
+
+.rename-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 49;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 80vw;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--notice-fg);
+  background: var(--notice-bg);
+  border: 1px solid var(--notice-border);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
+}
+
+.rename-banner__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rename-banner code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.rename-banner button {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--notice-btn-border);
+  border-radius: 4px;
+  background: var(--notice-btn-bg);
+}
+
+.rename-banner button:hover {
+  background: var(--notice-btn-bg-hover);
+}
+
+/* ---------- sync attention banner (YAZ-1081 3B) ----------
+   The rename-banner idiom exactly — same amber toast, same explicit buttons, never a modal.
+   It sits lowest of the three: sync is the least urgent thing on screen, and the note the
+   user is actually looking at is untouched by it. */
+
+.sync-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 48;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 80vw;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--notice-fg);
+  background: var(--notice-bg);
+  border: 1px solid var(--notice-border);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
+}
+
+/* The reason can run long (an `error` carries git's own message), so this one wraps rather
+   than ellipsing — a truncated explanation is worse than a two-line banner. */
+.sync-banner__text {
+  min-width: 0;
+}
+
+.sync-banner button {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--notice-btn-border);
+  border-radius: 4px;
+  background: var(--notice-btn-bg);
+}
+
+.sync-banner button:hover {
+  background: var(--notice-btn-bg-hover);
+}
+
+/* The rename banner above pushes this one down (the notice lives bottom-left since YAZ-1674, so it never stacks here). */
+.rename-banner ~ .sync-banner {
+  top: 48px;
+}
+
+/* ---------- sidebar ---------- */
+
+/* --side-w is stamped on .app from AppState.sidebarWidth (YAZ-738). */
+.sidebar {
+  width: var(--side-w);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-side);
+  border-right: 1px solid var(--border);
+  user-select: none;
+}
+
+/* The drag-to-resize edge (YAZ-738): sits over the sidebar's border, hit area wider than the line. */
+.sidebar-resize {
+  flex: none;
+  width: 6px;
+  margin-left: -3px;
+  cursor: col-resize;
+  z-index: 1;
+}
+
+.sidebar-resize:hover,
+.sidebar-resize--active {
+  background: var(--accent-soft);
+}
+
+.sidebar__header {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar__root {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 4px 10px 14px;
+  text-align: left;
+}
+
+.sidebar__root:hover {
+  background: var(--bg-hover);
+}
+
+.sidebar__root:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* Collapse (in the header) and reopen (floating, GRO-2023) share the panel icon. */
+.sidebar__collapse {
+  flex: none;
+  padding: 0 10px;
+  color: var(--fg-muted);
+}
+
+.sidebar__collapse:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+.sidebar__root-name {
+  font-weight: 600;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The switcher's chevron (YAZ-1767 D6): Octicons triangle-down — the one GitHub Desktop's repository
+   button wears — pointing up while the panel is open; one line, so the header keeps its height. */
+.sidebar__root-hint {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  color: var(--fg-muted);
+}
+
+/* ---------- the vault switcher panel (YAZ-1767) ---------- */
+
+/* The rows: the Welcome recent-row idiom (name left, relative time right, path below), at
+   GitHub Desktop's density. `aria-current` marks the vault this window is on (D3); `--active`
+   is the ONE keyboard/hover highlight (D7) — kept separate so both can show on the same row. */
+.vault-switcher__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1px 12px;
+  width: 100%;
+  padding: 8px 14px;
+  text-align: left;
+  font-size: 13px;
+}
+
+.vault-switcher__row[aria-current='true'] {
+  background: var(--accent-soft);
+}
+
+.vault-switcher__row--active:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.vault-switcher__row--active[aria-current='true'] {
+  background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.vault-switcher__row:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.vault-switcher__name {
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vault-switcher__when {
+  align-self: center;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+/* A dead folder (D5): the same danger colour Welcome's rows use. */
+.vault-switcher__when--missing {
+  color: var(--danger);
+}
+
+.vault-switcher__path {
+  grid-column: 1 / -1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vault-switcher__empty {
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+/* "Open folder…" (D4): the LAST row, under a hairline, a single line. */
+.vault-switcher__open {
+  display: block;
+  border-top: 1px solid var(--border);
+}
+
+/* The filter (D7): first in the panel, a hairline below it, pinned while the rows scroll. */
+.vault-switcher__filter {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  padding: 8px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.vault-switcher__filter::placeholder {
+  color: var(--fg-muted);
+}
+
+/* Lens tabs (YAZ-847) — chrome v2 ROW 1, between the header and the search bar: Topics ⇄ Files.
+   The ViewsPane tab idiom (`.view-tab`, views.css): a transparent 2px bottom border on every tab,
+   accent on the active one, pulled down over the row's own hairline so the two read as one line. */
+.sidebar__lenses {
+  flex: none;
+  display: flex;
+  gap: 2px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar__lens {
+  padding: 5px 10px 6px;
+  margin-bottom: -1px;
+  font-size: 12.5px;
+  color: var(--fg-muted);
+  border-bottom: 2px solid transparent;
+}
+
+.sidebar__lens:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+  border-radius: 4px 4px 0 0;
+}
+
+.sidebar__lens--active,
+.sidebar__lens--active:hover {
+  color: var(--fg);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+/* The Favorites tab is a heart, not a word (YAZ-1766 D1): sized to the text tabs' cap height,
+   stroked while idle and filled while active so the underline is not the only tell. */
+.sidebar__lens--glyph {
+  display: inline-flex;
+  align-items: center;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.sidebar__lens--active .heart-icon {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+
+/* Expand / collapse all (YAZ-862) — the header collapse button's icon look, pushed to the far
+   end of the lens row so it reads as chrome and not as a third tab. */
+.sidebar__expand-all {
+  flex: none;
+  margin-left: auto;
+  padding: 0 8px;
+  color: var(--fg-muted);
+}
+
+.sidebar__expand-all:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+/* Focus Mode's eye (YAZ-1605) — the expand-all look, one slot to its LEFT, in the accent so a lit
+   eye reads as "you are in a focus" and not as one more grey chrome button. It takes the push to
+   the far end when present; the chevrons then sit flush beside it. */
+.sidebar__focus-off {
+  flex: none;
+  margin-left: auto;
+  padding: 0 8px;
+  color: var(--accent);
+}
+
+.sidebar__focus-off:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+.sidebar__focus-off + .sidebar__expand-all {
+  margin-left: 0;
+}
+
+/* Persistent search bar (YAZ-801) — its OWN row, never fused into the header or into the lens
+   tabs above it: it is ALWAYS visible, on both lenses (YAZ-847). */
+.sidebar__search {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 6px 14px;
+  color: var(--fg-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar__search:focus-within {
+  border-bottom-color: var(--accent);
+}
+
+.sidebar__search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 0;
+  border: none;
+  font: inherit;
+  font-size: 12px;
+  background: transparent;
+  color: var(--fg);
+  outline: none;
+}
+
+.sidebar__search-input::placeholder {
+  color: var(--fg-muted);
+}
+
+.sidebar__body {
+  flex: 1;
+  overflow: auto;
+  padding: 6px 0 24px;
+}
+
+.sidebar__msg {
+  margin: 16px 14px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.sidebar__msg--error {
+  color: var(--danger);
+}
+
+/* Search results (YAZ-803) — a FLAT ranked list in place of the tree, scrolling inside
+   `.sidebar__body`; the rows borrow the tree row's metrics and wash so the swap reads as the
+   same surface. The folder rides under the label instead of an indent (🔒 flat-list ruling). */
+.search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.search-results__row {
+  display: flex;
+  flex-direction: column;
+  padding: 3px 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  border-radius: 4px;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.search-results__row:hover {
+  background: var(--bg-hover-row);
+}
+
+.search-results__row--active,
+.search-results__row--active:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.search-results__label,
+.search-results__folder {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-results__folder {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+/* A folder row (🔒 D4, YAZ-1491): a small folder glyph before the label. Inline, so the label
+   stays the block that owns the overflow and a long folder name still ellipsizes like a note's. */
+.search-results__glyph {
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+  vertical-align: -1px;
+  opacity: 0.7;
+}
+
+/* ---------- settings (GRO-2024; the dialog itself is settings/settings.css since YAZ-1679) ---------- */
+
+/* The footer's ONE height (YAZ-1674): 6px + 6px padding around the 26px cog (5px + 16px svg + 5px)
+   plus the 1px top border. Pinned as a variable so the bottom-left notice can sit ABOVE the row
+   (`.link-notice`'s `bottom`) without the two ever drifting apart. */
+:root {
+  --sidebar-footer-h: 39px;
+}
+
+.sidebar__footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  box-sizing: border-box;
+  height: var(--sidebar-footer-h);
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* The footer cog: it only opens the dialog now, so no open state to style. */
+.settings-button {
+  display: flex;
+  padding: 5px;
+  border-radius: 6px;
+  color: var(--fg-muted);
+}
+
+.settings-button:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+/* ---------- scrolling strips (YAZ-1471) ---------- */
+
+/*
+ * A horizontal strip that scrolls with NO scrollbar — the window's tab strip and a folder page's
+ * view tabs, one utility between them: a scroll-driven fade marks whichever edge still hides
+ * items. The keyframes run on the strip's OWN inline scroll position, so a strip that does not
+ * overflow has no timeline and no mask applies. `scrollbar-width: none` is the whole hiding rule
+ * on Chromium >= 121, so there is no `::-webkit-scrollbar` here.
+ */
+@keyframes strip-fade {
+  0% {
+    mask-image: linear-gradient(to right, transparent 0, #000 0, #000 calc(100% - 28px), transparent 100%);
+  }
+  50% {
+    mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+  }
+  100% {
+    mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 100%, transparent 100%);
+  }
+}
+
+.scroll-strip {
+  overflow-x: auto;
+  scrollbar-width: none;
+  animation: strip-fade linear both;
+  animation-timeline: scroll(self inline);
+}
+
+/* ---------- context menu + inline create (GRO-2022) ---------- */
+
+.ctx-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+/* Shared layer for overlay-backed and standalone context menus. */
+.ctx-menu {
+  position: fixed;
+  z-index: 40;
+  min-width: 140px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* A panel, not a popup (YAZ-1767 D5): the vault switcher's surface hangs off the sidebar header's
+   full width — no padding, no top border (the header's own bottom border is the seam), squared
+   top corners so it sits flush, and it scrolls rather than outgrowing the window. */
+.ctx-menu--panel {
+  padding: 0;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+  /* A short settle-in (GitHub Desktop's feel) rather than a pop: opacity + a 4px drop, GPU-composited
+     properties only, so the open costs no layout. Closing stays instant, as every menu's does. */
+  animation: vault-switcher-in 120ms ease-out;
+}
+
+@keyframes vault-switcher-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ctx-menu--panel {
+    animation: none;
+  }
+}
+
+/* A flex row (🔒 D7, YAZ-1674): the label left, the shortcut hint — when the item has one —
+   pushed to the right edge. Every other menu's item is a single text child, unchanged by this. */
+.ctx-menu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 5px;
+  font-size: 13px;
+  text-align: left;
+}
+
+/* Groups (🔒 D7): a rule between ADJACENT groups only — the component skips empty ones, so a
+   blank-space menu never ends in a stray separator. */
+.ctx-menu__group + .ctx-menu__group {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+/* The shortcut hint is drawn from the attribute, never as text: `textContent` and the accessible
+   name stay the bare label (the tests and e2e pin labels). */
+.ctx-menu__item[data-hint]::after {
+  content: attr(data-hint);
+  opacity: 0.5;
+  font-size: 11px;
+}
+
+/* "Open in ▸" (D7 amended, YAZ-1674): the parent row wears its chevron as CSS, like the hints, so
+   the label text stays bare — a stroked chevron-right SVG, masked so it takes `currentColor`
+   (both themes, the danger colour included) and never enters `textContent`. The flyout is a
+   second `.ctx-menu` — fixed, clamped and flipped by the component (to the LEFT of the parent
+   when the right edge would spill) — one layer above the root. */
+.ctx-menu__parent {
+  position: relative;
+}
+
+.ctx-menu__item--parent::after {
+  content: '';
+  flex: none;
+  width: 11px;
+  height: 11px;
+  background-color: currentColor;
+  opacity: 0.6;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 5l7 7-7 7'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 5l7 7-7 7'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.ctx-menu__sub {
+  z-index: 41;
+}
+
+.ctx-menu__item:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.ctx-menu__item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Delete (GRO-2272): destructive, so it reads as such in BOTH themes — --danger is
+   defined for light and dark alike, so no hard-coded hex here. */
+.ctx-menu__item--danger {
+  color: var(--danger);
+}
+
+.ctx-menu__item--danger:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+/* ---------- Delete confirm sheet (GRO-2272, LOCKED decision B) ---------- */
+
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.confirm {
+  width: 340px;
+  padding: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+}
+
+.confirm__text {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.confirm__ask {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.confirm__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.confirm__btn {
+  padding: 5px 12px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.confirm__btn:hover {
+  background: var(--accent-soft);
+}
+
+.confirm__btn--danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+
+.confirm__btn--danger:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+/* Sync from folder (YAZ-952): the confirm sheet's shell, plus the two lists only it has —
+   the folder picker and the preview of what it would add. Both scroll; the sheet does not. */
+
+.sync__folders {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  max-height: 168px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.sync__folder {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.sync__folder:hover {
+  background: var(--bg-hover-row);
+}
+
+.sync__folder[aria-pressed='true'] {
+  background: var(--accent-soft);
+}
+
+.sync__count {
+  flex: none;
+  color: var(--fg-muted);
+}
+
+.sync__missing {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  max-height: 120px;
+  overflow-y: auto;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.create-inline {
+  padding-right: 8px;
+}
+
+.create-inline__input {
+  width: 100%;
+  padding: 2px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--fg);
+  outline: none;
+}
+
+.create-inline__input--error {
+  border-color: var(--danger);
+}
+
+.create-inline__error {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--danger);
+}
+
+/* ---------- tree ---------- */
+
+.tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tree__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 3px 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+  border-radius: 4px;
+  color: var(--fg);
+}
+
+/* The keyboard walk (YAZ-921) needs a visible "you are here" — the hover wash, plus an inset
+   accent ring so mouse-hover and key-focus stay tellable apart. */
+.tree__row:focus-visible {
+  background: var(--bg-hover);
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.tree__row:hover {
+  background: var(--bg-hover-row);
+}
+
+.tree__row--dir {
+  color: var(--fg-dir);
+}
+
+/* A file with no in-app viewer (YAZ-1577 D2): listed, but a click leaves the app — quieter, so the
+   difference is visible before the click. */
+.tree__row--external {
+  color: var(--fg-muted);
+}
+
+.tree__row--active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tree__row--active:hover {
+  background: var(--accent-soft);
+}
+
+/* Multi-select (YAZ-1336, 🔒 D1): a PERSISTENT mark on every row of a selected path (🔒 D3), and
+   it has to stay tellable apart from `--active` right beside it — so where the open file fills
+   with the accent and takes its colour, a selected row keeps its own text and wears the accent
+   only on its leading edge, over the row wash. Both tokens swap with the theme, so this holds in
+   light and dark without a colour of its own. */
+.tree__row--selected,
+.tree__row--selected:hover {
+  background: var(--bg-hover-row);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* Selected AND active (D9, YAZ-1674 — a plain click now selects the row it opens, so the open
+   file is nearly always both): the active row keeps its fill and its accent text — it still reads
+   as "the open file" — and the selection adds only its leading edge. Any other selected row wears
+   the wash + edge above. Escape clears the edge and leaves the fill: the least surprising result. */
+.tree__row--active.tree__row--selected,
+.tree__row--active.tree__row--selected:hover {
+  background: var(--accent-soft);
+}
+
+/* The keyboard walk crosses selected rows: focus keeps its ring, the selection keeps its edge. */
+.tree__row--selected:focus-visible {
+  box-shadow:
+    inset 2px 0 0 var(--accent),
+    inset 0 0 0 1px var(--accent);
+}
+
+.tree__row--revealed,
+.tree__row--revealed:hover,
+.tree__row--revealed:focus-visible {
+  background: var(--reveal-bg);
+  color: var(--reveal-fg);
+}
+
+/* Drag-a-file-onto-a-folder (E1b, GRO-2241): the hovered drop target — dir row or root header. */
+.tree__row--drop,
+.sidebar__header--drop {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  border-radius: 4px;
+}
+
+/* Favorites drag-to-reorder (YAZ-1766 D4): a 2px accent line on the edge of the hovered root row
+   where the dragged favorite will land — above or below, never a fill (nothing moves on disk). */
+.tree__row--drop-before {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.tree__row--drop-after {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.tree__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree__chevron {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  position: relative;
+}
+
+.tree__chevron::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 3px;
+  width: 7px;
+  height: 7px;
+  border-right: 1.75px solid var(--fg-muted);
+  border-bottom: 1.75px solid var(--fg-muted);
+  transform: rotate(-45deg);
+  transition: transform 0.12s;
+}
+
+.tree__chevron--open::before {
+  transform: rotate(45deg);
+  top: 1px;
+}
+
+/* ---------- Topics lens (YAZ-848): the same tree rows, plus what a MEANING tree needs ---------- */
+
+/* A leaf keeps the chevron's slot so its label lines up with its siblings' — the mockup's rule. */
+.tree__chevron--none::before {
+  display: none;
+}
+
+/* The folder-page marker: the app's own folder-page glyph, at the size the mockup uses. */
+.tree__glyph {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-right: 2px;
+  color: var(--fg-muted);
+}
+
+.tree__row--active .tree__glyph {
+  color: inherit;
+}
+
+/* Direct-member count, pushed to the right edge of the row. */
+.tree__count {
+  margin-left: auto;
+  padding-left: 6px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+/* The Uncategorized row (🔒 D7): present, quiet, not one of the topics. */
+.tree__row--muted {
+  color: var(--fg-muted);
+  font-style: italic;
+}
+
+.tree--uncategorized {
+  margin-top: 10px;
+}
+
+/* The offer card (6C-, YAZ-849): shown ONLY in an un-adopted folder with no Home. Quiet, small,
+   and above the tree it does not replace — an invitation, never an empty state. */
+.topics-offer {
+  margin: 8px 8px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--accent-soft);
+}
+
+.topics-offer__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.topics-offer__body {
+  margin: 4px 0 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--fg-muted);
+}
+
+/* One button, sized for a sidebar rather than a dialog. */
+.topics-offer__go {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn--primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---------- document magnification (YAZ-1410) ---------- */
+
+/* One segmented control (YAZ-1710): [ − | 100% | + ] inside a single hairline pill. The
+   percentage is the dropdown trigger (the arrow went with YAZ-1710 — the number alone opens
+   the menu); − / + step through the presets and grey out at 50 / 200 so the wall is visible. */
+.document-zoom {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+/* No `overflow: hidden` on the pill: the dropdown menu is absolutely positioned inside it and
+   would be clipped. The end buttons round their own outer corners instead. */
+.document-zoom__step:first-of-type {
+  border-radius: 5px 0 0 5px;
+}
+
+.document-zoom__step:last-of-type {
+  border-radius: 0 5px 5px 0;
+}
+
+.document-zoom__trigger,
+.document-zoom__step {
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.document-zoom__trigger {
+  padding: 0 7px;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+.document-zoom__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.document-zoom__trigger:hover,
+.document-zoom__trigger[aria-expanded="true"],
+.document-zoom__step:hover:enabled {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.document-zoom__trigger:focus-visible,
+.document-zoom__step:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.document-zoom__step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.document-zoom__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 10;
+  width: 136px;
+  max-height: min(360px, calc(100vh - 64px));
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px #0002;
+  color: var(--fg);
+}
+
+.document-zoom__custom label {
+  display: block;
+  margin: 0 2px 4px;
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.document-zoom__custom input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 26px;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  outline: none;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+
+.document-zoom__custom input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.document-zoom__custom input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.document-zoom__divider {
+  height: 1px;
+  margin: 6px 0 4px;
+  background: var(--border);
+}
+
+.document-zoom__presets button {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.document-zoom__presets button:hover,
+.document-zoom__presets button:focus-visible {
+  background: var(--bg-hover);
+  outline: none;
+}
+
+.document-zoom__presets button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.document-zoom__error {
+  margin: 5px 2px 0;
+  color: var(--danger);
+  font-size: 11px;
+  line-height: 1.3;
+}

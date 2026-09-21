@@ -1,0 +1,35 @@
+{
+  "name": "yaseen-milkdown",
+  "private": true,
+  "version": "0.9.25",
+  "description": "Yaseen Docs: local markdown editor as an Electron desktop app (React + Milkdown Crepe renderer, main-process file layer)",
+  "workspaces": [
+    "client",
+    "desktop"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w desktop",
+    "build": "npm run build -w desktop",
+    "desktop:build": "npm run build -w desktop && node tools/packDesktop.mjs --mac",
+    "desktop:build:win": "npm run build -w desktop && node tools/packDesktop.mjs --win",
+    "typecheck": "tsc -p client/tsconfig.json --noEmit && tsc -p shared/tsconfig.json --noEmit && tsc -p desktop/tsconfig.json --noEmit",
+    "test": "vitest run",
+    "e2e": "npm run build -w desktop && playwright test --config desktop/e2e/playwright.config.ts",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@milkdown/components": "file:client/vendor/milkdown-components-7.22.1-yaz1410.tgz",
+    "jsdom": "^30.0.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  },
+  "engines": {
+    "node": ">=20.19"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  },
+  "overrides": {
+    "@milkdown/components": "$@milkdown/components"
+  }
+}

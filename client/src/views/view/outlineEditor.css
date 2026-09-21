@@ -1,0 +1,9 @@
+/* The outline editor's mount (YAZ-901). The Crepe instance wears `.editor-instance`, exactly the
+   class the note editor's mount wears, so bullets.css / guideLines.css / outlineFolding.css /
+   zoom.css apply to it verbatim — ZERO duplicated selectors. Only the note's page furniture is
+   undone here: `.editor-instance` is app.css's centred content COLUMN (max-width + 32/48/120px
+   padding), which belongs to a full page, not to a block inside a view. */
+.view-outline-editor .editor-instance {
+  max-width: none;
+  padding: 0;
+}

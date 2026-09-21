@@ -1,0 +1,819 @@
+<title>Where Should a Page Live?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500&family=Public+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --paper: #F2F3EE;
+    --card: #FBFBF8;
+    --card-2: #F6F7F2;
+    --ink: #242A24;
+    --muted: #5D655C;
+    --faint: #8B9288;
+    --line: #DADED3;
+    --line-soft: #E6E9E0;
+    --accent: #37624D;
+    --accent-ink: #2C5140;
+    --accent-soft: #E2EDE5;
+    --bad: #A24E2E;
+    --bad-soft: #F3E3DA;
+    --warn: #93712B;
+    --warn-soft: #F1E8D2;
+    --stone: #7A7263;
+    --stone-soft: #ECE8DE;
+    --slate: #4A6C8C;
+    --slate-soft: #E0E8EF;
+    --hl-a: #DCEBDF;
+    --hl-a-ink: #2C5140;
+    --hl-b: #DEE8F1;
+    --hl-b-ink: #35516C;
+    --shadow: 0 1px 2px rgba(36,42,36,.06), 0 8px 24px rgba(36,42,36,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #161A16;
+      --card: #1E241F;
+      --card-2: #1A201B;
+      --ink: #E5E8E1;
+      --muted: #A3AC9F;
+      --faint: #7C857A;
+      --line: #333B33;
+      --line-soft: #2A322B;
+      --accent: #7FB99A;
+      --accent-ink: #94C7AA;
+      --accent-soft: #223429;
+      --bad: #D68F6C;
+      --bad-soft: #392A21;
+      --warn: #C9A75B;
+      --warn-soft: #35301F;
+      --stone: #A79D89;
+      --stone-soft: #2C2A22;
+      --slate: #8AACC9;
+      --slate-soft: #22303C;
+      --hl-a: #23412F;
+      --hl-a-ink: #A5D2B8;
+      --hl-b: #223648;
+      --hl-b-ink: #A9C6E0;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #161A16;
+    --card: #1E241F;
+    --card-2: #1A201B;
+    --ink: #E5E8E1;
+    --muted: #A3AC9F;
+    --faint: #7C857A;
+    --line: #333B33;
+    --line-soft: #2A322B;
+    --accent: #7FB99A;
+    --accent-ink: #94C7AA;
+    --accent-soft: #223429;
+    --bad: #D68F6C;
+    --bad-soft: #392A21;
+    --warn: #C9A75B;
+    --warn-soft: #35301F;
+    --stone: #A79D89;
+    --stone-soft: #2C2A22;
+    --slate: #8AACC9;
+    --slate-soft: #22303C;
+    --hl-a: #23412F;
+    --hl-a-ink: #A5D2B8;
+    --hl-b: #223648;
+    --hl-b-ink: #A9C6E0;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Newsreader', Georgia, 'Times New Roman', serif;
+    font-size: 18px;
+    line-height: 1.65;
+    margin: 0;
+    padding: 0 20px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .prose { max-width: 720px; margin: 0 auto; }
+  .figure { max-width: 940px; margin: 36px auto; }
+  .figure-narrow { max-width: 720px; margin: 32px auto; }
+
+  h1, h2, h3 { font-family: 'Newsreader', Georgia, serif; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(38px, 6vw, 58px); font-weight: 600; line-height: 1.08; letter-spacing: -0.01em; }
+  h2 { font-size: clamp(27px, 3.6vw, 36px); font-weight: 600; line-height: 1.15; margin-bottom: 14px; }
+  h3 { font-size: 21px; font-weight: 600; margin-bottom: 8px; }
+  p { margin: 0 0 1.05em; }
+  .prose em { font-style: italic; }
+  a { color: var(--accent-ink); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+
+  .sans { font-family: 'Public Sans', -apple-system, 'Segoe UI', sans-serif; }
+  .mono { font-family: 'Spline Sans Mono', ui-monospace, 'SF Mono', Menlo, monospace; }
+
+  header.hero { max-width: 720px; margin: 72px auto 20px; }
+  .kicker {
+    font-family: 'Public Sans', sans-serif; font-size: 12.5px; font-weight: 600;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--accent-ink);
+    margin-bottom: 18px;
+  }
+  .hero-sub { font-size: 21px; line-height: 1.5; color: var(--muted); margin-top: 18px; font-style: italic; }
+
+  .eyebrow {
+    font-family: 'Public Sans', sans-serif; font-size: 12.5px; font-weight: 600;
+    letter-spacing: .13em; text-transform: uppercase; color: var(--faint);
+    margin: 0 0 12px; display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .eyebrow .num { color: var(--accent-ink); }
+  section { margin-top: 88px; }
+
+  /* ---- answer box ---- */
+  .answer {
+    background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+    border-radius: 8px; padding: 22px 26px; margin: 40px auto 0; max-width: 720px;
+    box-shadow: var(--shadow);
+  }
+  .answer .label { font-family: 'Public Sans', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 8px; }
+  .answer p { margin-bottom: .6em; }
+  .answer p:last-child { margin-bottom: 0; }
+
+  /* ---- "what I did" strip ---- */
+  .did { display: flex; flex-wrap: wrap; gap: 10px; max-width: 720px; margin: 26px auto 0; }
+  .did .step {
+    font-family: 'Public Sans', sans-serif; font-size: 13.5px; color: var(--muted);
+    background: var(--card-2); border: 1px solid var(--line-soft); border-radius: 100px;
+    padding: 7px 15px;
+  }
+  .did .step b { color: var(--ink); font-weight: 600; }
+
+  /* ---- callout ---- */
+  .callout {
+    background: var(--accent-soft); border-radius: 8px; padding: 18px 24px;
+    margin: 28px 0; font-size: 17.5px;
+  }
+  .callout .tag { font-family: 'Public Sans', sans-serif; font-size: 11.5px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; color: var(--accent-ink); display: block; margin-bottom: 6px; }
+  .callout p { margin: 0; }
+
+  /* ---- window mockups ---- */
+  .win {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .win-bar {
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+    border-bottom: 1px solid var(--line-soft); background: var(--card-2);
+  }
+  .win-bar .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+  .win-bar .win-title { font-family: 'Public Sans', sans-serif; font-size: 12.5px; color: var(--faint); margin-left: 6px; }
+  .win-body { padding: 20px 24px; }
+
+  /* file trees */
+  .tree { font-family: 'Spline Sans Mono', ui-monospace, monospace; font-size: 13.5px; line-height: 1.5; }
+  .tree .row { display: flex; align-items: center; gap: 7px; padding: 3px 8px; border-radius: 5px; white-space: nowrap; }
+  .tree .row.l1 { padding-left: 26px; } .tree .row.l2 { padding-left: 44px; } .tree .row.l3 { padding-left: 62px; }
+  .tree .row.hl { background: var(--hl-a); color: var(--hl-a-ink); font-weight: 500; }
+  .tree .row.dim { color: var(--faint); }
+  .tree .row.bad-hl { background: var(--bad-soft); color: var(--bad); font-weight: 500; }
+  .tree svg { flex: none; width: 14px; height: 14px; }
+  .ic-folder { color: var(--stone); } .ic-file { color: var(--faint); } .ic-base { color: var(--slate); }
+  .row.hl .ic-file, .row.hl .ic-folder { color: currentColor; }
+  .row.bad-hl .ic-folder { color: currentColor; }
+  .tree-note { font-family: 'Public Sans', sans-serif; font-size: 13px; color: var(--muted); padding: 10px 8px 0; }
+
+  /* yaml / index card */
+  .yaml {
+    font-family: 'Spline Sans Mono', ui-monospace, monospace; font-size: 13px; line-height: 1.65;
+    background: var(--card-2); border: 1px solid var(--line-soft); border-radius: 8px;
+    padding: 14px 16px; overflow-x: auto;
+  }
+  .yaml .k { color: var(--accent-ink); font-weight: 500; }
+  .yaml .v { color: var(--ink); }
+  .yaml .lnk { color: var(--slate); }
+  .yaml .fence { color: var(--faint); }
+  mark.hla { background: var(--hl-a); color: var(--hl-a-ink); border-radius: 3px; padding: 1px 4px; }
+  mark.hlb { background: var(--hl-b); color: var(--hl-b-ink); border-radius: 3px; padding: 1px 4px; }
+
+  .cardlabel {
+    display: inline-block; font-family: 'Public Sans', sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase; border-radius: 4px; padding: 3px 8px; margin-bottom: 8px;
+  }
+  .cardlabel.green { background: var(--accent-soft); color: var(--accent-ink); }
+  .cardlabel.stone { background: var(--stone-soft); color: var(--stone); }
+  .cardlabel.slate { background: var(--slate-soft); color: var(--slate); }
+  .cardlabel.rust { background: var(--bad-soft); color: var(--bad); }
+
+  /* prose inside mockups */
+  .doc-title { font-family: 'Newsreader', serif; font-size: 22px; font-weight: 600; margin: 14px 0 6px; }
+  .doc-p { font-size: 15px; color: var(--muted); line-height: 1.6; margin: 0 0 10px; }
+  .doc-p .wl { color: var(--accent-ink); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 2px; }
+
+  /* base table mockup */
+  .btable { font-family: 'Public Sans', sans-serif; font-size: 13px; border: 1px solid var(--line-soft); border-radius: 8px; overflow: hidden; }
+  .btable .thead, .btable .trow { display: grid; grid-template-columns: 2fr 1.4fr 1.6fr; }
+  .btable .thead { background: var(--card-2); color: var(--faint); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+  .btable .thead > div, .btable .trow > div { padding: 8px 12px; border-bottom: 1px solid var(--line-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .btable .group { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; padding: 7px 12px; font-size: 12.5px; border-bottom: 1px solid var(--line-soft); }
+  .btable .trow:last-child > div { border-bottom: none; }
+  .btable .cell-link { color: var(--slate); }
+
+  /* two-panel evidence */
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 780px) { .duo { grid-template-columns: 1fr; } }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; box-shadow: var(--shadow); }
+  .panel h4 { font-family: 'Public Sans', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 12px; color: var(--muted); }
+  .panel h4 .big { display: block; font-family: 'Newsreader', serif; font-size: 22px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--ink); margin-top: 4px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    font-family: 'Public Sans', sans-serif; font-size: 13px; font-weight: 500;
+    background: var(--accent-soft); color: var(--accent-ink);
+    border-radius: 100px; padding: 6px 13px;
+  }
+  .chip .sub { color: var(--faint); font-weight: 400; }
+  .verdict { font-size: 19px; font-style: italic; color: var(--muted); text-align: center; max-width: 640px; margin: 26px auto 0; line-height: 1.55; }
+  .verdict b { color: var(--ink); font-style: normal; }
+
+  /* breadcrumb */
+  .crumb { font-family: 'Spline Sans Mono', monospace; font-size: 13.5px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .crumb .sep { color: var(--faint); }
+  .crumb span.seg { padding: 2px 6px; border-radius: 4px; }
+
+  /* three jobs */
+  .jobs { display: grid; gap: 14px; }
+  .job { display: grid; grid-template-columns: 190px 1fr; gap: 18px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 22px; box-shadow: var(--shadow); border-left-width: 4px; }
+  .job.storage { border-left-color: var(--stone); }
+  .job.meaning { border-left-color: var(--accent); }
+  .job.nav { border-left-color: var(--slate); }
+  .job .jt { font-family: 'Public Sans', sans-serif; font-weight: 700; font-size: 15px; }
+  .job .jq { font-size: 15.5px; color: var(--muted); font-style: italic; margin-top: 2px; }
+  .job .jbody { font-family: 'Public Sans', sans-serif; font-size: 14px; color: var(--muted); line-height: 1.6; }
+  .job .jbody .mono { font-size: 12.5px; background: var(--card-2); border: 1px solid var(--line-soft); border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
+  @media (max-width: 680px) { .job { grid-template-columns: 1fr; gap: 8px; } }
+  .collapsebox {
+    margin-top: 16px; background: var(--bad-soft); border-radius: 10px; padding: 18px 24px;
+    font-size: 16.5px; color: var(--ink);
+  }
+  .collapsebox b { color: var(--bad); }
+
+  /* tool cards */
+  .tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .tool { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; box-shadow: var(--shadow); }
+  .tool.feature { grid-column: 1 / -1; border-color: var(--accent); border-width: 1.5px; }
+  .tool .tname { font-family: 'Newsreader', serif; font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .tool .tans { font-family: 'Public Sans', sans-serif; font-size: 14px; color: var(--muted); line-height: 1.6; margin-bottom: 10px; }
+  .tool .tless { font-family: 'Public Sans', sans-serif; font-size: 13.5px; line-height: 1.55; padding-top: 10px; border-top: 1px dashed var(--line); }
+  .tool .tless b { color: var(--accent-ink); }
+  .wikiduo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+  @media (max-width: 680px) { .wikiduo { grid-template-columns: 1fr; } }
+  .wikihalf { background: var(--card-2); border: 1px solid var(--line-soft); border-radius: 8px; padding: 14px 16px; font-family: 'Public Sans', sans-serif; font-size: 13.5px; color: var(--muted); line-height: 1.55; }
+  .wikihalf b { display: block; color: var(--ink); margin-bottom: 4px; font-size: 14px; }
+  .wikihalf .eq { color: var(--accent-ink); font-weight: 600; }
+
+  /* options */
+  .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+  .opt { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 22px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 14px; }
+  .opt.rec { border-color: var(--accent); border-width: 2px; }
+  .opt-head { display: flex; align-items: center; gap: 12px; }
+  .opt-letter { font-family: 'Newsreader', serif; font-size: 26px; font-weight: 700; width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex: none; }
+  .opt-letter.a { background: var(--stone-soft); color: var(--stone); }
+  .opt-letter.b { background: var(--slate-soft); color: var(--slate); }
+  .opt-letter.c { background: var(--accent-soft); color: var(--accent-ink); }
+  .opt-name { font-family: 'Public Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 1.3; }
+  .opt-name .sub { display: block; font-weight: 400; font-size: 13px; color: var(--faint); margin-top: 2px; }
+  .opt .tree { background: var(--card-2); border: 1px solid var(--line-soft); border-radius: 8px; padding: 10px 8px; font-size: 12.5px; overflow-x: auto; }
+  .opt .opt-body { font-family: 'Public Sans', sans-serif; font-size: 14px; color: var(--muted); line-height: 1.6; flex: 1; }
+  .pill { font-family: 'Public Sans', sans-serif; font-size: 13px; font-weight: 700; border-radius: 100px; padding: 7px 15px; align-self: flex-start; }
+  .pill.no { background: var(--bad-soft); color: var(--bad); }
+  .pill.yes { background: var(--accent-soft); color: var(--accent-ink); }
+
+  /* sidebar mockups */
+  .sidebar-mock { max-width: 300px; }
+  .sb-top { display: flex; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line-soft); background: var(--card-2); }
+  .sb-icon { width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+  .sb-icon.active { background: var(--accent-soft); color: var(--accent-ink); }
+  .sb-icon svg { width: 15px; height: 15px; }
+  .preview-pop {
+    position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: var(--shadow); padding: 14px 16px; font-family: 'Public Sans', sans-serif; font-size: 12.5px;
+    color: var(--muted); line-height: 1.55; max-width: 300px;
+  }
+  .preview-pop .pt { font-family: 'Newsreader', serif; font-size: 16px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+  .mockduo { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 780px) { .mockduo { grid-template-columns: 1fr; } }
+  .mocklabel { font-family: 'Public Sans', sans-serif; font-size: 13px; font-weight: 600; color: var(--muted); margin: 0 0 10px; text-align: center; }
+
+  /* related issue cards */
+  .issues { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .issue { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; box-shadow: var(--shadow); font-family: 'Public Sans', sans-serif; }
+  .issue .iid { font-family: 'Spline Sans Mono', monospace; font-size: 12px; font-weight: 600; color: var(--faint); margin-bottom: 6px; }
+  .issue .iname { font-weight: 700; font-size: 15px; margin-bottom: 8px; }
+  .issue .idesc { font-size: 13.5px; color: var(--muted); line-height: 1.6; margin-bottom: 10px; }
+  .issue .istatus { font-size: 12.5px; font-weight: 600; border-radius: 100px; padding: 4px 12px; display: inline-block; }
+  .istatus.safe { background: var(--accent-soft); color: var(--accent-ink); }
+  .istatus.watch { background: var(--warn-soft); color: var(--warn); }
+  .istatus.new { background: var(--slate-soft); color: var(--slate); }
+
+  /* question cards */
+  .q { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 26px 28px; box-shadow: var(--shadow); margin-bottom: 20px; }
+  .q .qbadge { font-family: 'Public Sans', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .1em; color: var(--accent-ink); background: var(--accent-soft); border-radius: 6px; padding: 4px 10px; display: inline-block; margin-bottom: 10px; }
+  .q h3 { font-size: 23px; margin-bottom: 12px; }
+  .q .qrow { display: grid; grid-template-columns: 110px 1fr; gap: 14px; padding: 10px 0; border-top: 1px dashed var(--line); font-size: 15.5px; }
+  .q .qrow:first-of-type { border-top: none; }
+  .q .qlabel { font-family: 'Public Sans', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); padding-top: 3px; }
+  .q .qrow div:last-child { color: var(--muted); line-height: 1.6; }
+  .q .qrow.lean div:last-child { color: var(--ink); }
+  @media (max-width: 620px) { .q .qrow { grid-template-columns: 1fr; gap: 4px; } }
+
+  footer { max-width: 720px; margin: 96px auto 0; padding-top: 24px; border-top: 1px solid var(--line); font-family: 'Public Sans', sans-serif; font-size: 14px; color: var(--muted); line-height: 1.7; }
+
+  .smallcap { font-family: 'Public Sans', sans-serif; font-size: 13px; color: var(--faint); }
+  @media (prefers-reduced-motion: no-preference) {
+    section { scroll-margin-top: 24px; }
+  }
+</style>
+
+<!-- ═══════════════════════════ HERO ═══════════════════════════ -->
+<header class="hero">
+  <div class="kicker">YAZ-796 · Knowledge Management · The Lay of the Land</div>
+  <h1>Where should a page live?</h1>
+  <p class="hero-sub">You asked whether to keep folders, go flat like Roam, or something else. This page explains the whole landscape from zero — what you have, what's wrong, what others did, and the one decision that matters.</p>
+</header>
+
+<div class="answer">
+  <div class="label">The short answer</div>
+  <p>A folder can hold a file in only <b>one</b> place. Your pages belong to <b>many</b> places at once. That's the entire conflict, and it can't be fixed by picking better folders.</p>
+  <p>Your app was already designed around this: folders are just parking spots, and the real organization lives <em>on the page itself</em>. Your wiki only half-uses that design. The decision on the table is whether to commit to it fully.</p>
+</div>
+
+<div class="did">
+  <div class="step">✓ Read the app manual <b>(8 docs in _how-to/)</b></div>
+  <div class="step">✓ Audited your wiki <b>(371 pages, 13 page types)</b></div>
+  <div class="step">✓ Posted full findings <b>to YAZ-796</b></div>
+</div>
+
+<div class="answer" style="border-left-color: var(--slate); margin-top: 22px;">
+  <div class="label" style="color: var(--slate);">Update — decisions locked since this page was written</div>
+  <p>The direction below was accepted. Locked so far: <b>Option C</b> (dumb bins + smart pages) · the official name is <b>folder pages</b> (older sections on this page say "hub pages") · folders demoted to pure parking bins · a <b>Home page</b> as the vault's entry point · the side panel becomes a <b>curated tree</b> that follows the links written on folder pages. The bases question (YAZ-798) is still open. Authoritative record: the 🔒 LOCKED comments on YAZ-796 / 797 / 799; full thinking in YAZ-810.</p>
+</div>
+
+<!-- ═══════════════════════════ PART 1 ═══════════════════════════ -->
+<section>
+  <div class="prose">
+    <div class="eyebrow"><span class="num">Part 1</span> What you have today</div>
+    <h2>Your wiki is four simple pieces</h2>
+    <p>Before anything else — here is the current system, from scratch. Your business wiki is a normal folder of files on your Mac. Every idea — a metric, a problem, a channel — is one page. The app (Yaseen Docs) adds three layers of smarts on top of those plain files.</p>
+  </div>
+
+  <div class="figure">
+    <div class="duo">
+      <div class="panel">
+        <h4>Piece 1 · <span class="big">Pages in folders</span></h4>
+        <div class="tree">
+          <div class="row"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>metrics/</div>
+          <div class="row l1"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>Customer Acquisition Cost.md</div>
+          <div class="row l1"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>Churn Rate.md</div>
+          <div class="row"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>channels/</div>
+          <div class="row l1"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>Meta Ads.md</div>
+          <div class="row"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>functions/</div>
+          <div class="row l1"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>1 Lead Gen.md</div>
+        </div>
+        <div class="tree-note">Ordinary markdown files. Open them in any app, sync them anywhere.</div>
+      </div>
+
+      <div class="panel">
+        <h4>Piece 2 · <span class="big">The index card</span></h4>
+        <span class="cardlabel green">The top of every page — a few labeled facts</span>
+        <div class="yaml"><span class="fence">---</span>
+<span class="k">page_type:</span> <span class="v">metric</span>
+<span class="k">channels:</span> <span class="lnk">["[[Meta Ads]]"]</span>
+<span class="k">owner:</span> <span class="v">"RevOps / Finance"</span>
+<span class="fence">---</span></div>
+        <div class="tree-note">This little block is what makes a page act like a <b>database row</b>. The app reads every index card in the wiki, automatically, all the time.</div>
+      </div>
+
+      <div class="panel">
+        <h4>Piece 3 · <span class="big">Links</span></h4>
+        <p class="doc-p" style="font-size:16px; font-family:'Newsreader',serif;">Lead scoring directly moves <span class="wl">Lead-to-Opportunity Conversion Rate</span>, especially for leads coming from <span class="wl">Meta Ads</span>.</p>
+        <div class="tree-note">Double-bracket links <span class="mono" style="font-size:12px;">[[like this]]</span> connect pages — in the writing <i>and</i> on the index card. Every page automatically shows who links <i>to</i> it (backlinks).</div>
+      </div>
+
+      <div class="panel">
+        <h4>Piece 4 · <span class="big">Live tables ("bases")</span></h4>
+        <div class="btable">
+          <div class="thead"><div>Problem</div><div>Tag</div><div>Metrics</div></div>
+          <div class="group">▾ 1.1 Cross-Channel</div>
+          <div class="trow"><div>Lead Scoring</div><div>revenue driver</div><div class="cell-link">Lead-to-Opp Rate</div></div>
+          <div class="trow"><div>Lead Routing &amp; SLA</div><div>revenue driver</div><div class="cell-link">Response Time</div></div>
+          <div class="group">▾ 1.2 Paid</div>
+          <div class="trow"><div>Landing Page Conversion</div><div>optimization</div><div class="cell-link">LP Conv. Rate</div></div>
+        </div>
+        <div class="tree-note">A <b>saved search</b>, shown as a table. "Every problem, grouped by function." It's not a copy of anything — it re-reads the index cards live, so it's never out of date.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="prose">
+    <div class="callout">
+      <span class="tag">The golden rule — already true today</span>
+      <p>The folder a file sits in means <b>nothing</b> to the app. Its type, its connections, its table memberships — all of it comes from the index card. Folders exist only for humans browsing. This isn't a proposal; it's how the app works right now.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ PART 2 ═══════════════════════════ -->
+<section>
+  <div class="prose">
+    <div class="eyebrow"><span class="num">Part 2</span> The problem you ran into</div>
+    <h2>One file. Five homes.</h2>
+    <p>Your question was: <em>"A metric belongs to Facebook ads, but metrics have their own folder — so which folder does it go in?"</em> Here's the thing: your own wiki already contains the answer. Look at one real page, Customer Acquisition Cost:</p>
+  </div>
+
+  <div class="figure">
+    <div class="duo">
+      <div class="panel">
+        <h4>Where it <span style="color:var(--stone)">sits</span> <span class="big">Exactly one place</span></h4>
+        <div class="tree">
+          <div class="row"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>metrics/</div>
+          <div class="row l1"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>calculated/</div>
+          <div class="row l2 hl"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>Customer Acquisition Cost.md</div>
+          <div class="row l2 dim"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>Churn Rate.md</div>
+          <div class="row l2 dim"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>LTV to CAC Ratio.md</div>
+        </div>
+      </div>
+      <div class="panel">
+        <h4>What it <span style="color:var(--accent-ink)">belongs to</span> <span class="big">Five places at once</span></h4>
+        <div class="chips">
+          <div class="chip">Meta Ads <span class="sub">· channel</span></div>
+          <div class="chip">0 Business Fundamentals <span class="sub">· function</span></div>
+          <div class="chip">1 Lead Gen <span class="sub">· function</span></div>
+          <div class="chip">2 Lead Nurture <span class="sub">· function</span></div>
+          <div class="chip">5 Expansion <span class="sub">· function</span></div>
+        </div>
+        <div class="tree-note" style="margin-top:12px;">All five memberships are written on its own index card. Any live table can pull it up under any of them — the Meta Ads page can show it, and so can each function.</div>
+      </div>
+    </div>
+    <p class="verdict">"Which folder does it go in?" has no right answer — <b>not because you haven't found it, but because a folder can only give one answer and the true answer is five.</b> Folders force every page to have exactly one parent. Your knowledge doesn't work that way.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ PART 3 ═══════════════════════════ -->
+<section>
+  <div class="prose">
+    <div class="eyebrow"><span class="num">Part 3</span> What the audit found</div>
+    <h2>Your wiki is doing the work twice</h2>
+    <p>I went through the whole vault. Three findings, in order of importance.</p>
+    <h3>Finding 1 — The same fact is written in two places</h3>
+    <p>Take the problem page "Lead Scoring." <em>Where the file sits</em> already says it belongs to Lead Gen → Cross-Channel. Then the index card says it <em>again</em>:</p>
+  </div>
+
+  <div class="figure-narrow">
+    <div class="panel">
+      <h4>Copy #1 — the folder path says it</h4>
+      <div class="crumb">
+        <span class="seg">functions</span><span class="sep">/</span>
+        <span class="seg"><mark class="hla">1 Lead Gen</mark></span><span class="sep">/</span>
+        <span class="seg"><mark class="hlb">1.1 Cross-Channel</mark></span><span class="sep">/</span>
+        <span class="seg">Lead Scoring.md</span>
+      </div>
+      <h4 style="margin-top:22px;">Copy #2 — the index cards say it too</h4>
+      <div class="yaml"><span class="fence"># Lead Scoring.md</span>
+<span class="k">function:</span> <span class="lnk">"[[<mark class="hlb">1.1 Cross-Channel</mark>]]"</span>
+
+<span class="fence"># 1.1 Cross-Channel.md</span>
+<span class="k">parent:</span> <span class="lnk">"[[<mark class="hla">1 Lead Gen</mark>]]"</span></div>
+      <div class="tree-note">Same facts, stored twice. When a fact lives in two places, one copy eventually goes stale — and in your vault it already has: the app's settings say problems should live in a <span class="mono" style="font-size:12px;">problems/</span> folder, but they're actually filed inside function folders. The two systems already disagree.</div>
+    </div>
+  </div>
+
+  <div class="prose">
+    <h3>Finding 2 — The tell-tale folder</h3>
+    <p>What happens when a problem touches <em>more than one</em> function? Folders can't say that. So a workaround folder had to be invented:</p>
+  </div>
+
+  <div class="figure-narrow">
+    <div class="panel">
+      <div class="tree">
+        <div class="row"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>functions/</div>
+        <div class="row l1 dim"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>1 Lead Gen/</div>
+        <div class="row l1 dim"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>2 Lead Nurture/</div>
+        <div class="row l1 dim"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>3 Sales &amp; Conversion/</div>
+        <div class="row l1 bad-hl"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>X Cross-Functional/ ⟵ the workaround</div>
+      </div>
+      <div class="tree-note">This folder exists <b>only</b> because folders can't do "belongs to several things." It's the smoking gun — the exact wall Roam Research hit, sitting in your own vault. Every folder system eventually grows one of these ("Misc", "Shared", "Cross-cutting").</div>
+    </div>
+  </div>
+
+  <div class="prose">
+    <h3>Finding 3 — You already invented your own fix</h3>
+    <p>Your "folder pages / master pages" idea from the issue? It's already in the vault. <span class="mono" style="font-size:14px;">1 Lead Gen.md</span> and <span class="mono" style="font-size:14px;">Meta Ads.md</span> are pages that <em>stand for</em> their folder — the Obsidian community calls these <b>folder notes</b>, Roam users call them <b>Maps of Content</b>. Right now yours are nearly empty; they just aren't doing any work yet. The proposal later in this page is mostly: give them the job.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ PART 4 ═══════════════════════════ -->
+<section>
+  <div class="prose">
+    <div class="eyebrow"><span class="num">Part 4</span> The mental model</div>
+    <h2>Three different jobs, one confused tool</h2>
+    <p>Here's the frame that makes everything click. "Organizing knowledge" is actually <b>three separate jobs</b>, and every tool you named — Roam, Obsidian, Notion, Wikipedia — is a different opinion about how to split them up:</p>
+  </div>
+
+  <div class="figure">
+    <div class="jobs">
+      <div class="job storage">
+        <div>
+          <div class="jt" style="color:var(--stone)">1 · Storage</div>
+          <div class="jq">"Where does the file physically sit?"</div>
+        </div>
+        <div class="jbody">A file path. Somebody has to pick a spot on the disk — but the spot doesn't have to <i>mean</i> anything. &nbsp;<span class="mono">metrics/calculated/CAC.md</span></div>
+      </div>
+      <div class="job meaning">
+        <div>
+          <div class="jt" style="color:var(--accent-ink)">2 · Meaning</div>
+          <div class="jq">"What is it, and what is it connected to?"</div>
+        </div>
+        <div class="jbody">The index card and the links. This is where "CAC is a metric, used by Meta Ads, relevant to four functions" lives. Many connections per page — a web, not a tree. &nbsp;<span class="mono">channels: ["[[Meta Ads]]"]</span></div>
+      </div>
+      <div class="job nav">
+        <div>
+          <div class="jt" style="color:var(--slate)">3 · Navigation</div>
+          <div class="jq">"How do I find it when I need it?"</div>
+        </div>
+        <div class="jbody">The lenses you look through: the sidebar tree, search, live tables, backlinks, hub pages. There can be <i>many</i> lenses over the same pages — none of them is "the" organization.</div>
+      </div>
+    </div>
+    <div class="collapsebox">
+      <b>A folder answers all three questions at once — with one answer.</b> That's its original sin. It's fine for a small drawer of files; it breaks the moment one page belongs to two things. Your app already keeps the three jobs separate. The friction you're feeling is that the <i>wiki</i> still uses folders for job 2, and the <i>sidebar</i> only shows job 1.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ PART 5 ═══════════════════════════ -->
+<section>
+  <div class="prose">
+    <div class="eyebrow"><span class="num">Part 5</span> The landscape</div>
+    <h2>How everyone else solved it</h2>
+    <p>You asked "what does Wikipedia do, what's the philosophy?" Here's each system, one line each, judged against the three jobs:</p>
+  </div>
+
+  <div class="figure">
+    <div class="tools">
+      <div class="tool">
+        <div class="tname">Roam Research</div>
+        <div class="tans"><b>No folders at all.</b> Every page in one flat pool. Humans hand-build "map" pages — outlines of links — as the navigation.</div>
+        <div class="tless"><b>Lesson:</b> proved maps beat folders. But it never solved the <i>table</i> half — no way to give pages structured facts and query them. That gap is exactly what our live tables fill.</div>
+      </div>
+      <div class="tool">
+        <div class="tname">Obsidian</div>
+        <div class="tans"><b>Folders allowed, but demoted.</b> The community treats them as parking spots; meaning lives in links; "folder notes" bridge tree and page.</div>
+        <div class="tless"><b>Lesson:</b> this is where our app already stands, by design. The vault just hasn't fully committed to it.</div>
+      </div>
+      <div class="tool">
+        <div class="tname">Notion</div>
+        <div class="tans"><b>One tree, enforced.</b> Every page lives inside exactly one database or one parent page.</div>
+        <div class="tless"><b>Lesson:</b> has your dilemma <i>worse</i> — "which database does this go in?" is a daily Notion argument. Not the model to copy.</div>
+      </div>
+      <div class="tool">
+        <div class="tname">Tana</div>
+        <div class="tans"><b>No files at all.</b> Everything is a typed node in one pool, browsed entirely through live queries.</div>
+        <div class="tless"><b>Lesson:</b> the closest existing thing to our model — evidence that "flat + types + queries" scales. We keep one advantage: our pages stay plain files you own.</div>
+      </div>
+      <div class="tool feature">
+        <div class="tname">Wikipedia — the interesting one</div>
+        <div class="tans">Wikipedia runs <b>two navigation systems in parallel, on purpose</b>, and never uses folders:</div>
+        <div class="wikiduo">
+          <div class="wikihalf">
+            <b>Category pages</b>
+            Automatic, complete, ugly listings of every article tagged into the category. Nobody curates them; they can't miss anything.
+            <div class="eq" style="margin-top:6px;">= our live tables</div>
+          </div>
+          <div class="wikihalf">
+            <b>"Outline of…" pages</b>
+            Hand-written maps: ordered, opinionated, readable guides to a topic. A human decided what matters first.
+            <div class="eq" style="margin-top:6px;">= our folder pages</div>
+          </div>
+        </div>
+        <div class="tless" style="margin-top:14px;"><b>Lesson:</b> completeness and curation are <i>different jobs</i>. An automatic list can't tell you what matters first; a curated map can't promise it's complete. You need both — and neither one is a folder.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ PART 6 ═══════════════════════════ -->
+<section>
+  <div class="prose">
+    <div class="eyebrow"><span class="num">Part 6</span> The options</div>
+    <h2>Three ways forward</h2>
+    <p>So: keep folders, go flat, or something in between. Concretely:</p>
+  </div>
+
+  <div class="figure">
+    <div class="opts">
+      <div class="opt">
+        <div class="opt-head">
+          <div class="opt-letter a">A</div>
+          <div class="opt-name">Keep both hierarchies<span class="sub">what the vault does today</span></div>
+        </div>
+        <div class="tree">
+          <div class="row"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>functions/</div>
+          <div class="row l1"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>1 Lead Gen/</div>
+          <div class="row l2"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>1.1 Cross-Channel/</div>
+          <div class="row l3"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>Lead Scoring.md</div>
+          <div class="row l3 dim"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>+ index card says it again</div>
+        </div>
+        <div class="opt-body">Deep meaning-folders <i>and</i> index-card connections, maintained in parallel. Every fact written twice; every reorganization is a double migration; workaround folders keep multiplying.</div>
+        <div class="pill no">✕ Guaranteed drift — already happening</div>
+      </div>
+
+      <div class="opt">
+        <div class="opt-head">
+          <div class="opt-letter b">B</div>
+          <div class="opt-name">Fully flat, like Roam<span class="sub">no folders at all</span></div>
+        </div>
+        <div class="tree">
+          <div class="row"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>Customer Acquisition Cost.md</div>
+          <div class="row"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>Lead Scoring.md</div>
+          <div class="row"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>Meta Ads.md</div>
+          <div class="row"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>1 Lead Gen.md</div>
+          <div class="row dim"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>…367 more files in one pile</div>
+        </div>
+        <div class="opt-body">You named the con yourself: at 371 pages and growing, a flat pile is unreadable in Finder and on GitHub — and since folders are <i>already meaningless</i> to the app, deleting them buys nothing.</div>
+        <div class="pill no">✕ Solves a problem you don't have</div>
+      </div>
+
+      <div class="opt rec">
+        <div class="opt-head">
+          <div class="opt-letter c">C</div>
+          <div class="opt-name">Dumb bins + smart pages<span class="sub">my recommendation</span></div>
+        </div>
+        <div class="tree">
+          <div class="row"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>metrics/</div>
+          <div class="row"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>problems/</div>
+          <div class="row l1"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>Lead Scoring.md</div>
+          <div class="row"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>functions/</div>
+          <div class="row l1"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>1 Lead Gen.md</div>
+          <div class="row"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>channels/</div>
+          <div class="row l1"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>Meta Ads.md</div>
+        </div>
+        <div class="opt-body">One shallow folder per <i>type</i> of page — deliberately dumb, so nobody ever mistakes location for meaning. The tree of meaning lives in <b>one</b> place: the index cards. Folder notes become real folder pages. Every fact written once.</div>
+        <div class="pill yes">✓ Finishes what the app already started</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ PART 7 ═══════════════════════════ -->
+<section>
+  <div class="prose">
+    <div class="eyebrow"><span class="num">Part 7</span> What C looks like</div>
+    <h2>Folder pages do what folders couldn't</h2>
+    <p>Under option C, opening "Meta Ads" doesn't mean opening a folder — it means opening a <b>page</b> that is both a curated map (the Wikipedia "Outline" half) and a complete, self-updating list (the "Category" half):</p>
+  </div>
+
+  <div class="figure-narrow">
+    <div class="win">
+      <div class="win-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="win-title">Meta Ads.md — a folder page</span></div>
+      <div class="win-body">
+        <span class="cardlabel green">curated by you — the map</span>
+        <div class="doc-title">Meta Ads</div>
+        <p class="doc-p">Our paid social motion. Start with <span class="wl">Campaign Structure</span>, then <span class="wl">Creative Testing</span>. The funnel math lives in <span class="wl">Video Sales Letter</span>.</p>
+        <p class="doc-p" style="margin-bottom:18px;">▸ <span class="wl">Campaign Structure</span> &nbsp;→&nbsp; how accounts are organized<br>
+        ▸ <span class="wl">Creative</span> &nbsp;→&nbsp; testing cadence and angles<br>
+        ▸ <span class="wl">Measurement</span> &nbsp;→&nbsp; attribution approach</p>
+        <span class="cardlabel slate">automatic — the complete list, updates itself</span>
+        <div class="btable">
+          <div class="thead"><div>Metric</div><div>Owner</div><div>Funnel stage</div></div>
+          <div class="trow"><div>Customer Acquisition Cost</div><div>RevOps / Finance</div><div class="cell-link">—</div></div>
+          <div class="trow"><div>Cost per Lead</div><div>Growth</div><div class="cell-link">Awareness</div></div>
+          <div class="trow"><div>Click Through Rate</div><div>Growth</div><div class="cell-link">Awareness</div></div>
+        </div>
+        <div class="tree-note">"Every metric whose index card says <span class="mono" style="font-size:12px;">channels: [[Meta Ads]]</span>" — written once, embedded here, always current. CAC appears here <b>and</b> on four function folder pages, while its file sits untouched in <span class="mono" style="font-size:12px;">metrics/</span>.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="prose">
+    <p>This is the answer to "where does the Facebook-ads metric go": the file goes in the metrics bin, <em>forever</em>, and every place it belongs to simply pulls it into view. Nothing ever needs to move again.</p>
+    <h3 style="margin-top:36px;">The missing piece in the app</h3>
+    <p>One honest gap remains, and it's the thing your gut kept circling: the sidebar is the main way you browse, and it can only show job 1 — the dumb bins. The <em>real</em> tree (functions → sub-functions → problems, from the index cards) has no browsing surface yet. That's a future app feature — a "browse by connection" lens:</p>
+  </div>
+
+  <div class="figure">
+    <div class="mockduo">
+      <div>
+        <p class="mocklabel">Today — sidebar shows where files sit</p>
+        <div class="win sidebar-mock" style="margin:0 auto;">
+          <div class="sb-top">
+            <div class="sb-icon active"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg></div>
+            <div class="sb-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></div>
+          </div>
+          <div class="win-body" style="padding:12px 10px;">
+            <div class="tree">
+              <div class="row"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>metrics/</div>
+              <div class="row"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>problems/</div>
+              <div class="row"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>functions/</div>
+              <div class="row"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-folder"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg>channels/</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="mocklabel">Future idea — a lens that shows what things mean</p>
+        <div class="win sidebar-mock" style="margin:0 auto;">
+          <div class="sb-top">
+            <div class="sb-icon"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 3h4l1.5 1.5h7.5V13h-13z"/></svg></div>
+            <div class="sb-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></div>
+            <div class="sb-icon active"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="4" cy="4" r="1.8"/><circle cx="12" cy="8" r="1.8"/><circle cx="5" cy="12.5" r="1.8"/><path d="M5.5 5 10.5 7.2M10.5 9 6.5 11.5"/></svg></div>
+          </div>
+          <div class="win-body" style="padding:12px 10px;">
+            <div class="tree">
+              <div class="row"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" class="ic-base"><circle cx="4" cy="4" r="1.8"/><circle cx="12" cy="8" r="1.8"/><circle cx="5" cy="12.5" r="1.8"/><path d="M5.5 5 10.5 7.2M10.5 9 6.5 11.5"/></svg>1 Lead Gen</div>
+              <div class="row l1"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" class="ic-base"><circle cx="4" cy="4" r="1.8"/><circle cx="12" cy="8" r="1.8"/><circle cx="5" cy="12.5" r="1.8"/><path d="M5.5 5 10.5 7.2M10.5 9 6.5 11.5"/></svg>1.1 Cross-Channel</div>
+              <div class="row l2 hl"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>Lead Scoring</div>
+              <div class="row l2"><svg viewBox="0 0 16 16" fill="currentColor" class="ic-file"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg>Lead Routing &amp; SLA</div>
+              <div class="row l1"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" class="ic-base"><circle cx="4" cy="4" r="1.8"/><circle cx="12" cy="8" r="1.8"/><circle cx="5" cy="12.5" r="1.8"/><path d="M5.5 5 10.5 7.2M10.5 9 6.5 11.5"/></svg>1.2 Paid</div>
+            </div>
+            <div class="preview-pop" style="margin-top:10px;">
+              <div class="pt">Lead Scoring</div>
+              All inbound leads treated the same — reps waste time on low-fit leads…
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="verdict">Same indentation, same click-to-open, same feel as folders — but built from the index cards, so one page can appear under <b>every</b> parent it belongs to. This is where "exploring via files" and "exploring via tables" stop being two different worlds.</p>
+  </div>
+
+  <div class="prose">
+    <h3 style="margin-top:36px;">Where your two open issues fit</h3>
+    <p>You worried that building them might create bloat. Verdict on each:</p>
+  </div>
+
+  <div class="figure">
+    <div class="issues">
+      <div class="issue">
+        <div class="iid">YAZ-739</div>
+        <div class="iname">⌘K Search</div>
+        <div class="idesc">Type a name, jump to the page. A fourth lens (recall by name). Touches none of this.</div>
+        <span class="istatus safe">Safe — build as planned</span>
+      </div>
+      <div class="issue">
+        <div class="iid">YAZ-750</div>
+        <div class="iname">Sidebar filter</div>
+        <div class="idesc">Narrow which files show in the sidebar based on index-card values. Fine — <b>if</b> it stays a display filter on the tree and reuses the tables' filter engine, instead of growing into a second query system.</div>
+        <span class="istatus watch">Safe with one guardrail</span>
+      </div>
+      <div class="issue">
+        <div class="iid">Not filed yet</div>
+        <div class="iname">"Browse by connection"</div>
+        <div class="idesc">The sidebar mockup above — the feature your issue description kept circling ("dynamic folders", "indentation that mimics folders", "click to preview"). Would be scoped as its own future issue.</div>
+        <span class="istatus new">New — decide in Q3 below</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ PART 8 ═══════════════════════════ -->
+<section>
+  <div class="prose">
+    <div class="eyebrow"><span class="num">Part 8</span> Your call</div>
+    <h2>The four questions, in plain terms</h2>
+    <p>These are the same Q1–Q4 from my Linear comment, with the context spelled out. Q1 is the fork everything else hangs off.</p>
+  </div>
+
+  <div class="figure-narrow">
+    <div class="q">
+      <span class="qbadge">Q1 · THE BIG ONE</span>
+      <h3>Do we flatten the folders?</h3>
+      <div class="qrow"><div class="qlabel">Context</div><div>Today, problem pages are filed deep inside function folders (<span class="mono" style="font-size:13px;">functions/1 Lead Gen/1.1 Cross-Channel/Lead Scoring.md</span>) — the "copy #1" from Finding 1. This question is: do we delete that copy and keep only the index-card copy?</div></div>
+      <div class="qrow"><div class="qlabel">If yes</div><div>Problems move to a flat <span class="mono" style="font-size:13px;">problems/</span> bin; the function tree lives only on index cards; your generator scripts do the move cheaply and nothing breaks, because the app never cared about location anyway.</div></div>
+      <div class="qrow lean"><div class="qlabel">My lean</div><div><b>Yes.</b> This is the commit moment — everything else in this page assumes it.</div></div>
+    </div>
+
+    <div class="q">
+      <span class="qbadge">Q2</span>
+      <h3>What makes a page a "folder page" — a rule or a habit?</h3>
+      <div class="qrow"><div class="qlabel">Context</div><div>Your "folder pages / master pages" idea. Meta Ads.md and 1 Lead Gen.md already play this role informally. Do we make "folder page" an official page type in the app's registry, or just a convention — a template with an intro, a curated outline, and an embedded live table?</div></div>
+      <div class="qrow"><div class="qlabel">If yes (convention)</div><div>No app changes needed. We write one good template and upgrade the existing hub pages with it.</div></div>
+      <div class="qrow lean"><div class="qlabel">My lean</div><div><b>Convention first.</b> Being a folder page is a role a page plays, not what it is — Meta Ads is still a channel.</div></div>
+    </div>
+
+    <div class="q">
+      <span class="qbadge">Q3</span>
+      <h3>Do we scope the "browse by connection" sidebar lens?</h3>
+      <div class="qrow"><div class="qlabel">Context</div><div>The future-idea mockup in Part 7 — a sidebar tree built from index-card connections instead of folder paths, with click-to-open and preview. This is an app feature, so it would get its own scoped Linear issue (not built now). Also decides the guardrail on YAZ-750: filter-the-tree only.</div></div>
+      <div class="qrow"><div class="qlabel">If yes</div><div>I scope it as a future issue with options (a new table view type vs. a pinned panel in the sidebar), and YAZ-750 gets its guardrail written into the issue.</div></div>
+      <div class="qrow lean"><div class="qlabel">My lean</div><div><b>Yes, but after Q1</b> — the vault change is useful with or without it.</div></div>
+    </div>
+
+    <div class="q">
+      <span class="qbadge">Q4</span>
+      <h3>Do we clean up the index cards?</h3>
+      <div class="qrow"><div class="qlabel">Context</div><div>Small drift found in the audit: metric pages carry both an old text field (<span class="mono" style="font-size:13px;">function: "Cross-functional"</span>) and the newer link field (<span class="mono" style="font-size:13px;">functions: [links]</span>) saying the same thing; plus a few category fields stored as plain text that could be links.</div></div>
+      <div class="qrow"><div class="qlabel">If yes</div><div>A small mechanical script pass over the metric pages. Low stakes, reversible, no app changes.</div></div>
+      <div class="qrow lean"><div class="qlabel">My lean</div><div><b>Yes, whenever</b> — housekeeping, not architecture.</div></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>Full written version of this analysis (with vault evidence) is posted on <a href="https://linear.app/growprofit/issue/YAZ-796/knowledge-management-system#comment-f7351558">YAZ-796</a>. Reply there or here — decisions get recorded as comments on the issue, per the usual workflow. Nothing has been changed in the vault or the app; this page and the comment are analysis only.</p>
+</footer>

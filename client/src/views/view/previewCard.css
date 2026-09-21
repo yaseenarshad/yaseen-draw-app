@@ -1,0 +1,26 @@
+/* Preview mode's hover card (YAZ-1244): `.view-popover`'s surface tokens, sized as a page peek. */
+
+.view-preview {
+  position: fixed;
+  z-index: 60;
+  width: 360px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+/* The height cap lives HERE, with the scroll — a cap on the card too would clip the scroll region. */
+.view-preview__body {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 8px 12px;
+}
+
+.view-preview__empty,
+.view-preview__error {
+  padding: 8px 0;
+  font-size: 13px;
+  color: var(--fg-muted);
+}

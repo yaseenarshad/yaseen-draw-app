@@ -1,0 +1,374 @@
+--- a/src/table-block/dnd/preview.ts
++++ b/src/table-block/dnd/preview.ts
+@@ -1,3 +1,8 @@
++function getEffectiveCSSZoom(element: Element): number {
++  const zoom = (element as Element & { currentCSSZoom?: number }).currentCSSZoom
++  return Number.isFinite(zoom) && zoom! > 0 ? zoom! : 1
++}
++
+ export function clearPreview(previewRoot: HTMLElement) {
+   while (previewRoot.firstChild) previewRoot.removeChild(previewRoot.firstChild)
+ }
+@@ -9,6 +14,7 @@
+   tableContent: HTMLElement,
+   index: number
+ ) {
++  const zoom = getEffectiveCSSZoom(tableContent)
+   const { width: tableWidth, height: tableHeight } = tableContent
+     .querySelector('tbody')!
+     .getBoundingClientRect()
+@@ -21,8 +27,8 @@
+     const height = row.getBoundingClientRect().height
+ 
+     Object.assign(preview.style, {
+-      width: `${tableWidth}px`,
+-      height: `${height}px`,
++      width: `${tableWidth / zoom}px`,
++      height: `${height / zoom}px`,
+     })
+ 
+     preview.dataset.show = 'true'
+@@ -47,8 +53,8 @@
+     })
+ 
+     Object.assign(preview.style, {
+-      width: `${width}px`,
+-      height: `${tableHeight}px`,
++      width: `${width! / zoom}px`,
++      height: `${tableHeight / zoom}px`,
+     })
+ 
+     preview.dataset.show = 'true'
+--- a/src/table-block/dnd/drag-over-handler.ts
++++ b/src/table-block/dnd/drag-over-handler.ts
+@@ -1,3 +1,8 @@
++function getEffectiveCSSZoom(element: Element): number {
++  const zoom = (element as Element & { currentCSSZoom?: number }).currentCSSZoom
++  return Number.isFinite(zoom) && zoom! > 0 ? zoom! : 1
++}
++
+ import { computePosition, offset } from '@floating-ui/dom'
+ import { throttle } from 'lodash-es'
+ 
+@@ -24,25 +29,27 @@
+ 
+     if (!contentRoot.offsetParent) return
+ 
++    const zoom = getEffectiveCSSZoom(contentRoot)
+     const wrapperOffsetTop = (contentRoot.offsetParent as HTMLElement).offsetTop
+     const wrapperOffsetLeft = (contentRoot.offsetParent as HTMLElement)
+       .offsetLeft
+ 
+     if (info.type === 'col') {
+-      const width = dom.col.getBoundingClientRect().width
+-      const { left, width: fullWidth } = contentRoot.getBoundingClientRect()
+-      const leftGap = wrapperOffsetLeft - left
+-      const previewLeft = e.clientX + leftGap - width / 2
++      const width = dom.col.getBoundingClientRect().width / zoom
++      const { left, width: scaledFullWidth } = contentRoot.getBoundingClientRect()
++      const fullWidth = scaledFullWidth / zoom
++      const pointerLeft = wrapperOffsetLeft + (e.clientX - left) / zoom
++      const previewLeft = pointerLeft - width / 2
+ 
+       const [startX] = info.startCoords
+       const direction = startX < e.clientX ? 'right' : 'left'
+ 
+       preview.style.top = `${wrapperOffsetTop}px`
+       const previewLeftOffset =
+-        previewLeft < left + leftGap - 20
+-          ? left + leftGap - 20
+-          : previewLeft > left + fullWidth + leftGap - width + 20
+-            ? left + fullWidth + leftGap - width + 20
++        previewLeft < wrapperOffsetLeft - 20
++          ? wrapperOffsetLeft - 20
++          : previewLeft > wrapperOffsetLeft + fullWidth - width + 20
++            ? wrapperOffsetLeft + fullWidth - width + 20
+             : previewLeft
+ 
+       preview.style.left = `${previewLeftOffset}px`
+@@ -56,12 +63,12 @@
+ 
+         computePosition(col, yHandle, {
+           placement: direction === 'left' ? 'left' : 'right',
+-          middleware: [offset(direction === 'left' ? -1 * yHandleWidth : 0)],
++          middleware: [offset(direction === 'left' ? (-1 * yHandleWidth) / zoom : 0)],
+         })
+           .then(({ x }) => {
+             yHandle.dataset.show = 'true'
+             Object.assign(yHandle.style, {
+-              height: `${contentBoundary.height}px`,
++              height: `${contentBoundary.height / zoom}px`,
+               left: `${x}px`,
+               top: `${wrapperOffsetTop}px`,
+             })
+@@ -69,20 +76,21 @@
+           .catch(console.error)
+       }
+     } else if (info.type === 'row') {
+-      const height = dom.row.getBoundingClientRect().height
+-      const { top, height: fullHeight } = contentRoot.getBoundingClientRect()
++      const height = dom.row.getBoundingClientRect().height / zoom
++      const { top, height: scaledFullHeight } = contentRoot.getBoundingClientRect()
++      const fullHeight = scaledFullHeight / zoom
+ 
+-      const topGap = wrapperOffsetTop - top
+-      const previewTop = e.clientY + topGap - height / 2
++      const pointerTop = wrapperOffsetTop + (e.clientY - top) / zoom
++      const previewTop = pointerTop - height / 2
+ 
+       const [_, startY] = info.startCoords
+       const direction = startY < e.clientY ? 'down' : 'up'
+ 
+       const previewTopOffset =
+-        previewTop < top + topGap - 20
+-          ? top + topGap - 20
+-          : previewTop > top + fullHeight + topGap - height + 20
+-            ? top + fullHeight + topGap - height + 20
++        previewTop < wrapperOffsetTop - 20
++          ? wrapperOffsetTop - 20
++          : previewTop > wrapperOffsetTop + fullHeight - height + 20
++            ? wrapperOffsetTop + fullHeight - height + 20
+             : previewTop
+ 
+       preview.style.top = `${previewTopOffset}px`
+@@ -97,12 +105,12 @@
+ 
+         computePosition(row, xHandle, {
+           placement: direction === 'up' ? 'top' : 'bottom',
+-          middleware: [offset(direction === 'up' ? -1 * xHandleHeight : 0)],
++          middleware: [offset(direction === 'up' ? (-1 * xHandleHeight) / zoom : 0)],
+         })
+           .then(({ y }) => {
+             xHandle.dataset.show = 'true'
+             Object.assign(xHandle.style, {
+-              width: `${contentBoundary.width}px`,
++              width: `${contentBoundary.width / zoom}px`,
+               top: `${y}px`,
+             })
+           })
+--- a/src/table-block/view/pointer.ts
++++ b/src/table-block/view/pointer.ts
+@@ -1,3 +1,8 @@
++function getEffectiveCSSZoom(element: Element): number {
++  const zoom = (element as Element & { currentCSSZoom?: number }).currentCSSZoom
++  return Number.isFinite(zoom) && zoom! > 0 ? zoom! : 1
++}
++
+ import type { EditorView } from '@milkdown/prose/view'
+ 
+ import { computePosition, offset } from '@floating-ui/dom'
+@@ -44,12 +49,15 @@
+     const dom = getRelatedDOM(contentWrapperRef, index)
+     if (!dom) return
+ 
++    const zoom = getEffectiveCSSZoom(content)
+     const [rowIndex, colIndex] = index
+     const boundary = dom.col.getBoundingClientRect()
+-    const closeToBoundaryLeft = Math.abs(e.clientX - boundary.left) < 8
+-    const closeToBoundaryRight = Math.abs(boundary.right - e.clientX) < 8
+-    const closeToBoundaryTop = Math.abs(e.clientY - boundary.top) < 8
+-    const closeToBoundaryBottom = Math.abs(boundary.bottom - e.clientY) < 8
++    const boundaryThreshold = 8 * zoom
++    const closeToBoundaryLeft =
++      Math.abs(e.clientX - boundary.left) < boundaryThreshold
++    const closeToBoundaryRight = Math.abs(boundary.right - e.clientX) < boundaryThreshold
++    const closeToBoundaryTop = Math.abs(e.clientY - boundary.top) < boundaryThreshold
++    const closeToBoundaryBottom = Math.abs(boundary.bottom - e.clientY) < boundaryThreshold
+ 
+     const closeToBoundary =
+       closeToBoundaryLeft ||
+@@ -77,12 +85,12 @@
+         lineHoverIndex.value![1] = closeToBoundaryLeft ? colIndex : colIndex + 1
+         computePosition(dom.col, yHandle, {
+           placement: closeToBoundaryLeft ? 'left' : 'right',
+-          middleware: [offset(closeToBoundaryLeft ? -1 * yHandleWidth : 0)],
++          middleware: [offset(closeToBoundaryLeft ? (-1 * yHandleWidth) / zoom : 0)],
+         })
+           .then(({ x }) => {
+             yHandle.dataset.show = 'true'
+             Object.assign(yHandle.style, {
+-              height: `${contentBoundary.height}px`,
++              height: `${contentBoundary.height / zoom}px`,
+               left: `${x}px`,
+             })
+           })
+@@ -97,12 +105,12 @@
+         lineHoverIndex.value![0] = closeToBoundaryTop ? rowIndex : rowIndex + 1
+         computePosition(dom.row, xHandle, {
+           placement: closeToBoundaryTop ? 'top' : 'bottom',
+-          middleware: [offset(closeToBoundaryTop ? -1 * xHandleHeight : 0)],
++          middleware: [offset(closeToBoundaryTop ? (-1 * xHandleHeight) / zoom : 0)],
+         })
+           .then(({ y }) => {
+             xHandle.dataset.show = 'true'
+             Object.assign(xHandle.style, {
+-              width: `${contentBoundary.width}px`,
++              width: `${contentBoundary.width / zoom}px`,
+               top: `${y}px`,
+             })
+           })
+--- a/lib/table-block/index.js
++++ b/lib/table-block/index.js
+@@ -155,10 +155,16 @@
+   return context;
+ }
+ 
++function getEffectiveCSSZoom(element) {
++  const zoom = element.currentCSSZoom;
++  return Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
++}
++
+ function clearPreview(previewRoot) {
+   while (previewRoot.firstChild) previewRoot.removeChild(previewRoot.firstChild);
+ }
+ function renderPreview(axis, preview, previewRoot, tableContent, index) {
++  const zoom = getEffectiveCSSZoom(tableContent);
+   const { width: tableWidth, height: tableHeight } = tableContent.querySelector("tbody").getBoundingClientRect();
+   if (axis === "y") {
+     const rows = tableContent.querySelectorAll("tr");
+@@ -167,8 +173,8 @@
+     previewRoot.appendChild(row.cloneNode(true));
+     const height = row.getBoundingClientRect().height;
+     Object.assign(preview.style, {
+-      width: `${tableWidth}px`,
+-      height: `${height}px`
++      width: `${tableWidth / zoom}px`,
++      height: `${height / zoom}px`
+     });
+     preview.dataset.show = "true";
+     return;
+@@ -186,8 +192,8 @@
+       previewRoot.appendChild(tr);
+     });
+     Object.assign(preview.style, {
+-      width: `${width}px`,
+-      height: `${tableHeight}px`
++      width: `${width / zoom}px`,
++      height: `${tableHeight / zoom}px`
+     });
+     preview.dataset.show = "true";
+     return;
+@@ -435,17 +441,19 @@
+     const info = dragInfo.value;
+     if (!info) return;
+     if (!contentRoot.offsetParent) return;
++    const zoom = getEffectiveCSSZoom(contentRoot);
+     const wrapperOffsetTop = contentRoot.offsetParent.offsetTop;
+     const wrapperOffsetLeft = contentRoot.offsetParent.offsetLeft;
+     if (info.type === "col") {
+-      const width = dom.col.getBoundingClientRect().width;
+-      const { left, width: fullWidth } = contentRoot.getBoundingClientRect();
+-      const leftGap = wrapperOffsetLeft - left;
+-      const previewLeft = e.clientX + leftGap - width / 2;
++      const width = dom.col.getBoundingClientRect().width / zoom;
++      const { left, width: scaledFullWidth } = contentRoot.getBoundingClientRect();
++      const fullWidth = scaledFullWidth / zoom;
++      const pointerLeft = wrapperOffsetLeft + (e.clientX - left) / zoom;
++      const previewLeft = pointerLeft - width / 2;
+       const [startX] = info.startCoords;
+       const direction = startX < e.clientX ? "right" : "left";
+       preview.style.top = `${wrapperOffsetTop}px`;
+-      const previewLeftOffset = previewLeft < left + leftGap - 20 ? left + leftGap - 20 : previewLeft > left + fullWidth + leftGap - width + 20 ? left + fullWidth + leftGap - width + 20 : previewLeft;
++      const previewLeftOffset = previewLeft < wrapperOffsetLeft - 20 ? wrapperOffsetLeft - 20 : previewLeft > wrapperOffsetLeft + fullWidth - width + 20 ? wrapperOffsetLeft + fullWidth - width + 20 : previewLeft;
+       preview.style.left = `${previewLeftOffset}px`;
+       const dragOverColumn = getDragOverColumn(contentRoot, e.clientX);
+       if (dragOverColumn) {
+@@ -455,24 +463,25 @@
+         info.endIndex = index;
+         computePosition(col, yHandle, {
+           placement: direction === "left" ? "left" : "right",
+-          middleware: [offset(direction === "left" ? -1 * yHandleWidth : 0)]
++          middleware: [offset(direction === "left" ? -1 * yHandleWidth / zoom : 0)]
+         }).then(({ x }) => {
+           yHandle.dataset.show = "true";
+           Object.assign(yHandle.style, {
+-            height: `${contentBoundary.height}px`,
++            height: `${contentBoundary.height / zoom}px`,
+             left: `${x}px`,
+             top: `${wrapperOffsetTop}px`
+           });
+         }).catch(console.error);
+       }
+     } else if (info.type === "row") {
+-      const height = dom.row.getBoundingClientRect().height;
+-      const { top, height: fullHeight } = contentRoot.getBoundingClientRect();
+-      const topGap = wrapperOffsetTop - top;
+-      const previewTop = e.clientY + topGap - height / 2;
++      const height = dom.row.getBoundingClientRect().height / zoom;
++      const { top, height: scaledFullHeight } = contentRoot.getBoundingClientRect();
++      const fullHeight = scaledFullHeight / zoom;
++      const pointerTop = wrapperOffsetTop + (e.clientY - top) / zoom;
++      const previewTop = pointerTop - height / 2;
+       const [_, startY] = info.startCoords;
+       const direction = startY < e.clientY ? "down" : "up";
+-      const previewTopOffset = previewTop < top + topGap - 20 ? top + topGap - 20 : previewTop > top + fullHeight + topGap - height + 20 ? top + fullHeight + topGap - height + 20 : previewTop;
++      const previewTopOffset = previewTop < wrapperOffsetTop - 20 ? wrapperOffsetTop - 20 : previewTop > wrapperOffsetTop + fullHeight - height + 20 ? wrapperOffsetTop + fullHeight - height + 20 : previewTop;
+       preview.style.top = `${previewTopOffset}px`;
+       preview.style.left = `${wrapperOffsetLeft}px`;
+       const dragOverRow = getDragOverRow(contentRoot, e.clientY);
+@@ -483,11 +492,11 @@
+         info.endIndex = index;
+         computePosition(row, xHandle, {
+           placement: direction === "up" ? "top" : "bottom",
+-          middleware: [offset(direction === "up" ? -1 * xHandleHeight : 0)]
++          middleware: [offset(direction === "up" ? -1 * xHandleHeight / zoom : 0)]
+         }).then(({ y }) => {
+           xHandle.dataset.show = "true";
+           Object.assign(xHandle.style, {
+-            width: `${contentBoundary.width}px`,
++            width: `${contentBoundary.width / zoom}px`,
+             top: `${y}px`
+           });
+         }).catch(console.error);
+@@ -712,12 +721,14 @@
+     if (!index) return;
+     const dom = getRelatedDOM(contentWrapperRef, index);
+     if (!dom) return;
++    const zoom = getEffectiveCSSZoom(content);
+     const [rowIndex, colIndex] = index;
+     const boundary = dom.col.getBoundingClientRect();
+-    const closeToBoundaryLeft = Math.abs(e.clientX - boundary.left) < 8;
+-    const closeToBoundaryRight = Math.abs(boundary.right - e.clientX) < 8;
+-    const closeToBoundaryTop = Math.abs(e.clientY - boundary.top) < 8;
+-    const closeToBoundaryBottom = Math.abs(boundary.bottom - e.clientY) < 8;
++    const boundaryThreshold = 8 * zoom;
++    const closeToBoundaryLeft = Math.abs(e.clientX - boundary.left) < boundaryThreshold;
++    const closeToBoundaryRight = Math.abs(boundary.right - e.clientX) < boundaryThreshold;
++    const closeToBoundaryTop = Math.abs(e.clientY - boundary.top) < boundaryThreshold;
++    const closeToBoundaryBottom = Math.abs(boundary.bottom - e.clientY) < boundaryThreshold;
+     const closeToBoundary = closeToBoundaryLeft || closeToBoundaryRight || closeToBoundaryTop || closeToBoundaryBottom;
+     const rowButtonGroup = rowHandle.querySelector(".button-group");
+     const colButtonGroup = colHandle.querySelector(".button-group");
+@@ -735,11 +746,11 @@
+         lineHoverIndex.value[1] = closeToBoundaryLeft ? colIndex : colIndex + 1;
+         computePosition(dom.col, yHandle, {
+           placement: closeToBoundaryLeft ? "left" : "right",
+-          middleware: [offset(closeToBoundaryLeft ? -1 * yHandleWidth : 0)]
++          middleware: [offset(closeToBoundaryLeft ? -1 * yHandleWidth / zoom : 0)]
+         }).then(({ x }) => {
+           yHandle.dataset.show = "true";
+           Object.assign(yHandle.style, {
+-            height: `${contentBoundary.height}px`,
++            height: `${contentBoundary.height / zoom}px`,
+             left: `${x}px`
+           });
+         }).catch(console.error);
+@@ -750,11 +761,11 @@
+         lineHoverIndex.value[0] = closeToBoundaryTop ? rowIndex : rowIndex + 1;
+         computePosition(dom.row, xHandle, {
+           placement: closeToBoundaryTop ? "top" : "bottom",
+-          middleware: [offset(closeToBoundaryTop ? -1 * xHandleHeight : 0)]
++          middleware: [offset(closeToBoundaryTop ? -1 * xHandleHeight / zoom : 0)]
+         }).then(({ y }) => {
+           xHandle.dataset.show = "true";
+           Object.assign(xHandle.style, {
+-            width: `${contentBoundary.width}px`,
++            width: `${contentBoundary.width / zoom}px`,
+             top: `${y}px`
+           });
+         }).catch(console.error);
+@@ -1101,4 +1112,3 @@
+ const tableBlock = [tableBlockConfig, tableBlockView];
+ 
+ export { TableNodeView, tableBlock, tableBlockConfig, tableBlockView };
+-//# sourceMappingURL=index.js.map
