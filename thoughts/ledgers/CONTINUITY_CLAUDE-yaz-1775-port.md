@@ -36,10 +36,10 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 
 - Done:
   - [x] 2A — Seed the repo from docs-app and rename to Yaseen Draw (YAZ-1807)
-- Now: [→] 2B — Strip the markdown-only subsystems, delete never hide (YAZ-1808)
+  - [x] 2C — Re-pack the engine at `e72242f8` and add `packEngine` (YAZ-1809)
+  - [x] 2B — Strip the markdown-only subsystems, delete never hide (YAZ-1808)
+- Now: [→] 2D — Make `.excalidraw` the document: load, save, autosave, conflict, chips (YAZ-1810)
 - Remaining:
-  - [ ] 2C — Re-pack the engine at `e72242f8` and add `packEngine` (YAZ-1809)
-  - [ ] 2D — Make `.excalidraw` the document: load, save, autosave, conflict, chips (YAZ-1810)
   - [ ] 2E — Image store: `assets/`, hydrate, extract, orphan sweep (YAZ-1811)
   - [ ] 2F — Canvas chrome: rail, panel shell, menus, full toolbar, parity checklist (YAZ-1812)
   - [ ] 2G — Settings: canvas preferences, Library folder, trims (YAZ-1813)
@@ -59,11 +59,10 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 
 ## Open Questions
 
-- UNCONFIRMED: ~14 source comments still point at `docs/CONTRACTS.md`, which D1 deliberately did not copy. 2B rewrites the docs — it should either add a Draw-shaped `CONTRACTS.md` or drop those pointers. Left untouched in 2A on purpose.
-- UNCONFIRMED: the CLI shim is `yaseendraw` (`desktop/src/cli`, `desktop/build/bin/yaseendraw`) and its help text still talks about page *comments*. 2B decides whether it survives at all.
-- UNCONFIRMED: `desktop/package.json` still carries its own `version: 0.4.4`, which is what `${version}` in the dmg/nsis artifact names resolves to. Root is `0.1.0`. 4D should settle which version stamps a release.
-- UNCONFIRMED: `LAUNCH.md` and `README.md` still describe a markdown editor (2A only fixed titles and names). 2B owns the rewrite.
 - UNCONFIRMED: `desktop/build/icon.png` is the only icon asset; the stale docs-app `icon.icns`/`icon.ico` were deleted and electron-builder now derives both from the PNG. Confirm during the 4D packaging run.
+- UNCONFIRMED (2B leftover, for 2D/2G): the rename CONFIRM sheet survives without its reason. ⚡ YAZ-888 made a name change ask first *because* the rename chained into every `[[wikilink]]`; with links gone the sheet now only says "Rename 'x' to 'y'?". Kept rather than removed — deleting a confirm is a product decision, not a strip — but it may want to go.
+- UNCONFIRMED (2B leftover, for 2D): `client/src/Editor.tsx` is a kind dispatcher with nothing to dispatch to — a drawing currently renders an empty pane. 2D mounts the canvas there and re-wires `SaveIndicator` / `SyncIndicator` (moved to `client/src/drawings/`) and the conflict bar, whose CSS is still in `app.css`.
+- UNCONFIRMED (2B leftover, for 2D): `focusOpenDocument` (Escape-from-sidebar → the document) went with `lib/focusHandoff.ts`; the canvas needs its own handoff.
 
 ## Working Set
 
@@ -76,7 +75,7 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
   ```sh
   npm ci
   npm run typecheck
-  npm test          # vitest, 4 projects: client jsdom, desktop node, tools node, perf jsdom
+  npm test          # vitest, 3 projects: client jsdom, desktop node, tools node
   npm run build     # electron-vite build into desktop/out
-  # npm run e2e     # FORBIDDEN — Playwright is never run
+  # there is no e2e script: Playwright was deleted in 2B (OD1)
   ```
