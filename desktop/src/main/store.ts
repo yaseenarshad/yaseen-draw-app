@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, renameSync } from 'node:fs'
 import { dirname, isAbsolute } from 'node:path'
 import {
+  DEFAULT_CANVAS_PANEL,
   DEFAULT_SETTINGS,
   MAX_RECENT_ROOTS,
   SIDEBAR_DEFAULT_W,
@@ -10,8 +11,10 @@ import {
   addRecentRoot,
   defaultAppState,
   defaultFolderState,
+  isCanvasPanelTab,
   isSidebarLens,
   type AppState,
+  type CanvasPanelState,
   type FolderState,
   type RecentRoots,
   type SettingsState,
@@ -20,6 +23,7 @@ import {
   type WindowBounds,
   type WindowEntry,
 } from '@shared/types'
+import { isCanvasPrefs, sanitizeCanvasPrefs } from '@shared/canvasPrefs'
 import { atomicWrite } from './fs/fsUtils'
 
 /**
@@ -80,18 +84,43 @@ const clampSidebarWidth = (w: number): number => Math.min(SIDEBAR_MAX_W, Math.ma
 export const isRecentRoots = (v: unknown): v is RecentRoots =>
   Array.isArray(v) && v.every((x) => isRecord(x) && typeof x.path === 'string' && isFiniteNumber(x.lastOpened))
 
+/** The canvas panel's memory (🔒 D10): both halves guarded, an unknown tab reads as the default. */
+export const isCanvasPanel = (v: unknown): v is CanvasPanelState => isRecord(v) && isCanvasPanelTab(v.tab) && typeof v.docked === 'boolean'
+const sanitizeCanvasPanel = (raw: unknown): CanvasPanelState => {
+  const src = isRecord(raw) ? raw : {}
+  return { tab: isCanvasPanelTab(src.tab) ? src.tab : DEFAULT_CANVAS_PANEL.tab, docked: typeof src.docked === 'boolean' ? src.docked : DEFAULT_CANVAS_PANEL.docked }
+}
+
 /** Per-field guards shared by the loader, `sanitizeSettings` and the IPC boundary (`isSettings`). */
 const SETTINGS_FIELD_OK: { [K in keyof SettingsState]: (v: unknown) => v is SettingsState[K] } = {
   theme: (v): v is Theme => typeof v === 'string' && (THEMES as readonly string[]).includes(v),
   confirmDelete: (v): v is boolean => typeof v === 'boolean',
+  // 🔒 D9: STRICT at the bridge — a sandboxed renderer hands over a whole `CanvasPrefs` or nothing.
+  canvas: isCanvasPrefs,
+  canvasPanel: isCanvasPanel,
 }
 const SETTINGS_KEYS = Object.keys(SETTINGS_FIELD_OK) as Array<keyof SettingsState>
+
+/**
+ * The LENIENT half of 🔒 D9's "strict guard at IPC, lenient sanitize on load": the two composite
+ * fields are repaired key by key rather than thrown away whole, so a state file written before a
+ * canvas pref existed keeps every pref it does have instead of resetting the lot.
+ */
+const SETTINGS_SANITIZE: Partial<{ [K in keyof SettingsState]: (v: unknown) => SettingsState[K] }> = {
+  canvas: sanitizeCanvasPrefs,
+  canvasPanel: sanitizeCanvasPanel,
+}
 
 /** Stored settings merged field-by-field over defaults, so partial/stale shapes stay usable. */
 export function sanitizeSettings(raw: unknown): SettingsState {
   const src = isRecord(raw) ? raw : {}
   const out = { ...DEFAULT_SETTINGS }
   for (const k of SETTINGS_KEYS) {
+    const repair = SETTINGS_SANITIZE[k]
+    if (repair !== undefined) {
+      ;(out as Record<string, unknown>)[k] = repair(src[k])
+      continue
+    }
     const v = src[k]
     if (SETTINGS_FIELD_OK[k](v)) (out as Record<string, unknown>)[k] = v
   }

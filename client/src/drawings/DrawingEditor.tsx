@@ -28,7 +28,13 @@
  *
  * ⚡ KEYS ARE THE HOST'S, NEVER `window`'s. ⌘S is caught on this element in the CAPTURE phase —
  * before the engine's own keymap sees it — and flushes now. A `window` listener would fire for
- * every mounted tab at once, and the shell keeps several mounted.
+ * every mounted tab at once, and the shell keeps several mounted. The surface applies the same
+ * rule to ⌘F / ⌘C, and it is why the parity checklist drops `handleKeyboardGlobally`.
+ *
+ * THE APPLICATION MENU'S TWO CANVAS ITEMS (🔒 D10) arrive the same way: `App` dispatches a
+ * `DRAWING_COMMAND_EVENT` on the VISIBLE `.editor--drawing` section (`drawingCommand.ts`), and
+ * this host claims it on its own element. Same reason as the keys — several engines are mounted,
+ * and exactly one of them is in front.
  *
  * THE CHIPS ARE THE ENGINE'S TOP-RIGHT ROW, not a strip above the canvas: the canvas starts
  * directly under the tab bar, and the chips sit where the web app's cloud status does.
@@ -47,13 +53,14 @@
  * live canvas cannot, and the pre-rename flush has already put it on disk.
  */
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
-import type { DrawingLoadResponse, GithubSyncStatus } from '@shared/types'
+import type { CanvasPanelState, CanvasPrefs, DrawingLoadResponse, GithubSyncStatus } from '@shared/types'
 import { unpersistedFiles } from '@shared/drawingAssets'
 import { api, BridgeRequestError } from '../api'
 import type { WatchSource } from '../hooks/useWatch'
 import { Autosave, SaveConflict, type SaveStatus } from '../lib/autosave'
 import { registerRenameContinuity } from '../lib/renameContinuity'
 import { useAppliedTheme } from '../lib/theme'
+import { DRAWING_COMMAND_EVENT, type DrawingCommand } from './drawingCommand'
 import { parseSceneText, type DrawingScene } from './drawingScene'
 import { ExcalidrawSurface, type DrawingSnapshot, type DrawingSurfaceApi } from './ExcalidrawSurface'
 import { SaveIndicator } from './SaveIndicator'
@@ -72,10 +79,15 @@ export interface DrawingEditorProps {
   sync?: GithubSyncStatus | null
   onSyncNow?: () => void
   /**
-   * User-level canvas preferences as engine `appState` (🔒 D9, wired in YAZ-1813). Read once, at
-   * load, to seed the scene; `{}` — the default — means the engine's own defaults.
+   * The user-level canvas preferences (🔒 D9), App's copy of `SettingsState.canvas`: seeded into
+   * the scene at mount and kept in step with the engine both ways. Omitted = the engine's defaults.
    */
-  canvasAppState?: Record<string, unknown>
+  canvasPrefs?: CanvasPrefs
+  /** The engine (or the rail) moved a pref: App writes it back to the one store every window reads. */
+  onCanvasPrefsChange?: (next: CanvasPrefs) => void
+  /** What the canvas panel remembers between mounts: its last-used tab and its dock pref (🔒 D10). */
+  canvasPanel?: CanvasPanelState
+  onCanvasPanelChange?: (next: CanvasPanelState) => void
 }
 
 /** A loaded document: the scene the canvas opens on, and the mtime the first save guards with. */
@@ -98,7 +110,7 @@ function toDocument(res: DrawingLoadResponse): LoadedDocument {
   return { scene: { ...parsed, files }, mtime: res.mtime, stored: res.stored }
 }
 
-export function DrawingEditor({ root, path, watch, sync, onSyncNow, canvasAppState }: DrawingEditorProps) {
+export function DrawingEditor({ root, path, watch, sync, onSyncNow, canvasPrefs, onCanvasPrefsChange, canvasPanel, onCanvasPanelChange }: DrawingEditorProps) {
   const [loaded, setLoaded] = useState<LoadedDocument | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -135,7 +147,20 @@ export function DrawingEditor({ root, path, watch, sync, onSyncNow, canvasAppSta
       {error === null && loaded === null && <p className="editor-msg">Loading…</p>}
       {/* Keyed by path so a rename mounts a fresh host rather than re-pointing a live canvas. */}
       {error === null && loaded !== null && (
-        <DrawingHost key={path} root={root} path={path} loaded={loaded} watch={watch} sync={sync} onSyncNow={onSyncNow} canvasAppState={canvasAppState} onFailed={setError} />
+        <DrawingHost
+          key={path}
+          root={root}
+          path={path}
+          loaded={loaded}
+          watch={watch}
+          sync={sync}
+          onSyncNow={onSyncNow}
+          canvasPrefs={canvasPrefs}
+          onCanvasPrefsChange={onCanvasPrefsChange}
+          canvasPanel={canvasPanel}
+          onCanvasPanelChange={onCanvasPanelChange}
+          onFailed={setError}
+        />
       )}
     </section>
   )
@@ -147,7 +172,7 @@ interface DrawingHostProps extends DrawingEditorProps {
 }
 
 /** Mounts exactly one canvas for `loaded` and owns everything that writes. */
-function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasAppState, onFailed }: DrawingHostProps) {
+function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasPrefs, onCanvasPrefsChange, canvasPanel, onCanvasPanelChange, onFailed }: DrawingHostProps) {
   const theme = useAppliedTheme()
   const hostRef = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState<SaveStatus>('saved')
@@ -278,6 +303,25 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasAppStat
     [path],
   )
 
+  // The application menu's two canvas items (🔒 D10), claimed on THIS host's element so only the
+  // drawing in front answers. `drawingCommand.ts` already picked the visible layer; a host whose
+  // engine has not handed its API over yet simply has nothing to do.
+  useEffect(() => {
+    // The event lands on the SECTION `drawingCommand.ts` selects (`.editor--drawing`), and it does
+    // not bubble — on purpose, so no ancestor can become a second claimant.
+    const section = hostRef.current?.closest('.editor--drawing') ?? null
+    if (section === null) return
+    const onCommand = (event: Event): void => {
+      const command = (event as CustomEvent<DrawingCommand>).detail
+      const s = surface.current
+      if (s === null) return
+      if (command.kind === 'export-image') s.openImageExport()
+      else s.setCanvasBackground(command.color)
+    }
+    section.addEventListener(DRAWING_COMMAND_EVENT, onCommand)
+    return () => section.removeEventListener(DRAWING_COMMAND_EVENT, onCommand)
+  }, [])
+
   // A tab coming back from `visibility: hidden` may have been laid out at the wrong size.
   useEffect(() => {
     const host = hostRef.current
@@ -328,7 +372,18 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasAppStat
         </div>
       )}
       <div className="drawing-editor__canvas">
-        <ExcalidrawSurface scene={loaded.scene} theme={theme} canvasAppState={canvasAppState} onSnapshot={onSnapshot} onFailed={onFailed} onApi={onApi} renderTopRight={renderTopRight} />
+        <ExcalidrawSurface
+          scene={loaded.scene}
+          theme={theme}
+          canvasPrefs={canvasPrefs}
+          onCanvasPrefsChange={onCanvasPrefsChange}
+          canvasPanel={canvasPanel}
+          onCanvasPanelChange={onCanvasPanelChange}
+          onSnapshot={onSnapshot}
+          onFailed={onFailed}
+          onApi={onApi}
+          renderTopRight={renderTopRight}
+        />
       </div>
     </div>
   )

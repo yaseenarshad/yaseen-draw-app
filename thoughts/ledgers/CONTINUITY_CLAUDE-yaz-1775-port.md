@@ -40,9 +40,9 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
   - [x] 2B — Strip the markdown-only subsystems, delete never hide (YAZ-1808)
   - [x] 2D — Make `.excalidraw` the document: load, save, autosave, conflict, chips (YAZ-1810)
   - [x] 2E — Image store: `assets/`, hydrate, extract, orphan sweep (YAZ-1811)
-- Now: [→] 2F — Canvas chrome: rail, panel shell, menus, full toolbar, parity checklist (YAZ-1812)
+  - [x] 2F — Canvas chrome: rail, panel shell, menus, full toolbar, parity checklist (YAZ-1812)
+- Now: [→] 2G — Settings: canvas preferences, Library folder, trims (YAZ-1813)
 - Remaining:
-  - [ ] 2G — Settings: canvas preferences, Library folder, trims (YAZ-1813)
   - [ ] 2H — ⌘K search over the drawing catalog (YAZ-1814)
   - [ ] 2I — New drawing, naming, extension display, file association (YAZ-1815)
   - [ ] 3A — Library folder and secrets plumbing (YAZ-1817)
@@ -61,10 +61,18 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 
 - UNCONFIRMED: `desktop/build/icon.png` is the only icon asset; the stale docs-app `icon.icns`/`icon.ico` were deleted and electron-builder now derives both from the PNG. Confirm during the 4D packaging run.
 - UNCONFIRMED (2B leftover, for 2D/2G): the rename CONFIRM sheet survives without its reason. ⚡ YAZ-888 made a name change ask first *because* the rename chained into every `[[wikilink]]`; with links gone the sheet now only says "Rename 'x' to 'y'?". Kept rather than removed — deleting a confirm is a product decision, not a strip — but it may want to go.
-- UNCONFIRMED (for 2F): `focusOpenDocument` (Escape-from-sidebar → the document) went with `lib/focusHandoff.ts` in 2B. 2D gives the canvas `autoFocus` at MOUNT — safe on a background tab, because a hidden layer is `visibility: hidden` and Chromium will not focus into one — but a tab that becomes visible LATER still gets no focus. That is the handoff 2F owes.
-- UNCONFIRMED (posted on YAZ-1810, awaiting Yasin): the image half of the asset pipe (`fs:read-asset` / `fs:write-asset`) has no caller left. 2D removed its drawing half; whether the rest goes now or waits for 3A/3B is a decision, not a cleanup.
+- RESOLVED (🔒 "Dead asset pipe deleted" on YAZ-1775): the image half of the asset pipe is gone — module, tests, channels, preload methods, types and CONTRACTS rows — in 2F's first commit.
+- UNCONFIRMED (posted on YAZ-1812, awaiting Yasin): `focusOpenDocument`. A tab that becomes visible LATER still gets no focus — `autoFocus` only fires at mount. Whether the canvas should claim focus when its layer becomes visible is a product call, so 2F left it alone.
 
-## Learnings (2D / 2E)
+## Learnings (2D / 2E / 2F)
+
+- **The toolbar-mode names read backwards.** The fully built-out `ContextualPropertiesToolbar` is the engine's `full` desktop mode; `compact` is upstream's vertical strip. `YASEEN_FULL_TOOLBAR_MODE` exists so no one ever writes the bare string and inverts it again (rounds 3–4 did).
+- **`getFormFactor` is the other half of that gate.** Without it a canvas pane narrowed by the shell sidebar falls into the engine's ≤ 1180 px tablet band and is forced to `compact` before the localStorage key is ever consulted.
+- **Nothing the engine is handed may change identity.** `<Excalidraw>` is memoized and calls `onChange` on every render, so `initialData` is built ONCE from the mount-time scene and prefs, and the rail reads live state from a tiny external store rather than props.
+- **One ref, two directions.** `appliedRef` is "what the engine is believed to hold"; both the engine→shell read-back and the shell→engine push compare against it before writing. That single comparison is the whole anti-ping-pong rule.
+- **`toolLock` and `framesVisible` are not plain appState.** A partial `activeTool` wipes the tool the user is holding, so a live lock update merges with what the engine holds; frames go through `updateFrameRendering` and never through `updateScene`.
+- **Menu commands reach the canvas by DOM, not by prop.** Several tabs are mounted at once, each with its own engine; a CustomEvent on the visible `.editor--drawing` section is the only address that means "the one in front".
+
 
 - **The document's bytes get ONE door per direction.** `drawing:load` / `drawing:save`, because a scene and the images it names are one thing: a save is "assets first, then the scene", and any second writer (the old `writeAsset` string body) would land half of it. 2D narrowed the asset pipe to images for exactly this reason.
 - **Autosave on the engine's scene VERSION, not the bytes.** The canvas reports a change per pointer move; `Autosave<number>` is fed the integer and serialises once, inside `save()`, when the timer fires. `Autosave` is generic over its content key now — string for text, number for a canvas.

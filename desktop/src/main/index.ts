@@ -2,13 +2,14 @@ import { app, BrowserWindow, Menu, nativeTheme, net, powerMonitor, protocol, scr
 import { statSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { isDrawing } from '@shared/fileKind'
 import { fileLink, parseFileLink } from '@shared/links'
 import type { WindowEntry } from '@shared/types'
 import type { GitSyncManager } from './git/manager'
 import { registerIpc } from './ipc'
 import { createLinkQueue } from './linkQueue'
 import { openLink } from './fs/openLink'
-import { buildContextMenuTemplate, buildMenuTemplate, createMenuHandlers, pickMenuTargetWindow, subscribeMenuRebuild } from './menu'
+import { buildContextMenuTemplate, buildMenuTemplate, createMenuHandlers, pickMenuTargetWindow, subscribeMenuRebuild, subscribeMenuRebuildOnActiveFile } from './menu'
 import { createStore } from './store'
 import { subscribeNativeTheme, windowBackgroundColor } from './theme'
 import { applyUserDataOverride } from './userData'
@@ -130,8 +131,16 @@ let lastFocusedWcId: number | undefined
 /** The per-vault GitHub sync manager (YAZ-1081), created with the rest of the IPC once `ready` fires. */
 let gitSync: GitSyncManager | undefined
 
+/**
+ * Set once the menu exists (🔒 D10): focusing another window changes which window a menu action
+ * targets, and therefore whether the two canvas items are enabled — but nothing in the STORE
+ * moved, so `subscribeMenuRebuildOnActiveFile` cannot see it. The focus hook says so directly.
+ */
+let rebuildMenuOnFocus: (() => void) | undefined
+
 app.on('browser-window-focus', (_event, win) => {
   lastFocusedWcId = win.webContents.id
+  rebuildMenuOnFocus?.()
   // YAZ-1081 D2: focusing a vault's window is a PULL trigger — alt-tabbing back from another
   // machine should converge without waiting out a timer. The manager's own cooldown throttles it.
   const root = store.get().windows.find((w) => w.id === manager.idFor(win.webContents))?.root ?? null
@@ -164,10 +173,22 @@ app.whenReady().then(() => {
     },
     openExternal: (url) => void shell.openExternal(url),
   })
+  // 🔒 D10: the two canvas items are enabled only while the window a menu action would target has
+  // a DRAWING in front. Read at build time from the same entry `focusedEntry` uses, so the answer
+  // and the send target can never disagree.
+  const activeFileIsDrawing = (): boolean => {
+    const wc = menuTarget()
+    const id = wc === undefined ? undefined : manager.idFor(wc)
+    const file = id === undefined ? null : (store.get().windows.find((w) => w.id === id)?.file ?? null)
+    return file !== null && isDrawing(file)
+  }
   const applyMenu = (): void =>
-    Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenuTemplate({ recents: store.get().recents, isDev: !app.isPackaged }, handlers)))
+    Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenuTemplate({ recents: store.get().recents, isDev: !app.isPackaged, activeIsDrawing: activeFileIsDrawing() }, handlers)))
   applyMenu()
   subscribeMenuRebuild(store, applyMenu)
+  // A tab switch changes which file is in front (🔒 D10); focus changes which window is asked.
+  subscribeMenuRebuildOnActiveFile(store, applyMenu)
+  rebuildMenuOnFocus = applyMenu
   const sync = registerIpc(store, manager)
   gitSync = sync
   // YAZ-1081 D3: a lid that just opened is the other "the world moved on while you were away"

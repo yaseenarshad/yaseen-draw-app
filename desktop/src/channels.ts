@@ -51,6 +51,10 @@ export const CH = {
   menuCloseTab: 'menu:close-tab',
   menuNextTab: 'menu:next-tab',
   menuPrevTab: 'menu:prev-tab',
+  // The two canvas gestures that left the engine's own menu (🔒 D10): they reach the focused
+  // window's renderer, which routes them to the VISIBLE drawing layer.
+  menuExportImage: 'menu:export-image',
+  menuCanvasBackground: 'menu:canvas-background',
   linkOpenFile: 'link:open-file',
   linkNotice: 'link:notice',
   vaultConfigRead: 'vaultConfig:read',

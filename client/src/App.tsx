@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { SIDEBAR_MAX_W, SIDEBAR_MIN_W, type SettingsState, type SidebarLens, type TreeNode } from '@shared/types'
+import { SIDEBAR_MAX_W, SIDEBAR_MIN_W, type CanvasPanelState, type CanvasPrefs, type SettingsState, type SidebarLens, type TreeNode } from '@shared/types'
+import { prefsEqual } from '@shared/canvasPrefs'
 import { api, BridgeRequestError } from './api'
+import { requestDrawingCommand } from './drawings/drawingCommand'
 import { Editor } from './Editor'
 import { useGithubSync } from './hooks/useGithubSync'
 import { useLinkEvents } from './hooks/useLinkEvents'
@@ -153,6 +155,31 @@ export function App() {
     setSettings(next)
   }, [])
 
+  // 🔒 D9: the canvas prefs are ONE value in the shell store, and every mounted canvas in every
+  // window reads it. The engine (or the rail) reports a change up here; the store broadcasts it;
+  // the surfaces apply what actually moved. A ref carries the current settings so the callback
+  // identity never changes — a new one would re-render the memoized `<Excalidraw>`.
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
+  const changeCanvasPrefs = useCallback(
+    (canvas: CanvasPrefs) => {
+      // Compare before writing, on this side too: an engine that re-reports the value it was just
+      // handed must not start a write loop.
+      if (prefsEqual(settingsRef.current.canvas, canvas)) return
+      changeSettings({ ...settingsRef.current, canvas })
+    },
+    [changeSettings],
+  )
+  /** 🔒 D10: the canvas panel's last-used tab and dock preference, remembered app-wide. */
+  const changeCanvasPanel = useCallback(
+    (canvasPanel: CanvasPanelState) => {
+      const current = settingsRef.current.canvasPanel
+      if (current.tab === canvasPanel.tab && current.docked === canvasPanel.docked) return
+      changeSettings({ ...settingsRef.current, canvasPanel })
+    },
+    [changeSettings],
+  )
+
   /** A lens tab click (YAZ-847): write through to this window's identity, then mirror it locally. */
   const changeLens = useCallback((next: SidebarLens) => {
     storage.setSidebarLens(next)
@@ -260,7 +287,24 @@ export function App() {
 
   // File › Open Folder… / Open Recent (GRO-2161) reuse the same flows as the in-app buttons;
   // File › Close Tab and Window › Next/Previous Tab (GRO-2232) drive the tab model.
-  useMenuEvents({ onOpenFolder: pick, onOpenRoot: openRoot, onSearch: openSearch, onSwitchVault: openVaultSwitcher, onSettings: openSettings, onToggleSidebar: toggleSidebar, onCloseTab: closeTabOrWindow, onNextTab: nextTab, onPrevTab: prevTab })
+  // 🔒 D10: File › Export Image… and View › Canvas Background act on the VISIBLE drawing layer,
+  // which `requestDrawingCommand` finds by DOM — several tabs are mounted at once and only one is
+  // in front. Main greys both items out off a drawing tab, so a miss here is already impossible.
+  const exportImage = useCallback(() => void requestDrawingCommand({ kind: 'export-image' }), [])
+  const setCanvasBackground = useCallback((color: string) => void requestDrawingCommand({ kind: 'canvas-background', color }), [])
+  useMenuEvents({
+    onOpenFolder: pick,
+    onOpenRoot: openRoot,
+    onSearch: openSearch,
+    onSwitchVault: openVaultSwitcher,
+    onSettings: openSettings,
+    onToggleSidebar: toggleSidebar,
+    onCloseTab: closeTabOrWindow,
+    onNextTab: nextTab,
+    onPrevTab: prevTab,
+    onExportImage: exportImage,
+    onCanvasBackground: setCanvasBackground,
+  })
 
   // Deep links (E1, GRO-2171): a routed link behaves like a sidebar click (Tabs rule 10) —
   // it activates the file's tab when already open, else opens it in the CURRENT tab;
@@ -534,7 +578,17 @@ export function App() {
               <div key={path} className={path === file ? 'tabstack__layer' : 'tabstack__layer tabstack__layer--hidden'}>
                 {/* One sync status per WINDOW (above), read by every mounted tab's chip: two
                     hooks watching one root would eventually disagree about what it is doing. */}
-                <Editor path={path} root={root} watch={watch} sync={githubSync.status} onSyncNow={githubSync.syncNow} />
+                <Editor
+                  path={path}
+                  root={root}
+                  watch={watch}
+                  sync={githubSync.status}
+                  onSyncNow={githubSync.syncNow}
+                  canvasPrefs={settings.canvas}
+                  onCanvasPrefsChange={changeCanvasPrefs}
+                  canvasPanel={settings.canvasPanel}
+                  onCanvasPanelChange={changeCanvasPanel}
+                />
               </div>
             ))}
           </div>

@@ -108,7 +108,7 @@ Electron flattens a thrown Error to its message, which is why failure travels as
 | `window.identity` / `setIdentity` | `window:*` | THIS window's `WindowEntry`, by the `?win=<id>` in its URL |
 | `window.open` / `duplicate` / `openRecent` / `closeSelf` / `zoom` | `window:*` | window lifecycle |
 | `window.onFlush` | `app:flush` / `app:flushed` | the close/quit handshake (main waits, 5s cap) |
-| `menu.on*` | `menu:*` | Open Folder…, Open Recent, Search Vault, Switch Vault…, Settings…, Toggle Sidebar, Close Tab, Next/Previous Tab |
+| `menu.on*` | `menu:*` | Open Folder…, Open Recent, Search Vault, Switch Vault…, Settings…, Toggle Sidebar, Close Tab, Next/Previous Tab, Export Image…, Canvas Background |
 | `link.onOpenFile` / `onNotice` | `link:*` | a routed `yaseendraw://` link |
 | `favorites.get` / `set` / `onChanged` | `favorites:*` | `<vault>/.yaseendraw/favorites.json` |
 | `vaultConfig.read` / `write` / `onChanged` | `vaultConfig:*` | any file in `<vault>/.yaseendraw/` |
@@ -155,7 +155,12 @@ anything unrecognised or malformed falls back to its default rather than failing
 ```ts
 AppState {
   version: 1
-  settings: { theme: 'system' | 'light' | 'dark'; confirmDelete: boolean }
+  settings: {
+    theme: 'system' | 'light' | 'dark'
+    confirmDelete: boolean
+    canvas: CanvasPrefs                  // 🔒 D9, below
+    canvasPanel: { tab: 'image-studio' | 'components' | 'presentation'; docked: boolean }
+  }
   sidebarWidth: number                     // clamped to [180, 520]
   recents: { path: string; lastOpened: number }[]   // MRU, max 10
   windows: WindowEntry[]
@@ -179,6 +184,38 @@ FolderState {
   lastFile: string | null
 }
 ```
+
+`SettingsState.canvas` is `CanvasPrefs` (`shared/types.ts`, mapped by `shared/canvasPrefs.ts`) —
+the fourteen user-level canvas preferences 🔒 D9 took out of the engine's browser localStorage:
+
+```ts
+CanvasPrefs {
+  gridModeEnabled: boolean          // false
+  objectsSnapModeEnabled: boolean   // false
+  snapToMidpoints: boolean          // true   (engine `isMidpointSnappingEnabled`)
+  arrowBinding: boolean             // true   (engine `isBindingEnabled`)
+  selectOn: 'wrap' | 'overlap'      // 'wrap' (engine `boxSelectionMode` contain/overlap)
+  toolLock: boolean                 // false  (engine `activeTool.locked`)
+  zenModeEnabled: boolean           // false
+  writingMode: boolean              // false
+  writingStrokeWidth: number        // 0.5    (engine `currentItemWritingStrokeWidth`)
+  vectorStrokeWidth: number         // 2      (engine `currentItemVectorStrokeWidth`)
+  framesVisible: boolean            // true   (engine `updateFrameRendering`, never appState)
+  defaultFontFamily: number         // 10 Assistant (engine `currentItemFontFamily`)
+  defaultRoughness: 0 | 1 | 2       // 0 architect  (engine `currentItemRoughness`)
+  defaultTextAlign: 'left'|'center'|'right'  // 'center' (engine `currentItemTextAlign`)
+}
+```
+
+Every default is the engine's own (`packages/excalidraw/appState.ts`, `packages/common/src/constants.ts`).
+They are seeded into `initialData.appState` at mount and kept in step both ways, each direction
+comparing against one "what the engine holds" ref before writing, so two windows can never
+ping-pong; the engine's own read-back is 300 ms debounced. The guard is STRICT at the IPC boundary
+(a renderer hands over a whole `CanvasPrefs` or nothing) and LENIENT on load (field by field over
+the defaults, so a state file written before a key existed keeps every key it does have). Per BOARD
+there is only what the engine writes into the file itself — `viewBackgroundColor`, `gridSize`,
+`gridStep`. None of the web app's localStorage keys are carried over; the one engine key this app
+touches is `excalidraw.desktopUIMode`, WRITTEN before every mount and never read (⚡ R4/R5).
 
 Invariants: `file ∈ tabs` whenever `file` is non-null, and `tabs: []` ⇔ `file: null`.
 `sidebarCollapsed`, `sidebarLens` and both focus lists are WINDOW identity — a duplicate inherits
@@ -209,22 +246,37 @@ never silently do nothing).
 | File | Open Folder… | ⌘⇧O |
 | File | Open Recent ▸ | — (⌥-click an entry opens it beside this window) |
 | File | Search Vault | ⌘K |
+| File | Export Image… (a drawing tab only) | ⌘⇧E |
 | File | Close Tab | ⌘W |
 | File | Close Window | ⌘⇧W |
 | Edit | Undo / Redo / Cut / Copy / Paste / Select All | stock roles |
 | View | Toggle Sidebar | — |
 | View | Reload · Toggle Developer Tools (dev builds) | — |
 | View | Actual Size / Zoom In / Zoom Out | ⌘0 / ⌘+ / ⌘− |
+| View | Canvas Background ▸ White / Slate / Blue / Yellow / Bronze (a drawing tab only) | — |
 | Window | Minimize · Zoom · Next Tab · Previous Tab · Bring All to Front | ⌃Tab / ⌃⇧Tab (⌘⇧] / ⌘⇧[ alternates) |
 | Help | Yaseen Draw on GitHub | — |
 
 Zoom is deliberately NOT the stock roles: a registered accelerator never reaches the page on
 macOS, so main applies the step to the focused window's `webContents` itself.
 
+Export Image… and Canvas Background are the canvas's own two items, moved out of the engine's main
+menu by 🔒 D10 (there is no `<MainMenu>` in a drawing and the engine's stock trigger is hidden).
+Main enables them only while the window a menu action would target has a `.excalidraw` in front,
+rebuilding the menu when any window's active file changes and when focus moves between windows.
+Each is pushed to that window's renderer, which dispatches it as a DOM event on the VISIBLE
+drawing layer (`client/src/drawings/drawingCommand.ts`) — several tabs are mounted at once, each
+with its own engine, so a prop or a `window` listener would reach the wrong canvas. The drawing
+then calls the engine's own door: `openDialog: { name: 'imageExport' }`, or `viewBackgroundColor`,
+which the engine writes into the file.
+
 Renderer-owned chords (`client/src/lib/*Hotkey.ts`, all gated by `ownsWindowChord` so a text field
 or an open modal keeps the key): ⌘B toggles the sidebar (YAZ-1280); ⌘X / ⌘C / ⌘V drive the
-sidebar's file clipboard when the selection owns them. Settings › Hotkeys lists every one of them and is the
-single place that copy lives.
+sidebar's file clipboard when the selection owns them. Inside a focused canvas, ⌘F and ⌘C open the
+canvas panel's Images and Components tabs — bound on the drawing's own element in the capture
+phase, never `window`, and suppressed whenever the keystroke could have meant something else (an
+editable target, a live selection, a gesture in flight, a dialog, or anything selected on the
+canvas). Settings › Hotkeys lists every one of them and is the single place that copy lives.
 
 The right-click menu inside the renderer is Electron's (`buildContextMenuTemplate`): spelling
 suggestions, Add to Dictionary, and cut/copy/paste. Electron ships no default one, which is why
