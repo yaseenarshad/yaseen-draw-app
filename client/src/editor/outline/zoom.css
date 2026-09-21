@@ -1,0 +1,65 @@
+/* Zoom into a bullet (GRO-2029). All classes come from ProseMirror decorations in zoom.ts; nothing
+   here changes the document. Hidden blocks = every block off the path root → zoomed item. Ancestor
+   items keep their DOM (so the zoomed subtree stays inside the real tree) but lose glyph, chevron
+   and own text, and a folded ancestor is shown expanded without touching its fold state. Because
+   Crepe's `ul`/`ol` carry no padding, dropping the ancestors' label gutters un-indents the zoomed
+   subtree to the left edge. Selectors are prefixed with `.editor-instance` (like bullets.css) to
+   outrank Crepe's theme (`.milkdown .milkdown-list-item-block { display: block }`) regardless of
+   CSS import order. */
+.editor-instance .milkdown .outline-zoom-hidden,
+.editor-instance .milkdown .outline-zoom-ancestor > li.list-item > .label-wrapper,
+.editor-instance .milkdown .outline-zoom-ancestor > li.list-item > .children > .content-dom > .outline-toggle {
+  display: none;
+}
+
+.editor-instance .milkdown .outline-zoom-ancestor > li.list-item > .children > .content-dom > [data-outline-folded='true'] {
+  display: block;
+}
+
+.outline-zoom-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin: 0 0 12px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--crepe-color-outline);
+  color: var(--crepe-color-on-surface-variant);
+  font-size: 0.85em;
+  line-height: 1.4;
+  user-select: none;
+}
+
+.outline-zoom-crumb {
+  max-width: 24em;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.outline-zoom-crumb:hover:not(:disabled) {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  color: var(--crepe-color-on-background);
+}
+
+.outline-zoom-crumb:focus-visible {
+  outline: 2px solid var(--crepe-color-primary);
+  outline-offset: 1px;
+}
+
+.outline-zoom-crumb:disabled {
+  color: var(--crepe-color-on-background);
+  font-weight: 600;
+  cursor: default;
+}
+
+.outline-zoom-crumb-separator {
+  opacity: 0.6;
+}

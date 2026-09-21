@@ -1,0 +1,30 @@
+import type { GitSyncManager } from '../git/manager'
+import type { Store } from '../store'
+import type { WindowManagerIpc } from '../windows'
+import { registerDialogIpc } from './dialog'
+import { registerFavoritesIpc } from './favorites'
+import { registerFsIpc } from './fs'
+import { registerGithubIpc } from './github'
+import { registerPropertiesIpc } from './properties'
+import { registerStateIpc } from './state'
+import { registerVaultConfigIpc } from './vaultConfig'
+import { registerWatchIpc } from './watch'
+import { registerWindowIpc } from './window'
+
+/**
+ * Every `ipcMain` handler the preload's bridge invokes; call once before the first window loads.
+ *
+ * Returns the GitHub sync manager (YAZ-1081, 2C) — the one registration with triggers no renderer
+ * can send (window focus, OS wake, the last flush before quit), which `main/index.ts` owns.
+ */
+export function registerIpc(store: Store, windows: WindowManagerIpc): GitSyncManager {
+  registerFsIpc(store, windows)
+  registerDialogIpc()
+  registerWatchIpc()
+  registerStateIpc(store)
+  registerVaultConfigIpc(store)
+  registerFavoritesIpc(store)
+  registerPropertiesIpc(store)
+  registerWindowIpc(store, windows)
+  return registerGithubIpc(store)
+}

@@ -1,0 +1,168 @@
+/* Window tab strip + per-tab editor stack (Tabs I2, GRO-2234). Owned by TabBar.tsx (the
+   feature-CSS convention); .workspace/.tabstack are rendered by App around it. Follows the
+   ViewTabs look (views.css): an underline-active tablist on the app theme tokens. */
+
+/* The editor half of the app row: tab strip on top, editor stack below. */
+.workspace {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* The strip's outer row (YAZ-721): history buttons + the scrolling tablist. The border and
+   background live HERE so the nav side reads as part of the same strip, not a hole in it. */
+.tabbar-row {
+  display: flex;
+  align-items: stretch;
+  flex: none;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.tabbar-nav {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 0 0 8px;
+}
+
+/* ◀ ▶ sized and coloured like the per-tab ✕, but always visible — disabled says "nowhere to go".
+   While the sidebar is collapsed a Show-sidebar button (YAZ-1759) leads the row in the same dress,
+   so nothing floats over ◀. */
+.tabbar-nav__btn {
+  display: inline-flex;
+  padding: 2px 4px;
+  line-height: 1;
+  color: var(--fg-muted);
+  border-radius: 4px;
+}
+
+.tabbar-nav__btn:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+.tabbar-nav__btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Overflow (I3): tabs shrink to their floor first, then the strip scrolls (Obsidian-like);
+   TabBar scrolls the ACTIVE tab into view on activation. The scrolling itself — no scrollbar, an
+   edge fade — is `.scroll-strip` (app.css), worn beside this class. */
+.tabbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px 0;
+}
+
+.tabbar__tab {
+  display: flex;
+  align-items: center;
+  /* Shrink as the strip fills, down to the ~120px floor; long names ellipsize under the cap. */
+  flex: 0 1 auto;
+  min-width: 120px;
+  max-width: 200px;
+  border-bottom: 2px solid transparent;
+}
+
+.tabbar__tab--active {
+  border-bottom-color: var(--accent);
+}
+
+/* Drag-to-reorder (I3): the grabbed tab dims; the drop slot draws an accent edge on the tab
+   it would land before (or after the LAST tab for the end slot) — box-shadow, no layout shift. */
+.tabbar__tab--dragging {
+  opacity: 0.5;
+}
+
+.tabbar__tab--insert-before {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.tabbar__tab--insert-after {
+  box-shadow: inset -2px 0 0 var(--accent);
+}
+
+.tabbar--drop-empty {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.tabbar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  padding: 4px 2px 4px 8px;
+  font-size: 13px;
+  color: var(--fg-muted);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.tabbar__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tabbar__btn:hover {
+  background: var(--bg-side);
+}
+
+.tabbar__btn[aria-selected='true'] {
+  color: var(--fg);
+}
+
+.tabbar__close {
+  padding: 2px 4px;
+  margin-right: 4px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--fg-muted);
+  border-radius: 4px;
+  /* Shown on hover/active only (the ViewTabs affordance pattern); visibility (not display)
+     so the tab never changes width when the ✕ appears. */
+  visibility: hidden;
+}
+
+.tabbar__tab:hover .tabbar__close,
+.tabbar__tab--active .tabbar__close {
+  visibility: visible;
+}
+
+.tabbar__close:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+/* One layer per VISITED tab, all mounted, only the active one visible (GRO-2234 rule 6).
+   Hidden layers use visibility:hidden, NEVER display:none: Chromium resets a scroller's
+   scrollTop once it sits in a display:none subtree, so switching back would lose each tab's
+   scroll position. visibility keeps layout alive — scroll offset, selection and undo history
+   all survive a switch — while still making the hidden layer unfocusable and hit-test
+   invisible. Layers stack absolutely so every editor owns the same box. */
+.tabstack {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tabstack__layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tabstack__layer--hidden {
+  visibility: hidden;
+}

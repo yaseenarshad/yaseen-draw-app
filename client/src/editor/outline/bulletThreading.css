@@ -1,0 +1,37 @@
+/* Bullet threading (GRO-2094; behaviour in docs/CONTRACTS.md rule 18). Classes come from
+   bulletThreading.ts; everything here is drawing, gated by `data-threading` on `.app`; `--thread-width` / `--thread-color` come from the
+   settings cog via App.tsx (GRO-2109), colour falling back to the app accent. Geometry
+   reuses the bullets.css / guideLines.css vars: the guide-line centre is
+   `--list-indent / 2 + --list-label-gap / 2` left of the item's edge, rows are
+   `--list-label-offset` + `--list-label-height`, and `li.list-item` is already `position: relative`.
+   `pointer-events: none` on the pseudo is REQUIRED: a pseudo hit-tests as its element, and
+   guide-line click-to-fold (guideLines.ts) only fires when the event target is the UL. */
+.app[data-threading='on'] .editor-instance .milkdown .milkdown-list-item-block.outline-thread-seg > li.list-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(-1 * (var(--list-indent) / 2 + var(--list-label-gap) / 2) - var(--thread-width, 2px) / 2);
+  width: 0;
+  border-left: var(--thread-width, 2px) solid var(--thread-color, var(--accent));
+  pointer-events: none;
+}
+
+/* The path child: cut the segment at the glyph centre and turn it into the bullet with an elbow. */
+.app[data-threading='on'] .editor-instance .milkdown .milkdown-list-item-block.outline-thread-stop > li.list-item::before {
+  bottom: auto;
+  box-sizing: border-box;
+  /* Row centre + half the border: the bottom border's centre then sits exactly on the glyph centre. */
+  height: calc(var(--list-label-offset, 0px) + var(--list-label-height, 32px) / 2 + var(--thread-width, 2px) / 2);
+  /* Line → glyph: half indent + half gap (to the item edge) + half the gutter − half the glyph,
+     minus a 2px breathing gap so the elbow does not touch the bullet. */
+  width: calc(var(--list-indent) / 2 + var(--list-label-gap) / 2 + (var(--list-indent) - var(--list-label-gap)) / 2 - var(--list-bullet-size) / 2 - 2px);
+  border-bottom: var(--thread-width, 2px) solid var(--thread-color, var(--accent));
+  border-bottom-left-radius: 6px;
+}
+
+/* Glyphs on the path take the accent. Set on the label wrapper, NOT the item: the marker var is
+   inherited, and setting it on the item would recolour every nested bullet below. */
+.app[data-threading='on'] .editor-instance .milkdown .milkdown-list-item-block.outline-thread-node > li.list-item > .label-wrapper {
+  --list-marker-color: var(--thread-color, var(--accent));
+}

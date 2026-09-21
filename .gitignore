@@ -1,0 +1,8 @@
+node_modules/
+dist/
+desktop/out/
+desktop/dist-app/
+.DS_Store
+*.log
+.claude/*
+desktop/e2e/artifacts/

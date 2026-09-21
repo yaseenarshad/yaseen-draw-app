@@ -1,0 +1,412 @@
+/*
+ * The settings dialog (YAZ-1679) — classes applied by SettingsDialog.tsx, SettingRow.tsx and the
+ * registry's controls. Obsidian's shape: a centred sheet, page nav + search down the left, the
+ * page's rows on the right. The overlay repeats the drawing modal's (drawingModal.css): fixed,
+ * centred, the same scrim, the same z-index — one modal is open at a time, and this is it.
+ *
+ * Everything is themed through app.css's tokens, so the `[data-theme='dark']` block there covers
+ * this file without a dark rule of its own.
+ */
+
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+/*
+ * `min-height: 0` on the grid AND on both columns is load-bearing: a grid item's default
+ * `min-height: auto` sizes to its content, and the pane would grow past the sheet instead of
+ * scrolling inside it.
+ */
+.settings-dialog {
+  position: relative; /* the close button pins to the sheet, not to the scrolling pane */
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  width: min(920px, calc(100vw - 48px));
+  height: min(680px, calc(100vh - 64px));
+  min-height: 0;
+  /* Yasin's fifth call: the dialog reads at ~120% by default — the base size; row labels and
+     the empty line inherit it, and every other size below is a deliberate step from it. */
+  font-size: 15px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+/* ---------- nav column ---------- */
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  padding: 14px 10px;
+  background: var(--bg-side);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+/* The search box: ColumnSearch's look (views.css `.column-search`), in the nav's own scale. */
+.settings-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.settings-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.settings-search svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--fg-muted);
+}
+
+.settings-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 14px;
+}
+
+.settings-search input::placeholder {
+  color: var(--fg-muted);
+}
+
+.settings-search button {
+  padding: 0 3px;
+  font-size: 18px;
+  line-height: 18px;
+  color: var(--fg-muted);
+}
+
+.settings-nav__item {
+  display: block;
+  width: 100%;
+  padding: 7px 12px;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 14px;
+  color: var(--fg);
+}
+
+.settings-nav__item:hover {
+  background: var(--bg-hover);
+}
+
+.settings-nav__item[aria-current] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Between the settings-page anchors and the standalone pages (Hotkeys). */
+.settings-nav__divider {
+  width: auto;
+  margin: 8px 6px;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+/* ---------- content pane ---------- */
+
+/*
+ * ONE scrolling page. `position: relative` makes the sections the pane's offset children, which
+ * is what the scrollspy measures; `scroll-padding-top` matches the top padding so a nav anchor
+ * lands under it rather than flush against the edge (and SPY_OFFSET in SettingsDialog.tsx sits
+ * just past it).
+ */
+.settings-pane {
+  position: relative;
+  min-height: 0;
+  padding: 24px 28px;
+  overflow: auto;
+  scroll-padding-top: 24px;
+}
+
+.settings-dialog__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  /* The pane is a later positioned sibling, so without this it paints OVER the button and eats the click (DL8). */
+  z-index: 1;
+  display: flex;
+  padding: 6px 9px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--fg-muted);
+}
+
+.settings-dialog__close:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+/*
+ * Obsidian's structure (Yasin's third call): headings sit in the open, rows sit in CARDS, and the
+ * only lines on the page are the hairlines BETWEEN rows inside one card. Sections are separated
+ * by whitespace alone — no divider, no line under a last row.
+ */
+.settings-section + .settings-section {
+  margin-top: 32px;
+}
+
+/* The section title — the page's H1 visually. */
+.settings-section__title {
+  margin: 0 0 14px;
+  padding-right: 36px; /* clear of the close button */
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+/* The one section-level note (Sync: these settings travel with the vault, not the app). */
+.settings-section__note {
+  margin: -6px 0 14px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--fg-muted);
+}
+
+.settings-group + .settings-group {
+  margin-top: 22px;
+}
+
+/* Group title + hint: above the card, outside it. */
+.settings-group__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.settings-group__hint {
+  margin: 3px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--fg-muted);
+}
+
+/* The card: 18px inset for the row text; the rows' own padding gives the vertical rhythm. */
+.settings-group__card {
+  padding: 6px 18px;
+  border-radius: 10px;
+  background: var(--bg-side);
+}
+
+.settings-group__title + .settings-group__card,
+.settings-group__hint + .settings-group__card {
+  margin-top: 10px;
+}
+
+/* Dark `--bg-side` sits close to `--bg`; an outline keeps the card reading as a card. */
+[data-theme='dark'] .settings-group__card {
+  border: 1px solid var(--border);
+}
+
+.settings-empty {
+  margin: 12px 0 0;
+  color: var(--fg-muted);
+}
+
+/* ---------- rows (SettingRow.tsx) ---------- */
+
+.setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+}
+
+/* The hairline lives BETWEEN rows: none above the first, none under the last. */
+.setting + .setting {
+  border-top: 1px solid var(--border);
+}
+
+.setting--wide {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.setting__text {
+  min-width: 0;
+}
+
+.setting__label {
+  margin: 0;
+  color: var(--fg);
+}
+
+/* Sub-label under a setting whose consequence is not obvious from the switch (GRO-2272). */
+.setting__hint {
+  margin: 3px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--fg-muted);
+}
+
+.setting__control {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.setting--wide .setting__control {
+  flex-direction: column;
+  align-items: stretch;
+  margin-top: 10px;
+}
+
+/* ---------- controls (moved from app.css's GRO-2024 popover block) ---------- */
+
+.settings__options {
+  display: flex;
+  gap: 4px;
+}
+
+/* On a card's side tint the controls keep the page background, so they read as controls. */
+.settings__option {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  white-space: nowrap;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.settings__option:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.settings__option--active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/*
+ * The dropdown (controls.tsx `Select`): a compact pill like the option buttons. The chevron is a
+ * masked pseudo-element on the wrapper — a <select> takes none — so it is painted in a token
+ * (`--fg-muted`) and follows the theme, where a background-image SVG could not.
+ */
+.settings__select-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.settings__select {
+  appearance: none;
+  padding: 6px 30px 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  font: inherit;
+  font-size: 14px;
+  color: var(--fg);
+  cursor: pointer;
+  outline: none;
+}
+
+.settings__select:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.settings__select-wrap::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  width: 12px;
+  height: 12px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  background: var(--fg-muted);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2.5 3.75 2.5 2.5 2.5-2.5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.settings__color {
+  width: 40px;
+  height: 30px;
+  padding: 0 3px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+/* The root-relative folder input under "In the folder specified below". */
+.settings__input {
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--fg);
+  outline: none;
+}
+
+.settings__input:focus {
+  border-color: var(--accent);
+}
+
+.settings__input--error {
+  border-color: var(--danger);
+}
+
+/* ---------- hotkey reference (GRO-2067) — one table per Hotkeys group ---------- */
+
+.hotkeys__list {
+  margin: 0;
+}
+
+.hotkeys__row {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 6px 0;
+}
+
+/* The card rule again, one level down: a hairline between hotkey rows, none above the first or under the last. */
+.hotkeys__row + .hotkeys__row {
+  border-top: 1px solid var(--border);
+}
+
+.hotkeys__keys {
+  flex: none;
+  min-width: 150px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+.hotkeys__label {
+  margin: 0;
+  font-size: 14px;
+  color: var(--fg-muted);
+}

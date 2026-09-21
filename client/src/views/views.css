@@ -1,0 +1,1799 @@
+/* Folder-page views: toolbar + menus (GRO-2135), placeholder row list, table/list/cards/board/outline. */
+
+/*
+ * TOMBSTONE (YAZ-861): `.view-view`'s own geometry block lived here — a full-pane content column
+ * (its own fixed max-width, centred margin, and document padding) plus `flex: 1; min-height: 0` to
+ * fill the window. It was written for a main pane that no longer exists: since the `.base`
+ * retirement (YAZ-846) the ONE mount is the note's contents block, which overrode the column and
+ * the padding on the very next rule it met. The values that actually apply now live where they are
+ * used — `.folder-page-contents .views-pane` in folderPageContents.css — and the class is
+ * `.views-pane`, named for the pane it is rather than the dead format it was named after.
+ */
+
+/* ---------- toolbar ---------- */
+
+.view-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.view-tabs-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Overflow (YAZ-1471): the scrolling and its edge fade are `.scroll-strip` (app.css), worn by the
+   tablist itself — trackpad/wheel, plus the active tab scrolled into view. The "+" lives OUTSIDE
+   the strip: always visible, never masked. */
+.view-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.view-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: none;
+  border-bottom: 2px solid transparent;
+}
+
+.view-tab--active {
+  border-bottom-color: var(--accent);
+}
+
+.view-tab__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  font-size: 13px;
+  color: var(--fg-muted);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.view-tab__btn > span {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.view-tab__btn:hover {
+  background: var(--bg-side);
+}
+
+.view-tab__btn[aria-selected='true'] {
+  color: var(--fg);
+}
+
+/* Drag-to-reorder (YAZ-1471), TabBar's indicator: an accent edge marks where the drop lands. */
+.view-tab--dragging {
+  opacity: 0.5;
+}
+
+.view-tab--insert-before {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.view-tab--insert-after {
+  box-shadow: inset -2px 0 0 var(--accent);
+}
+
+.view-tab__add {
+  flex: none;
+  padding: 2px 8px 4px;
+  font-size: 15px;
+  color: var(--fg-muted);
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.view-tab__add:hover,
+.view-tab__add[aria-expanded='true'] {
+  color: var(--fg);
+  background: var(--bg-side);
+}
+
+.view-tab__rename {
+  width: 110px;
+  margin: 0 2px 2px;
+}
+
+.view-popover--menu {
+  min-width: 140px;
+  padding: 4px;
+}
+
+.view-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+.view-toolbar__menu,
+.view-toolbar__search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.view-toolbar__btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 6px;
+  color: var(--fg-muted);
+  border-radius: 4px;
+}
+
+.view-toolbar__btn:hover,
+.view-toolbar__btn[aria-expanded='true'],
+.view-toolbar__btn--on {
+  color: var(--fg);
+  background: var(--bg-side);
+}
+
+.view-toolbar__new {
+  font-size: 12px;
+  color: var(--fg);
+}
+
+.view-toolbar__badge {
+  min-width: 14px;
+  padding: 0 3px;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 7px;
+}
+
+/* A `filters` block the engine could not compile (YAZ-1229) — the accent badge would read as a
+   healthy count, so the button and its badge both turn red, as `.save-indicator--error` does. */
+.view-toolbar__btn--error {
+  color: var(--danger);
+}
+
+.view-toolbar__btn--error .view-toolbar__badge {
+  color: var(--bg);
+  background: var(--danger);
+}
+
+.view-toolbar__search-input {
+  width: 150px;
+  margin-left: 4px;
+}
+
+.view-toolbar__count {
+  margin-left: 8px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
+/* ---------- popovers (anchored under their trigger; ctx-menu look) ---------- */
+
+.view-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  min-width: 260px;
+  max-width: 420px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 10px;
+  font-size: 13px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.view-popover:focus {
+  outline: none;
+}
+
+.view-popover--fixed {
+  position: fixed;
+  top: auto;
+  right: auto;
+}
+
+.view-popover__item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 5px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.view-popover__item:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.view-popover__item:disabled {
+  color: var(--fg-muted);
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* The "+" type picker's items carry a glyph (YAZ-1488); the base class stays text-only for
+   TableView's summary menu and EditableCell's option lists. */
+.view-popover--menu .view-popover__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---------- menu internals ---------- */
+
+.view-menu__errors {
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  list-style: none;
+  font-size: 12px;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 7%, var(--bg));
+  border-radius: 5px;
+}
+
+.view-menu__head {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.view-seg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-side);
+  border-radius: 6px;
+}
+
+.view-seg__opt {
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  border-radius: 4px;
+}
+
+.view-seg__opt[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--bg);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.view-rule__code {
+  flex: 1;
+  overflow-x: auto;
+  padding: 3px 6px;
+  font-size: 12px;
+  background: var(--bg-side);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.view-rule__expr {
+  width: 100%;
+  margin-top: 3px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+
+.view-menu__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.view-rule {
+  padding: 3px 0;
+}
+
+.view-rule__main {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* one nested group (YAZ-1231): a boxed level of its own, inside the top-level rule list */
+.view-rule-group {
+  margin: 4px 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.view-rule-group__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.view-rule__remove,
+.view-rule__nav {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 2px;
+  color: var(--fg-muted);
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.view-rule__remove:hover:not(:disabled),
+.view-rule__nav:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--bg-side);
+}
+
+.view-rule__remove:disabled,
+.view-rule__nav:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.view-select {
+  max-width: 150px;
+  padding: 3px 4px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+.view-input {
+  flex: 1;
+  min-width: 60px;
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+.view-input:focus,
+.view-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.view-chip {
+  flex: none;
+  padding: 3px 7px;
+  font-size: 11px;
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+.view-chip:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.view-menu__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.view-menu__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.view-menu__action {
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--accent);
+  border-radius: 5px;
+}
+
+.view-menu__action:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.view-menu__action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.view-menu__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.view-menu__label {
+  margin: 10px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+
+.view-menu__empty {
+  margin: 4px 0;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.view-prop {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 5px 0;
+}
+
+.view-prop__identity,
+.view-prop__controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.view-prop__identity {
+  align-items: flex-start;
+}
+
+.view-prop__controls {
+  flex-wrap: wrap;
+  padding-left: 22px;
+}
+
+/* Relation editor for one column (5E, GRO-2217): a full-width row under the property. */
+.view-relation {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0 2px 22px;
+  flex-wrap: wrap;
+}
+
+.view-relation__target {
+  width: 110px;
+}
+
+.view-relation__dest {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.view-relation__error {
+  font-size: 11px;
+  color: var(--danger);
+}
+
+.view-prop__name {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.view-prop__name small {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.view-prop__rename {
+  flex: 1;
+}
+
+/* Drag-to-reorder a shown property (YAZ-1207): the 6-dot grip, and TabBar's accent insertion edge. */
+.view-prop__handle {
+  cursor: grab;
+}
+
+.view-prop--dragging {
+  opacity: 0.4;
+}
+
+.view-prop--insert-before {
+  box-shadow: 0 -2px 0 0 var(--accent);
+}
+
+.view-prop--insert-after {
+  box-shadow: 0 2px 0 0 var(--accent);
+}
+
+/* Card-style toggles (YAZ-1206): pressed = accent chip, like an active filter. */
+/* The two-level Properties menu (YAZ-1513): a LIST row is grip · checkbox · kind glyph · label · ›,
+   and the DETAIL panel behind it holds everything the row used to carry at once. */
+.view-prop__open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 6px;
+  border-radius: 5px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.view-prop__open:hover {
+  background: var(--accent-soft);
+}
+
+.view-prop__kind {
+  display: inline-flex;
+  flex: none;
+  color: var(--fg-muted);
+}
+
+.view-prop__kind svg {
+  width: 14px;
+  height: 14px;
+}
+
+.view-prop__open .view-prop__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.view-prop__chevron {
+  flex: none;
+  color: var(--fg-muted);
+}
+
+.column-detail__head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px 10px;
+}
+
+.column-detail__back {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--fg);
+}
+
+.column-detail__back:hover {
+  background: var(--accent-soft);
+}
+
+/* The label IS the heading (3D): a field that reads as a title until it is touched. */
+.column-detail__name {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fg);
+  background: transparent;
+}
+
+.column-detail__name:hover {
+  border-color: var(--border);
+}
+
+.column-detail__name:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.column-detail__name::placeholder {
+  color: var(--fg);
+  opacity: 0.85;
+}
+
+.column-detail__rows {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.column-detail__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+  padding: 0 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.column-detail__row > span:first-child {
+  flex: none;
+  color: var(--fg-muted);
+}
+
+.column-detail__row .view-input,
+.column-detail__row .view-select {
+  width: 58%;
+  min-width: 0;
+}
+
+.column-detail__key {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.column-detail__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.column-detail__group {
+  padding: 0 8px;
+  margin-bottom: 8px;
+}
+
+.column-detail__group > .view-menu__label {
+  padding: 0 0 4px;
+}
+
+.column-detail__toggles {
+  display: flex;
+  gap: 4px;
+}
+
+.column-detail__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 4px 0;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.column-detail__action {
+  padding: 6px 8px;
+  border-radius: 5px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.column-detail__action:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.column-detail__action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.column-detail__action--danger {
+  color: var(--danger);
+}
+
+.view-card-toggle[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ---------- body (placeholder rows for non-table views; their real bodies land in later units) ---------- */
+
+.views-pane__error {
+  margin: 48px auto;
+  color: var(--danger);
+  text-align: center;
+}
+
+/*
+ * The report-don't-block footnote (YAZ-861): settings problems + engine errors, one muted line at
+ * the FOOT of the pane. Muted and small on purpose — it is `role="note"`, not an alert: nothing
+ * here failed, the app simply declined to honour part of a card and is saying so.
+ */
+.views-pane__notes {
+  margin: 12px 0 0;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.view-rows {
+  margin: 0;
+  padding: 8px 0 0;
+  list-style: none;
+}
+
+.view-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 2px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.view-row__link {
+  flex: none;
+  color: var(--accent);
+  text-align: left;
+}
+
+.view-row__link:hover {
+  text-decoration: underline;
+}
+
+.view-row__values {
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- table (4B) ---------- */
+
+.view-table-wrap {
+  flex: 1;
+  min-height: 0;
+  margin-top: 8px;
+  overflow: auto;
+}
+
+.view-table {
+  --view-table-cell-pad-y: 3px;
+  --view-table-cell-pad-x: 8px;
+
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  font-size: 13px;
+}
+
+.view-table th,
+.view-table td {
+  padding: var(--view-table-cell-pad-y) var(--view-table-cell-pad-x);
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.view-table th:last-child,
+.view-table td:last-child {
+  border-right: none;
+}
+
+.view-table thead {
+  position: relative;
+  z-index: 3;
+  transform: translateY(var(--view-table-header-y, 0px));
+}
+
+.view-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  font-weight: 600;
+  color: var(--fg-muted);
+  background: var(--bg);
+}
+
+.view-table .view-table__frozen {
+  position: sticky;
+  z-index: 1;
+  background: var(--bg);
+}
+
+.view-table thead th.view-table__frozen {
+  z-index: 4;
+}
+
+/* The `#` gutter (YAZ-1513): the always-first, always-sticky column, pinned like a frozen cell at
+   left 0 — display position only, so it is muted, right-aligned and never selectable. */
+.view-table .view-table__gutter {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  font-size: 11px;
+  color: var(--fg-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  background: var(--bg);
+  user-select: none;
+}
+
+.view-table thead th.view-table__gutter,
+.view-table tfoot td.view-table__gutter {
+  z-index: 4;
+}
+
+/* The header's own context menu (YAZ-1513): room for the inline rename and the add-column form. */
+.view-header-menu {
+  min-width: 200px;
+}
+
+.view-header-menu .view-header-menu__rename,
+.view-header-menu .view-relation .view-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.view-table tbody td {
+  height: var(--view-table-row-h, 28px);
+}
+
+.view-table tbody td:focus,
+.view-table tbody td:has(> .view-cell-edit[data-editing]) {
+  outline-width: 1px;
+  outline-style: solid;
+  outline-color: var(--accent);
+  outline-offset: -1px;
+}
+
+/* The real cell remains the only editing boundary; the shared editor simply fills it. */
+.view-table tbody td:has(> .view-cell-edit[data-editing]) {
+  padding: 0;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.view-table tbody td.view-table__frozen:has(> .view-cell-edit[data-editing]) {
+  z-index: 2;
+}
+
+.view-table tbody td:not(.view-table__frozen):has(> .view-cell-edit[data-editing]) {
+  position: relative;
+  z-index: 2;
+}
+
+.view-table tbody td > .view-cell-edit[data-editing] {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  height: var(--view-table-row-h, 28px);
+  text-align: inherit;
+}
+
+.view-table tbody td > .view-cell-edit[data-editing] .view-cell-edit__input,
+.view-table tbody td > .view-cell-edit[data-editing] .view-cell-edit__link,
+.view-table tbody td > .view-cell-edit[data-editing] .view-cell-edit__chips {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  text-align: inherit;
+}
+
+.view-table tbody td > .view-cell-edit[data-editing] .view-cell-edit__input {
+  padding: var(--view-table-cell-pad-y) var(--view-table-cell-pad-x);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.view-table tbody td > .view-cell-edit[data-editing] .view-cell-edit__chips {
+  flex-wrap: nowrap;
+  padding: var(--view-table-cell-pad-y) var(--view-table-cell-pad-x);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.view-table tbody td > .view-cell-edit[data-editing] .view-cell-edit__chips > .view-table__chip {
+  flex-shrink: 0;
+}
+
+.view-table tbody td > .view-cell-edit[data-editing] .view-cell-edit__chips .view-cell-edit__input {
+  flex-grow: 1;
+  flex-shrink: 0;
+  flex-basis: 6ch;
+  width: auto;
+  min-width: 6ch;
+  padding: 0;
+}
+
+/* The table cell owns mouse activation; double-click/Enter still invoke this control programmatically. */
+.view-table tbody td .view-cell-edit:has(> [data-edit]) {
+  pointer-events: none;
+}
+
+.view-table td.view-table__cell--num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.view-table__link {
+  max-width: 100%;
+  overflow: hidden;
+  /* Plain text, not link-blue (YAZ-1513): the hover underline still says "this opens". */
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.view-table__link:hover {
+  text-decoration: underline;
+}
+
+/* Header drag-to-reorder (YAZ-1548): the grabbed header dims, an accent edge marks the slot the
+   drop would land in — before the hovered header, or after the LAST one for the end slot. */
+.view-table thead th[draggable='true'] {
+  cursor: grab;
+}
+
+.view-table thead th.view-table__th--drag-source {
+  opacity: 0.45;
+}
+
+.view-table thead th.view-table__th--insert-before {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.view-table thead th.view-table__th--insert-after {
+  box-shadow: inset -2px 0 0 var(--accent);
+}
+
+.view-table__resize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+.view-table__resize:hover,
+.view-table__resize--active {
+  background: linear-gradient(var(--accent), var(--accent)) right / 2px 100% no-repeat;
+}
+
+.view-table__chip {
+  display: inline-block;
+  max-width: 100%;
+  margin-right: 4px;
+  padding: 0 7px;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--fg-muted);
+  background: var(--bg-side);
+  border-radius: 9px;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.view-table__chip--link {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.view-table__chip--error {
+  color: #fff;
+  background: var(--danger);
+}
+
+.view-table tfoot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  padding: 0;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  border-right: none;
+  border-bottom: none;
+}
+
+.view-table tfoot td.view-table__frozen {
+  z-index: 4;
+}
+
+.view-table__summary-btn {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  min-height: 24px;
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--fg);
+  text-align: left;
+}
+
+.view-table__summary-btn:hover {
+  background: var(--bg-side);
+}
+
+.view-table__summary-kind {
+  color: var(--fg-muted);
+}
+
+.view-table__summary-pop {
+  top: auto;
+  right: auto;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 140px;
+  padding: 4px;
+}
+
+.view-table__spacer td {
+  padding: 0;
+  border: none;
+}
+
+/* ---------- grouped table (4C) ---------- */
+
+.view-table td.view-table__group-cell {
+  overflow: visible;
+}
+
+.view-table__group-cell > .view-group {
+  position: sticky;
+  left: 8px;
+  width: fit-content;
+  max-width: 100%;
+}
+
+/* an inner section (YAZ-745) is one 28px step in from the cell's 8px padding edge. The indent
+   rides the sticky offset, not cell padding: the cluster pins at `left` while the table scrolls
+   horizontally (YAZ-1043-46), so a padded one would slide back onto the outer's 8px. */
+.view-table__group-cell--nested > .view-group {
+  left: 36px;
+}
+
+.view-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.view-group__toggle {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: 2px;
+  color: var(--fg-muted);
+  border-radius: 4px;
+}
+
+.view-group__toggle:hover {
+  color: var(--fg);
+  background: var(--bg-side);
+}
+
+.view-group__toggle svg {
+  transition: transform 120ms ease;
+}
+
+.view-group__toggle[aria-expanded='false'] svg {
+  transform: rotate(-90deg);
+}
+
+.view-group__value {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+.view-group__value--none {
+  font-weight: 400;
+  color: var(--fg-muted);
+}
+
+.view-group__count {
+  color: var(--fg-muted);
+}
+
+.view-group__new {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: 2px;
+  color: var(--fg-muted);
+  border-radius: 4px;
+}
+
+.view-group__new:hover {
+  color: var(--fg);
+  background: var(--bg-side);
+}
+
+.view-group__summary {
+  display: inline-flex;
+  flex: none;
+  gap: 4px;
+}
+
+.view-group__summary-kind {
+  color: var(--fg-muted);
+}
+
+/* ---------- board (4D) ---------- */
+
+.view-board {
+  display: flex;
+  flex: 1;
+  gap: 10px;
+  align-items: flex-start;
+  min-height: 0;
+  margin-top: 8px;
+  padding-bottom: 8px;
+  overflow: auto;
+}
+
+.view-board__col {
+  flex: none;
+  width: var(--view-board-col-w, 280px);
+  padding: 6px;
+  background: var(--bg-side);
+  border-radius: 8px;
+}
+
+.view-board__col--nested {
+  background: transparent;
+}
+
+.view-board__col-header {
+  background: var(--bg-side);
+  border: 2px solid var(--fg-muted);
+  border-radius: 8px;
+}
+
+.view-board__col .view-group {
+  padding: 10px 4px 10px;
+}
+
+.view-board__subgroups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.view-board__subgroup {
+  padding: 6px;
+  background: var(--bg-side);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.view-board__subgroup > .view-group {
+  padding: 0 0 6px;
+}
+
+.view-board__subgroup .view-board__cards {
+  gap: 6px;
+}
+
+.view-board__subgroup--drop {
+  outline: 1px dashed var(--accent);
+  outline-offset: -1px;
+}
+
+.view-board__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.view-board__card {
+  padding: 7px 10px;
+  font-size: 13px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  /* the transform transition is what PLAYS the FLIP (YAZ-944) once the hook clears its invert */
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.15s ease;
+}
+
+/* The selected card (YAZ-1557 D2) wears the table cell's own ring — one "this is the cell" look. */
+.view-board__card:focus {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.view-board__title {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--accent);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.view-board__title:hover {
+  text-decoration: underline;
+}
+
+/* The vertical rhythm lives on the LINE (YAZ-1217): a row inside one must not add its own. */
+.view-board__prop {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.view-board__prop-name {
+  flex: none;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.view-board__prop-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Card rows (YAZ-1217): one flex line per unjoined property; joined items carry the muted dash. */
+.view-board__line {
+  display: flex;
+  /* Tight, symmetric around the dash: the gap IS its breathing room, both sides. */
+  gap: 3px;
+  align-items: baseline;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.view-board__line + .view-board__line {
+  margin-top: 4px;
+}
+
+/* The en-dash separator element between joined items — its own flex child, so the line's gap
+   spaces it EVENLY (a pseudo on a flex row would inherit that row's internal 8px gap instead). */
+.view-board__dash {
+  flex: none;
+  color: var(--fg-muted);
+}
+
+/* The text flags from view.cardStyle (YAZ-1206) — note rows only, never the title. */
+.view-board__prop--bold {
+  font-weight: 600;
+}
+
+.view-board__prop--underline {
+  text-decoration: underline;
+}
+
+/* the inline add (YAZ-943): a quiet row, the same box as a card */
+.view-board__add,
+.view-board__add-input {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  text-align: left;
+  border-radius: 6px;
+}
+
+.view-board__add {
+  color: var(--fg-muted);
+}
+
+.view-board__add:hover {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.view-board__add-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.view-board__hint {
+  margin: 48px auto;
+  color: var(--fg-muted);
+  text-align: center;
+}
+
+.view-board__hint p {
+  margin: 0 0 10px;
+}
+
+/* ---------- drag between groups (5C) ---------- */
+
+.view-board__card[draggable='true'] {
+  cursor: grab;
+}
+
+/* picked up, not just faded: the card lifts off the column and tilts under the cursor */
+.view-board__card--drag {
+  opacity: 0.4;
+  transform: rotate(2deg) scale(1.03);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+}
+
+.view-board__col--drop {
+  outline: 1px dashed var(--accent);
+  outline-offset: -1px;
+}
+
+.view-board__placeholder {
+  height: 34px;
+  border: 1px dashed var(--accent);
+  border-radius: 6px;
+  opacity: 0.5;
+}
+
+.view-table__group--drop td,
+.view-table__row--drop td {
+  background: var(--accent-soft);
+}
+
+.view-table__row--drop td.view-table__frozen {
+  background: var(--accent-soft);
+}
+
+.view-drag__error {
+  margin-left: 6px;
+}
+
+/* ---------- motion (YAZ-944) ---------- */
+
+/* a card that is NEW to the board arrives instead of blinking into place */
+.view-flip-enter {
+  animation: view-flip-enter 0.18s ease-out;
+}
+
+@keyframes view-flip-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* belt to the hook's own guard: no motion means no motion, even mid-animation */
+@media (prefers-reduced-motion: reduce) {
+  .view-board__card,
+  .view-flip-enter {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* ---------- cards (4E) ---------- */
+
+.view-cards {
+  flex: 1;
+  min-height: 0;
+  margin-top: 8px;
+  overflow-y: auto;
+}
+
+.view-cards__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--view-card-w, 280px), 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 8px 0 2px;
+  list-style: none;
+}
+
+.view-cards__group {
+  margin-top: 8px;
+}
+
+.view-cards__group .view-group {
+  padding: 2px 0 4px;
+}
+
+.view-card {
+  overflow: hidden;
+  font-size: 13px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.view-card__cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: var(--view-card-ratio, 1);
+  object-fit: var(--view-card-fit, cover);
+  background: var(--bg-side);
+  border-bottom: 1px solid var(--border);
+}
+
+.view-card__body {
+  padding: 7px 10px;
+}
+
+.view-card__title {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--accent);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.view-card__title:hover {
+  text-decoration: underline;
+}
+
+.view-card__prop {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin-top: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.view-card__prop-name {
+  flex: none;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.view-card__prop-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- list (4F) ---------- */
+
+.view-list {
+  flex: 1;
+  min-height: 0;
+  margin-top: 8px;
+  overflow-y: auto;
+}
+
+.view-list__items {
+  margin: 0;
+  padding: 4px 0 2px;
+  list-style: none;
+}
+
+.view-list__group {
+  margin-top: 8px;
+}
+
+.view-list__group .view-group {
+  padding: 2px 0 4px;
+}
+
+.view-list__item {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 3px 2px;
+  font-size: 13px;
+}
+
+.view-list__marker {
+  flex: none;
+  min-width: 14px;
+  color: var(--fg-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.view-list__body {
+  min-width: 0;
+}
+
+.view-list__line {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.view-list__title {
+  flex: none;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--accent);
+  text-align: left;
+  text-overflow: ellipsis;
+}
+
+.view-list__title:hover {
+  text-decoration: underline;
+}
+
+.view-list__primary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.view-list__inline {
+  overflow: hidden;
+  color: var(--fg-muted);
+  text-overflow: ellipsis;
+}
+
+.view-list__prop {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin-top: 2px;
+  padding-left: 14px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.view-list__prop-name {
+  flex: none;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.view-list__prop-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* the Properties menu's per-view and Page settings rows */
+.view-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--fg-muted);
+}
+
+.view-width-setting {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.view-width-setting .view-input {
+  width: 72px;
+}
+
+.view-list-settings {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.view-list-settings .view-input {
+  width: 56px;
+}
+
+/* ---------- inline cell editors (5B, GRO-2142) ---------- */
+
+.view-cell-edit {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+/* the display is a button so it can be clicked/focused, but looks like plain cell content */
+.view-cell-edit__display {
+  display: inline-block;
+  max-width: 100%;
+  min-width: 12px;
+  min-height: 1em;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  background: none;
+  border: 0;
+  cursor: text;
+}
+
+.view-cell-edit__input {
+  width: 100%;
+  min-width: 60px;
+  font-size: 12px;
+}
+
+.view-cell-edit__chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
+  max-width: 100%;
+}
+
+.view-cell-edit__chips .view-cell-edit__input {
+  width: auto;
+  flex: 1;
+}
+
+.view-cell-edit__chip-x {
+  padding: 0 0 0 3px;
+  font-size: 11px;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.view-cell-edit__link {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+/* completion popover under the link input (reuses .view-popover) */
+.view-cell-edit__complete {
+  top: calc(100% + 2px);
+  left: 0;
+  right: auto;
+  min-width: 160px;
+  padding: 4px;
+}
+
+.view-cell-edit__error {
+  margin-left: 4px;
+}
+
+/* Searchable property controls (YAZ-1395/1396). Native selects elsewhere retain their width cap. */
+.view-popover--properties {
+  width: 390px;
+  max-width: calc(100vw - 24px);
+  padding-top: 0;
+}
+.view-popover--sort {
+  width: 340px;
+  max-width: calc(100vw - 24px);
+}
+.view-popover--filter {
+  width: 420px;
+  max-width: calc(100vw - 24px);
+}
+.filter-menu .view-rule__main { align-items: start; }
+.filter-menu .view-rule__main > .column-picker { flex: 1 1 140px; }
+.column-menu-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 10px 0 8px;
+  margin-bottom: 6px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.column-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+.column-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.column-search svg { width: 15px; height: 15px; flex: none; color: var(--fg-muted); }
+.column-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+}
+.column-search input::placeholder { color: var(--fg-muted); }
+.column-search button { padding: 0 3px; font-size: 17px; color: var(--fg-muted); line-height: 18px; }
+.column-menu-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.column-menu-summary .view-menu__actions { gap: 2px; }
+.column-menu-summary .view-menu__action { font-size: 11px; padding: 4px 6px; white-space: nowrap; }
+.column-reorder-hint { margin: 3px 0 0; font-size: 11px; color: var(--fg-muted); }
+.column-search__empty { padding: 20px 8px; margin: 0; text-align: center; font-size: 12px; color: var(--fg-muted); }
+.column-picker { min-width: 0; }
+.column-picker__trigger.view-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  max-width: none;
+  min-height: 30px;
+  padding: 5px 9px;
+  text-align: left;
+  cursor: pointer;
+}
+.column-picker__trigger > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.column-picker__trigger:hover { border-color: var(--fg-muted); }
+.column-picker__panel { padding: 5px; margin-top: 5px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
+.column-picker__panel .column-search { padding: 6px; gap: 5px; font-size: 12px; }
+.column-picker__options { position: relative; max-height: 190px; overflow-y: auto; margin-top: 4px; }
+.column-picker__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 31px;
+  padding: 7px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.column-picker__option--active { background: var(--bg-hover); }
+.column-picker__option small { display: block; font-size: 10px; color: var(--fg-muted); margin-top: 1px; }
+.column-picker__check { color: var(--accent); }
+.sort-menu .view-rule__main {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 48px 20px;
+  align-items: start;
+  gap: 8px;
+}
+.sort-menu .view-rule__main > .column-picker { grid-column: 2; }
+.sort-menu .view-rule__main > .view-chip { width: 48px; height: 30px; padding: 0; text-align: center; color: var(--fg); }
+.sort-menu .view-rule__nav, .sort-menu .view-rule__remove { width: 100%; height: 30px; min-width: 0; }
+.sort-menu .view-prop__handle { opacity: .65; }
+.sort-menu .view-prop__handle:hover { opacity: 1; }
+.sort-menu .view-prop__handle:disabled { opacity: .35; cursor: default; }
+.sort-menu .view-menu__foot { padding-left: 26px; margin-top: 6px; }
+.sort-menu > .view-menu__label {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  margin: 12px 0 8px;
+  font-size: 12px;
+  color: var(--fg);
+  font-weight: 600;
+}
+.sort-menu > .view-rule__main { grid-template-columns: minmax(0, 1fr) 48px; padding: 0 28px 0 26px; margin-bottom: 6px; }
+.sort-menu > .view-rule__main > .column-picker { grid-column: 1; }

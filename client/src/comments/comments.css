@@ -1,0 +1,528 @@
+/*
+ * The comment stream (YAZ-1472) — owned by CommentsSection.tsx (the feature-CSS convention). The
+ * block sits INSIDE the editor's scroller, after the folder page's contents and BEFORE "Linked
+ * mentions", and repeats `.editor-instance`'s content column (backlinks.css's rule, byte for byte)
+ * so it lines up with the note's text and scrolls with it, and draws NO hairline of its own
+ * (YAZ-1675 — the body flows straight into the header; YAZ-1680 did the same for Linked mentions). The header is the properties panel's
+ * control (chevron, muted label, plain count, collapses the rest) at the backlinks' size, with one
+ * fold-all button at its right. Below it, Linear's shape with the outliner's folding: every thread is ONE white card —
+ * the parent on top, an "N replies" fold, the replies one level in behind a guide line, and a
+ * "Reply…" row at the bottom that opens when focused. Every comment folds to one line the way a
+ * bullet does: its title, or its first line. Colours are app theme tokens only, so dark mode
+ * follows for free; a comment carrying `by` takes the agent tokens.
+ */
+
+.comments {
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 0 48px;
+}
+
+/* ---- header row: the properties panel's control at the left, the fold-all button at the right ---- */
+
+.comments__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0 10px;
+}
+
+.comments__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+
+.comments__header:hover {
+  color: var(--fg);
+}
+
+.comments__chevron {
+  flex: none;
+  transition: transform 120ms ease;
+}
+
+.comments__header[aria-expanded='false'] .comments__chevron,
+.comments__fold[aria-expanded='false'] .comments__chevron,
+.comments__replies-toggle[aria-expanded='false'] .comments__chevron {
+  transform: rotate(-90deg);
+}
+
+.comments__title {
+  font-weight: 600;
+}
+
+.comments__count {
+  font-weight: 400;
+}
+
+/* The header's tools, right-aligned as one group: the order toggle (YAZ-1515), then fold-all. */
+.comments__tools {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* Fold-all (and the order toggle): icon and word, a real button so it is easy to hit; the label says which way it goes. */
+.comments__tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.comments__tool:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+/* The one line a note gets instead of a composer when `comments` is not ours to write. */
+.comments__notice {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+
+/* ---- threads: one card each ---- */
+
+.comments__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.comments__thread {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+/* Every row of a card after the first sits under a hairline. */
+.comments__thread > * + *,
+.comments__replies > * + * {
+  border-top: 1px solid var(--border);
+}
+
+.comments__item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+}
+
+/* One line: the fold, the marker, who (when declared), the summary when folded, when, edited, actions. */
+.comments__meta {
+  display: flex;
+  /* A wrapped header aligns everything to its FIRST line: every seat is 20px tall. */
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 20px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+/* The bullet's fold, one size down: shows on hover, and stays while the row is folded. */
+.comments__fold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px; /* a 16px box centred on the 20px first line (YAZ-1516) */
+  margin-left: -4px;
+  color: var(--fg-muted);
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.comments__item:hover > .comments__meta > .comments__fold,
+.comments__item:focus-within > .comments__meta > .comments__fold,
+.comments__fold[aria-expanded='false'] {
+  opacity: 1;
+}
+
+.comments__fold:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+/* The comment's number, worn like an id in the avatar's seat: `#3`, quotable, never reassigned. */
+.comments__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 10px;
+}
+
+
+/* A declared writer is not the person at the keyboard: the number takes the agent colour. */
+.comments__item--agent .comments__mark {
+  color: var(--agent);
+  background: var(--agent-soft);
+}
+
+/* Folded: the title (or the first line) stands in for the body, in the body's colour. It WRAPS (⚡ YAZ-1516): a long title is never clipped; the seats beside it stay on its first line. */
+.comments__summary {
+  min-width: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+/* A real title keeps its weight when folded, so the row still reads as a title. */
+.comments__summary--title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* A one-liner IS its header row; it wraps like every other header now (YAZ-1516), so the class is a hook only. */
+
+/* A one-liner keeps the fold's seat so every number lines up, but has nothing to fold. */
+.comments__fold--none {
+  visibility: hidden;
+}
+
+/* The stamp, "(edited)" and the writer never wrap; the summary is what gives. Each sits on the 20px first line. */
+.comments__when,
+.comments__edited,
+.comments__by {
+  flex: none;
+  line-height: 20px;
+}
+
+.comments__actions {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+/* Direct children only: hovering a reply must not light up its parent's actions. */
+.comments__item:hover > .comments__meta > .comments__actions,
+.comments__item:focus-within > .comments__meta > .comments__actions {
+  opacity: 1;
+}
+
+.comments__action {
+  padding: 1px 6px;
+  font-size: 12px;
+  line-height: 18px; /* 1px padding each side + 18 = the 20px first line */
+  color: var(--fg-muted);
+  border-radius: 4px;
+}
+
+.comments__action:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+.comments__action--danger:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+.comments__action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* The content column starts where the meta row's text does: past the fold, the dot and their gaps. */
+.comments__body,
+.comments__item > .comments__composer {
+  margin-left: 48px;
+}
+
+/* The body is rendered Markdown (D9 as amended): the note's own typography, one size down, boxed. */
+.comments__body {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+.comments__body > :first-child {
+  margin-top: 0;
+}
+
+.comments__body > :last-child {
+  margin-bottom: 0;
+}
+
+.comments__body p,
+.comments__body ul,
+.comments__body ol,
+.comments__body pre,
+.comments__body table,
+.comments__body blockquote {
+  margin: 0 0 8px;
+}
+
+.comments__body h1,
+.comments__body h2,
+.comments__body h3,
+.comments__body h4,
+.comments__body h5,
+.comments__body h6 {
+  margin: 12px 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.comments__body h1 {
+  font-size: 16px;
+}
+
+.comments__body h2 {
+  font-size: 15px;
+}
+
+.comments__body ul,
+.comments__body ol {
+  padding-left: 22px;
+}
+
+.comments__body li + li {
+  margin-top: 2px;
+}
+
+.comments__body a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.comments__body a:hover {
+  text-decoration: underline;
+}
+
+.comments__body code {
+  padding: 1px 4px;
+  font-size: 13px;
+  background: var(--bg-side);
+  border-radius: 3px;
+}
+
+.comments__body pre {
+  padding: 8px 10px;
+  overflow-x: auto;
+  background: var(--bg-side);
+  border-radius: 6px;
+}
+
+.comments__body pre code {
+  padding: 0;
+  background: none;
+}
+
+.comments__body blockquote {
+  padding-left: 10px;
+  color: var(--fg-muted);
+  border-left: 2px solid var(--border);
+}
+
+.comments__body table {
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.comments__body th,
+.comments__body td {
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.comments__body th {
+  font-weight: 600;
+  background: var(--bg-side);
+}
+
+.comments__body img {
+  max-width: 100%;
+}
+
+
+.comments__body hr {
+  margin: 8px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+/* ---- replies: the "N replies" fold, then one level in behind a guide line ---- */
+
+.comments__replies-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 14px 6px 50px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  text-align: left;
+}
+
+.comments__replies-toggle:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+.comments__replies {
+  position: relative;
+  padding-left: 28px;
+}
+
+/* The outline's guide line, hung under the parent's dot. */
+.comments__replies::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 24px;
+  width: 1px;
+  background: var(--border);
+}
+
+/* ---- the composer: a card with the button inside, Linear's box ---- */
+
+.comments__composer {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.comments__composer:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* The bottom composer follows the list under BOTH orders (YAZ-1515): the composer never moves. */
+.comments__list + .comments__composer {
+  margin-top: 16px;
+}
+
+/* The reply field at the bottom of a card with replies: a row of the card, not a box of its own. */
+.comments__replies > .comments__composer {
+  border-radius: 0;
+  border-right: none;
+  border-bottom: none;
+  border-left: none;
+  box-shadow: none;
+}
+
+.comments__replies > .comments__composer:focus-within {
+  border-color: var(--border);
+}
+
+.comments__replies > .comments__composer .comments__textarea,
+.comments__replies > .comments__composer .comments__title-input,
+.comments__replies > .comments__composer .comments__footer {
+  padding-left: 42px;
+}
+
+/* The optional title: one bold line above the text, shown once the composer is in use. */
+.comments__title-input {
+  width: 100%;
+  padding: 10px 12px 0;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--fg);
+  background: transparent;
+  border: none;
+}
+
+.comments__title-input + .comments__textarea {
+  padding-top: 4px;
+}
+
+.comments__textarea {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 12px 6px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--fg);
+  background: transparent;
+  border: none;
+  resize: none;
+  overflow: hidden;
+}
+
+/* Collapsed (nothing typed, not focused): one line, no buttons — Linear's "Reply…" row. */
+.comments__composer--collapsed .comments__textarea {
+  padding-bottom: 10px;
+}
+
+.comments__title-input::placeholder,
+.comments__textarea::placeholder {
+  color: var(--fg-muted);
+  font-weight: 400;
+}
+
+.comments__title-input:focus,
+.comments__textarea:focus {
+  outline: none;
+}
+
+/* The row under the text: the shortcut hint at the left, the buttons at the right. */
+.comments__footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 8px 12px;
+}
+
+.comments__hint {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+/* `.btn` / `.btn--primary` are the app's own (the Welcome screen's); this only trims them to the block's scale. */
+.comments__btn {
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+.comments__btn:not(.btn--primary) {
+  color: var(--fg-muted);
+  background: var(--bg);
+}
+
+.comments__btn:not(.btn--primary):hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+.comments__error {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--danger);
+}

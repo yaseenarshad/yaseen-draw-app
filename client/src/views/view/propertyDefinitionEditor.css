@@ -1,0 +1,350 @@
+.property-kind-icon {
+  flex: none;
+  color: var(--fg-muted);
+  vertical-align: middle;
+}
+.property-def {
+  width: 100%;
+  min-width: 0;
+  color: var(--fg);
+  font-size: 13px;
+}
+.property-def button, .property-def input {
+  font: inherit;
+}
+.property-def button {
+  cursor: pointer;
+}
+.property-def button:focus-visible, .property-def input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.property-def__type-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--fg);
+  text-align: left;
+}
+.property-def__type-row:hover, .property-def__type-option:hover, .property-def__back:hover, .property-def__action:hover, .property-def__option:hover {
+  background: var(--accent-soft);
+}
+.property-def__muted, .property-def__description, .property-def__hint {
+  color: var(--fg-muted);
+}
+.property-def__current-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.property-def__chevron {
+  margin-left: 5px;
+  font-size: 19px;
+  line-height: 1;
+  color: var(--fg-muted);
+}
+.property-def__description {
+  margin: 5px 8px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.property-def__section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 5px 0;
+  padding: 12px 8px 5px;
+  border-top: 1px solid var(--border);
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+.property-def__section-title > :last-child {
+  font-size: 11px;
+  opacity: .8;
+}
+.property-def__option-list {
+  padding: 2px 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.property-def__option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 33px;
+  border-radius: 5px;
+  padding: 1px 4px;
+}
+.property-def__option[data-dragging] {
+  opacity: .45;
+}
+.property-def__grip {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: 5px 2px;
+  border: 0;
+  background: none;
+  color: var(--fg-muted);
+  cursor: grab !important;
+  opacity: .6;
+}
+.property-def__grip:active {
+  cursor: grabbing !important;
+}
+.property-def__grip svg {
+  width: 14px;
+  height: 14px;
+}
+.property-def__option-button {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 5px;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  text-align: left;
+}
+.property-def__chip {
+  max-width: 100%;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+  color: var(--fg);
+  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.property-def__more {
+  flex: none;
+  color: var(--fg-muted);
+  font-size: 10px;
+  letter-spacing: 1px;
+  opacity: 0;
+}
+.property-def__option:hover .property-def__more, .property-def__option:focus-within .property-def__more {
+  opacity: 1;
+}
+.property-def__action, .property-def__back {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--fg-muted);
+  text-align: left;
+}
+.property-def__action > span, .property-def__back > span {
+  width: 16px;
+  flex: none;
+  text-align: center;
+}
+.property-def__import {
+  font-size: 12px !important;
+}
+.property-def__back {
+  color: var(--fg);
+}
+.property-def__back > span {
+  font-size: 22px;
+  line-height: 16px;
+}
+.property-def__search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px;
+  margin: 6px 5px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--fg-muted);
+}
+.property-def__search > span {
+  font-size: 20px;
+  line-height: 16px;
+}
+.property-def__search input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--fg);
+  padding: 0;
+}
+.property-def__type-list {
+  max-height: 295px;
+  overflow-y: auto;
+  padding: 3px 0;
+}
+.property-def__type-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--fg);
+  text-align: left;
+}
+.property-def__type-option[aria-pressed=true] {
+  background: var(--accent-soft);
+}
+.property-def__check {
+  margin-left: auto;
+  color: var(--fg-muted);
+}
+.property-def__hint {
+  margin: 9px 8px 4px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.property-def__empty {
+  padding: 12px 8px;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+.property-def__detail {
+  padding: 0 3px 6px;
+}
+.property-def__rename-label, .property-def__target {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 10px 5px;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+.property-def__input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.property-def__form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin: 8px 5px;
+}
+.property-def__form-actions button {
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: none;
+  color: var(--fg-muted);
+}
+.property-def__form-actions .property-def__save {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--fg);
+}
+.property-def__add-form {
+  padding: 7px 8px 0;
+}
+.property-def__add-form .property-def__form-actions {
+  margin-right: 0;
+}
+.property-def__delete {
+  display: block;
+  width: calc(100% - 10px);
+  padding: 8px;
+  margin: 12px 5px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: none;
+  color: var(--danger, #c94747);
+  text-align: left;
+}
+.property-def__delete:hover {
+  background: color-mix(in srgb, var(--danger, #c94747) 8%, transparent);
+}
+.property-def__error {
+  margin: 6px 8px;
+  font-size: 12px;
+  color: var(--danger, #c94747);
+}
+
+/* Overlay the boundary so dragging never changes row height or shifts the target. */
+.property-def__option[data-insert]::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 1;
+}
+.property-def__option[data-insert=before]::after {
+  top: -1px;
+}
+.property-def__option[data-insert=after]::after {
+  bottom: -1px;
+}
+
+.property-def__order {
+  max-width: 130px;
+  border: 0;
+  border-radius: 4px;
+  padding: 4px;
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.property-def__order:hover {
+  background: var(--accent-soft);
+  color: var(--fg);
+}
+.property-def__order:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.property-def__order option {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* Per-option remove (YAZ-1513): shown on hover, beside the ••• rename affordance. */
+.property-def__remove {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--fg-muted);
+  opacity: 0;
+}
+.property-def__option:hover .property-def__remove,
+.property-def__remove:focus-visible {
+  opacity: 1;
+}
+.property-def__remove:hover {
+  color: var(--danger);
+  background: var(--accent-soft);
+}
