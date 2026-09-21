@@ -77,58 +77,6 @@ export interface FileResponse {
   size: number
 }
 
-// ---------- readAsset(root, ref) / writeAsset(req) (Bases 4E, GRO-2139 — Desktop D10: bridge methods, never routes) ----------
-
-/**
- * The image extensions the asset pipe serves (no dot), and the ONLY extensions it serves
- * (🔒 YAZ-1810): anything else rejects `UNSUPPORTED_EXTENSION`. A `.excalidraw` used to ride
- * this pipe too, when a drawing was a sidecar an embed pointed at; it is the DOCUMENT now, and
- * `drawing:load` / `drawing:save` are its one door per direction. Two doors to one file's bytes,
- * with different rules about its images, is the race that door exists to prevent.
- */
-export const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif', 'bmp'] as const
-
-export interface AssetResponse {
-  /** Absolute path the ref resolved to. */
-  path: string
-  /** Mime type derived from the extension. */
-  mime: string
-  /** The file's bytes, base64-encoded (the renderer builds a `data:` URL from them). */
-  data: string
-  /** Byte size; capped at MAX_FILE_BYTES (above → `TOO_LARGE`). */
-  size: number
-  /**
-   * Disk mtime at the moment of the read — `writeAsset`'s `expectedMtime` guard, taken by the
-   * door that read the bytes, since nowhere else can honestly say what version they are.
-   */
-  mtime: number
-}
-
-/**
- * `writeAsset` — the write half of the asset pipe (YAZ-876, narrowed to images by 🔒 YAZ-1810):
- * raw bytes onto an `IMAGE_EXTENSIONS` path, and nothing else. A text body used to mean scene
- * JSON; a drawing is written through `drawing:save` now, which is the only writer that also
- * knows what to do with the images the scene names.
- */
-export interface AssetWriteRequest {
-  /** Vault root; the resolved target must sit under it (else `BAD_REQUEST`). */
-  root: string
-  /** The asset's vault-relative path (absolute under `root` also accepted). Never a basename search — writes are never fuzzy. */
-  path: string
-  /** The raw bytes of an image (YAZ-1656); above MAX_FILE_BYTES → `TOO_LARGE`. */
-  content: Uint8Array
-  /** Optimistic-concurrency guard, `writeFile`'s exactly: a differing disk mtime rejects `CONFLICT` and nothing is written. */
-  expectedMtime?: number
-  /** Create mode (`createFile`'s `wx`): an existing target rejects `ALREADY_EXISTS` and is never overwritten. */
-  create?: boolean
-}
-
-export interface AssetWriteResponse {
-  path: string
-  mtime: number
-  size: number
-}
-
 // ---------- drawing:load / drawing:save (🔒 YAZ-1810, the drawing DOCUMENT's two doors) ----------
 
 /**
@@ -881,14 +829,6 @@ export interface YaseenDrawApi {
   writeFile(req: FileWriteRequest): Promise<FileWriteResponse>
   createDir(path: string): Promise<CreateDirResponse>
   createFile(req: string | CreateFileRequest): Promise<CreateFileResponse>
-  /**
-   * Local image under `root` (YAZ-876): `ref` is a path or bare name — tried root-relative,
-   * then by basename (case-insensitive, first match in a deterministic walk).
-   * `IMAGE_EXTENSIONS` only; a drawing opens through `drawing.load` (🔒 YAZ-1810).
-   */
-  readAsset(root: string, ref: string): Promise<AssetResponse>
-  /** Writes an image under `root` (YAZ-1661): explicit path, atomic; see `AssetWriteRequest`. */
-  writeAsset(req: AssetWriteRequest): Promise<AssetWriteResponse>
   /** The drawing DOCUMENT's two doors (🔒 YAZ-1810): the only way a `.excalidraw` tab reads and writes. */
   drawing: DrawingApi
   /** Native open-directory dialog parented to the calling window (GRO-2163). */

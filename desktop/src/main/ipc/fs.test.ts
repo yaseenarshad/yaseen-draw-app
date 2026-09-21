@@ -61,7 +61,7 @@ describe('registerFsIpc', () => {
   it('registers every fs channel the preload invokes (and nothing else)', () => {
     registerFsIpc(store, windows)
     const channels = vi.mocked(ipcMain.handle).mock.calls.map(([ch]) => ch).sort()
-    expect(channels).toEqual([CH.fsCreateDir, CH.fsCreateFile, CH.fsDelete, CH.fsClip, CH.fsPaste, CH.fsClipState, CH.fsRead, CH.fsReadAsset, CH.fsWriteAsset, CH.fsRename, CH.fsTree, CH.fsWrite, CH.shellReveal, CH.shellOpenVsCode, CH.shellOpenDefault, CH.shellOpenLink].sort())
+    expect(channels).toEqual([CH.fsCreateDir, CH.fsCreateFile, CH.fsDelete, CH.fsClip, CH.fsPaste, CH.fsClipState, CH.fsRead, CH.fsRename, CH.fsTree, CH.fsWrite, CH.shellReveal, CH.shellOpenVsCode, CH.shellOpenDefault, CH.shellOpenLink].sort())
   })
 
   it('answers with an envelope: a tree on success, a BridgeError on failure', async () => {
@@ -74,44 +74,6 @@ describe('registerFsIpc', () => {
       ok: false,
       error: { code: 'NOT_FOUND', message: 'path does not exist', path: missing },
     })
-  })
-
-  it('fs:read-asset answers a local image as base64 + mime, errors as a BridgeError envelope (GRO-2139)', async () => {
-    const ok = await registered(CH.fsReadAsset)({ sender: {} }, root, 'img.png')
-    expect(ok.ok).toBe(true)
-    if (!ok.ok) throw new Error('expected ok')
-    const value = ok.value as { path: string; mime: string; data: string; size: number }
-    expect(value.path).toBe(path.join(root, 'assets-only', 'img.png'))
-    expect(value.mime).toBe('image/png')
-    expect(Buffer.from(value.data, 'base64').toString('utf8')).toBe('png')
-    const missing = await registered(CH.fsReadAsset)({ sender: {} }, root, 'missing.png')
-    expect(missing).toEqual({ ok: false, error: { code: 'NOT_FOUND', message: 'no asset with this name under the root', path: 'missing.png' } })
-  })
-
-  it('fs:write-asset writes image bytes and envelopes its failures (YAZ-1661)', async () => {
-    const req = { root, path: 'assets/pasted.png', content: Uint8Array.from([0x89, 0x50]) }
-    const ok = await registered(CH.fsWriteAsset)({ sender: {} }, req)
-    expect(ok.ok).toBe(true)
-    if (!ok.ok) throw new Error('expected ok')
-    const file = path.join(root, 'assets', 'pasted.png')
-    expect((ok.value as { path: string }).path).toBe(file)
-    expect([...(await readFile(file))]).toEqual([0x89, 0x50])
-    // A DRAWING is not this pipe's business any more (🔒 YAZ-1810): `drawing:save` owns it.
-    const bad = await registered(CH.fsWriteAsset)({ sender: {} }, { ...req, path: 'assets/scene.excalidraw' })
-    expect(bad).toEqual({
-      ok: false,
-      error: { code: 'UNSUPPORTED_EXTENSION', message: 'the image pipe writes image files only', path: path.join(root, 'assets', 'scene.excalidraw') },
-    })
-  })
-
-  it('fs:write-asset takes image BYTES on an image path and passes them through untouched (YAZ-1661)', async () => {
-    const bytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0xff])
-    const ok = await registered(CH.fsWriteAsset)({ sender: {} }, { root, path: 'assets/pasted.png', content: bytes })
-    expect(ok.ok).toBe(true)
-    if (!ok.ok) throw new Error('expected ok')
-    const file = path.join(root, 'assets', 'pasted.png')
-    expect(ok.value).toMatchObject({ path: file, size: bytes.byteLength })
-    expect(await readFile(file)).toEqual(Buffer.from(bytes))
   })
 
   it('fs:rename renames on disk, repairs the store and broadcasts file:renamed to every window (Links E1, GRO-2194)', async () => {

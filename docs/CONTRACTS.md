@@ -94,8 +94,6 @@ Electron flattens a thrown Error to its message, which is why failure travels as
 | `writeFile(req)` | `fs:write` | atomic write (tmp + rename); `expectedMtime` rejects `CONFLICT` |
 | `createDir(path)` | `fs:create-dir` | never overwrites (`ALREADY_EXISTS`) |
 | `createFile(req)` | `fs:create-file` | `.excalidraw` only; content-at-create, `wx` flag |
-| `readAsset(root, ref)` | `fs:read-asset` | an IMAGE under the vault, base64 + mime (a drawing is `drawing.load`'s) |
-| `writeAsset(req)` | `fs:write-asset` | atomic image-bytes write with the same mtime guard |
 | `drawing.load(req)` | `drawing:load` | one `.excalidraw` AS A DOCUMENT: its bytes, its mtime, and the images it names |
 | `drawing.save(req)` | `drawing:save` | images first, then the scene, atomically; `expectedMtime` → `CONFLICT` with NOTHING written |
 | `pickFolder()` | `dialog:pick-folder` | the native open-directory dialog |

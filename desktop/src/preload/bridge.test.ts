@@ -13,7 +13,7 @@ vi.mock('electron', () => ({
  * typecheck. `as const satisfies` keeps each tuple's literal type (a plain `readonly (keyof T)[]`
  * annotation would widen it and make `Exhaustive<>` vacuous) while still rejecting typos.
  */
-const TOP = ['tree', 'readFile', 'writeFile', 'createDir', 'createFile', 'readAsset', 'writeAsset', 'drawing', 'pickFolder', 'watch', 'state', 'window', 'menu', 'link', 'file', 'shell', 'vaultConfig', 'favorites', 'github'] as const satisfies readonly (keyof YaseenDrawApi)[]
+const TOP = ['tree', 'readFile', 'writeFile', 'createDir', 'createFile', 'drawing', 'pickFolder', 'watch', 'state', 'window', 'menu', 'link', 'file', 'shell', 'vaultConfig', 'favorites', 'github'] as const satisfies readonly (keyof YaseenDrawApi)[]
 const STATE = ['get', 'setSettings', 'setSidebarWidth', 'pushRecent', 'removeRecent', 'setFolder', 'onChange'] as const satisfies readonly (keyof StateApi)[]
 const WINDOW = ['identity', 'setIdentity', 'open', 'duplicate', 'openRecent', 'closeSelf', 'zoom', 'onFlush'] as const satisfies readonly (keyof WindowApi)[]
 const MENU = ['onOpenFolder', 'onOpenRoot', 'onSearch', 'onSwitchVault', 'onSettings', 'onToggleSidebar', 'onCloseTab', 'onNextTab', 'onPrevTab'] as const satisfies readonly (keyof MenuApi)[]
@@ -156,15 +156,6 @@ describe('preload bridge', () => {
     expect(listener).toHaveBeenLastCalledWith(null)
     off()
     expect(vi.mocked(ipcRenderer.removeListener).mock.calls.some(([ch, l]) => ch === CH.clipChanged && l === emit)).toBe(true)
-  })
-
-  it('writeAsset invokes fs:write-asset with the request (YAZ-876)', async () => {
-    const { ipcRenderer } = await import('electron')
-    const req = { root: '/v', path: 'assets/a.png', content: Uint8Array.from([1, 2]) }
-    vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: { path: '/v/assets/a.png', mtime: 5, size: 2 } })
-    const { bridge } = await import('./index')
-    await expect(bridge.writeAsset(req)).resolves.toEqual({ path: '/v/assets/a.png', mtime: 5, size: 2 })
-    expect(ipcRenderer.invoke).toHaveBeenCalledWith(CH.fsWriteAsset, req)
   })
 
   it('the drawing document`s two doors invoke drawing:load / drawing:save (🔒 YAZ-1810)', async () => {
