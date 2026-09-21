@@ -1,4 +1,4 @@
-import type { GithubSyncStatus } from '@shared/types'
+import type { CanvasPanelState, CanvasPrefs, GithubSyncStatus } from '@shared/types'
 import { fileKind } from '@shared/fileKind'
 import { DrawingEditor } from './drawings/DrawingEditor'
 import type { WatchSource } from './hooks/useWatch'
@@ -10,8 +10,10 @@ import type { WatchSource } from './hooks/useWatch'
  * land somewhere honest rather than in a blank pane.
  *
  * Everything below is App's, handed through: the vault root (a drawing is read relative to it),
- * the window's single watcher subscription, and the vault's sync status — one per window, so the
- * chip on every mounted tab tells the same story.
+ * the window's single watcher subscription, the vault's sync status — one per window, so the chip
+ * on every mounted tab tells the same story — and the user-level canvas preferences plus the
+ * canvas panel's memory (🔒 D9 / 🔒 D10), which live in `SettingsState` and reach every mounted
+ * canvas from the one place that owns them.
  */
 export interface EditorProps {
   path: string | null
@@ -19,9 +21,15 @@ export interface EditorProps {
   watch: WatchSource
   sync?: GithubSyncStatus | null
   onSyncNow?: () => void
+  /** 🔒 D9: `SettingsState.canvas`, and the way back when the engine or the rail moves one. */
+  canvasPrefs?: CanvasPrefs
+  onCanvasPrefsChange?: (next: CanvasPrefs) => void
+  /** 🔒 D10: `SettingsState.canvasPanel` — the panel's last-used tab and its dock preference. */
+  canvasPanel?: CanvasPanelState
+  onCanvasPanelChange?: (next: CanvasPanelState) => void
 }
 
-export function Editor({ path, root, watch, sync, onSyncNow }: EditorProps) {
+export function Editor({ path, root, watch, sync, onSyncNow, canvasPrefs, onCanvasPrefsChange, canvasPanel, onCanvasPanelChange }: EditorProps) {
   if (path === null || root === null) {
     return (
       <section className="editor">
@@ -36,5 +44,17 @@ export function Editor({ path, root, watch, sync, onSyncNow }: EditorProps) {
       </section>
     )
   }
-  return <DrawingEditor root={root} path={path} watch={watch} sync={sync} onSyncNow={onSyncNow} />
+  return (
+    <DrawingEditor
+      root={root}
+      path={path}
+      watch={watch}
+      sync={sync}
+      onSyncNow={onSyncNow}
+      canvasPrefs={canvasPrefs}
+      onCanvasPrefsChange={onCanvasPrefsChange}
+      canvasPanel={canvasPanel}
+      onCanvasPanelChange={onCanvasPanelChange}
+    />
+  )
 }

@@ -37,6 +37,10 @@ export interface MenuHandlers {
   toggleSidebar(): void
   /** View › Zoom In / Out / Actual Size (⌘+ / ⌘− / ⌘0): app-wide zoom on the focused window (YAZ-1710). */
   zoom(step: ZoomStep): void
+  /** File › Export Image… (⌘⇧E, 🔒 D10): the focused renderer's visible drawing opens the engine's export dialog. */
+  exportImage(): void
+  /** View › Canvas Background › a pick (🔒 D10): the focused renderer's visible drawing takes `color`. */
+  canvasBackground(color: string): void
   openHelp(): void
 }
 
@@ -45,13 +49,34 @@ export interface MenuInputs {
   recents: RecentRoots
   /** Dev builds get View › Toggle Developer Tools. */
   isDev: boolean
+  /**
+   * Whether the focused window's ACTIVE TAB is a drawing (🔒 D10). The two canvas items are
+   * enabled only then — they act on a canvas, and a menu row that silently does nothing is worse
+   * than a greyed-out one. `main/index.ts` recomputes it on every rebuild, and
+   * `subscribeMenuRebuildOnActiveFile` plus the focus hook are what make a rebuild happen.
+   */
+  activeIsDrawing: boolean
 }
+
+/**
+ * The engine's own canvas-background picks (`DEFAULT_CANVAS_BACKGROUND_PICKS`,
+ * `packages/common/src/colors.ts`): white, then radix slate2 / blue2 / yellow2 / bronze2. No
+ * "Custom…" row — a colour dialog is not a menu item's job, and the engine's own picker is gone
+ * with its main menu (🔒 D10).
+ */
+export const CANVAS_BACKGROUND_PICKS: ReadonlyArray<{ label: string; color: string }> = [
+  { label: 'White', color: '#ffffff' },
+  { label: 'Slate', color: '#f8f9fa' },
+  { label: 'Blue', color: '#f5faff' },
+  { label: 'Yellow', color: '#fffce8' },
+  { label: 'Bronze', color: '#fdf8f6' },
+]
 
 /**
  * The whole menu bar as a template. Item `id`s are stable so a live check can drive items
  * through `Menu.getApplicationMenu().getMenuItemById(...)`.
  */
-export function buildMenuTemplate({ recents, isDev }: MenuInputs, handlers: MenuHandlers): MenuItemConstructorOptions[] {
+export function buildMenuTemplate({ recents, isDev, activeIsDrawing }: MenuInputs, handlers: MenuHandlers): MenuItemConstructorOptions[] {
   const recentItems: MenuItemConstructorOptions[] =
     recents.length === 0
       ? [{ label: 'No Recent Folders', enabled: false }]
@@ -95,6 +120,11 @@ export function buildMenuTemplate({ recents, isDev }: MenuInputs, handlers: Menu
         // so the gesture goes to the focused window's renderer — un-collapsing the sidebar first.
         { id: 'menu.file.search', label: 'Search Vault', accelerator: 'CmdOrCtrl+K', click: () => handlers.search() },
         { type: 'separator' },
+        // 🔒 D10: the drawing's image export left the canvas hamburger for the app menu bar. It
+        // opens the ENGINE's own export dialog (`openDialog: { name: 'imageExport' }`) — a
+        // standalone `.excalidraw` export is 3E's.
+        { id: 'menu.file.export-image', label: 'Export Image…', accelerator: 'CmdOrCtrl+Shift+E', enabled: activeIsDrawing, click: () => handlers.exportImage() },
+        { type: 'separator' },
         // ⌘W is Close Tab (GRO-2232, locked): the renderer owns tab state, so the gesture goes to
         // the focused window's renderer. Close Window moves to ⌘⇧W and keeps `role: 'close'` — the
         // OS close that windows.ts intercepts for the flush handshake.
@@ -121,6 +151,16 @@ export function buildMenuTemplate({ recents, isDev }: MenuInputs, handlers: Menu
         // Electron's own zoomIn role also answers ⌘= (no shift); keep that hidden twin.
         { id: 'menu.view.zoom-in-eq', label: 'Zoom In', accelerator: 'CmdOrCtrl+=', visible: false, click: () => handlers.zoom(1) },
         { id: 'menu.view.zoom-out', label: 'Zoom Out', accelerator: 'CmdOrCtrl+-', click: () => handlers.zoom(-1) },
+        { type: 'separator' },
+        // 🔒 D10: the engine's canvas-background picks, greyed out off a drawing tab. The value is
+        // per BOARD — the engine writes `viewBackgroundColor` into the file — which is why it is
+        // here and not in Settings › Canvas with the user-level prefs (🔒 D9).
+        {
+          id: 'menu.view.canvas-background',
+          label: 'Canvas Background',
+          enabled: activeIsDrawing,
+          submenu: CANVAS_BACKGROUND_PICKS.map(({ label, color }, i) => ({ id: `menu.view.canvas-background.${i}`, label, click: () => handlers.canvasBackground(color) })),
+        },
       ],
     },
     // Top-level role `window` marks this submenu as macOS's Windows menu, so the OS appends the window list.
@@ -263,6 +303,12 @@ export function createMenuHandlers(store: Store, windows: MenuWindows, host: Men
     zoom(step) {
       host.zoom(step)
     },
+    exportImage() {
+      host.focusedWebContents()?.send(CH.menuExportImage)
+    },
+    canvasBackground(color) {
+      host.focusedWebContents()?.send(CH.menuCanvasBackground, color)
+    },
     openHelp() {
       host.openExternal(HELP_URL)
     },
@@ -278,6 +324,27 @@ export function subscribeMenuRebuild(store: Store, rebuild: () => void): () => v
   return store.onChange((state) => {
     if (state.recents === last) return
     last = state.recents
+    rebuild()
+  })
+}
+
+/** The one fact the two canvas items are gated on: which file each window has in front. */
+const activeFilesKey = (state: { windows: ReadonlyArray<{ id: string; file: string | null }> }): string => state.windows.map((w) => `${w.id}=${w.file ?? ''}`).join('\n')
+
+/**
+ * Rebuild when any window's ACTIVE FILE changes (🔒 D10): File › Export Image… and View › Canvas
+ * Background are enabled only while the focused window's active tab is a drawing, so a tab switch
+ * has to re-evaluate them. A second subscription rather than a widening of `subscribeMenuRebuild`,
+ * so the recents rule — and its test — stays exactly what it was. Focus changes are the host's to
+ * report (`browser-window-focus` in `main/index.ts`): they move which window is asked, not what
+ * the store says.
+ */
+export function subscribeMenuRebuildOnActiveFile(store: Store, rebuild: () => void): () => void {
+  let last = activeFilesKey(store.get())
+  return store.onChange((state) => {
+    const next = activeFilesKey(state)
+    if (next === last) return
+    last = next
     rebuild()
   })
 }

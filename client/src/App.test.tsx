@@ -73,6 +73,8 @@ function installBridge(state: AppState, identity: IdentityFixture) {
   const menuCloseTab = new Set<() => void>()
   const menuNextTab = new Set<() => void>()
   const menuPrevTab = new Set<() => void>()
+  const menuExportImage = new Set<() => void>()
+  const menuCanvasBackground = new Set<() => void>()
   const linkOpenFile = new Set<(path: string) => void>()
   const linkNotice = new Set<(message: string) => void>()
   const fileRenamed = new Set<(ev: { oldPath: string; newPath: string; kind?: 'file' | 'dir' }) => void>()
@@ -127,6 +129,9 @@ function installBridge(state: AppState, identity: IdentityFixture) {
       onCloseTab: menuSub(menuCloseTab),
       onNextTab: menuSub(menuNextTab),
       onPrevTab: menuSub(menuPrevTab),
+      // 🔒 D10: the two canvas items; App routes them to the visible drawing layer by DOM.
+      onExportImage: menuSub(menuExportImage),
+      onCanvasBackground: menuSub(menuCanvasBackground),
     },
     link: {
       onOpenFile: vi.fn((l: (path: string) => void) => {
@@ -174,6 +179,8 @@ function installBridge(state: AppState, identity: IdentityFixture) {
     emitCloseTab: () => menuCloseTab.forEach((l) => l()),
     emitNextTab: () => menuNextTab.forEach((l) => l()),
     emitPrevTab: () => menuPrevTab.forEach((l) => l()),
+    emitExportImage: () => menuExportImage.forEach((l) => l()),
+    emitCanvasBackground: (color: string) => menuCanvasBackground.forEach((l) => (l as unknown as (c: string) => void)(color)),
     emitLinkOpenFile: (path: string) => linkOpenFile.forEach((l) => l(path)),
     emitLinkNotice: (message: string) => linkNotice.forEach((l) => l(message)),
     emitFileRenamed: (oldPath: string, newPath: string, kind?: 'file' | 'dir') => fileRenamed.forEach((l) => l({ oldPath, newPath, kind })),

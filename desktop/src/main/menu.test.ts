@@ -6,7 +6,7 @@ import type { MenuItemConstructorOptions } from 'electron'
 import type { RecentRoots, WindowEntry } from '@shared/types'
 import { CH } from '../channels'
 import { createStore, type Store } from './store'
-import { HELP_URL, buildContextMenuTemplate, buildMenuTemplate, createMenuHandlers, pickMenuTargetWindow, subscribeMenuRebuild, type ContextMenuActions, type MenuHandlers, type MenuHost } from './menu'
+import { HELP_URL, buildContextMenuTemplate, buildMenuTemplate, createMenuHandlers, pickMenuTargetWindow, subscribeMenuRebuild, subscribeMenuRebuildOnActiveFile, CANVAS_BACKGROUND_PICKS, type ContextMenuActions, type MenuHandlers, type MenuHost } from './menu'
 
 // ---------- buildMenuTemplate (pure) ----------
 
@@ -22,6 +22,8 @@ const noopHandlers = (): MenuHandlers => ({
   nextTab: vi.fn(),
   prevTab: vi.fn(),
   toggleSidebar: vi.fn(),
+  exportImage: vi.fn(),
+  canvasBackground: vi.fn(),
   openHelp: vi.fn(),
 })
 
@@ -31,8 +33,8 @@ const RECENTS: RecentRoots = [
   { path: '/vaults/old', lastOpened: 1 },
 ]
 
-function build(recents: RecentRoots = RECENTS, isDev = false, handlers: MenuHandlers = noopHandlers()) {
-  return buildMenuTemplate({ recents, isDev }, handlers)
+function build(recents: RecentRoots = RECENTS, isDev = false, handlers: MenuHandlers = noopHandlers(), activeIsDrawing = true) {
+  return buildMenuTemplate({ recents, isDev, activeIsDrawing }, handlers)
 }
 
 function menuOf(template: MenuItemConstructorOptions[], label: string): MenuItemConstructorOptions[] {
@@ -161,6 +163,32 @@ describe('buildMenuTemplate', () => {
     ])
     zoom.forEach((item) => click(item))
     expect(vi.mocked(handlers.zoom).mock.calls).toEqual([[0], [1], [1], [-1]])
+  })
+
+  it('File › Export Image… is ⌘⇧E, enabled only on a drawing tab, and calls exportImage (🔒 D10)', () => {
+    const handlers = noopHandlers()
+    const item = menuOf(build(RECENTS, false, handlers, true), 'File').find((i) => i.id === 'menu.file.export-image')
+    expect(item?.label).toBe('Export Image…')
+    expect(item?.accelerator).toBe('CmdOrCtrl+Shift+E')
+    expect(item?.enabled).toBe(true)
+    click(item)
+    expect(handlers.exportImage).toHaveBeenCalledTimes(1)
+    // A non-drawing tab (or no tab at all) greys it out rather than letting it silently no-op.
+    expect(menuOf(build(RECENTS, false, handlers, false), 'File').find((i) => i.id === 'menu.file.export-image')?.enabled).toBe(false)
+  })
+
+  it('View › Canvas Background carries the engine`s five picks, gated the same way (🔒 D10)', () => {
+    const handlers = noopHandlers()
+    const item = menuOf(build(RECENTS, false, handlers, true), 'View').find((i) => i.id === 'menu.view.canvas-background')
+    expect(item?.label).toBe('Canvas Background')
+    expect(item?.enabled).toBe(true)
+    expect(item?.accelerator).toBeUndefined()
+    const picks = item?.submenu as MenuItemConstructorOptions[]
+    expect(picks.map((p) => p.label)).toEqual(['White', 'Slate', 'Blue', 'Yellow', 'Bronze'])
+    expect(CANVAS_BACKGROUND_PICKS.map((p) => p.color)).toEqual(['#ffffff', '#f8f9fa', '#f5faff', '#fffce8', '#fdf8f6'])
+    picks.forEach((pick) => click(pick))
+    expect(vi.mocked(handlers.canvasBackground).mock.calls).toEqual(CANVAS_BACKGROUND_PICKS.map((p) => [p.color]))
+    expect(menuOf(build(RECENTS, false, handlers, false), 'View').find((i) => i.id === 'menu.view.canvas-background')?.enabled).toBe(false)
   })
 
   it('Window menu: role window (macOS window list) with minimize / zoom, the tab-switching items, front', () => {
@@ -466,6 +494,52 @@ describe('createMenuHandlers', () => {
 })
 
 // ---------- subscribeMenuRebuild ----------
+
+describe('createMenuHandlers — the two canvas gestures (🔒 D10)', () => {
+  it('exportImage and canvasBackground push to the focused renderer, colour and all', () => {
+    const wc = { id: 7, send: vi.fn() }
+    const { handlers } = makeHandlers(wc)
+    handlers.exportImage()
+    expect(wc.send).toHaveBeenCalledExactlyOnceWith(CH.menuExportImage)
+    wc.send.mockClear()
+    handlers.canvasBackground('#fffce8')
+    expect(wc.send).toHaveBeenCalledExactlyOnceWith(CH.menuCanvasBackground, '#fffce8')
+  })
+
+  it('with no window at all they are silent no-ops', () => {
+    const { handlers } = makeHandlers(undefined)
+    expect(() => {
+      handlers.exportImage()
+      handlers.canvasBackground('#ffffff')
+    }).not.toThrow()
+  })
+})
+
+describe('subscribeMenuRebuildOnActiveFile (🔒 D10)', () => {
+  it('rebuilds when a window`s active file changes, and not for other writes', () => {
+    store.upsertWindow(ENTRY)
+    const rebuild = vi.fn()
+    subscribeMenuRebuildOnActiveFile(store, rebuild)
+
+    store.setSidebarWidth(300)
+    store.pushRecent('/vaults/notes')
+    expect(rebuild).not.toHaveBeenCalled()
+
+    store.upsertWindow({ ...ENTRY, file: '/vaults/notes/b.excalidraw', tabs: ['/vaults/notes/b.excalidraw'] })
+    expect(rebuild).toHaveBeenCalledTimes(1)
+    // A write that leaves every window's active file alone is not a reason to rebuild.
+    store.upsertWindow({ ...ENTRY, file: '/vaults/notes/b.excalidraw', tabs: ['/vaults/notes/b.excalidraw'], sidebarCollapsed: true })
+    expect(rebuild).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns an unsubscribe', () => {
+    store.upsertWindow(ENTRY)
+    const rebuild = vi.fn()
+    subscribeMenuRebuildOnActiveFile(store, rebuild)()
+    store.upsertWindow({ ...ENTRY, file: null, tabs: [] })
+    expect(rebuild).not.toHaveBeenCalled()
+  })
+})
 
 describe('subscribeMenuRebuild', () => {
   it('rebuilds when recents change, not on other writes', () => {

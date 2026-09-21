@@ -20,6 +20,8 @@ function installBridge() {
   const closeTabListeners = new Set<() => void>()
   const nextTabListeners = new Set<() => void>()
   const prevTabListeners = new Set<() => void>()
+  const exportImageListeners = new Set<() => void>()
+  const canvasBackgroundListeners = new Set<(color: string) => void>()
   const sub = <T,>(set: Set<T>) =>
     vi.fn((l: T) => {
       set.add(l)
@@ -36,6 +38,8 @@ function installBridge() {
       onCloseTab: sub(closeTabListeners),
       onNextTab: sub(nextTabListeners),
       onPrevTab: sub(prevTabListeners),
+      onExportImage: sub(exportImageListeners),
+      onCanvasBackground: sub(canvasBackgroundListeners),
     },
   }
   Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
@@ -49,7 +53,9 @@ function installBridge() {
     emitCloseTab: () => closeTabListeners.forEach((l) => l()),
     emitNextTab: () => nextTabListeners.forEach((l) => l()),
     emitPrevTab: () => prevTabListeners.forEach((l) => l()),
-    count: () => openFolderListeners.size + openRootListeners.size + searchListeners.size + switchVaultListeners.size + settingsListeners.size + toggleSidebarListeners.size + closeTabListeners.size + nextTabListeners.size + prevTabListeners.size,
+    emitExportImage: () => exportImageListeners.forEach((l) => l()),
+    emitCanvasBackground: (color: string) => canvasBackgroundListeners.forEach((l) => l(color)),
+    count: () => openFolderListeners.size + openRootListeners.size + searchListeners.size + switchVaultListeners.size + settingsListeners.size + toggleSidebarListeners.size + closeTabListeners.size + nextTabListeners.size + prevTabListeners.size + exportImageListeners.size + canvasBackgroundListeners.size,
   }
 }
 
@@ -63,6 +69,8 @@ interface ProbeProps {
   onCloseTab: () => void
   onNextTab: () => void
   onPrevTab: () => void
+  onExportImage: () => void
+  onCanvasBackground: (color: string) => void
 }
 
 function Probe(props: ProbeProps) {
@@ -80,7 +88,7 @@ afterEach(() => {
 describe('useMenuEvents', () => {
   it('routes menu gestures to the callbacks and unsubscribes on unmount', () => {
     const b = installBridge()
-    const handlers = { onOpenFolder: vi.fn(), onOpenRoot: vi.fn(), onSearch: vi.fn(), onSwitchVault: vi.fn(), onSettings: vi.fn(), onToggleSidebar: vi.fn(), onCloseTab: vi.fn(), onNextTab: vi.fn(), onPrevTab: vi.fn() }
+    const handlers = { onOpenFolder: vi.fn(), onOpenRoot: vi.fn(), onSearch: vi.fn(), onSwitchVault: vi.fn(), onSettings: vi.fn(), onToggleSidebar: vi.fn(), onCloseTab: vi.fn(), onNextTab: vi.fn(), onPrevTab: vi.fn(), onExportImage: vi.fn(), onCanvasBackground: vi.fn() }
     root = createRoot(document.createElement('div'))
     act(() => root?.render(<Probe {...handlers} />))
 
@@ -102,6 +110,11 @@ describe('useMenuEvents', () => {
     expect(handlers.onNextTab).toHaveBeenCalledTimes(1)
     act(() => b.emitPrevTab())
     expect(handlers.onPrevTab).toHaveBeenCalledTimes(1)
+    // 🔒 D10: the two items that left the canvas hamburger for the application menu.
+    act(() => b.emitExportImage())
+    expect(handlers.onExportImage).toHaveBeenCalledTimes(1)
+    act(() => b.emitCanvasBackground('#fffce8'))
+    expect(handlers.onCanvasBackground).toHaveBeenCalledWith('#fffce8')
 
     act(() => root?.unmount())
     root = null

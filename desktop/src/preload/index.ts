@@ -88,6 +88,10 @@ const api: YaseenDrawApi = {
     onCloseTab: on<void>(CH.menuCloseTab),
     onNextTab: on<void>(CH.menuNextTab),
     onPrevTab: on<void>(CH.menuPrevTab),
+    // 🔒 D10: File › Export Image… and View › Canvas Background ▸, which main enables only while
+    // the focused window's active tab is a drawing.
+    onExportImage: on<void>(CH.menuExportImage),
+    onCanvasBackground: on<string>(CH.menuCanvasBackground),
   },
   // Deep links (E1, GRO-2171): main routes a yaseendraw:// URL to the best window.
   link: {

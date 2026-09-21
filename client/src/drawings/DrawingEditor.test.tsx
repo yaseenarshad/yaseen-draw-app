@@ -11,10 +11,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import type { DrawingLoadResponse, GithubSyncStatus } from '@shared/types'
+import { DEFAULT_CANVAS_PREFS, type DrawingLoadResponse, type GithubSyncStatus } from '@shared/types'
 import type { WatchEvent } from '@shared/types'
 import type { DrawingFileData } from '@shared/drawingAssets'
 import type { DrawingSnapshot, DrawingSurfaceApi, DrawingSurfaceProps } from './ExcalidrawSurface'
+import { DRAWING_COMMAND_EVENT, requestDrawingCommand, type DrawingCommand } from './drawingCommand'
 
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),
@@ -30,6 +31,8 @@ const surface = {
   nextReplaceVersion: 0,
   replaced: [] as unknown[],
   refreshes: 0,
+  /** What the application menu's two items (🔒 D10) reached this canvas as. */
+  commands: [] as DrawingCommand[],
 }
 
 vi.mock('./ExcalidrawSurface', () => ({
@@ -45,6 +48,12 @@ vi.mock('./ExcalidrawSurface', () => ({
       replaceScene: (scene) => {
         surface.replaced.push(scene)
         return surface.nextReplaceVersion
+      },
+      openImageExport: () => {
+        surface.commands.push({ kind: 'export-image' })
+      },
+      setCanvasBackground: (color) => {
+        surface.commands.push({ kind: 'canvas-background', color })
       },
     } satisfies DrawingSurfaceApi)
     // The real engine renders this into its own top-right row; the stub just puts it on screen,
@@ -117,6 +126,7 @@ beforeEach(() => {
   surface.replaced = []
   surface.refreshes = 0
   surface.nextReplaceVersion = 0
+  surface.commands = []
   flushListener = null
   Object.defineProperty(window, 'yaseenDraw', {
     configurable: true,
@@ -517,9 +527,29 @@ describe('chips and the canvas frame', () => {
     }
   })
 
-  it('seeds the canvas appState from the prefs hook 🔒 D9 will fill (YAZ-1813)', async () => {
-    render({ canvasAppState: { gridSize: 20 } })
+  it('claims the application menu`s two canvas commands on its own section (🔒 D10)', async () => {
+    // The container IS this tab's workspace layer, which is what `requestDrawingCommand` selects.
+    container.className = 'tabstack__layer'
+    render()
     await flush()
-    expect(surface.props?.canvasAppState).toEqual({ gridSize: 20 })
+
+    expect(requestDrawingCommand({ kind: 'export-image' }, document.body)).toBe(true)
+    expect(requestDrawingCommand({ kind: 'canvas-background', color: '#fffce8' }, document.body)).toBe(true)
+    expect(surface.commands).toEqual([{ kind: 'export-image' }, { kind: 'canvas-background', color: '#fffce8' }])
+  })
+
+  it('ignores a command once the editor is gone — the listener goes with it', async () => {
+    render()
+    await flush()
+    const section = container.querySelector('.editor--drawing') as Element
+    act(() => root?.render(null))
+    section.dispatchEvent(new CustomEvent(DRAWING_COMMAND_EVENT, { detail: { kind: 'export-image' } }))
+    expect(surface.commands).toEqual([])
+  })
+
+  it('hands the surface the shell`s canvas prefs to seed the scene with (🔒 D9)', async () => {
+    render({ canvasPrefs: { ...DEFAULT_CANVAS_PREFS, gridModeEnabled: true } })
+    await flush()
+    expect(surface.props?.canvasPrefs).toEqual({ ...DEFAULT_CANVAS_PREFS, gridModeEnabled: true })
   })
 })
