@@ -2,8 +2,8 @@
  * The drawing document's IPC (🔒 YAZ-1810): `fs/drawing.ts` behind the standard envelope, and
  * nothing else.
  *
- * NO STORE REPAIR AND NO BROADCAST, exactly like `fs:write-asset` and for the same reason: those
- * exist for paths that MOVE or GO, and a save does neither — it changes bytes at a path every
+ * NO STORE REPAIR AND NO BROADCAST: repair and the pushes exist for paths that MOVE or GO, and a
+ * save does neither — it changes bytes at a path every
  * window already knows. A window with the same document open learns of the change from the
  * shared watcher, like any edit made outside the app, and decides for itself (reload when clean,
  * the conflict bar when dirty). One writer telling the others what to think would be a second,
@@ -19,11 +19,16 @@ import { shell, type WebContents } from 'electron'
 import { CH } from '../../channels'
 import { sweepOrphanAssets } from '../drawings/orphanSweep'
 import { loadDrawing, saveDrawing } from '../fs/drawing'
+import { resolveLibraryFolder } from '../library'
+import type { Store } from '../store'
 import { handle } from './envelope'
 
-export function registerDrawingIpc(): void {
+export function registerDrawingIpc(store: Store, userData: string): void {
   handle(CH.drawingLoad, loadDrawing)
   handle(CH.drawingSave, saveDrawing)
+  // 🔒 D5: read-only and store-backed — the setting is the renderer's to WRITE (through
+  // `state:set-settings`, like every other setting); this only says where it points.
+  handle(CH.drawingLibraryFolder, async () => resolveLibraryFolder(store.get().settings.libraryFolder, userData))
 }
 
 /** Roots swept in this process's life — the "first opened in a session" guard. */

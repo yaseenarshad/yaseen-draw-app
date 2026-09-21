@@ -41,9 +41,9 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
   - [x] 2D — Make `.excalidraw` the document: load, save, autosave, conflict, chips (YAZ-1810)
   - [x] 2E — Image store: `assets/`, hydrate, extract, orphan sweep (YAZ-1811)
   - [x] 2F — Canvas chrome: rail, panel shell, menus, full toolbar, parity checklist (YAZ-1812)
-- Now: [→] 2G — Settings: canvas preferences, Library folder, trims (YAZ-1813)
+  - [x] 2G — Settings: canvas preferences, Library folder, trims (YAZ-1813)
+- Now: [→] 2H — ⌘K search over the drawing catalog (YAZ-1814)
 - Remaining:
-  - [ ] 2H — ⌘K search over the drawing catalog (YAZ-1814)
   - [ ] 2I — New drawing, naming, extension display, file association (YAZ-1815)
   - [ ] 3A — Library folder and secrets plumbing (YAZ-1817)
   - [ ] 3B — Images tab: Image Studio with main-process providers (YAZ-1818)
@@ -64,13 +64,15 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 - RESOLVED (🔒 "Dead asset pipe deleted" on YAZ-1775): the image half of the asset pipe is gone — module, tests, channels, preload methods, types and CONTRACTS rows — in 2F's first commit.
 - UNCONFIRMED (posted on YAZ-1812, awaiting Yasin): `focusOpenDocument`. A tab that becomes visible LATER still gets no focus — `autoFocus` only fires at mount. Whether the canvas should claim focus when its layer becomes visible is a product call, so 2F left it alone.
 
-## Learnings (2D / 2E / 2F)
+## Learnings (2D / 2E / 2F / 2G)
 
 - **The toolbar-mode names read backwards.** The fully built-out `ContextualPropertiesToolbar` is the engine's `full` desktop mode; `compact` is upstream's vertical strip. `YASEEN_FULL_TOOLBAR_MODE` exists so no one ever writes the bare string and inverts it again (rounds 3–4 did).
 - **`getFormFactor` is the other half of that gate.** Without it a canvas pane narrowed by the shell sidebar falls into the engine's ≤ 1180 px tablet band and is forced to `compact` before the localStorage key is ever consulted.
 - **Nothing the engine is handed may change identity.** `<Excalidraw>` is memoized and calls `onChange` on every render, so `initialData` is built ONCE from the mount-time scene and prefs, and the rail reads live state from a tiny external store rather than props.
 - **One ref, two directions.** `appliedRef` is "what the engine is believed to hold"; both the engine→shell read-back and the shell→engine push compare against it before writing. That single comparison is the whole anti-ping-pong rule.
 - **`toolLock` and `framesVisible` are not plain appState.** A partial `activeTool` wipes the tool the user is holding, so a live lock update merges with what the engine holds; frames go through `updateFrameRendering` and never through `updateScene`.
+- **Strict at the bridge, lenient on load.** The IPC guard demands a whole `CanvasPrefs` from a sandboxed renderer; the state FILE is repaired key by key, so a store written before a pref existed keeps every pref it does have instead of resetting the lot. One guard map, two callers.
+- **Only main can resolve the library folder.** `null` means `<userData>/library`, and only main knows where that is — which is why the Settings row asks over IPC instead of working it out.
 - **Menu commands reach the canvas by DOM, not by prop.** Several tabs are mounted at once, each with its own engine; a CustomEvent on the visible `.editor--drawing` section is the only address that means "the one in front".
 
 

@@ -64,6 +64,8 @@ export const api = {
   drawing: {
     load: (req: DrawingLoadRequest) => call<DrawingLoadResponse>(() => window.yaseenDraw.drawing.load(req)),
     save: (req: DrawingSaveRequest) => call<DrawingSaveResponse>(() => window.yaseenDraw.drawing.save(req)),
+    /** The RESOLVED library folder (🔒 D5): the setting, or `<userData>/library` — main's answer. */
+    libraryFolder: () => call<string>(() => window.yaseenDraw.drawing.libraryFolder()),
   },
   /** Native open-directory dialog parented to this window; resolves when the user picks or cancels. */
   pickFolder: () => call<PickFolderResponse>(() => window.yaseenDraw.pickFolder()),

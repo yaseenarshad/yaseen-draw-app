@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { HOTKEY_GROUPS, MOUSE_TIPS, WINDOW_HOTKEYS } from './hotkeys'
+import { CANVAS_HOTKEYS, HOTKEY_GROUPS, MOUSE_TIPS, WINDOW_HOTKEYS } from './hotkeys'
 
 describe('HOTKEYS source of truth', () => {
   it('covers the window & tab shortcuts from the application menu (B3 + Tabs + View › Zoom) plus the open-beside tip', () => {
     const keys = WINDOW_HOTKEYS.map((h) => h.keys)
     // ⌘⇧N / ⌘⇧O / ⌘W (Close Tab) / ⌘⇧W (Close Window), the tab-switch pairs and the zoom trio
     // live in the menu (menu.ts, GRO-2161/2232, YAZ-1710); ⌥-click Open Recent = open beside (GRO-2211).
-    for (const expected of ['⌘⇧N', '⌘⇧O', '⌘O', '⌘K', '⌘,', '⌘B', '⌘+ / ⌘− / ⌘0', '⌘X / ⌘C', '⌘V', '⌘W', '⌘⇧W', '⌃Tab / ⌃⇧Tab', '⌘⇧] / ⌘⇧[', '⌥ Open Recent']) {
+    for (const expected of ['⌘⇧N', '⌘⇧O', '⌘O', '⌘K', '⌘,', '⌘B', '⌘+ / ⌘− / ⌘0', '⌘X / ⌘C', '⌘V', '⌘S', '⌘W', '⌘⇧W', '⌃Tab / ⌃⇧Tab', '⌘⇧] / ⌘⇧[', '⌥ Open Recent']) {
       expect(keys).toContain(expected)
     }
     expect(WINDOW_HOTKEYS.find((h) => h.keys === '⌘B')?.label).toMatch(/outside editing surfaces/i)
@@ -47,9 +47,17 @@ describe('HOTKEYS source of truth', () => {
     }
   })
 
-  it('is TWO groups — Window and Mouse — in the order the page shows them', () => {
-    expect(HOTKEY_GROUPS.map((g) => g.title)).toEqual(['Window', 'Mouse'])
-    expect(HOTKEY_GROUPS.map((g) => g.entries)).toEqual([WINDOW_HOTKEYS, MOUSE_TIPS])
+  it('is THREE groups — Window, Canvas and Mouse — in the order the page shows them', () => {
+    expect(HOTKEY_GROUPS.map((g) => g.title)).toEqual(['Window', 'Canvas', 'Mouse'])
+    expect(HOTKEY_GROUPS.map((g) => g.entries)).toEqual([WINDOW_HOTKEYS, CANVAS_HOTKEYS, MOUSE_TIPS])
+  })
+
+  it('the Canvas table carries the drawing`s own keys (YAZ-1812), and says what gates ⌘C', () => {
+    expect(CANVAS_HOTKEYS.map((h) => h.keys)).toEqual(['⌘⇧E', '⌘F', '⌘C'])
+    expect(CANVAS_HOTKEYS.find((h) => h.keys === '⌘⇧E')?.label).toMatch(/export image/i)
+    expect(CANVAS_HOTKEYS.find((h) => h.keys === '⌘C')?.label).toMatch(/nothing is selected/i)
+    // ⌘S is a window-level key, listed with the rest (🔒 YAZ-1810 autosave still owns the file).
+    expect(WINDOW_HOTKEYS.find((h) => h.keys === '⌘S')?.label).toMatch(/autosaves/i)
   })
 
   it('every entry is renderable (non-empty keys and label)', () => {

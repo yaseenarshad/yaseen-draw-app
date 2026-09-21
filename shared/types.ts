@@ -149,6 +149,13 @@ export interface DrawingApi {
   load(req: DrawingLoadRequest): Promise<DrawingLoadResponse>
   /** Write one `.excalidraw`: assets first, then the scene, atomically. */
   save(req: DrawingSaveRequest): Promise<DrawingSaveResponse>
+  /**
+   * The RESOLVED library folder (🔒 D5): `SettingsState.libraryFolder`, or `<userData>/library`
+   * when that is null. Only main knows where userData is, so only main can answer — the Settings
+   * row shows what comes back. Main also makes sure the folder exists at startup, so the answer
+   * always names a real directory. Its CONTENTS (`media.json`, `components/`) are 3A/3B/3C's.
+   */
+  libraryFolder(): Promise<string>
 }
 
 // ---------- writeFile(req) ----------
@@ -452,6 +459,15 @@ export interface SettingsState {
   /** Appearance (Desktop K, GRO-2218): explicit values win; `system` tracks the OS live. */
   theme: Theme
   /**
+   * The one library folder every vault shares (🔒 D5): an absolute path the user chose, or null
+   * for the default `<userData>/library`. Media favorites and saved components were per cloud
+   * account in the web app; per-vault storage would mean re-favouriting in every vault, and app
+   * userData alone would never be backed up. A folder the user can point inside a synced vault is
+   * both. `drawing.libraryFolder()` resolves it; null is the default, never `''`. Its contents
+   * (`media.json`, `components/`) are written by 3A / 3B / 3C.
+   */
+  libraryFolder: string | null
+  /**
    * Show the confirm sheet before deleting (GRO-2272 — VS Code's `explorer.confirmDelete`).
    * Defaults TRUE and should stay that way: the sheet is the ONLY guard on delete, because
    * `shell.trashItem` has no programmatic undo, so there is no in-app restore to fall back
@@ -475,6 +491,7 @@ export const THEMES: readonly Theme[] = ['system', 'light', 'dark']
 
 export const DEFAULT_SETTINGS: SettingsState = {
   theme: 'system',
+  libraryFolder: null,
   confirmDelete: true,
   canvas: DEFAULT_CANVAS_PREFS,
   canvasPanel: DEFAULT_CANVAS_PANEL,

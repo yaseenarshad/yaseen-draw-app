@@ -96,6 +96,7 @@ Electron flattens a thrown Error to its message, which is why failure travels as
 | `createFile(req)` | `fs:create-file` | `.excalidraw` only; content-at-create, `wx` flag |
 | `drawing.load(req)` | `drawing:load` | one `.excalidraw` AS A DOCUMENT: its bytes, its mtime, and the images it names |
 | `drawing.save(req)` | `drawing:save` | images first, then the scene, atomically; `expectedMtime` → `CONFLICT` with NOTHING written |
+| `drawing.libraryFolder()` | `drawing:library-folder` | the RESOLVED library folder — the setting, or `<userData>/library` (🔒 D5) |
 | `pickFolder()` | `dialog:pick-folder` | the native open-directory dialog |
 | `watch(root, cb)` | `watch:*` | chokidar under the root; `ready` / `change` / `add` / `unlink` / `error` |
 | `file.rename(req)` | `fs:rename` | same-parent rename or a move; never overwrites |
@@ -157,6 +158,7 @@ AppState {
   version: 1
   settings: {
     theme: 'system' | 'light' | 'dark'
+    libraryFolder: string | null         // 🔒 D5, null = `<userData>/library`
     confirmDelete: boolean
     canvas: CanvasPrefs                  // 🔒 D9, below
     canvasPanel: { tab: 'image-studio' | 'components' | 'presentation'; docked: boolean }
@@ -222,6 +224,13 @@ Invariants: `file ∈ tabs` whenever `file` is non-null, and `tabs: []` ⇔ `fil
 them by value and then diverges; a global `state:changed` broadcast never moves another window's.
 Settings and `sidebarWidth` are global and every window follows a change live.
 
+`SettingsState.libraryFolder` (🔒 D5) is the ONE folder every vault shares, where media favorites
+and saved components will live (3A / 3B / 3C fill it): an absolute path the user picked, or null
+for `<userData>/library`. Only main can resolve null, so Settings asks through
+`drawing:library-folder`; main also `mkdir -p`s the folder at startup, so the row always names a
+directory that exists. A folder that cannot be created is still the answer — a launch must not
+fail because a picked path has gone read-only.
+
 Two things live in the VAULT instead, because they are the user's own data:
 `<vault>/.yaseendraw/favorites.json` (YAZ-1794: vault-relative paths, so favorites travel with the
 vault) and `<vault>/.yaseendraw/github.json` (the per-vault sync switch). Nothing else is ever
@@ -281,6 +290,25 @@ canvas). Settings › Hotkeys lists every one of them and is the single place th
 The right-click menu inside the renderer is Electron's (`buildContextMenuTemplate`): spelling
 suggestions, Add to Dictionary, and cut/copy/paste. Electron ships no default one, which is why
 this exists at all.
+
+### Settings
+
+The dialog (`client/src/settings/`) is one scrolling page of sections plus a standalone Hotkeys
+page, driven entirely by the registry in `registry.tsx`: a setting is declared once — id, label,
+hint, search keywords, how it renders — and appears in its section, in the nav and in search from
+that one entry. The row's `id` IS its `SettingsState` field name, so a spec that knows the field
+knows the row.
+
+| Section | Rows |
+|---|---|
+| Appearance | Theme (the only one — 🔒 D9 put everything else about the canvas in Canvas) |
+| Canvas | the fourteen `CanvasPrefs` (🔒 D9) in three groups: Drawing aids, Modes, New elements |
+| Files | Confirm before deleting · Library folder (🔒 D5: resolved path, Choose…, Reset to default) |
+| Sync | the per-vault GitHub switch — the one setting NOT in `SettingsState` (it lives in `.yaseendraw/github.json`) |
+| Hotkeys | its own page: the Window, Canvas and Mouse tables, from `hotkeys.ts` |
+
+`hotkeys.ts` is the single source of truth for every binding the app advertises, and
+`hotkeys.test.ts` pins the expected set so a keymap change anywhere fails loudly here.
 
 ## Multi-window
 

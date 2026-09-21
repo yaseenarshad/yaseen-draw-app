@@ -67,6 +67,34 @@ describe('createStore: loading', () => {
     expect(createStore(file).get()).toEqual({ ...state, folders: { '/v': { ...state.folders['/v'], expanded: [] } } })
   })
 
+  it('🔒 D9: the canvas prefs are repaired KEY BY KEY, not thrown away whole', async () => {
+    // A store written before a key existed — everything it does hold survives.
+    await seed(valid({ settings: { canvas: { gridModeEnabled: true, selectOn: 'overlap' } } }))
+    expect(createStore(file).get().settings.canvas).toEqual({ ...DEFAULT_SETTINGS.canvas, gridModeEnabled: true, selectOn: 'overlap' })
+    // One bad field defaults; its neighbours do not.
+    await seed(valid({ settings: { canvas: { gridModeEnabled: true, defaultRoughness: 9, zenModeEnabled: 'yes' } } }))
+    expect(createStore(file).get().settings.canvas).toEqual({ ...DEFAULT_SETTINGS.canvas, gridModeEnabled: true })
+    // Junk in the slot is the defaults, never a crash.
+    await seed(valid({ settings: { canvas: 'nope' } }))
+    expect(createStore(file).get().settings.canvas).toEqual(DEFAULT_SETTINGS.canvas)
+  })
+
+  it('🔒 D10: the canvas panel`s memory survives an unknown tab by falling back to the default', async () => {
+    await seed(valid({ settings: { canvasPanel: { tab: 'boards', docked: true } } }))
+    expect(createStore(file).get().settings.canvasPanel).toEqual({ tab: 'components', docked: true })
+    await seed(valid({ settings: { canvasPanel: { tab: 'image-studio' } } }))
+    expect(createStore(file).get().settings.canvasPanel).toEqual({ tab: 'image-studio', docked: false })
+  })
+
+  it('🔒 D5: the library folder takes an ABSOLUTE path or null — never a relative one, never an empty string', async () => {
+    await seed(valid({ settings: { libraryFolder: '/Vault/Library' } }))
+    expect(createStore(file).get().settings.libraryFolder).toBe('/Vault/Library')
+    for (const bad of ['', 'Library', 7]) {
+      await seed(valid({ settings: { libraryFolder: bad } }))
+      expect(createStore(file).get().settings.libraryFolder, String(bad)).toBeNull()
+    }
+  })
+
   it('settings fall back field by field (partial shapes, junk types)', async () => {
     await seed(valid({ settings: { confirmDelete: false } }))
     expect(createStore(file).get().settings).toEqual({ ...DEFAULT_SETTINGS, confirmDelete: false })

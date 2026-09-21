@@ -378,3 +378,41 @@
   font-size: 14px;
   color: var(--fg-muted);
 }
+
+/*
+ * The number field (Settings › Canvas's two pen widths, 🔒 D9): the `Select` pill's geometry,
+ * narrow enough that "0.5" and "2" read as the small numbers they are. The spinner is left alone —
+ * stepping by 0.1 is exactly the gesture these want.
+ */
+.settings__input {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  font: inherit;
+  font-size: 14px;
+  color: var(--fg);
+  outline: none;
+}
+
+.settings__input:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.settings__input--number {
+  width: 5.5rem;
+}
+
+/*
+ * The resolved path a row reports (Settings › Files › Library folder, 🔒 D5). It is the row's real
+ * content, so it sits above the buttons in a `wide` row — long, monospaced, and allowed to wrap
+ * anywhere rather than pushing the dialog sideways.
+ */
+.settings__path {
+  margin: 0 0 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}

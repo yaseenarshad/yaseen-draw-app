@@ -52,7 +52,7 @@ describe('api', () => {
   })
 
   it('the drawing document doors pass their request through and answer the receipt (🔒 YAZ-1810)', async () => {
-    const drawing = { load: vi.fn(), save: vi.fn() }
+    const drawing = { load: vi.fn(), save: vi.fn(), libraryFolder: vi.fn() }
     Object.defineProperty(window.yaseenDraw, 'drawing', { value: drawing, configurable: true })
     const loaded = { path: '/v/b.excalidraw', json: '{"elements":[]}', mtime: 1, size: 15, files: {}, stored: [] }
     drawing.load.mockResolvedValue(loaded)
@@ -62,6 +62,9 @@ describe('api', () => {
     drawing.save.mockResolvedValue({ path: '/v/b.excalidraw', mtime: 2, size: 15, persisted: [] })
     await expect(api.drawing.save(req)).resolves.toEqual({ path: '/v/b.excalidraw', mtime: 2, size: 15, persisted: [] })
     expect(drawing.save).toHaveBeenCalledWith(req)
+    // 🔒 D5: read-only, and main owns the resolution (only it knows where userData is).
+    drawing.libraryFolder.mockResolvedValue('/Users/x/Library/Application Support/Yaseen Draw/library')
+    await expect(api.drawing.libraryFolder()).resolves.toBe('/Users/x/Library/Application Support/Yaseen Draw/library')
     // A CONFLICT rejection arrives as plain data and comes back as the class, mtime included.
     drawing.save.mockRejectedValue({ code: 'CONFLICT', message: 'drawing changed on disk since last read', path: '/v/b.excalidraw', mtime: 9 })
     const err = (await api.drawing.save(req).catch((e: unknown) => e)) as BridgeRequestError

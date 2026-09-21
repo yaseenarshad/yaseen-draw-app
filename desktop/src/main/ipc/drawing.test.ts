@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { ipcMain } from 'electron'
 import { CH, type Envelope } from '../../channels'
+import { createStore, type Store } from '../store'
 import { _resetSweeps, registerDrawingIpc, sweepVaultOnce } from './drawing'
 
 vi.mock('electron', () => ({ ipcMain: { handle: vi.fn(), on: vi.fn() }, shell: { trashItem: vi.fn(async () => undefined) } }))
@@ -19,18 +20,33 @@ function registered(channel: string): Handler {
 const SCENE = `${JSON.stringify({ type: 'excalidraw', version: 2, elements: [], appState: {}, files: {} }, null, 2)}\n`
 
 let root: string
+let store: Store
+let userData: string
 
 beforeEach(async () => {
   vi.mocked(ipcMain.handle).mockClear()
   root = await mkdtemp(path.join(tmpdir(), 'draw-ipc-'))
+  userData = path.join(root, 'userData')
+  store = createStore(path.join(userData, 'yaseendraw.json'))
   _resetSweeps()
-  registerDrawingIpc()
+  registerDrawingIpc(store, userData)
 })
-afterEach(() => rm(root, { recursive: true, force: true }))
+afterEach(async () => {
+  await store.flush()
+  await rm(root, { recursive: true, force: true })
+})
 
 describe('drawing IPC', () => {
-  it('registers exactly the two document doors', () => {
-    expect(vi.mocked(ipcMain.handle).mock.calls.map(([ch]) => ch)).toEqual([CH.drawingLoad, CH.drawingSave])
+  it('registers the two document doors plus the library-folder read (🔒 D5)', () => {
+    expect(vi.mocked(ipcMain.handle).mock.calls.map(([ch]) => ch)).toEqual([CH.drawingLoad, CH.drawingSave, CH.drawingLibraryFolder])
+  })
+
+  it('drawing:library-folder answers the default under userData, and the setting once it is set (🔒 D5)', async () => {
+    const answer = async () => ((await registered(CH.drawingLibraryFolder)({})) as Envelope<string>)
+    expect(await answer()).toEqual({ ok: true, value: path.join(userData, 'library') })
+    const chosen = path.join(root, 'My Library')
+    store.setSettings({ ...store.get().settings, libraryFolder: chosen })
+    expect(await answer()).toEqual({ ok: true, value: chosen })
   })
 
   it('answers drawing:load in the standard envelope', async () => {

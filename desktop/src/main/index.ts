@@ -7,6 +7,7 @@ import { fileLink, parseFileLink } from '@shared/links'
 import type { WindowEntry } from '@shared/types'
 import type { GitSyncManager } from './git/manager'
 import { registerIpc } from './ipc'
+import { ensureLibraryFolder } from './library'
 import { createLinkQueue } from './linkQueue'
 import { openLink } from './fs/openLink'
 import { buildContextMenuTemplate, buildMenuTemplate, createMenuHandlers, pickMenuTargetWindow, subscribeMenuRebuild, subscribeMenuRebuildOnActiveFile } from './menu'
@@ -189,8 +190,11 @@ app.whenReady().then(() => {
   // A tab switch changes which file is in front (🔒 D10); focus changes which window is asked.
   subscribeMenuRebuildOnActiveFile(store, applyMenu)
   rebuildMenuOnFocus = applyMenu
-  const sync = registerIpc(store, manager)
+  const sync = registerIpc(store, manager, app.getPath('userData'))
   gitSync = sync
+  // 🔒 D5: the one library folder every vault shares. Made at startup, detached — a launch must
+  // not wait on a disk, and a path that cannot be created is still what the Settings row names.
+  void ensureLibraryFolder(store.get().settings.libraryFolder, app.getPath('userData'))
   // YAZ-1081 D3: a lid that just opened is the other "the world moved on while you were away"
   // moment, and the machine that edited the vault meanwhile is usually the other one. Wired here
   // rather than at module scope because powerMonitor is only safe to touch after `ready`.
