@@ -2,7 +2,6 @@ import path from 'node:path'
 import { CH } from '../../channels'
 import * as favorites from '../favorites'
 import { fileClip } from '../fileClip'
-import { readAsset, writeAsset } from '../fs/assets'
 import { copyEntry, pasteEntries } from '../fs/copy'
 import { createDir, createFile } from '../fs/create'
 import { readFile, writeFile } from '../fs/file'
@@ -45,16 +44,6 @@ export function registerFsIpc(store: Store, windows: WindowLookup): void {
   handle(CH.fsWrite, writeFile)
   handle(CH.fsCreateDir, createDir)
   handle(CH.fsCreateFile, createFile)
-  // The cold-start reconcile diff (Links E1c, GRO-2242): the client's rename detector reads it
-  // AFTER the first fs:index for the root. Null before the first build (and again once idle
-  // eviction drops the entry); the index cache's honest-miss semantics ride through untouched —
-  // consumers gate on cacheStatus === 'hit'.
-  handle(CH.fsReadAsset, readAsset)
-  // The image write (YAZ-1661): no store repair and no broadcast — repair and the pushes exist
-  // for paths that MOVE or GO, and a write does neither. A pasted image is a NEW file the tree
-  // learns of from the watcher, like any add made outside the app. (A DRAWING is written through
-  // `drawing:save`, 🔒 YAZ-1810 — never here.)
-  handle(CH.fsWriteAsset, writeAsset)
   // Reveal in Finder (GRO-2274): read-only, so no store repair and no broadcast — but still
   // enveloped like every other handler so a stale row's NOT_FOUND reaches the renderer as a
   // passive notice instead of vanishing (showItemInFolder is silent on a missing path).

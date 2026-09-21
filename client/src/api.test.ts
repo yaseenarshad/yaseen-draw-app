@@ -10,8 +10,6 @@ function installBridge(): { [K in keyof YaseenDrawApi]: ReturnType<typeof vi.fn>
     writeFile: vi.fn(),
     createDir: vi.fn(),
     createFile: vi.fn(),
-    readAsset: vi.fn(),
-    writeAsset: vi.fn(),
     drawing: vi.fn(),
     pickFolder: vi.fn(),
     watch: vi.fn(),
@@ -51,14 +49,6 @@ describe('api', () => {
     expect(bridge.readFile).toHaveBeenCalledWith('/v/a.excalidraw')
     expect(bridge.createDir).toHaveBeenCalledWith('/v/d')
     expect(bridge.createFile).toHaveBeenCalledWith('/v/n.excalidraw')
-    bridge.readAsset.mockResolvedValue({ path: '/v/pic.png', mime: 'image/png', data: 'aGk=', size: 2 })
-    await expect(api.readAsset('/v', 'pic.png')).resolves.toEqual({ path: '/v/pic.png', mime: 'image/png', data: 'aGk=', size: 2 })
-    expect(bridge.readAsset).toHaveBeenCalledWith('/v', 'pic.png')
-    // The image write half (YAZ-1661): the request goes through untouched, the receipt comes back.
-    const image = { root: '/v', path: 'assets/a.png', content: Uint8Array.from([1, 2]) }
-    bridge.writeAsset.mockResolvedValue({ path: '/v/assets/a.png', mtime: 7, size: 2 })
-    await expect(api.writeAsset(image)).resolves.toEqual({ path: '/v/assets/a.png', mtime: 7, size: 2 })
-    expect(bridge.writeAsset).toHaveBeenCalledWith(image)
   })
 
   it('the drawing document doors pass their request through and answer the receipt (🔒 YAZ-1810)', async () => {

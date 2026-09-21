@@ -34,8 +34,6 @@ const api: YaseenDrawApi = {
   writeFile: (req) => call(CH.fsWrite, req),
   createDir: (path) => call(CH.fsCreateDir, path),
   createFile: (req) => call(CH.fsCreateFile, req),
-  readAsset: (root, ref) => call(CH.fsReadAsset, root, ref),
-  writeAsset: (req) => call(CH.fsWriteAsset, req),
   // The drawing DOCUMENT's two doors (🔒 YAZ-1810): the only way a `.excalidraw` tab reads and writes.
   drawing: {
     load: (req) => call(CH.drawingLoad, req),

@@ -55,7 +55,7 @@ export function isSkipped(name: string): boolean {
   return name.startsWith('.') || name === 'node_modules'
 }
 
-export function byNameCi<T extends { name: string }>(a: T, b: T): number {
+function byNameCi<T extends { name: string }>(a: T, b: T): number {
   return a.name.toLowerCase().localeCompare(b.name.toLowerCase())
 }
 
@@ -127,7 +127,7 @@ export async function buildTree(dir: string): Promise<TreeNode[]> {
 
 /**
  * Writes `content` to `<file>.tmp-<rand>` then renames over `file`. Parent dir must exist.
- * A string lands as UTF-8; bytes (an image through `writeAsset`, YAZ-1661) land verbatim —
+ * A string lands as UTF-8; bytes (a scene's images through `drawing:save`, 🔒 D3) land verbatim —
  * `writeFile` ignores the encoding for a view, so one call serves both.
  */
 export async function atomicWrite(file: string, content: string | Uint8Array): Promise<{ mtime: number; size: number }> {
