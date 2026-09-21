@@ -7,7 +7,7 @@ import type { WatchSource } from '../hooks/useWatch'
 import { basename } from '../lib/paths'
 import { storage } from '../lib/storage'
 import { EMPTY_SELECTION, orderedSelection, selectionReducer } from '../lib/selection'
-import { allDirs, allFiles, ancestorDirs, favoriteRoots, findDirNode, focusRoots, treeHasFile, treeHasPath, treeReducer } from '../lib/treeState'
+import { allDirs, ancestorDirs, favoriteRoots, findDirNode, focusRoots, treeHasFile, treeHasPath, treeReducer } from '../lib/treeState'
 import { SearchResults } from '../search/SearchResults'
 import type { SearchCandidate } from '../search/searchCandidates'
 import { useSearchResults } from '../search/useSearchResults'
@@ -344,10 +344,10 @@ export function Sidebar({
   const favoriteDirs = useMemo(() => allDirs(favoriteNodes), [favoriteNodes])
   // What the chevrons button unfolds on the two disk-reading lenses.
   const bodyDirs = lens === 'favorites' ? favoriteDirs : shownDirs
-  // Every file of the CURRENT tree, in tree order: the search list's file rows (🔒 D1) — the
-  // same one feed the folder rows come from.
-  const files = useMemo(() => (tree === null ? [] : allFiles(tree.tree)), [tree])
-  const results = useSearchResults(root, query, dirs, files)
+  // ⌘K's feed (2H, YAZ-1814): the ONE tree this panel already holds and the watcher already keeps
+  // fresh — the catalog walk lives in `search/`, is lazy until the first query, and drops
+  // non-drawing files and (through `fs:tree`) the image store.
+  const results = useSearchResults(root, query, tree?.tree ?? null)
   // 🔒 flat-list ruling on YAZ-739: while a query is typed the body shows a FLAT ranked list
   // instead of the tree. A conditional render, not a teardown — every bit of tree state (data,
   // expansion, pending create/rename, drag) lives here and is waiting untouched when it clears.
@@ -1119,15 +1119,17 @@ export function Sidebar({
               else e.currentTarget.blur()
               return
             }
-            // The bar keeps focus while the list is driven from it (YAZ-803). Clamped at both
-            // ends, never wrapping — the `[[` picker's rule. Opening leaves the list up.
+            // The bar keeps focus while the list is driven from it (YAZ-803). ↑/↓ WRAP (2H,
+            // YAZ-1814): the list is capped at 50 and read top-down, so falling off the end is a
+            // request for the other end — and ↑ from the top row is the cheapest way to the
+            // bottom of a full list. Opening leaves the list up.
             if (results.length === 0) return
             if (e.key === 'ArrowDown') {
               e.preventDefault()
-              setSelected(Math.min(sel + 1, results.length - 1))
+              setSelected(sel + 1 >= results.length ? 0 : sel + 1)
             } else if (e.key === 'ArrowUp') {
               e.preventDefault()
-              setSelected(Math.max(sel - 1, 0))
+              setSelected(sel - 1 < 0 ? results.length - 1 : sel - 1)
             } else if (e.key === 'Enter') {
               e.preventDefault()
               const hit = results[sel]

@@ -900,15 +900,37 @@ describe('search results (YAZ-803)', () => {
     expect(el.querySelector('.search-results__folder')?.textContent).toBe('Docs')
   })
 
-  it('the top row starts selected; ArrowDown/ArrowUp clamp at both ends and never wrap', async () => {
+  it('a NON-drawing file is never a result row (2H, YAZ-1814) — it still lists in the tree', async () => {
+    const withPng: TreeNode[] = [...SEARCH_TREE, { type: 'file', name: 'alpaca.png', path: '/v/alpaca.png', size: 1, mtime: 1, kind: null }]
+    const m = await mount({}, (b) => b.tree.mockResolvedValue({ root: '/v', tree: withPng, generatedAt: 1 }))
+    expect(m.el.querySelector('.tree__row--file[title="/v/alpaca.png"]')).not.toBeNull()
+    await type(searchInput(m.el)!, 'alp')
+    expect(rowLabels(m.el)).toEqual(['Alpha'])
+  })
+
+  it('a drawing created after the search opened turns up on the next tree — no restart (2H)', async () => {
+    // The feed is the tree the STRUCTURAL WATCHER refreshes: fire the watch event the main process
+    // would send for a new file and the result list follows, with the query still standing.
+    let notify: ((ev: WatchEvent) => void) | null = null
+    const { el, bridge } = await search('a', { watch: { subscribe: (l) => ((notify = l), () => (notify = null)) } })
+    expect(rowLabels(el)).toEqual(['Alpha', 'Anchor'])
+    bridge.tree.mockResolvedValue({ root: '/v', tree: [...SEARCH_TREE, drawing('Abacus')], generatedAt: 2 })
+    await act(async () => {
+      notify?.({ type: 'add', path: '/v/Abacus.excalidraw', mtime: 2 })
+      await Promise.resolve()
+    })
+    expect(rowLabels(el)).toEqual(['Alpha', 'Anchor', 'Abacus'])
+  })
+
+  it('the top row starts selected; ArrowDown/ArrowUp WRAP at both ends (2H, YAZ-1814)', async () => {
     const { el, input } = await search('a')
     expect(activeLabel(el)).toBe('Alpha')
     await press(input, 'ArrowUp')
-    expect(activeLabel(el)).toBe('Alpha') // already at the top
+    expect(activeLabel(el)).toBe('Anchor') // up from the top lands on the last row
+    await press(input, 'ArrowDown')
+    expect(activeLabel(el)).toBe('Alpha') // and down from the bottom comes back to the first
     await press(input, 'ArrowDown')
     expect(activeLabel(el)).toBe('Anchor')
-    await press(input, 'ArrowDown')
-    expect(activeLabel(el)).toBe('Anchor') // already at the bottom
     await press(input, 'ArrowUp')
     expect(activeLabel(el)).toBe('Alpha')
   })

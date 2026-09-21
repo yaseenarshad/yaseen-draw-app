@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TreeNode } from '@shared/types'
-import { allDirs, allFiles, ancestorDirs, favoriteRoots, findDirNode, findNode, focusRoots, treeHasFile, treeHasPath, treeReducer } from './treeState'
+import { allDirs, ancestorDirs, favoriteRoots, findDirNode, findNode, focusRoots, treeHasFile, treeHasPath, treeReducer } from './treeState'
 
 describe('treeReducer', () => {
   it('toggle adds then removes a dir', () => {
@@ -72,27 +72,6 @@ describe('allDirs', () => {
     ]
     expect(allDirs(tree)).toEqual(['/r/a', '/r/a/b', '/r/c'])
     expect(allDirs([])).toEqual([])
-  })
-})
-
-describe('allFiles', () => {
-  it('lists every file at every depth in tree order, and no directories', () => {
-    const tree: TreeNode[] = [
-      {
-        type: 'dir',
-        name: 'a',
-        path: '/r/a',
-        children: [
-          { type: 'file', name: 'x.excalidraw', path: '/r/a/x.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
-          { type: 'dir', name: 'b', path: '/r/a/b', children: [{ type: 'file', name: 'deep.excalidraw', path: '/r/a/b/deep.excalidraw', size: 1, mtime: 1, kind: 'drawing' }] },
-        ],
-      },
-      { type: 'file', name: 'y.excalidraw', path: '/r/y.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
-      { type: 'dir', name: 'empty', path: '/r/empty', children: [] },
-    ]
-    expect(allFiles(tree).map((n) => n.path)).toEqual(['/r/a/x.excalidraw', '/r/a/b/deep.excalidraw', '/r/y.excalidraw'])
-    expect(allFiles(tree).every((n) => n.type === 'file')).toBe(true)
-    expect(allFiles([])).toEqual([])
   })
 })
 

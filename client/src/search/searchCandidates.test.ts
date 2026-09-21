@@ -1,118 +1,180 @@
 /**
- * Title search candidates (YAZ-802): one row per FILE of the loaded tree, named the way the tree
- * and the tab strip spell it (a drawing without its extension), matched through the shared
- * matcher at SEARCH_CAP — and, since YAZ-1491, one row per FOLDER of that same tree (🔒 D1),
- * ranked through the very same matcher (🔒 D2).
+ * The ⌘K catalog (YAZ-1814): ONE walk of the tree the Sidebar already holds gives one row per
+ * drawing — named the way the tree and the tab strip spell it — and one row per folder (🔒 D1/D2,
+ * YAZ-1491), ranked through the shared matcher at SEARCH_CAP. Non-drawing files never appear, and
+ * `assets/` is already gone from `fs:tree`, so the catalog inherits that rule.
  */
 import { describe, expect, it } from 'vitest'
-import type { TreeNode } from '@shared/types'
-import { SEARCH_CAP, folderCandidates, searchCandidates, searchTitles } from './searchCandidates'
+import type { FileKind, TreeNode } from '@shared/types'
+import { SEARCH_CAP, buildDrawingCatalog, searchTitles } from './searchCandidates'
 
-const file = (path: string): TreeNode => ({
+const file = (path: string, kind: FileKind | null = 'drawing'): TreeNode => ({
   type: 'file',
   name: path.slice(path.lastIndexOf('/') + 1),
   path,
   size: 1,
   mtime: 1,
-  kind: 'drawing',
+  kind,
 })
 
-describe('searchCandidates', () => {
-  it('one row per file: matched on the name, opening its own path, folder as the label', () => {
-    expect(searchCandidates('/vault', [file('/vault/sub/Alpha.excalidraw')])).toEqual([
+const dir = (path: string, children: TreeNode[] = []): TreeNode => ({
+  type: 'dir',
+  name: path.slice(path.lastIndexOf('/') + 1),
+  path,
+  children,
+})
+
+describe('buildDrawingCatalog — the file rows', () => {
+  it('one row per drawing: matched on the name, opening its own path, folder as the label', () => {
+    expect(buildDrawingCatalog('/vault', [dir('/vault/sub', [file('/vault/sub/Alpha.excalidraw')])])).toEqual([
+      { kind: 'dir', name: 'sub', lower: 'sub', label: 'sub', path: '/vault/sub', folder: '' },
       { kind: 'file', name: 'Alpha', lower: 'alpha', label: 'Alpha', path: '/vault/sub/Alpha.excalidraw', folder: 'sub' },
     ])
   })
 
-  it('a root-level file carries an empty folder', () => {
-    expect(searchCandidates('/vault', [file('/vault/Alpha.excalidraw')])[0].folder).toBe('')
+  it('a root-level drawing carries an empty folder', () => {
+    expect(buildDrawingCatalog('/vault', [file('/vault/Alpha.excalidraw')])[0].folder).toBe('')
   })
 
-  it('a nested file is labelled by its ROOT-RELATIVE parent, and a trailing slash on the root is tolerated', () => {
-    expect(searchCandidates('/vault', [file('/vault/A/B/Deep.excalidraw')])[0].folder).toBe('A/B')
-    expect(searchCandidates('/vault/', [file('/vault/A/Deep.excalidraw')])[0].folder).toBe('A')
+  it('a nested drawing is labelled by its ROOT-RELATIVE parent, and a trailing slash on the root is tolerated', () => {
+    const deep = [dir('/vault/A', [dir('/vault/A/B', [file('/vault/A/B/Deep.excalidraw')])])]
+    expect(buildDrawingCatalog('/vault', deep).find((r) => r.kind === 'file')?.folder).toBe('A/B')
+    expect(buildDrawingCatalog('/vault/', deep).find((r) => r.kind === 'file')?.folder).toBe('A/B')
   })
 
   it('a drawing matches and reads WITHOUT its extension — the name the tree shows', () => {
-    const rows = searchCandidates('/vault', [file('/vault/Customer Acquisition Cost.excalidraw')])
-    expect(rows.map((c) => [c.name, c.label, c.lower])).toEqual([
-      ['Customer Acquisition Cost', 'Customer Acquisition Cost', 'customer acquisition cost'],
-    ])
+    const rows = buildDrawingCatalog('/vault', [file('/vault/Customer Acquisition Cost.excalidraw')])
+    expect(rows.map((c) => [c.name, c.label, c.lower])).toEqual([['Customer Acquisition Cost', 'Customer Acquisition Cost', 'customer acquisition cost']])
     expect(rows[0].path).toBe('/vault/Customer Acquisition Cost.excalidraw')
   })
 
   it('duplicate names BOTH appear under the bare name, told apart by the folder', () => {
-    const rows = searchCandidates('/vault', [file('/vault/Note.excalidraw'), file('/vault/deep/Note.excalidraw')])
+    const rows = buildDrawingCatalog('/vault', [file('/vault/Note.excalidraw'), dir('/vault/deep', [file('/vault/deep/Note.excalidraw')])]).filter((r) => r.kind === 'file')
     expect(rows.map((c) => c.name)).toEqual(['Note', 'Note'])
     expect(rows.map((c) => c.folder)).toEqual(['', 'deep'])
     expect(rows.map((c) => c.path)).toEqual(['/vault/Note.excalidraw', '/vault/deep/Note.excalidraw'])
   })
 
-  it('no files, no rows', () => {
-    expect(searchCandidates('/vault', [])).toEqual([])
+  it('a NON-drawing file is never a row — it lists in the tree and opens in the OS app, but it is not a document', () => {
+    expect(buildDrawingCatalog('/vault', [file('/vault/photo.png', null), file('/vault/notes.md', null), file('/vault/Board.excalidraw')]).map((r) => r.path)).toEqual([
+      '/vault/Board.excalidraw',
+    ])
+  })
+
+  it('the image store never appears: `fs:tree` already drops the top-level `assets/`, and the catalog is that tree', () => {
+    // What `fs:tree` hands over for a vault WITH an image store: the store is simply not in it.
+    expect(buildDrawingCatalog('/vault', [file('/vault/Board.excalidraw')]).some((r) => r.name === 'assets')).toBe(false)
+    // A folder the user called `assets` INSIDE a subfolder is theirs — the tree shows it, so search finds it.
+    expect(buildDrawingCatalog('/vault', [dir('/vault/sub', [dir('/vault/sub/assets')])]).map((r) => r.path)).toEqual(['/vault/sub', '/vault/sub/assets'])
+  })
+
+  it('an empty tree is an empty catalog', () => {
+    expect(buildDrawingCatalog('/vault', [])).toEqual([])
   })
 })
 
-describe('folderCandidates (🔒 D1, YAZ-1491)', () => {
-  it('one `dir` row per folder: matched by its own name, opening (revealing) its own path', () => {
-    expect(folderCandidates('/vault', ['/vault/Archive'])).toEqual([
+describe('buildDrawingCatalog — the folder rows (🔒 D1, YAZ-1491)', () => {
+  it('one `dir` row per folder: matched by its own name, revealing its own path', () => {
+    expect(buildDrawingCatalog('/vault', [dir('/vault/Archive')])).toEqual([
       { kind: 'dir', name: 'Archive', lower: 'archive', label: 'Archive', path: '/vault/Archive', folder: '' },
     ])
   })
 
-  it('a nested folder is labelled by its ROOT-RELATIVE parent, the way a file row is', () => {
-    expect(folderCandidates('/vault', ['/vault/A', '/vault/A/B', '/vault/A/B/C']).map((c) => [c.name, c.folder])).toEqual([
+  it('a nested folder is labelled by its ROOT-RELATIVE parent, the way a drawing row is', () => {
+    const rows = buildDrawingCatalog('/vault', [dir('/vault/A', [dir('/vault/A/B', [dir('/vault/A/B/C')])])])
+    expect(rows.map((c) => [c.name, c.folder])).toEqual([
       ['A', ''],
       ['B', 'A'],
       ['C', 'A/B'],
     ])
   })
 
-  it('tolerates a trailing slash on the root', () => {
-    expect(folderCandidates('/vault/', ['/vault/A/B']).map((c) => [c.name, c.folder])).toEqual([['B', 'A']])
-  })
-
-  it('no folders, no rows', () => {
-    expect(folderCandidates('/vault', [])).toEqual([])
+  it('folders lead the catalog, outer before inner, whatever order their drawings sit in', () => {
+    const rows = buildDrawingCatalog('/vault', [file('/vault/Root.excalidraw'), dir('/vault/A', [file('/vault/A/Inner.excalidraw'), dir('/vault/A/B')])])
+    expect(rows.map((c) => c.path)).toEqual(['/vault/A', '/vault/A/B', '/vault/Root.excalidraw', '/vault/A/Inner.excalidraw'])
   })
 })
 
 describe('searchTitles', () => {
-  const candidates = searchCandidates('/vault', [
-    file('/vault/Big CAC story.excalidraw'),
-    file('/vault/CAC Model.excalidraw'),
-    file('/vault/CAC.excalidraw'),
-  ])
+  const catalog = buildDrawingCatalog('/vault', [file('/vault/Big CAC story.excalidraw'), file('/vault/CAC Model.excalidraw'), file('/vault/CAC.excalidraw')])
 
   it('ranks exact → prefix → substring, input order within each bucket', () => {
-    expect(searchTitles(candidates, 'cac').map((c) => c.label)).toEqual(['CAC', 'CAC Model', 'Big CAC story'])
+    expect(searchTitles(catalog, 'cac').map((c) => c.label)).toEqual(['CAC', 'CAC Model', 'Big CAC story'])
+  })
+
+  it('is case-insensitive in both directions', () => {
+    expect(searchTitles(catalog, 'CAC MODEL').map((c) => c.label)).toEqual(['CAC Model'])
   })
 
   it('a drawing never matches on its folder (🔒 D3, YAZ-739); the folder itself is ONE row (🔒 D2, YAZ-1491)', () => {
-    const rows = [...folderCandidates('/vault', ['/vault/Archive']), ...searchCandidates('/vault', [file('/vault/Archive/Note.excalidraw')])]
+    const rows = buildDrawingCatalog('/vault', [dir('/vault/Archive', [file('/vault/Archive/Note.excalidraw')])])
     expect(searchTitles(rows, 'archive').map((c) => [c.kind, c.label])).toEqual([['dir', 'Archive']])
   })
 
-  it('a folder and a drawing of the same name both match exactly — the folder first (tree order, 🔒 D1)', () => {
-    const rows = [...folderCandidates('/vault', ['/vault/CAC']), ...searchCandidates('/vault', [file('/vault/CAC.excalidraw')])]
+  it('a folder and a drawing of the same name both match exactly — the folder first (🔒 D1)', () => {
+    const rows = buildDrawingCatalog('/vault', [dir('/vault/CAC'), file('/vault/CAC.excalidraw')])
     expect(searchTitles(rows, 'cac').map((c) => [c.kind, c.path])).toEqual([
       ['dir', '/vault/CAC'],
       ['file', '/vault/CAC.excalidraw'],
     ])
   })
 
-  it('an empty query returns the first SEARCH_CAP rows in tree order', () => {
-    const many = searchCandidates('/vault', Array.from({ length: SEARCH_CAP + 10 }, (_, i) => file(`/vault/Note ${i}.excalidraw`)))
+  it('"Board 4" lists Board 04 and Board 40–49, prefix-first (the issue`s acceptance criterion)', () => {
+    const rows = buildDrawingCatalog('/vault', [
+      file('/vault/Board 04.excalidraw'),
+      ...Array.from({ length: 10 }, (_, i) => file(`/vault/Board 4${i}.excalidraw`)),
+      file('/vault/Old Board 4 sketch.excalidraw'),
+    ])
+    const hits = searchTitles(rows, 'Board 4').map((c) => c.label)
+    expect(hits.slice(0, 10)).toEqual(Array.from({ length: 10 }, (_, i) => `Board 4${i}`))
+    expect(hits).toContain('Old Board 4 sketch')
+    expect(hits.indexOf('Old Board 4 sketch')).toBeGreaterThan(hits.indexOf('Board 49'))
+    expect(searchTitles(rows, 'Board 04').map((c) => c.label)).toEqual(['Board 04'])
+  })
+
+  it('an empty query returns the first SEARCH_CAP rows in catalog order', () => {
+    const many = buildDrawingCatalog('/vault', Array.from({ length: SEARCH_CAP + 10 }, (_, i) => file(`/vault/Note ${i}.excalidraw`)))
     expect(searchTitles(many, '')).toEqual(many.slice(0, SEARCH_CAP))
   })
 
-  it('caps at SEARCH_CAP after ranking — a late exact match still tops a board of substrings', () => {
-    const many = searchCandidates('/vault', [
+  it('caps at SEARCH_CAP AFTER ranking — a late exact match still tops a board of substrings', () => {
+    const many = buildDrawingCatalog('/vault', [
       ...Array.from({ length: SEARCH_CAP + 10 }, (_, i) => file(`/vault/note cac ${i}.excalidraw`)),
       file('/vault/CAC.excalidraw'),
     ])
     const matched = searchTitles(many, 'cac')
     expect(matched).toHaveLength(SEARCH_CAP)
     expect(matched[0].name).toBe('CAC')
+  })
+})
+
+/**
+ * The perf tripwire (2H): ⌘K has NO debounce, so every keystroke builds nothing and scans the whole
+ * catalog. These budgets are an order of magnitude above what the scan costs — they exist to fail
+ * loudly if the matcher ever grows a per-row allocation, a regex or a sort, not to time a machine.
+ */
+describe('perf tripwire — a 5,000-drawing vault', () => {
+  const tree: TreeNode[] = Array.from({ length: 50 }, (_, d) =>
+    dir(
+      `/vault/Folder ${d}`,
+      Array.from({ length: 100 }, (_, i) => file(`/vault/Folder ${d}/Board ${d}-${i}.excalidraw`)),
+    ),
+  )
+
+  it('builds the catalog once, well under a frame', () => {
+    const started = performance.now()
+    const catalog = buildDrawingCatalog('/vault', tree)
+    const elapsed = performance.now() - started
+    expect(catalog).toHaveLength(5050)
+    expect(elapsed).toBeLessThan(200)
+  })
+
+  it('ranks a whole typed word — one scan per keystroke — well inside a keypress', () => {
+    const catalog = buildDrawingCatalog('/vault', tree)
+    const queries = ['b', 'bo', 'boa', 'boar', 'board', 'board ', 'board 4', 'board 40', 'board 40-', 'board 40-9']
+    const started = performance.now()
+    for (const q of queries) searchTitles(catalog, q)
+    const elapsed = performance.now() - started
+    expect(elapsed).toBeLessThan(250)
   })
 })

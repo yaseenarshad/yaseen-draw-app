@@ -239,6 +239,36 @@ written into a vault except the drawings and `assets/`.
 To reset or hand-edit the state file: **quit the app first** (⌘Q flushes it), then edit or delete
 the JSON. A missing file launches one empty window.
 
+## ⌘K search
+
+One search, over NAMES, in the sidebar's own bar (🔒 YAZ-797: a persistent bar, never a modal).
+⌘K focuses it — the sidebar un-collapses first — and a typed query replaces the active lens's body
+with a FLAT ranked list (🔒 the flat-list ruling on YAZ-739), never a filtered tree.
+
+- **The catalog** (`client/src/search/searchCandidates.ts`, 🔒 2H on YAZ-1814) is one row per
+  `.excalidraw` file — under the name the tree and the tab strip show, WITHOUT the extension — plus
+  one row per folder, matched by its own name (🔒 D2 on YAZ-1491) and labelled by its parent. A
+  drawing never matches on its folder; the folder is its own row instead.
+- **It is derived, not indexed.** There is no vault index any more (it went with the markdown layer
+  in YAZ-1808): the catalog is one walk of the tree the Sidebar already holds, which IS `fs:tree`
+  and is already kept fresh by the structural watcher — so a drawing created a second ago is
+  findable without a restart, and searching costs no second read of the vault.
+- **What never appears:** a file of no supported kind (it lists in the tree and opens in the OS app,
+  but it is not a document this app can search for), and the image store `assets/`, which `fs:tree`
+  has already dropped (🔒 D3 on YAZ-1775). A folder the user called `assets` inside a subfolder is
+  theirs and is searchable, exactly as the tree rule says.
+- **Ranking** is the ONE matcher every naming surface uses (`search/matchCandidates.ts`, GRO-2197):
+  case-insensitive, exact → prefix → substring, input order inside a bucket, capped at `SEARCH_CAP`
+  (50) AFTER ranking, so a late exact match still tops a page of substrings. Folders lead the
+  catalog, so a folder sits above a drawing it ties with — the reveal is the cheaper mistake.
+- **The feed is lazy and latches.** Nothing is built until the first non-empty query of a mount;
+  from then on it rebuilds with every new tree. There is NO debounce — the scan is synchronous and
+  a tripwire test over a 5,000-drawing catalog fails if it ever stops being cheap.
+- **Keys, in the bar** (it keeps focus throughout, so ↑/↓ carry on walking): ↑/↓ move and WRAP at
+  both ends; Enter activates — a drawing OPENS in the current tab, a folder REVEALS itself in the
+  Files lens (🔒 D3 on YAZ-1491) — ⌘-Enter opens in a background tab; Escape clears a typed query
+  and only gives up focus on a second press. A click does exactly what Enter does on that row.
+
 ## Menus and shortcuts
 
 The application menu is a pure function of its inputs (`desktop/src/main/menu.ts`
