@@ -189,20 +189,11 @@ button {
   white-space: nowrap;
 }
 
-/* ---------- status chips: sync (YAZ-1081 D5) then save, top-right of the editor ---------- */
-
-/* Reserve a fixed-size row so document magnification cannot overlap its controls. */
-.status-chips {
-  position: relative;
-  min-height: 34px;
-  flex-shrink: 0;
-  justify-content: flex-end;
-  padding: 5px 16px;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
+/* ---------- status chips: sync (YAZ-1081 D5) then save ----------
+   There is no chips ROW here any more (🔒 YAZ-1810): a drawing hands both chips to the engine's
+   own top-right slot, so the canvas starts directly under the tab strip. The two chips keep
+   their own styles because they are the shell's, not the canvas's — `drawingEditor.css` only
+   places them. */
 
 /* ---------- save indicator ---------- */
 

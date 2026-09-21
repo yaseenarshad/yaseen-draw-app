@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { FavoritesApi, FileApi, FileClipState, GithubApi, GithubSyncStatus, LinkApi, MenuApi, ShellApi, StateApi, VaultConfigApi, WatchEvent, WindowApi, YaseenDrawApi } from '@shared/types'
+import type { DrawingApi, FavoritesApi, FileApi, FileClipState, GithubApi, GithubSyncStatus, LinkApi, MenuApi, ShellApi, StateApi, VaultConfigApi, WatchEvent, WindowApi, YaseenDrawApi } from '@shared/types'
 import { CH } from '../channels'
 
 const exposed: Record<string, unknown> = {}
@@ -13,7 +13,7 @@ vi.mock('electron', () => ({
  * typecheck. `as const satisfies` keeps each tuple's literal type (a plain `readonly (keyof T)[]`
  * annotation would widen it and make `Exhaustive<>` vacuous) while still rejecting typos.
  */
-const TOP = ['tree', 'readFile', 'writeFile', 'createDir', 'createFile', 'readAsset', 'writeAsset', 'pickFolder', 'watch', 'state', 'window', 'menu', 'link', 'file', 'shell', 'vaultConfig', 'favorites', 'github'] as const satisfies readonly (keyof YaseenDrawApi)[]
+const TOP = ['tree', 'readFile', 'writeFile', 'createDir', 'createFile', 'readAsset', 'writeAsset', 'drawing', 'pickFolder', 'watch', 'state', 'window', 'menu', 'link', 'file', 'shell', 'vaultConfig', 'favorites', 'github'] as const satisfies readonly (keyof YaseenDrawApi)[]
 const STATE = ['get', 'setSettings', 'setSidebarWidth', 'pushRecent', 'removeRecent', 'setFolder', 'onChange'] as const satisfies readonly (keyof StateApi)[]
 const WINDOW = ['identity', 'setIdentity', 'open', 'duplicate', 'openRecent', 'closeSelf', 'zoom', 'onFlush'] as const satisfies readonly (keyof WindowApi)[]
 const MENU = ['onOpenFolder', 'onOpenRoot', 'onSearch', 'onSwitchVault', 'onSettings', 'onToggleSidebar', 'onCloseTab', 'onNextTab', 'onPrevTab'] as const satisfies readonly (keyof MenuApi)[]
@@ -22,6 +22,7 @@ const FILE = ['rename', 'onRenamed', 'delete', 'onDeleted', 'clip', 'paste', 'cl
 const SHELL = ['reveal', 'openVsCode', 'openDefault', 'openLink'] as const satisfies readonly (keyof ShellApi)[]
 const VAULT_CONFIG = ['read', 'write', 'onChange'] as const satisfies readonly (keyof VaultConfigApi)[]
 const FAVORITES = ['get', 'set', 'onChanged'] as const satisfies readonly (keyof FavoritesApi)[]
+const DRAWING = ['load', 'save'] as const satisfies readonly (keyof DrawingApi)[]
 const GITHUB = ['status', 'syncNow', 'setEnabled', 'onStatus'] as const satisfies readonly (keyof GithubApi)[]
 type Exhaustive<T, K extends readonly (keyof T)[]> = Exclude<keyof T, K[number]> extends never ? true : never
 const _top: Exhaustive<YaseenDrawApi, typeof TOP> = true
@@ -33,8 +34,9 @@ const _file: Exhaustive<FileApi, typeof FILE> = true
 const _shell: Exhaustive<ShellApi, typeof SHELL> = true
 const _vaultConfig: Exhaustive<VaultConfigApi, typeof VAULT_CONFIG> = true
 const _favorites: Exhaustive<FavoritesApi, typeof FAVORITES> = true
+const _drawing: Exhaustive<DrawingApi, typeof DRAWING> = true
 const _github: Exhaustive<GithubApi, typeof GITHUB> = true
-void [_top, _state, _window, _menu, _link, _file, _shell, _vaultConfig, _favorites, _github]
+void [_top, _state, _window, _menu, _link, _file, _shell, _vaultConfig, _favorites, _drawing, _github]
 
 describe('preload bridge', () => {
   it('installs window.yaseenDraw with every contract method', async () => {
@@ -158,11 +160,28 @@ describe('preload bridge', () => {
 
   it('writeAsset invokes fs:write-asset with the request (YAZ-876)', async () => {
     const { ipcRenderer } = await import('electron')
-    const req = { root: '/v', path: 'assets/drawings/a.excalidraw', content: '{}' }
-    vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: { path: '/v/assets/drawings/a.excalidraw', mtime: 5, size: 2 } })
+    const req = { root: '/v', path: 'assets/a.png', content: Uint8Array.from([1, 2]) }
+    vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: { path: '/v/assets/a.png', mtime: 5, size: 2 } })
     const { bridge } = await import('./index')
-    await expect(bridge.writeAsset(req)).resolves.toEqual({ path: '/v/assets/drawings/a.excalidraw', mtime: 5, size: 2 })
+    await expect(bridge.writeAsset(req)).resolves.toEqual({ path: '/v/assets/a.png', mtime: 5, size: 2 })
     expect(ipcRenderer.invoke).toHaveBeenCalledWith(CH.fsWriteAsset, req)
+  })
+
+  it('the drawing document`s two doors invoke drawing:load / drawing:save (🔒 YAZ-1810)', async () => {
+    const { ipcRenderer } = await import('electron')
+    const { bridge } = await import('./index')
+    const loadReq = { root: '/v', path: 'Board.excalidraw' }
+    const loaded = { path: '/v/Board.excalidraw', json: '{"elements":[]}', mtime: 1, size: 15, files: {}, stored: [] }
+    vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: loaded })
+    await expect(bridge.drawing.load(loadReq)).resolves.toEqual(loaded)
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith(CH.drawingLoad, loadReq)
+    const saveReq = { root: '/v', path: 'Board.excalidraw', json: '{"elements":[]}', newFiles: [] }
+    vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: { path: '/v/Board.excalidraw', mtime: 2, size: 15, persisted: [] } })
+    await expect(bridge.drawing.save(saveReq)).resolves.toMatchObject({ mtime: 2 })
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith(CH.drawingSave, saveReq)
+    // A failure comes back as the envelope's plain data, rethrown as-is.
+    vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: false, error: { code: 'CONFLICT', message: 'drawing changed on disk since last read', mtime: 9 } })
+    await expect(bridge.drawing.save(saveReq)).rejects.toEqual({ code: 'CONFLICT', message: 'drawing changed on disk since last read', mtime: 9 })
   })
 
   it('window.closeSelf invokes window:close-self (GRO-2232)', async () => {

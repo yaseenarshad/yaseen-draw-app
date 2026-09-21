@@ -38,9 +38,9 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
   - [x] 2A — Seed the repo from docs-app and rename to Yaseen Draw (YAZ-1807)
   - [x] 2C — Re-pack the engine at `e72242f8` and add `packEngine` (YAZ-1809)
   - [x] 2B — Strip the markdown-only subsystems, delete never hide (YAZ-1808)
-- Now: [→] 2D — Make `.excalidraw` the document: load, save, autosave, conflict, chips (YAZ-1810)
+  - [x] 2D — Make `.excalidraw` the document: load, save, autosave, conflict, chips (YAZ-1810)
+- Now: [→] 2E — Image store: `assets/`, hydrate, extract, orphan sweep (YAZ-1811)
 - Remaining:
-  - [ ] 2E — Image store: `assets/`, hydrate, extract, orphan sweep (YAZ-1811)
   - [ ] 2F — Canvas chrome: rail, panel shell, menus, full toolbar, parity checklist (YAZ-1812)
   - [ ] 2G — Settings: canvas preferences, Library folder, trims (YAZ-1813)
   - [ ] 2H — ⌘K search over the drawing catalog (YAZ-1814)
@@ -61,8 +61,8 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 
 - UNCONFIRMED: `desktop/build/icon.png` is the only icon asset; the stale docs-app `icon.icns`/`icon.ico` were deleted and electron-builder now derives both from the PNG. Confirm during the 4D packaging run.
 - UNCONFIRMED (2B leftover, for 2D/2G): the rename CONFIRM sheet survives without its reason. ⚡ YAZ-888 made a name change ask first *because* the rename chained into every `[[wikilink]]`; with links gone the sheet now only says "Rename 'x' to 'y'?". Kept rather than removed — deleting a confirm is a product decision, not a strip — but it may want to go.
-- UNCONFIRMED (2B leftover, for 2D): `client/src/Editor.tsx` is a kind dispatcher with nothing to dispatch to — a drawing currently renders an empty pane. 2D mounts the canvas there and re-wires `SaveIndicator` / `SyncIndicator` (moved to `client/src/drawings/`) and the conflict bar, whose CSS is still in `app.css`.
-- UNCONFIRMED (2B leftover, for 2D): `focusOpenDocument` (Escape-from-sidebar → the document) went with `lib/focusHandoff.ts`; the canvas needs its own handoff.
+- UNCONFIRMED (for 2F): `focusOpenDocument` (Escape-from-sidebar → the document) went with `lib/focusHandoff.ts` in 2B. 2D gives the canvas `autoFocus` at MOUNT — safe on a background tab, because a hidden layer is `visibility: hidden` and Chromium will not focus into one — but a tab that becomes visible LATER still gets no focus. That is the handoff 2F owes.
+- UNCONFIRMED (posted on YAZ-1810, awaiting Yasin): the image half of the asset pipe (`fs:read-asset` / `fs:write-asset`) has no caller left. 2D removed its drawing half; whether the rest goes now or waits for 3A/3B is a decision, not a cleanup.
 
 ## Working Set
 

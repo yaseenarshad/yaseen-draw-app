@@ -1,4 +1,4 @@
-import type { AssetResponse, AssetWriteRequest, AssetWriteResponse, BridgeError, BridgeErrorCode, CreateDirResponse, CreateFileRequest, CreateFileResponse, DeleteRequest, DeleteResponse, FileClipRequest, FileClipState, FileResponse, FileWriteRequest, FileWriteResponse, GithubSyncStatus, OpenLinkRequest, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, RevealRequest, RevealResponse, TreeResponse } from '@shared/types'
+import type { AssetResponse, DrawingLoadRequest, DrawingLoadResponse, DrawingSaveRequest, DrawingSaveResponse, AssetWriteRequest, AssetWriteResponse, BridgeError, BridgeErrorCode, CreateDirResponse, CreateFileRequest, CreateFileResponse, DeleteRequest, DeleteResponse, FileClipRequest, FileClipState, FileResponse, FileWriteRequest, FileWriteResponse, GithubSyncStatus, OpenLinkRequest, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, RevealRequest, RevealResponse, TreeResponse } from '@shared/types'
 
 /** Typed failure from the main process (see docs/CONTRACTS.md "Bridge API"). */
 export class BridgeRequestError extends Error {
@@ -56,10 +56,19 @@ export const api = {
   openDefault: (req: RevealRequest) => call<RevealResponse>(() => window.yaseenDraw.shell.openDefault(req)),
   /** Open an external link target through the OS; main owns validation and resolution. */
   openLink: (req: OpenLinkRequest) => call<void>(() => window.yaseenDraw.shell.openLink(req)),
-  /** Local image or drawing under `root` (🔒 D3, YAZ-876); `ref` = a path or a bare name. */
+  /** Local IMAGE under `root` (YAZ-876); `ref` = a path or a bare name. A drawing opens through `drawing.load`. */
   readAsset: (root: string, ref: string) => call<AssetResponse>(() => window.yaseenDraw.readAsset(root, ref)),
-  /** Writes a `.excalidraw` sidecar under `root` (YAZ-876): drawings only, explicit path, never fuzzy. */
+  /** Writes image bytes under `root` (YAZ-1661): images only, explicit path, never fuzzy. */
   writeAsset: (req: AssetWriteRequest) => call<AssetWriteResponse>(() => window.yaseenDraw.writeAsset(req)),
+  /**
+   * The drawing DOCUMENT's two doors (🔒 YAZ-1810). Everything a `.excalidraw` tab reads and
+   * writes goes through these two calls and no other — the scene and the bytes it names travel
+   * together, so neither can land without the other.
+   */
+  drawing: {
+    load: (req: DrawingLoadRequest) => call<DrawingLoadResponse>(() => window.yaseenDraw.drawing.load(req)),
+    save: (req: DrawingSaveRequest) => call<DrawingSaveResponse>(() => window.yaseenDraw.drawing.save(req)),
+  },
   /** Native open-directory dialog parented to this window; resolves when the user picks or cancels. */
   pickFolder: () => call<PickFolderResponse>(() => window.yaseenDraw.pickFolder()),
   /** The Favorites list over `.yaseendraw/favorites.json` (YAZ-1766 6A): absolute paths in the user's order; a malformed file rejects `set` with INVALID_CONFIG. */

@@ -88,18 +88,19 @@ describe('registerFsIpc', () => {
     expect(missing).toEqual({ ok: false, error: { code: 'NOT_FOUND', message: 'no asset with this name under the root', path: 'missing.png' } })
   })
 
-  it('fs:write-asset writes a drawing sidecar and envelopes its failures (YAZ-876)', async () => {
-    const req = { root, path: 'assets/drawings/scene.excalidraw', content: '{"type":"excalidraw"}' }
+  it('fs:write-asset writes image bytes and envelopes its failures (YAZ-1661)', async () => {
+    const req = { root, path: 'assets/pasted.png', content: Uint8Array.from([0x89, 0x50]) }
     const ok = await registered(CH.fsWriteAsset)({ sender: {} }, req)
     expect(ok.ok).toBe(true)
     if (!ok.ok) throw new Error('expected ok')
-    const file = path.join(root, 'assets', 'drawings', 'scene.excalidraw')
+    const file = path.join(root, 'assets', 'pasted.png')
     expect((ok.value as { path: string }).path).toBe(file)
-    expect(await readFile(file, 'utf8')).toBe(req.content)
-    const bad = await registered(CH.fsWriteAsset)({ sender: {} }, { ...req, path: 'assets/drawings/scene.png' })
+    expect([...(await readFile(file))]).toEqual([0x89, 0x50])
+    // A DRAWING is not this pipe's business any more (🔒 YAZ-1810): `drawing:save` owns it.
+    const bad = await registered(CH.fsWriteAsset)({ sender: {} }, { ...req, path: 'assets/scene.excalidraw' })
     expect(bad).toEqual({
       ok: false,
-      error: { code: 'UNSUPPORTED_EXTENSION', message: 'a text body writes drawing files only', path: path.join(root, 'assets', 'drawings', 'scene.png') },
+      error: { code: 'UNSUPPORTED_EXTENSION', message: 'the image pipe writes image files only', path: path.join(root, 'assets', 'scene.excalidraw') },
     })
   })
 

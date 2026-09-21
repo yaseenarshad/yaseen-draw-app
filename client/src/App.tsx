@@ -526,13 +526,15 @@ export function App() {
             onNotice={notify}
           />
           <div className="tabstack">
-            {mounted.length === 0 && <Editor path={null} />}
+            {mounted.length === 0 && <Editor path={null} root={root} watch={watch} />}
             {mounted.map((path) => (
               // Every VISITED tab keeps its document mounted so its view state survives a switch
               // (rule 6); inactive layers hide via visibility — see tabs.css for why
               // display:none would lose scroll positions.
               <div key={path} className={path === file ? 'tabstack__layer' : 'tabstack__layer tabstack__layer--hidden'}>
-                <Editor path={path} />
+                {/* One sync status per WINDOW (above), read by every mounted tab's chip: two
+                    hooks watching one root would eventually disagree about what it is doing. */}
+                <Editor path={path} root={root} watch={watch} sync={githubSync.status} onSyncNow={githubSync.syncNow} />
               </div>
             ))}
           </div>

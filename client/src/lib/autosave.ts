@@ -2,6 +2,14 @@
  * Pure debounced auto-save state machine (no DOM, no React) so the dirty /
  * debounce / conflict rules can be unit-tested.
  *
+ * GENERIC OVER THE CONTENT KEY `C` (🔒 YAZ-1810). A text editor hands it the serialised string,
+ * so "differs from the baseline" is a string compare and `save` gets the bytes for free. A
+ * DRAWING hands it the engine's cheap scene VERSION (an integer) and serialises inside `save()`
+ * only when the timer fires: the canvas reports a change per pointer move, and serialising every
+ * one of them is precisely the cost the version exists to avoid. The debounce, conflict and
+ * flush rules are identical either way — only what "the content" means changes, and comparing
+ * with `===` is honest for both (a string's value, a version's number).
+ *
  * Rules (docs/CONTRACTS.md "Bridge API" — atomic writes and mtime echo suppression):
  *  - only content that differs from the last saved/loaded content is dirty
  *    (an editor's first serialisation is a normalised rewrite — never save it);
@@ -19,20 +27,21 @@ export class SaveConflict extends Error {
   }
 }
 
-export interface AutosaveOptions {
-  /** Baseline content (what is on disk, as the editor serialises it). */
-  content: string
+export interface AutosaveOptions<C = string> {
+  /** Baseline content KEY (what is on disk, as the editor serialises it — or a drawing's scene version). */
+  content: C
   /** mtime of the baseline. */
   mtime: number
-  save: (content: string, expectedMtime: number) => Promise<{ mtime: number }>
+  /** Writes `content`; a drawing serialises the live scene here, since this runs once per save, not once per change. */
+  save: (content: C, expectedMtime: number) => Promise<{ mtime: number }>
   onStatus: (status: SaveStatus) => void
   onConflict: (diskMtime: number) => void
   delayMs?: number
 }
 
-export class Autosave {
-  private baseline: string
-  private pending: string | null = null
+export class Autosave<C = string> {
+  private baseline: C
+  private pending: C | null = null
   private timer: ReturnType<typeof setTimeout> | null = null
   private inflight: Promise<void> | null = null
   private blocked = false
@@ -41,7 +50,7 @@ export class Autosave {
   /** mtime of the last successful read or write — the echo-suppression key for watcher events. */
   mtime: number
 
-  constructor(private readonly opts: AutosaveOptions) {
+  constructor(private readonly opts: AutosaveOptions<C>) {
     this.baseline = opts.content
     this.mtime = opts.mtime
   }
@@ -60,7 +69,7 @@ export class Autosave {
   }
 
   /** New editor content. Schedules a save when it differs from the baseline. */
-  update(content: string): void {
+  update(content: C): void {
     if (this.disposed) return
     this.clearTimer()
     if (content === this.baseline) {
@@ -117,7 +126,7 @@ export class Autosave {
   }
 
   /** Disk content was (re)loaded into the editor: new baseline, nothing pending. */
-  reset(content: string, mtime: number): void {
+  reset(content: C, mtime: number): void {
     this.clearTimer()
     this.baseline = content
     this.mtime = mtime

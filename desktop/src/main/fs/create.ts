@@ -5,8 +5,10 @@ import { BridgeFailure, fsCall, requireAbsPath } from './fsUtils'
 
 /**
  * Creation calls for the sidebar's "New folder" / "New drawing" (GRO-2022).
- * Drawing files are created empty. The object form's `content` (Bible B, GRO-2202) rides the
- * same `wx` write — content-at-create, no create-then-write race. Existence races resolve at
+ * The object form's `content` (Bible B, GRO-2202) rides the same `wx` write — content-at-create,
+ * no create-then-write race, which is how "New drawing" is born with an EMPTY SCENE rather than
+ * as a zero-byte file (🔒 YAZ-1810: an empty `.excalidraw` is the corrupt case, not a new
+ * board). Omitting `content` still writes an empty file; nothing in the app does. Existence races resolve at
  * the fs layer: mkdir and `wx` writes throw EEXIST, which `toBridgeFailure` maps to
  * ALREADY_EXISTS — nothing is ever overwritten.
  */
