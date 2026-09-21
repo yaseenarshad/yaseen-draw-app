@@ -16,7 +16,7 @@
  * listed under a divider in the nav, and `page` names it while it is showing; `null` is the
  * settings page.
  *
- * ⚡ KEYS ARE THE OVERLAY'S, NEVER `window`'s — the DrawingModal precedent (YAZ-888): React
+ * ⚡ KEYS ARE THE OVERLAY'S, NEVER `window`'s (⚡ YAZ-888): React
  * flushes mount effects inside the dispatch of the event that opened the dialog, so a `window`
  * mousedown listener installed on mount would hear the cog click that opened it and close it in
  * the same tick. Bound to the overlay, it only hears what happens inside itself.
