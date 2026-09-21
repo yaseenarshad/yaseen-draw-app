@@ -94,6 +94,9 @@ const sanitizeCanvasPanel = (raw: unknown): CanvasPanelState => {
 /** Per-field guards shared by the loader, `sanitizeSettings` and the IPC boundary (`isSettings`). */
 const SETTINGS_FIELD_OK: { [K in keyof SettingsState]: (v: unknown) => v is SettingsState[K] } = {
   theme: (v): v is Theme => typeof v === 'string' && (THEMES as readonly string[]).includes(v),
+  // 🔒 D5: an absolute path the user picked, or null for `<userData>/library`. Never `''` — an
+  // empty string would resolve to the process cwd, which is not a place to put a user's library.
+  libraryFolder: (v): v is string | null => v === null || (typeof v === 'string' && isAbsolute(v)),
   confirmDelete: (v): v is boolean => typeof v === 'boolean',
   // 🔒 D9: STRICT at the bridge — a sandboxed renderer hands over a whole `CanvasPrefs` or nothing.
   canvas: isCanvasPrefs,

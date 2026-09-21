@@ -16,10 +16,13 @@ import { registerWindowIpc } from './window'
  *
  * Returns the GitHub sync manager (YAZ-1081, 2C) — the one registration with triggers no renderer
  * can send (window focus, OS wake, the last flush before quit), which `main/index.ts` owns.
+ *
+ * `userData` is passed in rather than read from `app`: it is the library folder's default root
+ * (🔒 D5), and every module under `main/` that touches it stays Electron-free and testable.
  */
-export function registerIpc(store: Store, windows: WindowManagerIpc): GitSyncManager {
+export function registerIpc(store: Store, windows: WindowManagerIpc, userData: string): GitSyncManager {
   registerFsIpc(store, windows)
-  registerDrawingIpc()
+  registerDrawingIpc(store, userData)
   registerDialogIpc()
   registerWatchIpc()
   registerStateIpc(store)

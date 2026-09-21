@@ -22,7 +22,28 @@ const tiers: SettingHit[] = (['theme of the app', 'theme', 'system theme'] as co
 
 describe('settingCandidates', () => {
   it('covers every setting of every available section, one candidate each, in registry order', () => {
-    expect(ids(settingCandidates(ctx()))).toEqual(['theme', 'confirmDelete', 'hotkeys-window', 'hotkeys-mouse'])
+    expect(ids(settingCandidates(ctx()))).toEqual([
+      'theme',
+      'canvas.gridModeEnabled',
+      'canvas.objectsSnapModeEnabled',
+      'canvas.snapToMidpoints',
+      'canvas.arrowBinding',
+      'canvas.selectOn',
+      'canvas.toolLock',
+      'canvas.zenModeEnabled',
+      'canvas.writingMode',
+      'canvas.framesVisible',
+      'canvas.writingStrokeWidth',
+      'canvas.vectorStrokeWidth',
+      'canvas.defaultFontFamily',
+      'canvas.defaultRoughness',
+      'canvas.defaultTextAlign',
+      'confirmDelete',
+      'libraryFolder',
+      'hotkeys-window',
+      'hotkeys-canvas',
+      'hotkeys-mouse',
+    ])
   })
 
   it('includes the Sync page only when the engine is there', () => {
@@ -79,7 +100,7 @@ describe('searchSettings', () => {
   it('a hotkey label or key finds its Hotkeys table: "close tab" → Window', () => {
     expect(ids(searchSettings(settingCandidates(ctx()), 'close tab'))).toEqual(['hotkeys-window'])
     expect(ids(searchSettings(settingCandidates(ctx()), '⌘W'))).toEqual(['hotkeys-window'])
-    expect(ids(searchSettings(settingCandidates(ctx()), 'keyboard shortcuts'))).toEqual(['hotkeys-window', 'hotkeys-mouse'])
+    expect(ids(searchSettings(settingCandidates(ctx()), 'keyboard shortcuts'))).toEqual(['hotkeys-window', 'hotkeys-canvas', 'hotkeys-mouse'])
   })
 
   it('no match is an empty list', () => {

@@ -14,8 +14,10 @@
  */
 import type { ReactNode } from 'react'
 import type { GithubSyncStatus, SettingsState } from '@shared/types'
+import { CANVAS_SECTION } from './canvasSection'
 import { Segmented } from './controls'
 import { HOTKEY_GROUPS, type HotkeyEntry } from './hotkeys'
+import { LibraryFolderControl, LibraryFolderHint } from './LibraryFolderControl'
 import { ON_OFF_OPTIONS, repoHint, THEME_OPTIONS } from './options'
 
 export interface SettingsCtx {
@@ -35,7 +37,7 @@ export interface SettingDef {
   render: (ctx: SettingsCtx) => ReactNode
 }
 
-export type SettingsSectionId = 'appearance' | 'files' | 'sync' | 'hotkeys'
+export type SettingsSectionId = 'appearance' | 'canvas' | 'files' | 'sync' | 'hotkeys'
 
 /** Rows that belong together under one sub-heading; no title = plain rows straight under the section. */
 export interface SettingsGroup {
@@ -89,6 +91,9 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
       },
     ],
   },
+  // 🔒 D9: the user-level canvas preferences, declared in their own module because there are
+  // fourteen of them and they are the one section with a mapping behind it (`shared/canvasPrefs.ts`).
+  CANVAS_SECTION,
   {
     id: 'files',
     title: 'Files',
@@ -104,6 +109,24 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
             hint: 'Deleted notes and folders move to the Trash either way.',
             render: ({ settings, onChange }) => (
               <Segmented options={ON_OFF_OPTIONS} value={settings.confirmDelete} onChange={(confirmDelete) => onChange({ ...settings, confirmDelete })} ariaLabel="Confirm before deleting" />
+            ),
+          },
+          {
+            // 🔒 D5: ONE library folder for every vault. `wide` because the row's real content is
+            // the resolved path, which is long, and the two buttons belong under it rather than
+            // squeezed beside it. The hint is a component: only main can resolve the default.
+            id: 'libraryFolder',
+            label: 'Library folder',
+            hint: 'Your saved components and media favorites, shared by every vault. Put it inside a synced vault to back it up.',
+            keywords: ['library', 'components', 'favorites', 'media', 'folder'],
+            wide: true,
+            render: ({ settings, onChange }) => (
+              <>
+                <LibraryFolderHint setting={settings.libraryFolder} />
+                <div className="settings__options" role="group" aria-label="Library folder">
+                  <LibraryFolderControl settings={settings} onChange={onChange} />
+                </div>
+              </>
             ),
           },
         ],

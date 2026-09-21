@@ -12,6 +12,8 @@ export const CH = {
   // then the scene", and splitting either would let a renderer land half of it.
   drawingLoad: 'drawing:load',
   drawingSave: 'drawing:save',
+  // The resolved library folder (🔒 D5): only main knows where userData is.
+  drawingLibraryFolder: 'drawing:library-folder',
   fsRename: 'fs:rename',
   fsDelete: 'fs:delete',
   fsClip: 'fs:clip',

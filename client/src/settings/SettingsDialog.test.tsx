@@ -11,6 +11,16 @@ import { createRoot, type Root } from 'react-dom/client'
 import { DEFAULT_SETTINGS, type GithubSyncStatus, type SettingsState } from '@shared/types'
 import { SettingsDialog } from './SettingsDialog'
 
+// The Library folder row (🔒 D5) is the one row that ASKS main something: only main knows what a
+// null setting resolves to. The bridge is stubbed at the client `api` seam, like every other test.
+vi.mock('../api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../api')>()),
+  api: { drawing: { libraryFolder: vi.fn(async () => '/userData/library') }, pickFolder: vi.fn(async () => ({ cancelled: true as const })) },
+}))
+import { api } from '../api'
+const libraryFolder = vi.mocked(api.drawing.libraryFolder)
+const pickFolder = vi.mocked(api.pickFolder)
+
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 let root: Root | null = null
@@ -21,6 +31,10 @@ const scrollIntoView = vi.fn()
 beforeEach(() => {
   Element.prototype.scrollIntoView = scrollIntoView
   scrollIntoView.mockClear()
+  libraryFolder.mockClear()
+  libraryFolder.mockResolvedValue('/userData/library')
+  pickFolder.mockClear()
+  pickFolder.mockResolvedValue({ cancelled: true })
 })
 
 function mount(settings: SettingsState = { ...DEFAULT_SETTINGS }, syncStatus?: GithubSyncStatus | null) {
@@ -129,25 +143,45 @@ describe('SettingsDialog shell (D1)', () => {
 describe('SettingsDialog: one page of every settings section (the post-demo redesign)', () => {
   it('the nav: the settings-page anchors (Sync only with the engine), a divider, then the standalone Hotkeys page', () => {
     const { el } = mount()
-    expect(navShape(el)).toEqual(['Appearance', 'Files', '—', 'Hotkeys'])
+    expect(navShape(el)).toEqual(['Appearance', 'Canvas', 'Files', '—', 'Hotkeys'])
     unmount()
     const withSync = mount({ ...DEFAULT_SETTINGS }, status())
-    expect(navShape(withSync.el)).toEqual(['Appearance', 'Files', 'Sync', '—', 'Hotkeys'])
+    expect(navShape(withSync.el)).toEqual(['Appearance', 'Canvas', 'Files', 'Sync', '—', 'Hotkeys'])
   })
 
   it('renders every settings section on the one page, in order, each anchored by id and every row addressed by data-setting — Hotkeys is not on it', () => {
     const { el } = mount({ ...DEFAULT_SETTINGS }, status())
-    expect(headings(el)).toEqual(['Appearance', 'Files', 'Sync'])
-    expect(sections(el).map((s) => s.id)).toEqual(['settings-appearance', 'settings-files', 'settings-sync'])
-    expect(rowIds(el)).toEqual(['theme', 'confirmDelete', 'githubSync'])
+    expect(headings(el)).toEqual(['Appearance', 'Canvas', 'Files', 'Sync'])
+    expect(sections(el).map((s) => s.id)).toEqual(['settings-appearance', 'settings-canvas', 'settings-files', 'settings-sync'])
+    expect(rowIds(el)).toEqual([
+      'theme',
+      // 🔒 D9's fourteen, in the order Settings › Canvas shows them.
+      'canvas.gridModeEnabled',
+      'canvas.objectsSnapModeEnabled',
+      'canvas.snapToMidpoints',
+      'canvas.arrowBinding',
+      'canvas.selectOn',
+      'canvas.toolLock',
+      'canvas.zenModeEnabled',
+      'canvas.writingMode',
+      'canvas.framesVisible',
+      'canvas.writingStrokeWidth',
+      'canvas.vectorStrokeWidth',
+      'canvas.defaultFontFamily',
+      'canvas.defaultRoughness',
+      'canvas.defaultTextAlign',
+      'confirmDelete',
+      'libraryFolder',
+      'githubSync',
+    ])
     for (const r of el.querySelectorAll<HTMLElement>('.setting')) expect(r.dataset.setting).toBeTruthy()
     expect(el.querySelector('[data-setting^="hotkeys"]')).toBeNull()
   })
 
-  it('every settings-page group is untitled: the rows sit straight under their section title', () => {
+  it('CANVAS is the only settings-page section with titled groups — fourteen rows need headings; every other section`s rows sit straight under its title', () => {
     const { el } = mount({ ...DEFAULT_SETTINGS }, status())
-    expect(groupTitles(el)).toEqual([])
-    expect([...el.querySelectorAll('.settings-group__hint')]).toEqual([])
+    expect(groupTitles(el)).toEqual(['Drawing aids', 'Modes', 'New elements'])
+    expect([...el.querySelectorAll('#settings-appearance .settings-group__title')]).toEqual([])
     expect(el.querySelector('#settings-files .settings-group__title')).toBeNull()
     expect(row(el, 'theme')?.querySelector('.setting__label')?.textContent).toBe('Theme')
     expect(row(el, 'confirmDelete')?.querySelector('.setting__label')?.textContent).toBe('Confirm before deleting')
@@ -160,14 +194,14 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
     expect(notes[0].closest('[data-section]')?.id).toBe('settings-sync')
   })
 
-  it('Hotkeys is its own page: clicking it swaps the pane for its two tables and takes aria-current; no anchor is current meanwhile', () => {
+  it('Hotkeys is its own page: clicking it swaps the pane for its three tables and takes aria-current; no anchor is current meanwhile', () => {
     const { el } = mount()
     clickNav(el, 'Hotkeys')
     expect(currentNav(el)).toBe('Hotkeys')
     expect(currentKind(el)).toBe('page') // a page, where an anchor says `location`
     expect(headings(el)).toEqual(['Hotkeys'])
-    expect(groupTitles(el)).toEqual(['Window', 'Mouse'])
-    expect(rowIds(el)).toEqual(['hotkeys-window', 'hotkeys-mouse'])
+    expect(groupTitles(el)).toEqual(['Window', 'Canvas', 'Mouse'])
+    expect(rowIds(el)).toEqual(['hotkeys-window', 'hotkeys-canvas', 'hotkeys-mouse'])
     expect([...el.querySelectorAll('[data-setting="hotkeys-window"] .hotkeys__keys')].map((k) => k.textContent)).toContain('⌘,')
     expect(scrollIntoView).not.toHaveBeenCalled()
   })
@@ -177,7 +211,7 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
     clickNav(el, 'Hotkeys')
     clickNav(el, 'Files')
     expect(currentNav(el)).toBe('Files')
-    expect(headings(el)).toEqual(['Appearance', 'Files'])
+    expect(headings(el)).toEqual(['Appearance', 'Canvas', 'Files'])
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
     expect(scrollIntoView.mock.instances[0]).toBe(el.querySelector('#settings-files'))
   })
@@ -201,15 +235,15 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
 
   it('scrollspy: the current nav item follows the pane scroll — last heading above the read line, the last section at the bottom', () => {
     const { el } = mount({ ...DEFAULT_SETTINGS }, status())
-    layOut(el) // sections at 0 / 300 / 600, pane 400 of 900
+    layOut(el) // four sections at 0 / 300 / 600 / 900, pane 400 of 1200
     scrollTo(el, 0)
     expect(currentNav(el)).toBe('Appearance')
-    scrollTo(el, 270) // the read line (scrollTop + 24 = 294) is still above Files' top (300)
+    scrollTo(el, 270) // the read line (scrollTop + 24 = 294) is still above Canvas' top (300)
     expect(currentNav(el)).toBe('Appearance')
-    scrollTo(el, 280) // 304: Files' top is now at or above it
-    expect(currentNav(el)).toBe('Files')
-    // The bottom: 900 - 400 = 500, and Sync's top (600) never reaches the read line.
-    scrollTo(el, 500)
+    scrollTo(el, 280) // 304: Canvas' top is now at or above it
+    expect(currentNav(el)).toBe('Canvas')
+    // The bottom: 1200 - 400 = 800, and Sync's top (900) never reaches the read line.
+    scrollTo(el, 800)
     expect(currentNav(el)).toBe('Sync')
   })
 
@@ -220,7 +254,7 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
     unmount()
     const again = mount()
     expect(currentNav(again.el)).toBe('Appearance')
-    expect(headings(again.el)).toEqual(['Appearance', 'Files'])
+    expect(headings(again.el)).toEqual(['Appearance', 'Canvas', 'Files'])
   })
 })
 
@@ -288,10 +322,10 @@ describe('SettingsDialog search (D6)', () => {
     // Window table whose clipboard rows name files — two breadcrumbs, registry order, never rank.
     type(searchInput(el), 'files')
     expect(headings(el)).toEqual(['Files', 'Hotkeys › Window'])
-    expect(rowIds(el)).toEqual(['confirmDelete', 'hotkeys-window'])
+    expect(rowIds(el)).toEqual(['confirmDelete', 'libraryFolder', 'hotkeys-window'])
     type(searchInput(el), 'keyboard shortcuts')
-    expect(headings(el)).toEqual(['Hotkeys › Window', 'Hotkeys › Mouse'])
-    expect(rowIds(el)).toEqual(['hotkeys-window', 'hotkeys-mouse'])
+    expect(headings(el)).toEqual(['Hotkeys › Window', 'Hotkeys › Canvas', 'Hotkeys › Mouse'])
+    expect(rowIds(el)).toEqual(['hotkeys-window', 'hotkeys-canvas', 'hotkeys-mouse'])
     type(searchInput(el), 'close tab')
     expect(headings(el)).toEqual(['Hotkeys › Window'])
     expect(rowIds(el)).toEqual(['hotkeys-window'])
@@ -321,12 +355,12 @@ describe('SettingsDialog search (D6)', () => {
     pressEscape(searchInput(el))
     expect(onClose).not.toHaveBeenCalled()
     expect(searchInput(el).value).toBe('')
-    expect(headings(el)).toEqual(['Appearance', 'Files'])
+    expect(headings(el)).toEqual(['Appearance', 'Canvas', 'Files'])
 
     type(searchInput(el), 'dark')
     act(() => el.querySelector<HTMLButtonElement>('[aria-label="Clear search settings"]')?.click())
     expect(searchInput(el).value).toBe('')
-    expect(headings(el)).toEqual(['Appearance', 'Files'])
+    expect(headings(el)).toEqual(['Appearance', 'Canvas', 'Files'])
   })
 
   it('a nav click during a search clears the query and then scrolls to that section on the restored page', () => {
@@ -337,5 +371,91 @@ describe('SettingsDialog search (D6)', () => {
     expect(currentNav(el)).toBe('Files')
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
     expect(scrollIntoView.mock.instances[0]).toBe(el.querySelector('#settings-files'))
+  })
+})
+
+describe('Settings › Canvas (🔒 D9)', () => {
+  it('writes the whole SettingsState with only the one canvas key changed', () => {
+    const { el, onChange } = mount()
+    act(() => rowButtons(el, 'canvas.gridModeEnabled')[0].click()) // On
+    expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...DEFAULT_SETTINGS, canvas: { ...DEFAULT_SETTINGS.canvas, gridModeEnabled: true } })
+  })
+
+  it('Select on speaks OUR vocabulary, not the engine`s', () => {
+    const { el, onChange } = mount()
+    expect(rowButtons(el, 'canvas.selectOn').map((b) => b.textContent)).toEqual(['Wrap', 'Overlap'])
+    act(() => rowButtons(el, 'canvas.selectOn')[1].click())
+    expect(onChange.mock.calls[0][0].canvas.selectOn).toBe('overlap')
+  })
+
+  it('sloppiness and text alignment carry the engine`s own presets', () => {
+    const { el, onChange } = mount()
+    expect(rowButtons(el, 'canvas.defaultRoughness').map((b) => b.textContent)).toEqual(['Architect', 'Artist', 'Cartoonist'])
+    expect(rowButtons(el, 'canvas.defaultTextAlign').map((b) => b.textContent)).toEqual(['Left', 'Center', 'Right'])
+    act(() => rowButtons(el, 'canvas.defaultRoughness')[2].click())
+    expect(onChange.mock.calls[0][0].canvas.defaultRoughness).toBe(2)
+  })
+
+  it('Default font is a select, Assistant first and current by default', () => {
+    const { el, onChange } = mount()
+    const select = row(el, 'canvas.defaultFontFamily')?.querySelector('select') as HTMLSelectElement
+    expect([...select.options].map((o) => o.textContent)[0]).toBe('Assistant')
+    expect(select.options[select.selectedIndex].textContent).toBe('Assistant')
+    act(() => {
+      select.value = '1' // Excalifont, the second option
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(onChange.mock.calls[0][0].canvas.defaultFontFamily).toBe(5)
+  })
+
+  it('a pen width commits a valid number and IGNORES anything the engine could not draw with', () => {
+    const { el, onChange } = mount()
+    const input = row(el, 'canvas.writingStrokeWidth')?.querySelector('input') as HTMLInputElement
+    expect(input.defaultValue).toBe('0.5')
+    type(input, '1.5')
+    expect(onChange.mock.calls[0][0].canvas.writingStrokeWidth).toBe(1.5)
+    onChange.mockClear()
+    for (const bad of ['0', '-2', '', '999']) {
+      type(input, bad)
+      expect(onChange, bad).not.toHaveBeenCalled()
+    }
+  })
+
+  it('does NOT offer a properties-toolbar row — the round-4 amendment made the toolbar a constant', () => {
+    const { el } = mount()
+    expect(rowIds(el).filter((id) => id?.includes('toolbar'))).toEqual([])
+  })
+})
+
+describe('Settings › Files › Library folder (🔒 D5)', () => {
+  it('shows the resolved default main answered, marked as the default, and both buttons', async () => {
+    const { el } = mount()
+    await act(async () => await Promise.resolve())
+    expect(el.querySelector('[data-testid="library-folder-path"]')?.textContent).toBe('/userData/library (default)')
+    expect(rowButtons(el, 'libraryFolder').map((b) => b.textContent)).toEqual(['Choose…', 'Reset to default'])
+    // Nothing to reset to while it already IS the default.
+    expect(rowButtons(el, 'libraryFolder')[1].disabled).toBe(true)
+  })
+
+  it('a chosen folder is its own answer — main is not asked again', async () => {
+    const { el } = mount({ ...DEFAULT_SETTINGS, libraryFolder: '/Vault/Library' })
+    await act(async () => await Promise.resolve())
+    expect(el.querySelector('[data-testid="library-folder-path"]')?.textContent).toBe('/Vault/Library')
+    expect(libraryFolder).not.toHaveBeenCalled()
+    expect(rowButtons(el, 'libraryFolder')[1].disabled).toBe(false)
+  })
+
+  it('Choose… goes through the native picker and writes the path; Reset writes null, never an empty string', async () => {
+    const { el, onChange } = mount({ ...DEFAULT_SETTINGS, libraryFolder: '/Vault/Library' })
+    await act(async () => await Promise.resolve())
+    act(() => rowButtons(el, 'libraryFolder')[1].click())
+    expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...DEFAULT_SETTINGS, libraryFolder: null })
+    onChange.mockClear()
+    pickFolder.mockResolvedValueOnce({ path: '/Elsewhere/Library' })
+    await act(async () => {
+      rowButtons(el, 'libraryFolder')[0].click()
+      await Promise.resolve()
+    })
+    expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...DEFAULT_SETTINGS, libraryFolder: '/Elsewhere/Library' })
   })
 })

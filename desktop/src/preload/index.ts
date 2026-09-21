@@ -38,6 +38,7 @@ const api: YaseenDrawApi = {
   drawing: {
     load: (req) => call(CH.drawingLoad, req),
     save: (req) => call(CH.drawingSave, req),
+    libraryFolder: () => call(CH.drawingLibraryFolder),
   },
   pickFolder: () => call(CH.dialogPickFolder),
   watch: (root, listener) => {
