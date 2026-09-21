@@ -14,7 +14,6 @@
     "desktop:build:win": "npm run build -w desktop && node tools/packDesktop.mjs --win",
     "typecheck": "tsc -p client/tsconfig.json --noEmit && tsc -p shared/tsconfig.json --noEmit && tsc -p desktop/tsconfig.json --noEmit",
     "test": "vitest run",
-    "e2e": "npm run build -w desktop && playwright test --config desktop/e2e/playwright.config.ts",
     "test:watch": "vitest"
   },
   "devDependencies": {
