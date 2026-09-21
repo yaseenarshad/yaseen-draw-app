@@ -33,6 +33,13 @@
  * THE CHIPS ARE THE ENGINE'S TOP-RIGHT ROW, not a strip above the canvas: the canvas starts
  * directly under the tab bar, and the chips sit where the web app's cloud status does.
  *
+ * 🔒 D3 ON SAVE. `unpersistedFiles` picks the canvas files the store lacks — referenced by a
+ * live image element, and not among what `drawing:load` found in `assets/` plus what earlier
+ * saves reported back — and ships them as `newFiles`; main writes them BEFORE the scene. A
+ * legacy embedded board comes back from load as not-stored, so its first save is the shrink:
+ * bytes into `assets/`, JSON down to `files: {}`. The persisted set only ever grows, so the same
+ * image is never shipped twice in one session.
+ *
  * RENAME AND DELETE. The host registers the shell's rename-continuity handle for its path, so a
  * rename flushes these bytes before the file moves and a DELETE retires the controller — without
  * which closing the tab would flush on unmount and resurrect the file that was just trashed.
@@ -41,6 +48,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { DrawingLoadResponse, GithubSyncStatus } from '@shared/types'
+import { unpersistedFiles } from '@shared/drawingAssets'
 import { api, BridgeRequestError } from '../api'
 import type { WatchSource } from '../hooks/useWatch'
 import { Autosave, SaveConflict, type SaveStatus } from '../lib/autosave'
@@ -74,6 +82,8 @@ export interface DrawingEditorProps {
 interface LoadedDocument {
   scene: DrawingScene
   mtime: number
+  /** The ids the store already holds — what the renderer must never ship again. */
+  stored: string[]
 }
 
 /**
@@ -85,7 +95,7 @@ function toDocument(res: DrawingLoadResponse): LoadedDocument {
   const files: Record<string, unknown> = {}
   const created = Date.now()
   for (const [id, entry] of Object.entries(res.files)) files[id] = { id, mimeType: entry.mimeType, dataURL: entry.dataURL, created }
-  return { scene: { ...parsed, files }, mtime: res.mtime }
+  return { scene: { ...parsed, files }, mtime: res.mtime, stored: res.stored }
 }
 
 export function DrawingEditor({ root, path, watch, sync, onSyncNow, canvasAppState }: DrawingEditorProps) {
@@ -148,6 +158,8 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasAppStat
   const autosave = useRef<Autosave<number> | null>(null)
   /** Set by a reload; the next snapshot is consumed as the new baseline, not as a change. */
   const reloadedTo = useRef<number | null>(null)
+  /** Ids the store holds: load's `stored`, grown by every save's `persisted` (🔒 D3). */
+  const persisted = useRef(new Set(loaded.stored))
   /** A retired host never writes again (a delete, or a rename that moved this path away). */
   const retired = useRef(false)
 
@@ -155,8 +167,12 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasAppStat
     async (_version: number, expectedMtime: number): Promise<{ mtime: number }> => {
       const current = snapshot.current
       if (current === null) throw new Error('nothing to save')
+      const { json, files, referenced } = current.serialize()
+      const newFiles = unpersistedFiles(files, referenced, persisted.current)
       try {
-        return await api.drawing.save({ root, path, json: current.serialize(), expectedMtime, newFiles: [] })
+        const res = await api.drawing.save({ root, path, json, expectedMtime, newFiles })
+        for (const id of res.persisted) persisted.current.add(id)
+        return res
       } catch (err) {
         // A stale guard is the conflict bar's business, not an error chip.
         if (err instanceof BridgeRequestError && err.mtime !== undefined) throw new SaveConflict(err.mtime)
@@ -196,6 +212,7 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasAppStat
     try {
       const doc = toDocument(await api.drawing.load({ root, path }))
       reloadedTo.current = doc.mtime
+      persisted.current = new Set(doc.stored)
       a.reset(s.replaceScene(doc.scene), doc.mtime)
       setConflictMtime(null)
     } catch {

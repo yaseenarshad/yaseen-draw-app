@@ -14,6 +14,7 @@ import { renameFile } from '../fs/rename'
 import { removeEntry } from '../fs/remove'
 import { revealItem } from '../fs/reveal'
 import { tree } from '../fs/tree'
+import { sweepVaultOnce } from './drawing'
 import type { Store } from '../store'
 import type { WindowLookup } from '../windows'
 import { broadcastAll } from './broadcast'
@@ -31,7 +32,15 @@ const repairFavorites = (p: Promise<void>): Promise<void> => p.catch((err: unkno
 
 /** The fs half of `window.yaseenDraw` (`dialog:pick-folder` lives in `./dialog`). */
 export function registerFsIpc(store: Store, windows: WindowLookup): void {
-  handle(CH.fsTree, tree)
+  // The tree, plus the one-per-session orphan sweep of this vault's image store (🔒 D3,
+  // YAZ-1811). The first `fs:tree` for a root IS "the vault was opened", and it is the only
+  // moment that means that without inventing a second signal for it. The sweep is detached: the
+  // tree answers immediately, and its own notice reaches the asking window later, if at all.
+  handleWithEvent(CH.fsTree, async (e, root: string) => {
+    const res = await tree(root)
+    sweepVaultOnce(res.root, e.sender)
+    return res
+  })
   handle(CH.fsRead, readFile)
   handle(CH.fsWrite, writeFile)
   handle(CH.fsCreateDir, createDir)

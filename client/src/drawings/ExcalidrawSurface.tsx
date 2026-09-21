@@ -33,7 +33,9 @@
  * "Save to disk" uses — so element cleanup is its rules, not ours. Two things are ours: the
  * `files` argument is deliberately EMPTY (🔒 D3: bytes live in `<vault>/assets/`, the scene
  * carries ids only) and a trailing newline, so a file this app creates and this app saves differ
- * only in what was drawn.
+ * only in what was drawn. A snapshot hands the host the engine's LIVE files and the ids the
+ * scene still references alongside the lean JSON, so the host can work out what the store is
+ * missing (`unpersistedFiles`) without ever seeing an engine type.
  *
  * ⚡ EVERY PROP HANDED TO THE ENGINE IS STABLE. `<Excalidraw>` is memoized and calls `onChange`
  * whenever it renders, so a prop rebuilt per render is a feedback loop: change → the host
@@ -49,6 +51,7 @@
  * props here, not reshaping what exists.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
+import { referencedFileIds, type DrawingFileData } from '@shared/drawingAssets'
 import type { DrawingScene } from './drawingScene'
 import { loadExcalidraw, type ExcalidrawModule } from './engine'
 
@@ -60,8 +63,11 @@ type ImperativeApi = NonNullable<Parameters<NonNullable<ExcalidrawProps['onExcal
 export interface DrawingSnapshot {
   /** Cheap identity of the drawn content: equal to the baseline's = nothing to save. */
   readonly version: number
-  /** The exact bytes a save would write, in the 🔒 D3 form. Called once, when the save timer fires. */
-  serialize(): string
+  /**
+   * Everything a save needs, computed once when the save timer fires: the scene in the 🔒 D3
+   * form (`files: {}`), the engine's live image map, and the ids the scene still references.
+   */
+  serialize(): { json: string; files: Record<string, DrawingFileData>; referenced: Set<string> }
 }
 
 /** The engine-free handle the host gets; nothing in it names the package. */
@@ -154,8 +160,8 @@ export function ExcalidrawSurface({ scene, theme, canvasAppState = NO_CANVAS_APP
         setEngine(mod)
         // The baseline, before the engine has said anything — through the engine's own restore,
         // because restored elements are what it mounts (see the module doc).
-        const { elements, appState } = engineScene(openedOn.current.scene, openedOn.current.canvasAppState)
-        emitRef.current(snapshotOf(mod, mod.restoreElements(elements, null) as ChangeArgs[0], appState))
+        const { elements, appState, files } = engineScene(openedOn.current.scene, openedOn.current.canvasAppState)
+        emitRef.current(snapshotOf(mod, mod.restoreElements(elements, null) as ChangeArgs[0], appState, files))
       },
       () => {
         if (live) failRef.current(ENGINE_LOAD_FAILED)
@@ -169,9 +175,9 @@ export function ExcalidrawSurface({ scene, theme, canvasAppState = NO_CANVAS_APP
   // The saved scene may sit far from the origin; open on what it holds.
   const initialData = useMemo(() => ({ ...engineScene(scene, canvasAppState), scrollToContent: true }), [scene, canvasAppState])
 
-  const onChange = useCallback((elements: ChangeArgs[0], appState: ChangeArgs[1]) => {
+  const onChange = useCallback((elements: ChangeArgs[0], appState: ChangeArgs[1], files: ChangeArgs[2]) => {
     const mod = engineRef.current
-    if (mod !== null) emitRef.current(snapshotOf(mod, elements, appState))
+    if (mod !== null) emitRef.current(snapshotOf(mod, elements, appState, files))
   }, [])
 
   /** The imperative handle, wrapped once into the engine-free API the host sees. */
@@ -220,11 +226,23 @@ export function ExcalidrawSurface({ scene, theme, canvasAppState = NO_CANVAS_APP
 }
 
 /** One snapshot from the engine's own two utilities; the only place either is called. */
-function snapshotOf(engine: ExcalidrawModule, elements: ChangeArgs[0], appState: ChangeArgs[1]): DrawingSnapshot {
+function snapshotOf(engine: ExcalidrawModule, elements: ChangeArgs[0], appState: ChangeArgs[1], files: ChangeArgs[2]): DrawingSnapshot {
   return {
     version: engine.getSceneVersion(elements),
-    // 🔒 D3: an EMPTY files map on purpose — the scene names its images and never carries them.
-    // A text file in a git vault ends with a newline, exactly as a new drawing is written.
-    serialize: () => `${engine.serializeAsJSON(elements, appState, {}, 'local')}\n`,
+    serialize: () => {
+      // The engine's map, flattened to the two fields that cross the bridge: its `created` /
+      // `lastRetrieved` bookkeeping is about this session, not about the file.
+      const live: Record<string, DrawingFileData> = {}
+      for (const [id, entry] of Object.entries(files ?? {})) {
+        if (typeof entry?.dataURL === 'string' && typeof entry.mimeType === 'string') live[id] = { mimeType: entry.mimeType, dataURL: entry.dataURL }
+      }
+      return {
+        // 🔒 D3: an EMPTY files map on purpose — the scene names its images and never carries
+        // them. A text file in a git vault ends with a newline, as a new drawing is written.
+        json: `${engine.serializeAsJSON(elements, appState, {}, 'local')}\n`,
+        files: live,
+        referenced: referencedFileIds(elements),
+      }
+    },
   }
 }

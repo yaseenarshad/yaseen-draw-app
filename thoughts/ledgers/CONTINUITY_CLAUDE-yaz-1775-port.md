@@ -39,9 +39,9 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
   - [x] 2C — Re-pack the engine at `e72242f8` and add `packEngine` (YAZ-1809)
   - [x] 2B — Strip the markdown-only subsystems, delete never hide (YAZ-1808)
   - [x] 2D — Make `.excalidraw` the document: load, save, autosave, conflict, chips (YAZ-1810)
-- Now: [→] 2E — Image store: `assets/`, hydrate, extract, orphan sweep (YAZ-1811)
+  - [x] 2E — Image store: `assets/`, hydrate, extract, orphan sweep (YAZ-1811)
+- Now: [→] 2F — Canvas chrome: rail, panel shell, menus, full toolbar, parity checklist (YAZ-1812)
 - Remaining:
-  - [ ] 2F — Canvas chrome: rail, panel shell, menus, full toolbar, parity checklist (YAZ-1812)
   - [ ] 2G — Settings: canvas preferences, Library folder, trims (YAZ-1813)
   - [ ] 2H — ⌘K search over the drawing catalog (YAZ-1814)
   - [ ] 2I — New drawing, naming, extension display, file association (YAZ-1815)
@@ -63,6 +63,17 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 - UNCONFIRMED (2B leftover, for 2D/2G): the rename CONFIRM sheet survives without its reason. ⚡ YAZ-888 made a name change ask first *because* the rename chained into every `[[wikilink]]`; with links gone the sheet now only says "Rename 'x' to 'y'?". Kept rather than removed — deleting a confirm is a product decision, not a strip — but it may want to go.
 - UNCONFIRMED (for 2F): `focusOpenDocument` (Escape-from-sidebar → the document) went with `lib/focusHandoff.ts` in 2B. 2D gives the canvas `autoFocus` at MOUNT — safe on a background tab, because a hidden layer is `visibility: hidden` and Chromium will not focus into one — but a tab that becomes visible LATER still gets no focus. That is the handoff 2F owes.
 - UNCONFIRMED (posted on YAZ-1810, awaiting Yasin): the image half of the asset pipe (`fs:read-asset` / `fs:write-asset`) has no caller left. 2D removed its drawing half; whether the rest goes now or waits for 3A/3B is a decision, not a cleanup.
+
+## Learnings (2D / 2E)
+
+- **The document's bytes get ONE door per direction.** `drawing:load` / `drawing:save`, because a scene and the images it names are one thing: a save is "assets first, then the scene", and any second writer (the old `writeAsset` string body) would land half of it. 2D narrowed the asset pipe to images for exactly this reason.
+- **Autosave on the engine's scene VERSION, not the bytes.** The canvas reports a change per pointer move; `Autosave<number>` is fed the integer and serialises once, inside `save()`, when the timer fires. `Autosave` is generic over its content key now — string for text, number for a canvas.
+- **A reload must not write.** `updateScene` provokes the engine's own `onChange`, so the naive version saves what it has just read. Two guards: `replaceScene` returns the version computed from the elements it HANDED the engine (reading back races its commit), and the first snapshot after a reload is consumed as the new baseline.
+- **`getSceneVersion` is a SUM.** An undo back to the same total reads clean. Accepted on YAZ-1775; the failure mode is a skipped redundant save, not a lost edit.
+- **Register rename-continuity from the canvas too.** Without `retire()`, closing the tab of a deleted board flushes on unmount and resurrects the file. `capture()` returns null: a live canvas has no string buffer to carry, and the pre-rename flush already put it on disk.
+- **`stripEmbeddedFiles` must be byte-stable on a lean scene**, or every untouched save rewrites the file and churns the vault's git history.
+- **The sweep's age guard is the whole safety property.** Unreferenced is not enough — a paste lands in `assets/` before the board that names it is saved.
+- **Pre-existing flake:** `desktop/src/main/git/{sync,guarantees}.test.ts` intermittently time out under full-suite load (real git subprocesses). Reproduced on the 2D baseline with 2E stashed — not caused by either. Worth a look in 5A/5B.
 
 ## Working Set
 

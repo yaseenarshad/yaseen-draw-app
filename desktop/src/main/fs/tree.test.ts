@@ -25,7 +25,7 @@ describe('tree', () => {
     expect(body.tree.find((n) => n.name === 'book.epub')).toMatchObject({ type: 'file', kind: null })
     const zeta = body.tree[3]
     if (zeta.type !== 'dir') throw new Error('expected dir')
-    expect(names(zeta.children)).toEqual(['inner', 'z.excalidraw'])
+    expect(names(zeta.children)).toEqual(['assets', 'inner', 'z.excalidraw'])
     const alpha = body.tree[0]
     if (alpha.type !== 'dir') throw new Error('expected dir')
     expect(names(alpha.children)).toEqual(['a.excalidraw'])
@@ -38,6 +38,10 @@ describe('tree', () => {
     expect(all).toContain(path.join(root, 'notes.txt'))
     expect(all.some((p) => p.includes('.obsidian') || p.includes('.git') || p.includes('node_modules'))).toBe(false)
     expect(all).not.toContain(path.join(root, '.hidden.excalidraw'))
+    // 🔒 D3: the image store at the ROOT is invisible; a user's own `assets` folder deeper in
+    // the vault is theirs and shows, contents and all.
+    expect(all).not.toContain(path.join(root, 'assets', 'deadbeef.png'))
+    expect(all).toContain(path.join(root, 'Zeta', 'assets', 'theirs.excalidraw'))
     // `.yaseendraw/` (vault-local config, GRO-2188) never reaches the tree — the sidebar renders the tree as-is.
     expect(all.some((p) => p.includes('.yaseendraw'))).toBe(false)
   })

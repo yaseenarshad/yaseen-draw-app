@@ -62,8 +62,13 @@ One kind, one extension.
   never read or written through the bridge (`UNSUPPORTED_EXTENSION`).
 - `.excalidraw` hides its extension wherever a name is shown — tree rows, tab labels, the window
   title, the rename field (⚡ D8 amended on YAZ-1775). Every other file shows its full name.
-- Image bytes do NOT live in the scene JSON: they are content-addressed under `<vault>/assets/`
-  (🔒 D3 on YAZ-1775) and travel with the scene through `drawing:load` / `drawing:save`.
+- Image bytes do NOT live in the scene JSON: they are content-addressed at
+  `<vault>/assets/<fileId>.<ext>` (🔒 D3 on YAZ-1775) and travel with the scene through
+  `drawing:load` / `drawing:save`. The id is Excalidraw's own — the SHA-1 of the bytes — so an
+  asset is immutable, rename-proof and shared by every board that uses the picture. The scene is
+  always written with `files: {}`; a legacy file that still embeds its images is extracted on its
+  first save. `assets/` is hidden from the sidebar tree (the TOP-LEVEL one only: a folder the
+  user called `assets` inside a subfolder is theirs and shows).
 - A `.excalidraw` has ONE door per direction (🔒 YAZ-1810): `drawing:load` and `drawing:save`.
   Not `fs:read` / `fs:write` (a text buffer capped at 10 MiB), and not the image pipe — which
   stopped accepting drawings in YAZ-1810, because a second writer with different rules about the
@@ -125,6 +130,20 @@ Rules that hold across the whole surface:
 - **Read ceilings are per door.** `MAX_FILE_BYTES` (10 MiB) bounds the text reads;
   `MAX_DRAWING_BYTES` (200 MiB) bounds `drawing:load`, which has to open legacy scenes that still
   embed their images as base64.
+- **Assets are immutable and append-only.** A save writes an asset with `wx` and treats EEXIST as
+  success; nothing but the orphan sweep ever removes one.
+
+### The orphan sweep (🔒 D3)
+
+The first `fs:tree` for a root in a session — the moment a vault is "opened" — also runs one
+sweep of `<vault>/assets/`, detached, so the tree answers immediately. A file goes to the OS
+trash (`shell.trashItem`, never `fs.rm`) only when BOTH hold: no `.excalidraw` anywhere under the
+root references its id, and it is older than 24 h (`ORPHAN_MAX_AGE_MS`). The age guard is what
+makes this safe with editors open — an image pasted a minute ago is already in `assets/` while
+the board naming it has not saved yet. The scan reads every board fresh, nested folders included,
+skips dot-dirs, `node_modules` and the store itself, and tolerates a corrupt or unreadable file
+by skipping it. When it trashed something the asking window shows "Cleaned N unused images"
+through the existing passive notice; when it did not, it says nothing.
 - **No path jail** (out of scope, below): anything under the user's account is reachable.
 
 ## App state schema
