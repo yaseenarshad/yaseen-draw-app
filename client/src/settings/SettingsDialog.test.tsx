@@ -1,9 +1,9 @@
 /**
  * The settings dialog (YAZ-1679): one scrolling page of every section with grouped rows, nav
  * anchors with a scrollspy, search over the one registry, the popover's controls rehoused row by
- * row (Theme writes through `onChange`, the folder input's draft/commit logic, the per-vault
- * GitHub switch through `sync.setEnabled`), and the modal's own contract — Esc layered over
- * search, click-away, focus restored to whatever opened it.
+ * row (Theme writes through `onChange`, the per-vault GitHub switch through `sync.setEnabled`),
+ * and the modal's own contract — Esc layered over search, click-away, focus restored to whatever
+ * opened it.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
@@ -72,13 +72,12 @@ function type(input: HTMLInputElement, value: string) {
   })
 }
 const pressEscape = (target: HTMLElement) => act(() => void target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
-const pressEnter = (input: HTMLInputElement) => act(() => void input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
 const status = (extra: Partial<GithubSyncStatus> = {}): GithubSyncStatus => ({ root: '/vault', state: 'off', ...extra })
 
 /**
  * jsdom lays nothing out, so the scroll geometry is stubbed: every section 300px tall in order,
- * the pane 400px tall showing the whole 1500px page as it scrolls. `scrollTop` is a plain
- * property on the pane, so setting it and dispatching `scroll` is the whole simulation.
+ * the pane 400px tall showing the whole page as it scrolls. `scrollTop` is a plain property on
+ * the pane, so setting it and dispatching `scroll` is the whole simulation.
  */
 function layOut(el: HTMLElement, sectionHeight = 300, paneHeight = 400) {
   const all = sections(el)
@@ -114,7 +113,7 @@ describe('SettingsDialog shell (D1)', () => {
     expect(onClose).toHaveBeenCalledTimes(3)
   })
 
-  it('gives focus back to whatever had it before — the cog, or the editor ⌘, was pressed in', () => {
+  it('gives focus back to whatever had it before — the cog, or wherever ⌘, was pressed', () => {
     const opener = document.createElement('button')
     document.body.appendChild(opener)
     opener.focus()
@@ -130,31 +129,28 @@ describe('SettingsDialog shell (D1)', () => {
 describe('SettingsDialog: one page of every settings section (the post-demo redesign)', () => {
   it('the nav: the settings-page anchors (Sync only with the engine), a divider, then the standalone Hotkeys page', () => {
     const { el } = mount()
-    expect(navShape(el)).toEqual(['Appearance', 'Editor', 'Files & Links', '—', 'Hotkeys'])
+    expect(navShape(el)).toEqual(['Appearance', 'Files', '—', 'Hotkeys'])
     unmount()
     const withSync = mount({ ...DEFAULT_SETTINGS }, status())
-    expect(navShape(withSync.el)).toEqual(['Appearance', 'Editor', 'Files & Links', 'Sync', '—', 'Hotkeys'])
+    expect(navShape(withSync.el)).toEqual(['Appearance', 'Files', 'Sync', '—', 'Hotkeys'])
   })
 
   it('renders every settings section on the one page, in order, each anchored by id and every row addressed by data-setting — Hotkeys is not on it', () => {
     const { el } = mount({ ...DEFAULT_SETTINGS }, status())
-    expect(headings(el)).toEqual(['Appearance', 'Editor', 'Files & Links', 'Sync'])
-    expect(sections(el).map((s) => s.id)).toEqual(['settings-appearance', 'settings-editor', 'settings-files', 'settings-sync'])
-    expect(rowIds(el)).toEqual(['theme', 'contentWidth', 'lineSpacing', 'blockGap', 'bulletThreading', 'threadWidth', 'threadColor', 'commentsOrder', 'confirmDelete', 'newNoteLocation', 'githubSync'])
+    expect(headings(el)).toEqual(['Appearance', 'Files', 'Sync'])
+    expect(sections(el).map((s) => s.id)).toEqual(['settings-appearance', 'settings-files', 'settings-sync'])
+    expect(rowIds(el)).toEqual(['theme', 'confirmDelete', 'githubSync'])
     for (const r of el.querySelectorAll<HTMLElement>('.setting')) expect(r.dataset.setting).toBeTruthy()
     expect(el.querySelector('[data-setting^="hotkeys"]')).toBeNull()
   })
 
-  it('group titles and hints render under their section; untitled groups are plain rows', () => {
-    const { el } = mount()
-    expect(groupTitles(el)).toEqual(['Spacing', 'Bullet threading', 'Comments'])
-    expect([...el.querySelectorAll('.settings-group__hint')].map((h) => h.textContent)).toEqual(['Guide lines that connect nested bullets.'])
-    // The threading rows carry the shortened labels; the group names the feature.
-    expect(row(el, 'bulletThreading')?.querySelector('.setting__label')?.textContent).toBe('Show')
-    expect(row(el, 'threadWidth')?.querySelector('.setting__label')?.textContent).toBe('Line width')
-    expect(row(el, 'commentsOrder')?.querySelector('.setting__label')?.textContent).toBe('Order')
-    // Files & Links has one untitled group: rows straight under the section title.
+  it('every settings-page group is untitled: the rows sit straight under their section title', () => {
+    const { el } = mount({ ...DEFAULT_SETTINGS }, status())
+    expect(groupTitles(el)).toEqual([])
+    expect([...el.querySelectorAll('.settings-group__hint')]).toEqual([])
     expect(el.querySelector('#settings-files .settings-group__title')).toBeNull()
+    expect(row(el, 'theme')?.querySelector('.setting__label')?.textContent).toBe('Theme')
+    expect(row(el, 'confirmDelete')?.querySelector('.setting__label')?.textContent).toBe('Confirm before deleting')
   })
 
   it('the Sync section carries the per-vault note under its title; no other section does', () => {
@@ -164,14 +160,14 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
     expect(notes[0].closest('[data-section]')?.id).toBe('settings-sync')
   })
 
-  it('Hotkeys is its own page: clicking it swaps the pane for its four tables and takes aria-current; no anchor is current meanwhile', () => {
+  it('Hotkeys is its own page: clicking it swaps the pane for its two tables and takes aria-current; no anchor is current meanwhile', () => {
     const { el } = mount()
     clickNav(el, 'Hotkeys')
     expect(currentNav(el)).toBe('Hotkeys')
     expect(currentKind(el)).toBe('page') // a page, where an anchor says `location`
     expect(headings(el)).toEqual(['Hotkeys'])
-    expect(groupTitles(el)).toEqual(['Keyboard', 'Views', 'Window', 'Mouse'])
-    expect(rowIds(el)).toEqual(['hotkeys-keyboard', 'hotkeys-views', 'hotkeys-window', 'hotkeys-mouse'])
+    expect(groupTitles(el)).toEqual(['Window', 'Mouse'])
+    expect(rowIds(el)).toEqual(['hotkeys-window', 'hotkeys-mouse'])
     expect([...el.querySelectorAll('[data-setting="hotkeys-window"] .hotkeys__keys')].map((k) => k.textContent)).toContain('⌘,')
     expect(scrollIntoView).not.toHaveBeenCalled()
   })
@@ -179,11 +175,11 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
   it('an anchor click from the Hotkeys page returns to the settings page and scrolls to that section', () => {
     const { el } = mount()
     clickNav(el, 'Hotkeys')
-    clickNav(el, 'Editor')
-    expect(currentNav(el)).toBe('Editor')
-    expect(headings(el)).toEqual(['Appearance', 'Editor', 'Files & Links'])
+    clickNav(el, 'Files')
+    expect(currentNav(el)).toBe('Files')
+    expect(headings(el)).toEqual(['Appearance', 'Files'])
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
-    expect(scrollIntoView.mock.instances[0]).toBe(el.querySelector('#settings-editor'))
+    expect(scrollIntoView.mock.instances[0]).toBe(el.querySelector('#settings-files'))
   })
 
   it('an anchor click scrolls its section into view and marks it current — as a location, not a page', () => {
@@ -205,17 +201,15 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
 
   it('scrollspy: the current nav item follows the pane scroll — last heading above the read line, the last section at the bottom', () => {
     const { el } = mount({ ...DEFAULT_SETTINGS }, status())
-    layOut(el) // sections at 0 / 300 / 600 / 900, pane 400 of 1200
+    layOut(el) // sections at 0 / 300 / 600, pane 400 of 900
     scrollTo(el, 0)
     expect(currentNav(el)).toBe('Appearance')
-    scrollTo(el, 270) // the read line (scrollTop + 24 = 294) is still above Editor's top (300)
+    scrollTo(el, 270) // the read line (scrollTop + 24 = 294) is still above Files' top (300)
     expect(currentNav(el)).toBe('Appearance')
-    scrollTo(el, 280) // 304: Editor's top is now at or above it
-    expect(currentNav(el)).toBe('Editor')
-    scrollTo(el, 650)
-    expect(currentNav(el)).toBe('Files & Links')
-    // The bottom: 1200 - 400 = 800, and Sync's top (900) never reaches the read line.
-    scrollTo(el, 800)
+    scrollTo(el, 280) // 304: Files' top is now at or above it
+    expect(currentNav(el)).toBe('Files')
+    // The bottom: 900 - 400 = 500, and Sync's top (600) never reaches the read line.
+    scrollTo(el, 500)
     expect(currentNav(el)).toBe('Sync')
   })
 
@@ -226,7 +220,7 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
     unmount()
     const again = mount()
     expect(currentNav(again.el)).toBe('Appearance')
-    expect(headings(again.el)).toEqual(['Appearance', 'Editor', 'Files & Links'])
+    expect(headings(again.el)).toEqual(['Appearance', 'Files'])
   })
 })
 
@@ -241,56 +235,14 @@ describe('SettingsDialog rows write through the popover contracts', () => {
     expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...DEFAULT_SETTINGS, theme: 'dark' })
   })
 
-  it('Line colour: Default is disabled while the thread already uses the accent, enabled once a colour is set', () => {
+  it('Confirm before deleting: On · Off with the guard ON by default, its hint in the row, and Off writing the whole object', () => {
     const { el, onChange } = mount()
-    const defaultButton = rowButtons(el, 'threadColor').find((b) => b.textContent === 'Default') as HTMLButtonElement
-    expect(defaultButton.disabled).toBe(true)
-    unmount()
-    const custom = mount({ ...DEFAULT_SETTINGS, threadColor: '#ff0000' })
-    const reset = rowButtons(custom.el, 'threadColor').find((b) => b.textContent === 'Default') as HTMLButtonElement
-    expect(reset.disabled).toBe(false)
-    act(() => reset.click())
-    expect(custom.onChange).toHaveBeenCalledExactlyOnceWith({ ...DEFAULT_SETTINGS, threadColor: null })
-    expect(onChange).not.toHaveBeenCalled()
-  })
-
-  it('Confirm before deleting carries its hint in the row', () => {
-    const { el } = mount()
     expect(row(el, 'confirmDelete')?.querySelector('.setting__hint')?.textContent).toBe('Deleted notes and folders move to the Trash either way.')
-  })
-
-  it('Default location: a dropdown of the three Obsidian options, writing the whole object with only the location flipped; the folder input and the wide row appear only for the third', () => {
-    const { el, onChange } = mount()
-    const select = row(el, 'newNoteLocation')?.querySelector<HTMLSelectElement>('select.settings__select') as HTMLSelectElement
-    expect([...select.options].map((o) => o.textContent)).toEqual(['Vault folder', 'Same folder as current file', 'In the folder specified below'])
-    expect(select.selectedOptions[0].textContent).toBe('Same folder as current file') // the YAZ-1643 default
-    expect(row(el, 'newNoteLocation')?.querySelector('.settings__input')).toBeNull()
-    expect(row(el, 'newNoteLocation')?.classList.contains('setting--wide')).toBe(false)
-    act(() => {
-      select.value = '0'
-      select.dispatchEvent(new Event('change', { bubbles: true }))
-    })
-    expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...DEFAULT_SETTINGS, newNoteLocation: 'root' })
-    unmount()
-    const folder = mount({ ...DEFAULT_SETTINGS, newNoteLocation: 'folder', newNoteFolder: 'Inbox' })
-    expect(row(folder.el, 'newNoteLocation')?.classList.contains('setting--wide')).toBe(true)
-    expect(row(folder.el, 'newNoteLocation')?.querySelector<HTMLInputElement>('.settings__input')?.value).toBe('Inbox')
-  })
-
-  it('Default location: an invalid folder keeps the stored value, marks the input aria-invalid, and keeps the typed text for fixing up', () => {
-    const { el, onChange } = mount({ ...DEFAULT_SETTINGS, newNoteLocation: 'folder', newNoteFolder: 'Old' })
-    const input = row(el, 'newNoteLocation')?.querySelector<HTMLInputElement>('.settings__input') as HTMLInputElement
-    expect(input.value).toBe('Old')
-    type(input, 'a/../b')
-    pressEnter(input)
-    expect(onChange).not.toHaveBeenCalled()
-    expect(input.getAttribute('aria-invalid')).toBe('true')
-    expect(input.classList.contains('settings__input--error')).toBe(true)
-    expect(input.value).toBe('a/../b')
-    type(input, 'Notes/Inbox')
-    expect(input.getAttribute('aria-invalid')).toBe('false')
-    pressEnter(input)
-    expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...DEFAULT_SETTINGS, newNoteLocation: 'folder', newNoteFolder: 'Notes/Inbox' })
+    const buttons = rowButtons(el, 'confirmDelete')
+    expect(buttons.map((b) => b.textContent)).toEqual(['On', 'Off'])
+    expect(buttons.map((b) => b.classList.contains('settings__option--active'))).toEqual([true, false])
+    act(() => buttons[1].click())
+    expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...DEFAULT_SETTINGS, confirmDelete: false })
   })
 
   it('GitHub sync: the engine-stamped `enabled` is the read-back, the hint is the detected repo, and Off calls setEnabled(false) — never onChange', () => {
@@ -324,23 +276,22 @@ describe('SettingsDialog search (D6)', () => {
 
   it('a titled group heads its hits with a breadcrumb, without repeating the group title below it', () => {
     const { el } = mount()
-    type(searchInput(el), 'threading')
-    expect(headings(el)).toEqual(['Editor › Bullet threading'])
+    type(searchInput(el), 'mouse')
+    expect(headings(el)).toEqual(['Hotkeys › Mouse'])
     expect(groupTitles(el)).toEqual([])
-    expect([...el.querySelectorAll('.settings-group__hint')].map((h) => h.textContent)).toEqual(['Guide lines that connect nested bullets.'])
-    expect(rowIds(el)).toEqual(['bulletThreading', 'threadWidth', 'threadColor'])
+    expect(rowIds(el)).toEqual(['hotkeys-mouse'])
   })
 
   it('hits from several groups stack under their own breadcrumbs, in registry order', () => {
     const { el } = mount({ ...DEFAULT_SETTINGS }, status())
-    // "bullet": the threading group (by its hint and title) and, on the standalone Hotkeys page,
-    // the two tables whose labels name a bullet — three breadcrumbs, registry order, never rank.
-    type(searchInput(el), 'bullet')
-    expect(headings(el)).toEqual(['Editor › Bullet threading', 'Hotkeys › Keyboard', 'Hotkeys › Mouse'])
-    expect(rowIds(el)).toEqual(['bulletThreading', 'threadWidth', 'threadColor', 'hotkeys-keyboard', 'hotkeys-mouse'])
-    type(searchInput(el), 'spacing')
-    expect(headings(el)).toEqual(['Appearance › Spacing'])
-    expect(rowIds(el)).toEqual(['lineSpacing', 'blockGap'])
+    // "files": the Files section (by its own title) and, on the standalone Hotkeys page, the
+    // Window table whose clipboard rows name files — two breadcrumbs, registry order, never rank.
+    type(searchInput(el), 'files')
+    expect(headings(el)).toEqual(['Files', 'Hotkeys › Window'])
+    expect(rowIds(el)).toEqual(['confirmDelete', 'hotkeys-window'])
+    type(searchInput(el), 'keyboard shortcuts')
+    expect(headings(el)).toEqual(['Hotkeys › Window', 'Hotkeys › Mouse'])
+    expect(rowIds(el)).toEqual(['hotkeys-window', 'hotkeys-mouse'])
     type(searchInput(el), 'close tab')
     expect(headings(el)).toEqual(['Hotkeys › Window'])
     expect(rowIds(el)).toEqual(['hotkeys-window'])
@@ -370,20 +321,20 @@ describe('SettingsDialog search (D6)', () => {
     pressEscape(searchInput(el))
     expect(onClose).not.toHaveBeenCalled()
     expect(searchInput(el).value).toBe('')
-    expect(headings(el)).toEqual(['Appearance', 'Editor', 'Files & Links'])
+    expect(headings(el)).toEqual(['Appearance', 'Files'])
 
     type(searchInput(el), 'dark')
     act(() => el.querySelector<HTMLButtonElement>('[aria-label="Clear search settings"]')?.click())
     expect(searchInput(el).value).toBe('')
-    expect(headings(el)).toEqual(['Appearance', 'Editor', 'Files & Links'])
+    expect(headings(el)).toEqual(['Appearance', 'Files'])
   })
 
   it('a nav click during a search clears the query and then scrolls to that section on the restored page', () => {
     const { el } = mount()
     type(searchInput(el), 'dark')
-    clickNav(el, 'Files & Links')
+    clickNav(el, 'Files')
     expect(searchInput(el).value).toBe('')
-    expect(currentNav(el)).toBe('Files & Links')
+    expect(currentNav(el)).toBe('Files')
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
     expect(scrollIntoView.mock.instances[0]).toBe(el.querySelector('#settings-files'))
   })

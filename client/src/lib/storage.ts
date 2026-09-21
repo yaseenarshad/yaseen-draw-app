@@ -1,15 +1,10 @@
 import {
-  MAX_COLLAPSED_GROUP_KEYS,
-  MAX_FOLD_KEYS_PER_FILE,
-  MAX_TOPICS_EXPANDED_PAGES,
   addRecentRoot,
   defaultAppState,
   defaultFolderState,
-  defaultRightPanelIdentity,
   type AppState,
   type FolderState,
   type RecentRoots,
-  type RightPanelIdentity,
   type SettingsState,
   type SidebarLens,
   type WindowIdentity,
@@ -24,7 +19,7 @@ import {
  */
 
 let state: AppState = defaultAppState()
-let identity: WindowIdentity = { id: '', root: null, file: null, tabs: [], rightPanel: defaultRightPanelIdentity(), sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [] }
+let identity: WindowIdentity = { id: '', root: null, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [] }
 let unsubscribe: (() => void) | null = null
 const listeners = new Set<() => void>()
 
@@ -70,13 +65,13 @@ export const storage = {
 
   getRoot: (): string | null => identity.root,
   /**
-   * Changing the root clears this window's file AND tab list (Tabs rule 13, GRO-2234) and all
-   * three Focus Mode lists (YAZ-1628, YAZ-1766) in the same write; re-setting the same root keeps them.
+   * Changing the root clears this window's file AND tab list (Tabs rule 13, GRO-2234) and both
+   * Focus Mode lists (YAZ-1628, YAZ-1766) in the same write; re-setting the same root keeps them.
    */
   setRoot(root: string | null): void {
     const patch = root === identity.root
       ? { root }
-      : { root, file: null, tabs: [] as string[], rightPanel: defaultRightPanelIdentity(), focusDirs: [] as string[], focusTopics: [] as string[], focusFavorites: [] as string[] }
+      : { root, file: null, tabs: [] as string[], focusDirs: [] as string[], focusFavorites: [] as string[] }
     identity = { ...identity, ...patch }
     send('window.setIdentity', () => window.yaseenDraw.window.setIdentity(patch))
   },
@@ -102,34 +97,15 @@ export const storage = {
   },
 
   /**
-   * The Topics tree's expanded folder pages (🔒 D4, YAZ-848) — PAGE PATHS, not tree positions,
-   * so a page under two folder pages is one entry and opens under both. `expanded`'s twin in
-   * every way: same per-root bucket, same `setFolder` patch, same path-keyed repair in
-   * `store.renamePath` / `store.removePath`.
-   */
-  getTopicsExpanded: (root: string): string[] => folderOf(root).topicsExpanded,
-  setTopicsExpanded(root: string, pages: readonly string[]): void {
-    const topicsExpanded = pages.slice(0, MAX_TOPICS_EXPANDED_PAGES)
-    patchFolder(root, { topicsExpanded })
-    send('state.setFolder', () => window.yaseenDraw.state.setFolder(root, { topicsExpanded }))
-  },
-
-  /**
    * Focus Mode (YAZ-1605): a path list per lens, empty when off. Window identity since YAZ-1628,
    * like `sidebarCollapsed` below — no root argument, and a global state broadcast never follows
-   * another window's focus into this one; a root change clears both lists (`setRoot`).
+   * another window's focus into this one; a root change clears the lists (`setRoot`).
    */
   getFocusDirs: (): string[] => identity.focusDirs,
   setFocusDirs(dirs: readonly string[]): void {
     const focusDirs = [...dirs]
     identity = { ...identity, focusDirs }
     send('window.setIdentity', () => window.yaseenDraw.window.setIdentity({ focusDirs }))
-  },
-  getFocusTopics: (): string[] => identity.focusTopics,
-  setFocusTopics(pages: readonly string[]): void {
-    const focusTopics = [...pages]
-    identity = { ...identity, focusTopics }
-    send('window.setIdentity', () => window.yaseenDraw.window.setIdentity({ focusTopics }))
   },
   /** The Favorites tab's own focus list (YAZ-1766 D5): the favorited dirs it is narrowed to. */
   getFocusFavorites: (): string[] => identity.focusFavorites,
@@ -145,25 +121,17 @@ export const storage = {
   /** Valid AT BOOT only (like `getFile`): the renderer owns tab state after boot (Tabs I2, GRO-2234). */
   getTabs: (): string[] => identity.tabs,
 
-  /** Durable right-panel identity at boot; clone the ordered list so callers cannot mutate the cache. */
-  getRightPanel: (): RightPanelIdentity => ({ ...identity.rightPanel, items: [...identity.rightPanel.items] }),
-
   getLastFile: (root: string): string | null => folderOf(root).lastFile,
 
-  /** One durable mirror for the complete main/right workspace identity. */
-  setWorkspace(root: string | null, tabs: readonly string[], file: string | null, rightPanel: RightPanelIdentity): void {
+  /** One durable mirror for the complete workspace identity. */
+  setWorkspace(root: string | null, tabs: readonly string[], file: string | null): void {
     const fileChanged = file !== identity.file
-    const nextRight = { ...rightPanel, items: [...rightPanel.items] }
-    identity = { ...identity, file, tabs: [...tabs], rightPanel: nextRight }
+    identity = { ...identity, file, tabs: [...tabs] }
     if (root !== null && fileChanged) {
       patchFolder(root, { lastFile: file })
       send('state.setFolder', () => window.yaseenDraw.state.setFolder(root, { lastFile: file }))
     }
-    send('window.setIdentity', () => window.yaseenDraw.window.setIdentity({
-      tabs: [...tabs],
-      file,
-      rightPanel: { ...nextRight, items: [...nextRight.items] },
-    }))
+    send('window.setIdentity', () => window.yaseenDraw.window.setIdentity({ tabs: [...tabs], file }))
   },
 
   /** Already validated field-by-field by the main process on load (`desktop/src/main/store.ts`). */
@@ -197,35 +165,5 @@ export const storage = {
   setSidebarLens(lens: SidebarLens): void {
     identity = { ...identity, sidebarLens: lens }
     send('window.setIdentity', () => window.yaseenDraw.window.setIdentity({ sidebarLens: lens }))
-  },
-
-  getFolds: (root: string, file: string): string[] => folderOf(root).folds[file] ?? [],
-  /** Replace the fold keys for one file; an empty list removes the entry (keys the plugin no longer reports are dropped). */
-  setFolds(root: string, file: string, keys: readonly string[]): void {
-    const folds = { ...folderOf(root).folds }
-    if (keys.length === 0) delete folds[file]
-    else folds[file] = keys.slice(0, MAX_FOLD_KEYS_PER_FILE)
-    patchFolder(root, { folds })
-    send('state.setFolds', () => window.yaseenDraw.state.setFolds(root, file, keys))
-  },
-
-  /**
-   * Collapsed group keys for one view; `key` is `<pagePath>::<viewName>` (4C, GRO-2137).
-   *
-   * HISTORICAL NAMES (🔒 D1 of YAZ-823, kept deliberately by YAZ-858's rename): the STORED field
-   * is still `baseGroups` and the bridge method / IPC channel are still `state.setBaseGroups` /
-   * `state:set-base-groups`. Renaming them would either orphan every user's persisted collapse
-   * state or need a migration, and would break the preload/main contract — so `shared/types.ts`'s
-   * `AppState` field, `store.ts`'s mutator and the channel all keep the old spelling on purpose.
-   * Only these two client accessors were renamed; the wire below is untouched.
-   */
-  getViewGroups: (root: string, key: string): string[] => folderOf(root).baseGroups[key] ?? [],
-  /** Replace the collapsed group keys for one view; an empty list removes the entry. Session chrome, never written to the page's own frontmatter. */
-  setViewGroups(root: string, key: string, collapsed: readonly string[]): void {
-    const baseGroups = { ...folderOf(root).baseGroups }
-    if (collapsed.length === 0) delete baseGroups[key]
-    else baseGroups[key] = collapsed.slice(0, MAX_COLLAPSED_GROUP_KEYS)
-    patchFolder(root, { baseGroups })
-    send('state.setBaseGroups', () => window.yaseenDraw.state.setBaseGroups(root, key, collapsed))
   },
 }

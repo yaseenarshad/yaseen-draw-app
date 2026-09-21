@@ -38,6 +38,11 @@ export function allDirs(tree: TreeNode[]): string[] {
   return tree.flatMap((n) => (n.type === 'dir' ? [n.path, ...allDirs(n.children)] : []))
 }
 
+/** Every FILE in `tree`, at every depth, in tree order — the search list's file rows. */
+export function allFiles(tree: TreeNode[]): TreeNode[] {
+  return tree.flatMap((n) => (n.type === 'dir' ? allFiles(n.children) : [n]))
+}
+
 /** True when `path` is a file somewhere in `tree`. */
 export function treeHasFile(tree: TreeNode[], path: string): boolean {
   return tree.some((n) => (n.type === 'file' ? n.path === path : treeHasFile(n.children, path)))

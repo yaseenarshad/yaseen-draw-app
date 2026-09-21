@@ -14,16 +14,16 @@ const code = async (p: Promise<unknown>) => (await failure(p)).code
 
 describe('readFile', () => {
   it('returns content, mtime, size', async () => {
-    const body = await readFile(path.join(root, 'A.md'))
-    expect(body).toMatchObject({ path: path.join(root, 'A.md'), content: '# A\n', size: 4 })
+    const body = await readFile(path.join(root, 'A.excalidraw'))
+    expect(body).toMatchObject({ path: path.join(root, 'A.excalidraw'), content: '{"A":1}\n', size: 8 })
     expect(body.mtime).toBeGreaterThan(0)
   })
 
-  it('reads supported view-only text without normalizing Unicode, CRLF, or a UTF-8 BOM', async () => {
+  it('reads a drawing without normalizing Unicode, CRLF, or a UTF-8 BOM', async () => {
     const cases = [
-      ['data.json', '{\r\n  "message": "Hello 🌍"\r\n}\r\n'],
-      ['script.py', 'print("Ünicode")\n'],
-      ['notes.txt', '\ufefffirst\r\nsecond\r\n'],
+      ['crlf.excalidraw', '{\r\n  "message": "Hello 🌍"\r\n}\r\n'],
+      ['unicode.excalidraw', '{"label":"Ünicode"}\n'],
+      ['bom.excalidraw', '﻿{"first":1}\r\n'],
     ] as const
 
     for (const [name, content] of cases) {
@@ -35,9 +35,9 @@ describe('readFile', () => {
   })
 
   it.each([
-    ['malformed UTF-8', 'broken.json', Buffer.from([0xc3, 0x28])],
-    ['NUL content', 'binary.py', Buffer.from('before\0after', 'utf8')],
-  ])('rejects %s instead of returning lossy view-only text', async (_label, name, bytes) => {
+    ['malformed UTF-8', 'broken.excalidraw', Buffer.from([0xc3, 0x28])],
+    ['NUL content', 'binary.excalidraw', Buffer.from('before\0after', 'utf8')],
+  ])('rejects %s instead of returning lossy text', async (_label, name, bytes) => {
     const file = path.join(root, name)
     await fsWriteFile(file, bytes)
     const err = await failure(readFile(file))
@@ -45,38 +45,27 @@ describe('readFile', () => {
     expect(err.message).toMatch(/valid UTF-8 text|NUL/)
   })
 
-  it('retains the existing replacement-character behavior for malformed Markdown bytes', async () => {
-    const file = path.join(root, 'legacy.md')
-    await fsWriteFile(file, Buffer.from([0x23, 0x20, 0xc3, 0x28, 0x0a]))
-    expect((await readFile(file)).content).toBe('# �(\n')
-  })
-
-  it('retains the existing leading BOM behavior for Markdown', async () => {
-    const file = path.join(root, 'legacy-bom.md')
-    await fsWriteFile(file, Buffer.from('\ufeff# Title\n', 'utf8'))
-    expect((await readFile(file)).content).toBe('\ufeff# Title\n')
-  })
-
-  it('rejects view-only text above the existing 10 MiB limit', async () => {
-    const file = path.join(root, 'oversized.txt')
+  it('rejects a drawing above the existing 10 MiB limit', async () => {
+    const file = path.join(root, 'oversized.excalidraw')
     await fsWriteFile(file, Buffer.alloc(MAX_FILE_BYTES + 1, 0x61))
     expect(await code(readFile(file))).toBe('TOO_LARGE')
   })
 
   it('NOT_FOUND missing, NOT_ABSOLUTE relative, UNSUPPORTED_EXTENSION, NOT_A_FILE', async () => {
-    expect(await code(readFile(path.join(root, 'missing.md')))).toBe('NOT_FOUND')
-    expect(await code(readFile('rel.md'))).toBe('NOT_ABSOLUTE')
+    expect(await code(readFile(path.join(root, 'missing.excalidraw')))).toBe('NOT_FOUND')
+    expect(await code(readFile('rel.excalidraw'))).toBe('NOT_ABSOLUTE')
+    expect(await code(readFile(path.join(root, 'notes.txt')))).toBe('UNSUPPORTED_EXTENSION')
     expect(await code(readFile(path.join(root, 'report.pdf')))).toBe('UNSUPPORTED_EXTENSION')
     expect(await code(readFile(path.join(root, 'alpha')))).toBe('UNSUPPORTED_EXTENSION')
-    await mkdir(path.join(root, 'folder.md'))
-    expect(await code(readFile(path.join(root, 'folder.md')))).toBe('NOT_A_FILE')
+    await mkdir(path.join(root, 'folder.excalidraw'))
+    expect(await code(readFile(path.join(root, 'folder.excalidraw')))).toBe('NOT_A_FILE')
   })
 })
 
 describe('writeFile', () => {
-  it('write then read is byte-identical (unicode/emoji/frontmatter) and leaves no tmp files', async () => {
-    const file = path.join(root, 'alpha', 'new.md')
-    const content = '---\ntitle: Ünïcödé 🚀\n---\n\n# Hello 🌍\n\n- [ ] task ✅\n\n```ts\nconst x = "é"\n```\n'
+  it('write then read is byte-identical (unicode/emoji) and leaves no tmp files', async () => {
+    const file = path.join(root, 'alpha', 'new.excalidraw')
+    const content = '{"type":"excalidraw","elements":[{"text":"Ünïcödé 🚀"},{"text":"task ✅"}],"appState":{"name":"Hello 🌍"}}\n'
     const w = await writeFile({ path: file, content })
     expect(w.path).toBe(file)
     expect(w.size).toBe(Buffer.byteLength(content))
@@ -88,16 +77,16 @@ describe('writeFile', () => {
   })
 
   it('BAD_REQUEST when content is not a string / request not an object, NOT_ABSOLUTE, UNSUPPORTED_EXTENSION', async () => {
-    expect(await code(writeFile({ path: path.join(root, 'x.md'), content: 42 as never }))).toBe('BAD_REQUEST')
-    expect(await code(writeFile({ path: path.join(root, 'x.md') } as never))).toBe('BAD_REQUEST')
-    expect(await code(writeFile({ path: path.join(root, 'x.md'), content: '', expectedMtime: '1' as never }))).toBe('BAD_REQUEST')
-    expect(await code(writeFile({ path: 'rel.md', content: '' }))).toBe('NOT_ABSOLUTE')
+    expect(await code(writeFile({ path: path.join(root, 'x.excalidraw'), content: 42 as never }))).toBe('BAD_REQUEST')
+    expect(await code(writeFile({ path: path.join(root, 'x.excalidraw') } as never))).toBe('BAD_REQUEST')
+    expect(await code(writeFile({ path: path.join(root, 'x.excalidraw'), content: '', expectedMtime: '1' as never }))).toBe('BAD_REQUEST')
+    expect(await code(writeFile({ path: 'rel.excalidraw', content: '' }))).toBe('NOT_ABSOLUTE')
     expect(await code(writeFile({ path: path.join(root, 'x.txt'), content: '' }))).toBe('UNSUPPORTED_EXTENSION')
     expect(await code(writeFile(undefined as never))).toBe('BAD_REQUEST')
     expect(await code(writeFile('{not json' as never))).toBe('BAD_REQUEST')
   })
 
-  it.each(['existing.json', 'existing.py', 'existing.pdf'])('refuses to write %s and preserves the original bytes', async (name) => {
+  it.each(['existing.md', 'existing.json', 'existing.pdf'])('refuses to write %s and preserves the original bytes', async (name) => {
     const file = path.join(root, name)
     const original = Buffer.from(`original:${name}`)
     await fsWriteFile(file, original)
@@ -106,11 +95,11 @@ describe('writeFile', () => {
   })
 
   it('NOT_FOUND when parent dir does not exist', async () => {
-    expect(await code(writeFile({ path: path.join(root, 'nope', 'x.md'), content: '' }))).toBe('NOT_FOUND')
+    expect(await code(writeFile({ path: path.join(root, 'nope', 'x.excalidraw'), content: '' }))).toBe('NOT_FOUND')
   })
 
   it('CONFLICT (with the disk mtime) when expectedMtime differs, nothing written; succeeds when it matches', async () => {
-    const file = path.join(root, 'b.md')
+    const file = path.join(root, 'b.excalidraw')
     const before = await readFile(file)
     await utimes(file, new Date(), new Date(before.mtime + 5000))
     const conflict = await failure(writeFile({ path: file, content: 'clobber', expectedMtime: before.mtime }))
@@ -118,7 +107,7 @@ describe('writeFile', () => {
     expect(conflict.path).toBe(file)
     expect(conflict.mtime).toBeDefined()
     expect(conflict.mtime).not.toBe(before.mtime)
-    expect(await fsReadFile(file, 'utf8')).toBe('# b\n')
+    expect(await fsReadFile(file, 'utf8')).toBe('{"b":1}\n')
     const ok = await writeFile({ path: file, content: 'fresh', expectedMtime: conflict.mtime })
     expect(ok.path).toBe(file)
     expect(await fsReadFile(file, 'utf8')).toBe('fresh')

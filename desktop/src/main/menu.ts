@@ -6,7 +6,7 @@
  * lives in `main/index.ts`.
  */
 import type { MenuItemConstructorOptions } from 'electron'
-import type { ClipboardPasteRequest, RecentRoots, ZoomStep } from '@shared/types'
+import type { RecentRoots, ZoomStep } from '@shared/types'
 import { CH } from '../channels'
 import type { Store } from './store'
 import type { WindowManager } from './windows'
@@ -15,8 +15,6 @@ import type { WindowManager } from './windows'
 export const HELP_URL = 'https://github.com/yaseenarshad/yaseen-draw-app#readme'
 
 export interface MenuHandlers {
-  copyAs(mode: 'plain' | 'markdown'): void
-  pasteAs(mode: ClipboardPasteRequest['mode']): void
   /** File › New Window (⌘⇧N, D6): duplicate the focused window — same folder, same file. */
   newWindow(): void
   /** File › Switch Vault… (⌘O, YAZ-1767 D8): the focused window's renderer opens its sidebar vault switcher. */
@@ -37,7 +35,7 @@ export interface MenuHandlers {
   prevTab(): void
   /** View › Toggle Sidebar: ask only the focused renderer to toggle its window identity. */
   toggleSidebar(): void
-  /** View › Zoom In / Out / Actual Size (⌘+ / ⌘− / ⌘0): the renderer routes it to the focused note or the app (YAZ-1710). */
+  /** View › Zoom In / Out / Actual Size (⌘+ / ⌘− / ⌘0): app-wide zoom on the focused window (YAZ-1710). */
   zoom(step: ZoomStep): void
   openHelp(): void
 }
@@ -50,8 +48,8 @@ export interface MenuInputs {
 }
 
 /**
- * The whole menu bar as a template. Item `id`s are stable so a live check (Playwright) can
- * drive items through `Menu.getApplicationMenu().getMenuItemById(...)`.
+ * The whole menu bar as a template. Item `id`s are stable so a live check can drive items
+ * through `Menu.getApplicationMenu().getMenuItemById(...)`.
  */
 export function buildMenuTemplate({ recents, isDev }: MenuInputs, handlers: MenuHandlers): MenuItemConstructorOptions[] {
   const recentItems: MenuItemConstructorOptions[] =
@@ -106,7 +104,7 @@ export function buildMenuTemplate({ recents, isDev }: MenuInputs, handlers: Menu
     },
     {
       label: 'Edit',
-      submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, copyAsMenu(handlers.copyAs), { role: 'paste' }, pasteAsMenu(handlers.pasteAs, true), { role: 'selectAll' }],
+      submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }],
     },
     {
       label: 'View',
@@ -117,7 +115,7 @@ export function buildMenuTemplate({ recents, isDev }: MenuInputs, handlers: Menu
         ...(isDev ? [{ role: 'toggleDevTools' } satisfies MenuItemConstructorOptions] : []),
         { type: 'separator' },
         // Not the stock zoom roles (YAZ-1710): a registered accelerator never reaches the page on
-        // macOS, so main forwards the step and the renderer decides — the focused note or the app.
+        // macOS, so main applies the step to the focused window's webContents itself.
         { id: 'menu.view.zoom-reset', label: 'Actual Size', accelerator: 'CmdOrCtrl+0', click: () => handlers.zoom(0) },
         { id: 'menu.view.zoom-in', label: 'Zoom In', accelerator: 'CmdOrCtrl+Plus', click: () => handlers.zoom(1) },
         // Electron's own zoomIn role also answers ⌘= (no shift); keep that hidden twin.
@@ -147,64 +145,22 @@ export function buildMenuTemplate({ recents, isDev }: MenuInputs, handlers: Menu
   ]
 }
 
-function copyAsMenu(copyAs: MenuHandlers['copyAs']): MenuItemConstructorOptions {
-  return {
-    label: 'Copy as',
-    submenu: [
-      { id: 'menu.edit.copy-plain', label: 'Plain text', click: () => copyAs('plain') },
-      { id: 'menu.edit.copy-markdown', label: 'Markdown', click: () => copyAs('markdown') },
-    ],
-  }
-}
-
-function pasteAsMenu(pasteAs: MenuHandlers['pasteAs'], accelerator = false): MenuItemConstructorOptions {
-  return {
-    label: 'Paste as',
-    submenu: [
-      { id: 'menu.edit.paste-plain', label: 'Plain text', ...(accelerator ? { accelerator: 'CmdOrCtrl+Shift+V' } : {}), click: () => pasteAs('plain') },
-      { id: 'menu.edit.paste-markdown', label: 'Markdown', click: () => pasteAs('markdown') },
-    ],
-  }
-}
-
 export interface ContextMenuActions {
-  copyAs(mode: 'plain' | 'markdown'): void
-  pasteAs(mode: ClipboardPasteRequest['mode']): void
   /** Swap the misspelled word under the cursor for the suggestion the user picked. */
   replace(word: string): void
   /** Teach the spellchecker a word it flagged, for good. */
   addToDictionary(word: string): void
-  /** Copy the right-clicked image's pixels to the clipboard (YAZ-1666). */
-  copyImage(): void
-  /** Reveal the right-clicked image's file in Finder (YAZ-1666); `srcURL` is the `<img src>` as loaded. */
-  revealImage(srcURL: string): void
 }
 
 /**
  * The right-click menu (YAZ-672). Electron ships no default one, so the spellchecker's squiggles
  * had nothing to act on. Pure like `buildMenuTemplate`; the `context-menu` event and the
  * `Menu.buildFromTemplate(...).popup()` apply layer live in `main/index.ts`.
- *
- * An IMAGE under the cursor (YAZ-1666, images-as-first-class-citizens YAZ-1656 D7) gets its
- * own two-row menu INSTEAD of the text one: cut/copy/paste act on a selection an image does
- * not have, and the spellchecker has nothing to say about pixels. Exactly two rows — a "Copy
- * Image Address" would hand out an `app://vault` URL that means nothing outside the app, and
- * "Copy Markdown" is the editor's job. Chromium reports `mediaType: 'image'` only for an
- * element laid out as an image (`<img>`, `<input type=image>`, SVG `<image>`), never for an
- * inline `<svg>` or a CSS background — so the sidebar's icons keep the text menu, and the rows
- * appear on the editor's images, the lightbox and card covers alike. Reveal receives the
- * `<img src>` verbatim; `vaultProtocol.ts` decides whether it names a vault file.
  */
 export function buildContextMenuTemplate(
-  params: Pick<Electron.ContextMenuParams, 'misspelledWord' | 'dictionarySuggestions' | 'editFlags' | 'mediaType' | 'srcURL'>,
+  params: Pick<Electron.ContextMenuParams, 'misspelledWord' | 'dictionarySuggestions' | 'editFlags'>,
   actions: ContextMenuActions,
 ): MenuItemConstructorOptions[] {
-  if (params.mediaType === 'image') {
-    return [
-      { label: 'Copy Image', click: () => actions.copyImage() },
-      { label: 'Reveal in Finder', click: () => actions.revealImage(params.srcURL) },
-    ]
-  }
   const suggestions: MenuItemConstructorOptions[] = params.dictionarySuggestions.map((s) => ({ label: s, click: () => actions.replace(s) }))
   const dictionary: MenuItemConstructorOptions[] =
     params.misspelledWord === ''
@@ -219,9 +175,7 @@ export function buildContextMenuTemplate(
     ...dictionary,
     { role: 'cut', enabled: params.editFlags.canCut },
     { role: 'copy', enabled: params.editFlags.canCopy },
-    { ...copyAsMenu(actions.copyAs), enabled: params.editFlags.canCopy },
     { role: 'paste', enabled: params.editFlags.canPaste },
-    { ...pasteAsMenu(actions.pasteAs), enabled: params.editFlags.canPaste },
   ]
 }
 
@@ -254,7 +208,8 @@ export interface MenuHost {
    * this through `pickMenuTargetWindow` (see its comment for why macOS forces the fallback).
    */
   focusedWebContents(): { id: number; send(channel: string, ...args: unknown[]): void } | undefined
-  readClipboardText(): string
+  /** App-wide zoom on the focused window: level ± 0.5, or back to 0 (YAZ-1710). */
+  zoom(step: ZoomStep): void
   openExternal(url: string): void
 }
 
@@ -268,13 +223,6 @@ export function createMenuHandlers(store: Store, windows: MenuWindows, host: Men
     return id === undefined ? undefined : store.get().windows.find((w) => w.id === id)
   }
   return {
-    copyAs(mode) {
-      host.focusedWebContents()?.send(CH.menuCopyAs, mode)
-    },
-    pasteAs(mode) {
-      const target = host.focusedWebContents()
-      if (target !== undefined) target.send(CH.menuPasteAs, { mode, text: host.readClipboardText() } satisfies ClipboardPasteRequest)
-    },
     newWindow() {
       const entry = focusedEntry()
       if (entry !== undefined) windows.duplicateWindow(entry)
@@ -313,7 +261,7 @@ export function createMenuHandlers(store: Store, windows: MenuWindows, host: Men
       host.focusedWebContents()?.send(CH.menuToggleSidebar)
     },
     zoom(step) {
-      host.focusedWebContents()?.send(CH.menuZoom, step)
+      host.zoom(step)
     },
     openHelp() {
       host.openExternal(HELP_URL)

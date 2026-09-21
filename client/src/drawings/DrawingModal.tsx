@@ -3,11 +3,10 @@
  * → the scene opens full-size → edit → Save writes the sidecar back → every preview of that target
  * re-renders.
  *
- * 🔒 A MODAL, NEVER A NODE VIEW. The embed stays plain markdown text under decorations (rule 27),
- * so there is no node to host an editor in — and a full drawing canvas inside a text column would
- * fight the caret for every key it owns. This is React beside the editor, the `FolderPageContents`
- * / `PageTitle` precedent: `Editor`'s `CrepeHost` holds `openDrawing`, the preview's click sets it
- * (`drawingPreview.onOpenDrawing`), and this renders over the window.
+ * 🔒 A MODAL over the window (YAZ-879), and the LAST survivor of the embed: 2B removed the
+ * previews that used to open it, and 2D replaces it with the document canvas itself. It is kept
+ * meanwhile because it already holds the chrome the canvas needs — dirty tracking, the save
+ * dance, the Esc/click-away rules — and the engine seam below it is what 2D builds on.
  *
  * 🔒 CHROME ONLY. Everything about the ENGINE — the canvas, what "changed" means, how a scene
  * serializes — lives behind `ExcalidrawSurface`, and nothing in this file imports the package or
@@ -17,8 +16,7 @@
  * ⚡ KEYS ARE THE OVERLAY'S, NEVER `window`'s (the YAZ-888 lesson, learned by `ConfirmRename` and
  * paid for in e2e): React flushes a component's mount effects INSIDE the dispatch of the event
  * that opened it, so a `window` listener installed on mount hears that very keystroke or click.
- * The preview opens this on a CLICK, and a `window` mousedown listener would have closed it in the
- * same tick. Bound to the overlay, it only ever hears what happens inside itself — and the overlay
+ * Opened on a CLICK, a `window` mousedown listener would have closed it in the same tick. Bound to the overlay, it only ever hears what happens inside itself — and the overlay
  * takes focus on mount so Esc reaches it before the canvas exists.
  *
  * DIRTY: the surface reports a cheap version per change; the FIRST one is the baseline, so a
@@ -46,7 +44,7 @@ export const DISCARD_PROMPT = 'Discard drawing changes?'
 interface DrawingModalProps {
   /** Vault root; with the target it is all `openDrawing` needs. */
   root: string
-  /** The embed's raw target, exactly as the note spells it — the resolution rule is the pipe's. */
+  /** The raw target, exactly as the caller spells it — the resolution rule is the pipe's. */
   target: string
   /** The app's resolved appearance, handed straight to the surface. */
   theme: 'light' | 'dark'

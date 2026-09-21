@@ -47,7 +47,6 @@ export function SearchResults({ results, selected, onSelect, onActivate }: Searc
           ref={i === selected ? selectedRow : null}
           role="option"
           aria-selected={i === selected}
-          // e2e anchors rows by aria-label (Playwright's hasText cannot read them otherwise).
           aria-label={`Search result ${r.label}${r.kind === 'dir' ? ', folder' : ''}`}
           className={`search-results__row${i === selected ? ' search-results__row--active' : ''}${r.kind === 'dir' ? ' search-results__row--dir' : ''}`}
           title={r.path}

@@ -3,21 +3,21 @@ import { basename, stripExt } from './paths'
 
 describe('basename', () => {
   it('returns the last segment, ignoring trailing slashes', () => {
-    expect(basename('/a/b/c.md')).toBe('c.md')
+    expect(basename('/a/b/c.excalidraw')).toBe('c.excalidraw')
     expect(basename('/a/b/')).toBe('b')
     expect(basename('/')).toBe('/')
   })
 })
 
 describe('stripExt', () => {
-  it('strips markdown extensions, case-insensitive', () => {
-    expect(stripExt('note.md')).toBe('note')
-    expect(stripExt('note.MARKDOWN')).toBe('note')
+  it('strips the vault extension, case-insensitive', () => {
+    expect(stripExt('Board.excalidraw')).toBe('Board')
+    expect(stripExt('Board.EXCALIDRAW')).toBe('Board')
   })
 
-  it('leaves other names alone', () => {
+  it('leaves every other name alone — nothing else vouches for what its bytes are', () => {
     expect(stripExt('notes.txt')).toBe('notes.txt')
-    expect(stripExt('Tasks.base')).toBe('Tasks.base') // not a vault extension since YAZ-844
+    expect(stripExt('note.md')).toBe('note.md')
     expect(stripExt('database')).toBe('database')
   })
 })

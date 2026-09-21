@@ -4,7 +4,7 @@ import type { Theme } from '@shared/types'
 /**
  * Appearance resolution (Desktop K, GRO-2218): explicit `light`/`dark` win; `system` follows
  * the OS. App applies the result as `data-theme` on <html> (app.css `[data-theme='dark']`
- * redefines the palette tokens) and swaps the Crepe frame vars (editor/crepeTheme.ts).
+ * redefines the palette tokens).
  */
 export function resolveTheme(setting: Theme, systemPrefersDark: boolean): 'light' | 'dark' {
   return setting === 'system' ? (systemPrefersDark ? 'dark' : 'light') : setting

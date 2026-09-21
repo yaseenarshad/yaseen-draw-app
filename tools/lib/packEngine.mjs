@@ -31,7 +31,7 @@ export function packedName(pkg, version) {
 
 /**
  * Inverse of `tarballName`. Returns `null` for anything that is not one of ours (the
- * milkdown tarball living in the same directory, for instance).
+ * unrelated tarball living in the same directory, for instance).
  */
 export function parseTarballName(name) {
   const m = TARBALL_RE.exec(name)

@@ -2,20 +2,19 @@ import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { AssetResponse, AssetWriteRequest, AssetWriteResponse } from '@shared/types'
 import { DRAWING_EXTENSIONS, IMAGE_EXTENSIONS, MAX_FILE_BYTES } from '@shared/types'
-import { linkTarget } from '../vaultIndex/scan'
 import { atomicWrite, BridgeFailure, byNameCi, fsCall, isSkipped, requireAbsPath, requireDir } from './fsUtils'
 
 /**
  * `window.yaseenDraw.readAsset(root, ref)` / `.writeAsset(req)` (Bases 4E, GRO-2139 — Desktop
- * D10: bridge methods, never routes): the vault's ASSET pipe. Reads resolve a wikilink target or
+ * D10: bridge methods, never routes): the vault's ASSET pipe. Reads resolve a bare name or
  * path to a local image or drawing under `root` and answer its bytes base64-encoded with a mime
  * derived from the extension; writes take drawing JSON (YAZ-876) or image bytes (YAZ-1661).
  * Pure Node, no Electron import — `resolveAsset` and `mimeFor` are shared with the `app://vault`
- * image protocol (`main/vaultProtocol.ts`, YAZ-1658), which is why they are exported.
+ * asset pipe, which is why they are exported.
  *
  * Assets use this dedicated pipe instead of the supported-file read capabilities: neither kind is
  * a supported file, so a `.excalidraw` sidecar or a pasted image lists in the tree with
- * `kind: null` (YAZ-1577 D4), stays out of the Markdown index, and opens in the OS default app.
+ * `kind: null` (YAZ-1577 D4) and opens in the OS default app.
  */
 
 const MIME: Record<string, string> = {
@@ -94,7 +93,8 @@ export async function resolveAsset(root: string, target: string, from?: string):
 export async function readAsset(root: string, ref: string): Promise<AssetResponse> {
   const dir = requireAbsPath(root, 'root')
   if (typeof ref !== 'string') throw new BridgeFailure('BAD_REQUEST', "missing 'ref'")
-  const target = linkTarget(ref)
+  // `[[Name|alias#heading]]` spellings are stripped to the bare target the vault stores.
+  const target = ref.split('|')[0].split('#')[0].trim()
   if (target === '') throw new BridgeFailure('BAD_REQUEST', "missing 'ref'")
   const ext = path.extname(target).slice(1).toLowerCase()
   const mime = MIME[ext]

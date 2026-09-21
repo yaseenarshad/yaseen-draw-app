@@ -11,10 +11,10 @@ describe('applyUserDataOverride', () => {
 
   it('sets only the userData path when an override is present', () => {
     const app = { setPath: vi.fn() }
-    applyUserDataOverride(app, '/Users/yasin/Desktop/YAZ-966-right-panel-demo-profile')
+    applyUserDataOverride(app, '/Users/yasin/Desktop/yaz-1775-demo-profile')
     expect(app.setPath).toHaveBeenCalledExactlyOnceWith(
       'userData',
-      '/Users/yasin/Desktop/YAZ-966-right-panel-demo-profile',
+      '/Users/yasin/Desktop/yaz-1775-demo-profile',
     )
   })
 })

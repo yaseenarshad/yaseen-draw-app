@@ -24,8 +24,8 @@ import { atomicWrite, BridgeFailure, fsCall, requireAbsPath, toBridgeFailure } f
  *
  * Echo policy: `writeConfig` notifies this process's subscribers synchronously (so every window
  * of the vault hears about a write from any of them), and the watcher's later echo of that same
- * write is dropped by mtime — the app's standard echo-suppression pattern (CONTRACTS.md,
- * multi-window). A genuinely external edit has a different mtime and notifies as usual,
+ * write is dropped by mtime — the app's standard echo-suppression pattern (docs/CONTRACTS.md,
+ * "Bridge API"). A genuinely external edit has a different mtime and notifies as usual,
  * debounced/deduped to one `{ root, name }` per file.
  */
 

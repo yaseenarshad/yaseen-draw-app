@@ -2,9 +2,9 @@
  * Pure debounced auto-save state machine (no DOM, no React) so the dirty /
  * debounce / conflict rules can be unit-tested.
  *
- * Rules (docs/CONTRACTS.md):
- *  - only content that differs from the last saved/loaded markdown is dirty
- *    (Crepe's first serialisation is a normalised rewrite — never save it);
+ * Rules (docs/CONTRACTS.md "Bridge API" — atomic writes and mtime echo suppression):
+ *  - only content that differs from the last saved/loaded content is dirty
+ *    (an editor's first serialisation is a normalised rewrite — never save it);
  *  - save `delayMs` after the last change, with `expectedMtime` = mtime of the
  *    last read/write; a CONFLICT rejection is reported via `onConflict` and
  *    saving pauses until `reset()` (reload) or `adopt()` (overwrite);
@@ -20,8 +20,8 @@ export class SaveConflict extends Error {
 }
 
 export interface AutosaveOptions {
-  /** Baseline markdown (what is on disk, as Crepe serialises it). */
-  markdown: string
+  /** Baseline content (what is on disk, as the editor serialises it). */
+  content: string
   /** mtime of the baseline. */
   mtime: number
   save: (content: string, expectedMtime: number) => Promise<{ mtime: number }>
@@ -42,7 +42,7 @@ export class Autosave {
   mtime: number
 
   constructor(private readonly opts: AutosaveOptions) {
-    this.baseline = opts.markdown
+    this.baseline = opts.content
     this.mtime = opts.mtime
   }
 
@@ -60,19 +60,19 @@ export class Autosave {
   }
 
   /** New editor content. Schedules a save when it differs from the baseline. */
-  update(markdown: string): void {
+  update(content: string): void {
     if (this.disposed) return
     this.clearTimer()
-    if (markdown === this.baseline) {
+    if (content === this.baseline) {
       this.pending = null
       if (this.inflight === null) this.setStatus('saved')
       return
     }
-    if (markdown === this.pending) {
+    if (content === this.pending) {
       this.schedule()
       return
     }
-    this.pending = markdown
+    this.pending = content
     this.setStatus('unsaved')
     this.schedule()
   }
@@ -117,9 +117,9 @@ export class Autosave {
   }
 
   /** Disk content was (re)loaded into the editor: new baseline, nothing pending. */
-  reset(markdown: string, mtime: number): void {
+  reset(content: string, mtime: number): void {
     this.clearTimer()
-    this.baseline = markdown
+    this.baseline = content
     this.mtime = mtime
     this.pending = null
     this.blocked = false

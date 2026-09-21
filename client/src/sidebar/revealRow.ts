@@ -11,7 +11,7 @@ export interface SidebarRevealRequest {
 export const SIDEBAR_REVEAL_MS = 3000
 
 export const revealMissingMessage = (path: string, lens: SidebarLens): string =>
-  `Can't show "${basename(path)}" in ${lens === 'topics' ? 'Topics' : 'Files'} — it is no longer there`
+  `Can't show "${basename(path)}" in ${lens === 'favorites' ? 'Favorites' : 'Files'} — it is no longer there`
 
 /** Flash every visible occurrence of `path`; the caller owns replacement/unmount cleanup. */
 export function flashTreeRows(host: ParentNode, path: string): (() => void) | null {

@@ -6,52 +6,35 @@
  * unchanged, and activating a stale tab probes a fresh tree before onFileMissing fires.
  * Real Tree/ContextMenu render against the jsdom bridge stub.
  */
-import { newFolderPageProperties } from '../views/folderPageSettings'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { StrictMode, act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { DEFAULT_SETTINGS, defaultAppState, defaultRightPanelIdentity, type AppState, type FileClipRequest, type FileClipState, type PasteResponse, type TreeNode, type WatchEvent, type WindowIdentity } from '@shared/types'
-import { parseFrontmatter, splitFrontmatter } from '@shared/frontmatter'
+import { DEFAULT_SETTINGS, defaultAppState, type AppState, type FileClipRequest, type FileClipState, type PasteResponse, type TreeNode, type WatchEvent, type WindowIdentity } from '@shared/types'
 import { EMPTY_SELECTION } from '../lib/selection'
 // Focus Mode's persistence is the REAL storage module (no mock in this file): a spy on its read is
 // how a test hands the Sidebar a focus restored from an earlier session (YAZ-1605).
 import { storage } from '../lib/storage'
-
-// Forward uses the one-key writer; reverse uses its shared whole-file transform because the
-// migrated outline and flag must change atomically (YAZ-1022).
-vi.mock('../views/writeProperty', () => ({ transformFile: vi.fn(), writeProperty: vi.fn() }))
-import { transformFile, writeProperty } from '../views/writeProperty'
-import { turnIntoFolderPage } from '../views/folderPageSettings'
 import { countChildren, Sidebar, type SidebarClipboard } from './Sidebar'
 
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const TREE: TreeNode[] = [
   { type: 'dir', name: 'sub', path: '/v/sub', children: [] },
-  { type: 'file', name: 'a.md', path: '/v/a.md', size: 1, mtime: 1, kind: 'markdown' },
+  { type: 'file', name: 'a.excalidraw', path: '/v/a.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
 ]
 
 /** Just the bridge surface the Sidebar tree touches (the jsdom stub pattern, App.test.tsx). */
 function installBridge() {
   const bridge = {
     tree: vi.fn(async (root: string) => ({ root, tree: TREE, generatedAt: 1 })),
-    // The delete confirm sheet reads the index for its backlink count (GRO-2272 C3).
-    index: vi.fn(async (root: string) => ({ root, records: [] as unknown[], generatedAt: 1 })),
-    // The inline-create flow (GRO-2022; "New folder page" YAZ-841). `createFile` takes the bare
-    // path OR `{ path, content }` — the content form is the atomic born-with-frontmatter call.
+    // The inline-create flow (GRO-2022): "New drawing" hands `createFile` the bare path.
     createFile: vi.fn(async (req: string | { path: string; content?: string }) => ({ path: typeof req === 'string' ? req : req.path, mtime: 2, size: 0 })),
     createDir: vi.fn(async (path: string) => ({ path })),
-    // Birth from a Topics folder-page row (8H, YAZ-869) probes the folder page's template through
-    // the ordinary readFile door. The default vault has none — the bridge rejects the way main
-    // does, with a bare BridgeError object, which `api` gives its class back.
-    readFile: vi.fn(async (path: string) => {
-      throw { code: 'NOT_FOUND', message: `no such file: ${path}` }
-    }),
     state: { get: vi.fn(async () => defaultAppState()), setFolder: vi.fn(async () => undefined), onChange: vi.fn((_listener: (state: AppState) => void) => () => undefined) },
     window: {
       open: vi.fn(async () => undefined),
       // Focus Mode is window identity (YAZ-1628): `storage.init()` boots from `identity`, writes go to `setIdentity`.
-      identity: vi.fn(async (): Promise<WindowIdentity> => ({ id: 'w1', root: '/v', file: null, tabs: [], rightPanel: defaultRightPanelIdentity(), sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [] })),
+      identity: vi.fn(async (): Promise<WindowIdentity> => ({ id: 'w1', root: '/v', file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [] })),
       setIdentity: vi.fn(async () => undefined),
     },
     // The file clipboard (YAZ-1674, 🔒 D1) lives in main behind `file.*`: two invokes and the
@@ -108,8 +91,8 @@ async function mount(over: Partial<SidebarProps> = {}, tweakBridge?: (bridge: Re
     switcherOpenRequest: 0,
     onCollapse: vi.fn(),
     // Every test below this line is about the FILE TREE, so the harness mounts the FILES lens
-    // (YAZ-847). The app's own default is Topics — App owns and persists the value, and the
-    // "lens tabs" describe mounts each lens explicitly, including the default.
+    // (YAZ-847) — which is also the app's own default. App owns and persists the value, and the
+    // "lens tabs" describe mounts each lens explicitly.
     lens: 'files',
     onLensChange: vi.fn(),
     revealRequest: null,
@@ -122,16 +105,9 @@ async function mount(over: Partial<SidebarProps> = {}, tweakBridge?: (bridge: Re
     onRenameFile: vi.fn(async () => undefined),
     onDeleteFile: vi.fn(async () => undefined),
     onNotice: vi.fn(),
-    // The window's already-on index feed (WikilinkIndexBridge's source): empty unless a test
-    // hands over a snapshot, which is exactly the pre-first-index state.
-    indexSource: { resolve: null, records: [], subscribe: () => () => undefined },
     pendingSearchFocus: false,
     onSearchFocusHandled: vi.fn(),
-    // 6C (YAZ-849): App's per-vault verdict, threaded to the Topics lens. False = adopted, the
-    // ordinary case — the offer card is TopicsTree.test's own subject.
-    unadopted: false,
-    onCreateHome: vi.fn(),
-    // ⌘⇧C's box (🔒 D4, YAZ-1338): App's in production, the harness's here — every mount gets a
+    // The selection box (🔒 D4, YAZ-1338): App's in production, the harness's here — every mount gets a
     // fresh one, and the "hands its selection up" case reads it back.
     selectionRef: { current: EMPTY_SELECTION },
     // ⌘C / ⌘X / ⌘V's handle (D6 amended, YAZ-1674): App's listener asks it; the chord tests hold their own box.
@@ -149,8 +125,7 @@ const fileRow = (el: HTMLElement) => el.querySelector<HTMLButtonElement>('.tree_
 const searchInput = (el: HTMLElement) => el.querySelector<HTMLInputElement>('input[aria-label="Search notes"]')
 /**
  * Drive the CONTROLLED search input like a user: native value setter + input event (SettingsDialog
- * idiom). Async because the index feed is LAZY since YAZ-808 — the first non-empty query is what
- * starts the read, so a keystroke now has settling to do.
+ * idiom). Async so the re-render it triggers has settled before the assertions read the body.
  */
 const type = async (input: HTMLInputElement, value: string) => {
   const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
@@ -199,7 +174,7 @@ afterEach(() => {
  */
 describe('rows with no viewer open in the OS default app (YAZ-1577 D2)', () => {
   const NO_VIEWER_TREE: TreeNode[] = [
-    { type: 'file', name: 'a.md', path: '/v/a.md', size: 1, mtime: 1, kind: 'markdown' },
+    { type: 'file', name: 'a.excalidraw', path: '/v/a.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
     { type: 'file', name: 'book.epub', path: '/v/book.epub', size: 1, mtime: 1, kind: null },
   ]
   const withNoViewerTree = (bridge: ReturnType<typeof installBridge>) =>
@@ -251,7 +226,7 @@ describe('rows with no viewer open in the OS default app (YAZ-1577 D2)', () => {
     const labels = subLabels(el)
     expect(labels.indexOf('Default app')).toBe(labels.indexOf('VS Code') + 1)
     await clickSubAsync(el, 'Default app')
-    expect(bridge.shell.openDefault).toHaveBeenCalledExactlyOnceWith({ path: '/v/a.md' })
+    expect(bridge.shell.openDefault).toHaveBeenCalledExactlyOnceWith({ path: '/v/a.excalidraw' })
   })
 })
 
@@ -259,7 +234,7 @@ describe('Sidebar file-row open gestures (D2 GRO-2168, I3 GRO-2235)', () => {
   it('a plain click on a file row opens it in place (onOpenFile), never over the bridge', async () => {
     const { bridge, props, el } = await mount()
     act(() => fileRow(el)?.click())
-    expect(props.onOpenFile).toHaveBeenCalledWith('/v/a.md')
+    expect(props.onOpenFile).toHaveBeenCalledWith('/v/a.excalidraw')
     expect(bridge.window.open).not.toHaveBeenCalled()
   })
 
@@ -267,7 +242,7 @@ describe('Sidebar file-row open gestures (D2 GRO-2168, I3 GRO-2235)', () => {
     const { bridge, props, el } = await mount()
     act(() => void fileRow(el)?.dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: true })))
     expect(props.onOpenFileBackground).toHaveBeenCalledTimes(1)
-    expect(props.onOpenFileBackground).toHaveBeenCalledWith('/v/a.md')
+    expect(props.onOpenFileBackground).toHaveBeenCalledWith('/v/a.excalidraw')
     expect(props.onOpenFile).not.toHaveBeenCalled()
     expect(bridge.window.open).not.toHaveBeenCalled()
   })
@@ -281,7 +256,7 @@ describe('Sidebar file-row open gestures (D2 GRO-2168, I3 GRO-2235)', () => {
     expect(subLabels(el)).toContain('New window')
     clickSub(el, 'New window')
     expect(bridge.window.open).toHaveBeenCalledTimes(1)
-    expect(bridge.window.open).toHaveBeenCalledWith({ root: '/v', file: '/v/a.md' })
+    expect(bridge.window.open).toHaveBeenCalledWith({ root: '/v', file: '/v/a.excalidraw' })
     expect(props.onOpenFile).not.toHaveBeenCalled()
     expect(el.querySelector('.ctx-menu')).toBeNull()
   })
@@ -294,76 +269,7 @@ describe('Sidebar file-row open gestures (D2 GRO-2168, I3 GRO-2235)', () => {
     act(() => void el.querySelector('.ctx-overlay')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })))
     act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
     expect(subItemByLabel(el, 'New window')).toBeUndefined()
-    expect(itemByLabel(el, 'New note')).toBeDefined()
-  })
-})
-
-describe('Sidebar view-only file routing (YAZ-1301)', () => {
-  const VIEW_ONLY_TREE: TreeNode[] = [
-    { type: 'file', name: 'data.json', path: '/v/data.json', size: 1, mtime: 1, kind: 'text' },
-    { type: 'file', name: 'report.PDF', path: '/v/report.PDF', size: 1, mtime: 1, kind: 'pdf' },
-  ]
-  const withViewOnlyTree = (bridge: ReturnType<typeof installBridge>) =>
-    bridge.tree.mockResolvedValue({ root: '/v', tree: VIEW_ONLY_TREE, generatedAt: 1 })
-
-  it('shows exact extensions, selects the active file, and routes plain and command clicks through the existing tab callbacks', async () => {
-    const { el, props } = await mount({ activeFile: '/v/data.json' }, withViewOnlyTree)
-    const rows = [...el.querySelectorAll<HTMLButtonElement>('.tree__row--file')]
-    expect(rows.map((row) => row.textContent)).toEqual(['data.json', 'report.PDF'])
-    expect(rows[0]?.closest('[role="treeitem"]')?.getAttribute('aria-selected')).toBe('true')
-    expect(rows[1]?.closest('[role="treeitem"]')?.getAttribute('aria-selected')).toBe('false')
-
-    act(() => rows[1]?.click())
-    expect(props.onOpenFile).toHaveBeenCalledExactlyOnceWith('/v/report.PDF')
-    act(() => void rows[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: true })))
-    expect(props.onOpenFileBackground).toHaveBeenCalledExactlyOnceWith('/v/data.json')
-  })
-
-  it.each([
-    ['/v/data.json'],
-    ['/v/report.PDF'],
-  ] as const)('keeps %s on the standard file menu while hiding semantic Markdown actions', async (path) => {
-    const { bridge, el, props } = await mount({ settings: { ...DEFAULT_SETTINGS, confirmDelete: false } }, withViewOnlyTree)
-    const row = el.querySelector(`[title="${path}"]`)
-
-    act(() => void row?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
-    expect(menuItems(el).map((item) => item.textContent)).toEqual(expect.arrayContaining([
-      'Open in',
-      'Copy path',
-      'Rename',
-      'Delete',
-    ]))
-    expect(subLabels(el)).toEqual(['New window', 'VS Code', 'Default app', 'Reveal in Finder'])
-    expect(itemByLabel(el, 'Turn into folder page')).toBeUndefined()
-    expect(itemByLabel(el, 'Turn back into normal page')).toBeUndefined()
-
-    clickSub(el, 'New window')
-    expect(bridge.window.open).toHaveBeenCalledExactlyOnceWith({ root: '/v', file: path })
-
-    act(() => void row?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
-    clickSub(el, 'Reveal in Finder')
-    expect(bridge.shell.reveal).toHaveBeenCalledExactlyOnceWith({ path })
-
-    act(() => void row?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
-    act(() => itemByLabel(el, 'Delete')?.click())
-    expect(props.onDeleteFile).toHaveBeenCalledExactlyOnceWith(path)
-  })
-})
-
-/**
- * "Copy link" is GONE (YAZ-1554): it sat directly under "Copy path" and the two were easy to
- * confuse, and the `[[` picker already links from inside a note. One tombstone test, so the
- * item cannot creep back on any row kind.
- */
-describe('Sidebar copy link (retired, YAZ-1554)', () => {
-  it('no row kind offers "Copy link" — file, folder or blank space — while "Copy path" stays', async () => {
-    const { el } = await mount()
-    for (const selector of ['.tree__row--file', '.tree__row--dir', '.sidebar__body']) {
-      act(() => void el.querySelector(selector)?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
-      expect(itemByLabel(el, 'Copy link')).toBeUndefined()
-      expect(itemByLabel(el, 'Copy path')).toBeDefined()
-      act(() => void el.querySelector('.ctx-overlay')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })))
-    }
+    expect(itemByLabel(el, 'New drawing')).toBeDefined()
   })
 })
 
@@ -374,10 +280,10 @@ describe('Sidebar folder rename + file drag-move (E1b, GRO-2241)', () => {
   const dirRow = (el: HTMLElement) => el.querySelector<HTMLButtonElement>('.tree__row--dir')
 
   it.each([
-    ['data.json', 'profile', '/v/profile.json', 'text'],
-    ['report.PDF', 'brief.PDF', '/v/brief.PDF', 'pdf'],
-  ] as const)('shows the full view-only filename for %s and renames it deterministically', async (name, nextName, target, kind) => {
-    const node: TreeNode = { type: 'file', name, path: `/v/${name}`, size: 1, mtime: 1, kind }
+    ['data.json', 'profile', '/v/profile.json'],
+    ['report.PDF', 'brief', '/v/brief.PDF'],
+  ] as const)('shows the full UNSUPPORTED filename for %s and renames it deterministically', async (name, nextName, target) => {
+    const node: TreeNode = { type: 'file', name, path: `/v/${name}`, size: 1, mtime: 1, kind: null }
     const { props, el } = await mount({}, (bridge) =>
       bridge.tree.mockResolvedValue({ root: '/v', tree: [node], generatedAt: 1 }),
     )
@@ -394,8 +300,8 @@ describe('Sidebar folder rename + file drag-move (E1b, GRO-2241)', () => {
     expect(props.onRenameFile).toHaveBeenCalledExactlyOnceWith(`/v/${name}`, target, 'file')
   })
 
-  it('submitting an unchanged full view-only filename is a no-op', async () => {
-    const node: TreeNode = { type: 'file', name: 'data.json', path: '/v/data.json', size: 1, mtime: 1, kind: 'text' }
+  it('submitting an unchanged full unsupported filename is a no-op', async () => {
+    const node: TreeNode = { type: 'file', name: 'data.json', path: '/v/data.json', size: 1, mtime: 1, kind: null }
     const { props, el } = await mount({}, (bridge) =>
       bridge.tree.mockResolvedValue({ root: '/v', tree: [node], generatedAt: 1 }),
     )
@@ -408,8 +314,8 @@ describe('Sidebar folder rename + file drag-move (E1b, GRO-2241)', () => {
     expect(props.onRenameFile).not.toHaveBeenCalled()
   })
 
-  it('submitting an unchanged compound view-only filename is a no-op', async () => {
-    const node: TreeNode = { type: 'file', name: 'schema.graphql.ts', path: '/v/schema.graphql.ts', size: 1, mtime: 1, kind: 'text' }
+  it('submitting an unchanged compound unsupported filename is a no-op', async () => {
+    const node: TreeNode = { type: 'file', name: 'schema.graphql.ts', path: '/v/schema.graphql.ts', size: 1, mtime: 1, kind: null }
     const { props, el } = await mount({}, (bridge) =>
       bridge.tree.mockResolvedValue({ root: '/v', tree: [node], generatedAt: 1 }),
     )
@@ -442,7 +348,7 @@ describe('Sidebar folder rename + file drag-move (E1b, GRO-2241)', () => {
     fire(dirRow(el), 'dragover')
     expect(dirRow(el)?.classList.contains('tree__row--drop')).toBe(true)
     fire(dirRow(el), 'drop')
-    expect(props.onRenameFile).toHaveBeenCalledWith('/v/a.md', '/v/sub/a.md', 'file')
+    expect(props.onRenameFile).toHaveBeenCalledWith('/v/a.excalidraw', '/v/sub/a.excalidraw', 'file')
     expect(el.querySelector('.tree__row--drop')).toBeNull() // drag state cleared
   })
 
@@ -453,7 +359,7 @@ describe('Sidebar folder rename + file drag-move (E1b, GRO-2241)', () => {
     fire(header, 'dragover')
     expect(header?.classList.contains('sidebar__header--drop')).toBe(true)
     fire(header, 'drop')
-    expect(props.onRenameFile).not.toHaveBeenCalled() // `/v/a.md` already lives at the root
+    expect(props.onRenameFile).not.toHaveBeenCalled() // `/v/a.excalidraw` already lives at the root
     fire(fileRow(el), 'dragstart')
     fire(fileRow(el), 'dragend')
     fire(dirRow(el), 'drop')
@@ -463,26 +369,26 @@ describe('Sidebar folder rename + file drag-move (E1b, GRO-2241)', () => {
 
 describe('Sidebar stale tab activation (I3, GRO-2235)', () => {
   it('activating a file the tree does not show probes a FRESH tree and fires onFileMissing when it is really gone', async () => {
-    const { bridge, props, rerender } = await mount({ activeFile: '/v/a.md' })
+    const { bridge, props, rerender } = await mount({ activeFile: '/v/a.excalidraw' })
     bridge.tree.mockClear()
-    await rerender({ activeFile: '/v/gone.md' })
+    await rerender({ activeFile: '/v/gone.excalidraw' })
     expect(bridge.tree).toHaveBeenCalledWith('/v') // the confirmation probe
     expect(props.onFileMissing).toHaveBeenCalledTimes(1)
   })
 
   it('a just-created file missing from the CACHED tree but present in the fresh one stays open (the inline-create race)', async () => {
-    const { bridge, props, rerender } = await mount({ activeFile: '/v/a.md' })
-    const created: TreeNode = { type: 'file', name: 'new.md', path: '/v/new.md', size: 1, mtime: 2, kind: 'markdown' }
+    const { bridge, props, rerender } = await mount({ activeFile: '/v/a.excalidraw' })
+    const created: TreeNode = { type: 'file', name: 'new.excalidraw', path: '/v/new.excalidraw', size: 1, mtime: 2, kind: 'drawing' }
     bridge.tree.mockImplementation(async (r: string) => ({ root: r, tree: [...TREE, created], generatedAt: 2 }))
-    await rerender({ activeFile: '/v/new.md' })
+    await rerender({ activeFile: '/v/new.excalidraw' })
     expect(props.onFileMissing).not.toHaveBeenCalled()
   })
 
   it('activating a file the cached tree shows probes nothing; out-of-root activations are skipped', async () => {
     const { bridge, props, rerender } = await mount({ activeFile: null })
     bridge.tree.mockClear()
-    await rerender({ activeFile: '/v/a.md' }) // in the cached tree: no probe
-    await rerender({ activeFile: '/elsewhere/pasted.md' }) // outside the root: never in the tree, never probed
+    await rerender({ activeFile: '/v/a.excalidraw' }) // in the cached tree: no probe
+    await rerender({ activeFile: '/elsewhere/pasted.excalidraw' }) // outside the root: never in the tree, never probed
     expect(bridge.tree).not.toHaveBeenCalled()
     expect(props.onFileMissing).not.toHaveBeenCalled()
   })
@@ -498,25 +404,25 @@ describe('Sidebar stale tab activation (I3, GRO-2235)', () => {
         return () => undefined
       },
     }
-    const { bridge, props } = await mount({ activeFile: '/v/a.md', watch })
-    bridge.tree.mockImplementation(async (r: string) => ({ root: r, tree: TREE.filter((n) => n.path !== '/v/a.md'), generatedAt: 3 }))
-    await act(async () => emit?.({ type: 'unlink', path: '/v/a.md' }))
+    const { bridge, props } = await mount({ activeFile: '/v/a.excalidraw', watch })
+    bridge.tree.mockImplementation(async (r: string) => ({ root: r, tree: TREE.filter((n) => n.path !== '/v/a.excalidraw'), generatedAt: 3 }))
+    await act(async () => emit?.({ type: 'unlink', path: '/v/a.excalidraw' }))
     expect(props.onFileMissing).not.toHaveBeenCalled()
   })
 })
 
 describe('Show in sidebar — Files reveal (YAZ-1063)', () => {
-  const TARGET = '/v/target/deep/Note.md'
+  const TARGET = '/v/target/deep/Note.excalidraw'
   const DEEP_TREE: TreeNode[] = [
     {
       type: 'dir', name: 'other', path: '/v/other',
-      children: [{ type: 'file', name: 'Keep.md', path: '/v/other/Keep.md', size: 1, mtime: 1, kind: 'markdown' }],
+      children: [{ type: 'file', name: 'Keep.excalidraw', path: '/v/other/Keep.excalidraw', size: 1, mtime: 1, kind: 'drawing' }],
     },
     {
       type: 'dir', name: 'target', path: '/v/target',
       children: [{
         type: 'dir', name: 'deep', path: '/v/target/deep',
-        children: [{ type: 'file', name: 'Note.md', path: TARGET, size: 1, mtime: 1, kind: 'markdown' }],
+        children: [{ type: 'file', name: 'Note.excalidraw', path: TARGET, size: 1, mtime: 1, kind: 'drawing' }],
       }],
     },
   ]
@@ -545,8 +451,8 @@ describe('Show in sidebar — Files reveal (YAZ-1063)', () => {
   })
 
   it('reports one passive notice when the loaded Files tree cannot show the path', async () => {
-    const { props } = await mount({ revealRequest: { id: 1, path: '/v/Missing.md', lens: 'files' } }, withDeepTree)
-    expect(props.onNotice).toHaveBeenCalledExactlyOnceWith('Can\'t show "Missing.md" in Files — it is no longer there', 'error')
+    const { props } = await mount({ revealRequest: { id: 1, path: '/v/Missing.excalidraw', lens: 'files' } }, withDeepTree)
+    expect(props.onNotice).toHaveBeenCalledExactlyOnceWith('Can\'t show "Missing.excalidraw" in Files — it is no longer there', 'error')
   })
 })
 
@@ -556,10 +462,10 @@ describe('Show in sidebar — Files reveal (YAZ-1063)', () => {
  * mount (the expand-all idiom below): the app-state cache is module-level.
  */
 describe('launch: the restored tab is shown, not revealed (YAZ-1642)', () => {
-  const note = (path: string): TreeNode => ({ type: 'file', name: path.split('/').pop()!, path, size: 1, mtime: 1, kind: 'markdown' })
+  const drawing = (path: string): TreeNode => ({ type: 'file', name: path.split('/').pop()!, path, size: 1, mtime: 1, kind: 'drawing' })
   const DEEP = (v: string): TreeNode[] => [
-    { type: 'dir', name: 'other', path: `${v}/other`, children: [note(`${v}/other/Keep.md`)] },
-    { type: 'dir', name: 'target', path: `${v}/target`, children: [{ type: 'dir', name: 'deep', path: `${v}/target/deep`, children: [note(`${v}/target/deep/Note.md`)] }] },
+    { type: 'dir', name: 'other', path: `${v}/other`, children: [drawing(`${v}/other/Keep.excalidraw`)] },
+    { type: 'dir', name: 'target', path: `${v}/target`, children: [{ type: 'dir', name: 'deep', path: `${v}/target/deep`, children: [drawing(`${v}/target/deep/Note.excalidraw`)] }] },
   ]
   let vaults = 0
   const mountVault = async (activeFile: (v: string) => string) => {
@@ -570,25 +476,25 @@ describe('launch: the restored tab is shown, not revealed (YAZ-1642)', () => {
   const isOpen = (el: HTMLElement, path: string) => el.querySelector(`.tree__row[data-path="${path}"]`)?.closest('[role="treeitem"]')?.getAttribute('aria-expanded')
 
   it('mounting with an active file leaves its ancestors closed', async () => {
-    const { el, v } = await mountVault((v) => `${v}/target/deep/Note.md`)
+    const { el, v } = await mountVault((v) => `${v}/target/deep/Note.excalidraw`)
     expect(isOpen(el, `${v}/target`)).toBe('false')
-    expect(el.querySelector(`[data-path="${v}/target/deep/Note.md"]`)).toBeNull()
+    expect(el.querySelector(`[data-path="${v}/target/deep/Note.excalidraw"]`)).toBeNull()
   })
 
   it('a file opened after the mount still opens its ancestors', async () => {
-    const { el, v, rerender } = await mountVault((v) => `${v}/other/Keep.md`)
+    const { el, v, rerender } = await mountVault((v) => `${v}/other/Keep.excalidraw`)
     expect(isOpen(el, `${v}/other`)).toBe('false')
-    await rerender({ activeFile: `${v}/target/deep/Note.md` })
+    await rerender({ activeFile: `${v}/target/deep/Note.excalidraw` })
     expect(isOpen(el, `${v}/target`)).toBe('true')
     expect(isOpen(el, `${v}/target/deep`)).toBe('true')
     expect(isOpen(el, `${v}/other`)).toBe('false')
   })
 
   it('coming back to the restored tab after another file reveals it too', async () => {
-    const { el, v, rerender } = await mountVault((v) => `${v}/target/deep/Note.md`)
-    await rerender({ activeFile: `${v}/other/Keep.md` })
+    const { el, v, rerender } = await mountVault((v) => `${v}/target/deep/Note.excalidraw`)
+    await rerender({ activeFile: `${v}/other/Keep.excalidraw` })
     expect(isOpen(el, `${v}/other`)).toBe('true')
-    await rerender({ activeFile: `${v}/target/deep/Note.md` })
+    await rerender({ activeFile: `${v}/target/deep/Note.excalidraw` })
     expect(isOpen(el, `${v}/target`)).toBe('true')
     expect(isOpen(el, `${v}/target/deep`)).toBe('true')
   })
@@ -627,9 +533,8 @@ describe('context menu target matrix (GRO-2296)', () => {
     const el = await open('.sidebar__body')
     expect(itemByLabel(el, 'Rename')).toBeUndefined()
     expect(subItemByLabel(el, 'New window')).toBeUndefined()
-    // The create actions are always available on blank space (they target the root) — and the
-    // FILES lens keeps "New folder", which only the Topics lens drops (YAZ-948).
-    expect(itemByLabel(el, 'New note')).toBeDefined()
+    // The create actions are always available on blank space: they target the root.
+    expect(itemByLabel(el, 'New drawing')).toBeDefined()
     expect(itemByLabel(el, 'New folder')).toBeDefined()
   })
 
@@ -649,7 +554,7 @@ describe('context menu target matrix (GRO-2296)', () => {
 /**
  * Blank-space "Copy path" (GRO-2273): right-clicking below the tree copies the VAULT ROOT's
  * absolute path — the blank area already means "the root" everywhere else in this menu
- * (`targetDirFor` sends "New note" there). VS Code's empty-Explorer menu behaves the same.
+ * (`targetDirFor` sends "New drawing" there). VS Code's empty-Explorer menu behaves the same.
  * Copy path only: Copy Relative Path was declined (LOCKED, GRO-2273).
  */
 describe('blank-space copy path (GRO-2273)', () => {
@@ -683,7 +588,7 @@ describe('blank-space copy path (GRO-2273)', () => {
     const { el } = await mount()
     act(() => void el.querySelector('.tree__row--file')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
     act(() => itemByLabel(el, 'Copy path')?.click())
-    expect(writeText).toHaveBeenCalledWith('/v/a.md')
+    expect(writeText).toHaveBeenCalledWith('/v/a.excalidraw')
     act(() => void el.querySelector('.tree__row--dir')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
     act(() => itemByLabel(el, 'Copy path')?.click())
     expect(writeText).toHaveBeenCalledWith('/v/sub')
@@ -724,7 +629,7 @@ describe('delete (GRO-2272)', () => {
     const { el, props } = await openOn('.tree__row--file')
     act(() => itemByLabel(el, 'Delete')?.click())
     await act(async () => sheetBtn(el, 'Delete')?.click())
-    expect(props.onDeleteFile).toHaveBeenCalledExactlyOnceWith('/v/a.md')
+    expect(props.onDeleteFile).toHaveBeenCalledExactlyOnceWith('/v/a.excalidraw')
   })
 
   it('cancelling calls nothing and closes the sheet', async () => {
@@ -749,52 +654,14 @@ describe('delete (GRO-2272)', () => {
     act(() => void el.querySelector<HTMLInputElement>('.confirm__ask input')?.click())
     await act(async () => sheetBtn(el, 'Delete')?.click())
     expect(props.onChangeSettings).toHaveBeenCalledWith(expect.objectContaining({ confirmDelete: false }))
-    expect(props.onDeleteFile).toHaveBeenCalledExactlyOnceWith('/v/a.md')
+    expect(props.onDeleteFile).toHaveBeenCalledExactlyOnceWith('/v/a.excalidraw')
   })
 
   it('confirmDelete: false deletes DIRECTLY — no sheet at all (YAZ-857: the setting finally gates)', async () => {
     const { el, props } = await openOn('.tree__row--file', { settings: { ...DEFAULT_SETTINGS, confirmDelete: false } })
     act(() => itemByLabel(el, 'Delete')?.click())
     expect(sheet(el)).toBeNull()
-    expect(props.onDeleteFile).toHaveBeenCalledExactlyOnceWith('/v/a.md')
-  })
-
-  it('shows the backlink count when notes link to the target', async () => {
-    // One note whose body link resolves to a.md — the shared resolver is what countLinkReferences uses.
-    // The TARGET must be in the record set too: the shared resolver resolves a link NAME
-    // against the indexed records, so without a.md there is nothing for [[a]] to point at.
-    // `basename` (no extension) and `folder` are what the shared resolver matches on — a
-    // record missing them resolves nothing, which is how the first draft of this test passed
-    // vacuously against an empty count.
-    const rec = (base: string, links: string[] = []) => ({
-      path: `/v/${base}.md`, name: `${base}.md`, basename: base, folder: '', ext: 'md',
-      size: 1, ctime: 1, mtime: 1, properties: {}, aliases: [], tags: [], links, embeds: [],
-    })
-    const records = [rec('a'), rec('hub', ['a'])]
-    const m = await mount()
-    m.bridge.index.mockResolvedValue({ root: '/v', records, generatedAt: 1 } as never)
-    act(() => void m.el.querySelector('.tree__row--file')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
-    await act(async () => itemByLabel(m.el, 'Delete')?.click())
-    await act(async () => undefined)
-    expect(sheet(m.el)?.textContent).toContain('1 note links to this')
-  })
-
-  it('says nothing about links when nothing links to the target', async () => {
-    const { el } = await openOn('.tree__row--file')
-    await act(async () => itemByLabel(el, 'Delete')?.click())
-    await act(async () => undefined)
-    expect(sheet(el)?.textContent).not.toContain('link to this')
-    expect(sheet(el)?.textContent).not.toContain('links to this')
-  })
-
-  it('an unavailable index still opens the sheet and still deletes — a missing count never blocks', async () => {
-    const m = await mount()
-    m.bridge.index.mockRejectedValue(new Error('no index'))
-    act(() => void m.el.querySelector('.tree__row--file')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
-    await act(async () => itemByLabel(m.el, 'Delete')?.click())
-    expect(sheet(m.el)).not.toBeNull()
-    await act(async () => sheetBtn(m.el, 'Delete')?.click())
-    expect(m.props.onDeleteFile).toHaveBeenCalledExactlyOnceWith('/v/a.md')
+    expect(props.onDeleteFile).toHaveBeenCalledExactlyOnceWith('/v/a.excalidraw')
   })
 })
 
@@ -805,24 +672,24 @@ describe('countChildren (GRO-2272 C3)', () => {
       name: 'Docs',
       path: '/v/Docs',
       children: [
-        { type: 'file', name: 'a.md', path: '/v/Docs/a.md', size: 1, mtime: 1, kind: 'markdown' },
-        { type: 'dir', name: 'deep', path: '/v/Docs/deep', children: [{ type: 'file', name: 'b.md', path: '/v/Docs/deep/b.md', size: 1, mtime: 1, kind: 'markdown' }] },
+        { type: 'file', name: 'a.excalidraw', path: '/v/Docs/a.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
+        { type: 'dir', name: 'deep', path: '/v/Docs/deep', children: [{ type: 'file', name: 'b.excalidraw', path: '/v/Docs/deep/b.excalidraw', size: 1, mtime: 1, kind: 'drawing' }] },
       ],
     },
-    { type: 'file', name: 'x.md', path: '/v/x.md', size: 1, mtime: 1, kind: 'markdown' },
+    { type: 'file', name: 'x.excalidraw', path: '/v/x.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
   ]
 
   it('counts the WHOLE subtree, not just direct children — a delete takes all of it', () => {
-    expect(countChildren(TREE_DEEP, '/v/Docs')).toEqual({ notes: 2, folders: 1 })
+    expect(countChildren(TREE_DEEP, '/v/Docs')).toEqual({ files: 2, folders: 1 })
   })
 
   it('counts a nested folder found by descent', () => {
-    expect(countChildren(TREE_DEEP, '/v/Docs/deep')).toEqual({ notes: 1, folders: 0 })
+    expect(countChildren(TREE_DEEP, '/v/Docs/deep')).toEqual({ files: 1, folders: 0 })
   })
 
   it('an unknown or empty folder counts zero rather than throwing', () => {
-    expect(countChildren(TREE_DEEP, '/v/nope')).toEqual({ notes: 0, folders: 0 })
-    expect(countChildren([], '/v/Docs')).toEqual({ notes: 0, folders: 0 })
+    expect(countChildren(TREE_DEEP, '/v/nope')).toEqual({ files: 0, folders: 0 })
+    expect(countChildren([], '/v/Docs')).toEqual({ files: 0, folders: 0 })
   })
 })
 
@@ -841,7 +708,7 @@ describe('reveal in Finder (GRO-2274)', () => {
   it('a FILE row reveals its own path', async () => {
     const { el, bridge } = await openOn('.tree__row--file')
     clickSub(el, 'Reveal in Finder')
-    expect(bridge.shell.reveal).toHaveBeenCalledExactlyOnceWith({ path: '/v/a.md' })
+    expect(bridge.shell.reveal).toHaveBeenCalledExactlyOnceWith({ path: '/v/a.excalidraw' })
   })
 
   it('a FOLDER row reveals the folder itself — no branching on kind', async () => {
@@ -955,20 +822,26 @@ describe('persistent search bar (YAZ-801)', () => {
 /**
  * Search results in the body (YAZ-803, 🔒 flat-list ruling on YAZ-739): a typed query swaps the
  * tree for a FLAT ranked list and clearing brings the tree straight back — the swap is a
- * conditional render, so nothing about the tree is torn down. The list is driven entirely from
- * the bar, which never loses focus: arrows clamp at both ends (no wrap, the `[[` picker's rule),
+ * conditional render, so nothing about the tree is torn down. The rows come from the tree the
+ * Sidebar already holds (🔒 D1, YAZ-1491), so search costs no second read of the vault. The list
+ * is driven entirely from the bar, which never loses focus: arrows clamp at both ends (no wrap),
  * Enter opens in place, ⌘Enter in a background tab, and the list stays up either way.
  */
 describe('search results (YAZ-803)', () => {
-  const record = (basename: string, folder = '') => ({
-    path: `/v/${folder === '' ? '' : `${folder}/`}${basename}.md`, name: `${basename}.md`, basename, folder, ext: 'md',
-    size: 1, ctime: 1, mtime: 1, properties: {}, aliases: [], tags: [], links: [], embeds: [],
+  const drawing = (basename: string, folder = ''): TreeNode => ({
+    type: 'file',
+    name: `${basename}.excalidraw`,
+    path: `/v/${folder === '' ? '' : `${folder}/`}${basename}.excalidraw`,
+    size: 1,
+    mtime: 1,
+    kind: 'drawing',
   })
-  const RECORDS = [record('Alpha'), record('Anchor', 'Docs')]
+  /** Alpha at the root and Anchor inside Docs — two prefix matches for "a", one of them with a folder label. */
+  const SEARCH_TREE: TreeNode[] = [drawing('Alpha'), { type: 'dir', name: 'Docs', path: '/v/Docs', children: [drawing('Anchor', 'Docs')] }]
 
-  /** Mount over an index of Alpha + Docs/Anchor, then type `query` into the bar. */
+  /** Mount over the vault of Alpha + Docs/Anchor, then type `query` into the bar. */
   const search = async (query: string, over: Partial<SidebarProps> = {}) => {
-    const m = await mount(over, (b) => b.index.mockResolvedValue({ root: '/v', records: RECORDS, generatedAt: 1 } as never))
+    const m = await mount(over, (b) => b.tree.mockResolvedValue({ root: '/v', tree: SEARCH_TREE, generatedAt: 1 }))
     const input = searchInput(m.el)!
     await type(input, query)
     return { ...m, input }
@@ -989,14 +862,14 @@ describe('search results (YAZ-803)', () => {
 
   it('a reveal request for the current lens clears search so that lens tree can render', async () => {
     const { el, input, rerender } = await search('a')
-    await rerender({ revealRequest: { id: 1, path: '/v/a.md', lens: 'files' } })
+    await rerender({ revealRequest: { id: 1, path: '/v/Alpha.excalidraw', lens: 'files' } })
     expect(input.value).toBe('')
     expect(el.querySelector('.tree__row--file')).not.toBeNull()
   })
 
   it('a request pinned to another lens does not disturb the current search', async () => {
     const { input, rerender } = await search('a')
-    await rerender({ revealRequest: { id: 1, path: '/v/a.md', lens: 'topics' } })
+    await rerender({ revealRequest: { id: 1, path: '/v/Alpha.excalidraw', lens: 'favorites' } })
     expect(input.value).toBe('a')
   })
 
@@ -1028,7 +901,7 @@ describe('search results (YAZ-803)', () => {
     const { el, input, props } = await search('a')
     await press(input, 'ArrowDown')
     await press(input, 'Enter')
-    expect(props.onOpenFile).toHaveBeenCalledExactlyOnceWith('/v/Docs/Anchor.md')
+    expect(props.onOpenFile).toHaveBeenCalledExactlyOnceWith('/v/Docs/Anchor.excalidraw')
     expect(props.onOpenFileBackground).not.toHaveBeenCalled()
     expect(input.value).toBe('a')
     expect(rowLabels(el)).toEqual(['Alpha', 'Anchor'])
@@ -1037,41 +910,8 @@ describe('search results (YAZ-803)', () => {
   it('⌘Enter opens the selected row in a background tab instead', async () => {
     const { input, props } = await search('a')
     await press(input, 'Enter', true)
-    expect(props.onOpenFileBackground).toHaveBeenCalledExactlyOnceWith('/v/Alpha.md')
+    expect(props.onOpenFileBackground).toHaveBeenCalledExactlyOnceWith('/v/Alpha.excalidraw')
     expect(props.onOpenFile).not.toHaveBeenCalled()
-  })
-
-  /** An editor stand-in: layoutless jsdom always answers `offsetParent: null`, so it declares its own. */
-  const editorStub = (): HTMLElement => {
-    const instance = document.createElement('div')
-    instance.className = 'editor-instance'
-    const pm = document.createElement('div')
-    pm.className = 'ProseMirror'
-    pm.tabIndex = -1
-    Object.defineProperty(pm, 'offsetParent', { get: () => document.body })
-    instance.appendChild(pm)
-    document.body.appendChild(instance)
-    return pm
-  }
-
-  it('a second Enter on the page ALREADY open commits the caret into it, and never re-opens it (YAZ-961)', async () => {
-    // The tree rows' rule (YAZ-921), on the search list: the first Enter previews — focus stays
-    // in the bar, so the walk continues — and the second is the deliberate "take me in".
-    const pm = editorStub()
-    const { input, props } = await search('alph', { activeFile: '/v/Alpha.md' })
-    await press(input, 'Enter')
-    expect(props.onOpenFile).not.toHaveBeenCalled()
-    expect(document.activeElement).toBe(pm)
-    pm.remove()
-  })
-
-  it('⌘-Enter on the open page still opens a background tab — never the commit (YAZ-961)', async () => {
-    const pm = editorStub()
-    const { input, props } = await search('alph', { activeFile: '/v/Alpha.md' })
-    await press(input, 'Enter', true)
-    expect(props.onOpenFileBackground).toHaveBeenCalledExactlyOnceWith('/v/Alpha.md')
-    expect(document.activeElement).not.toBe(pm)
-    pm.remove()
   })
 
   it('changing the query re-selects the top row', async () => {
@@ -1083,8 +923,9 @@ describe('search results (YAZ-803)', () => {
     expect(rowLabels(el)).toEqual(['Anchor'])
   })
 
-  it('an index refresh that shrinks the list keeps the highlight on the LAST row, and Enter opens that row (YAZ-808)', async () => {
-    // The watcher fans out to every subscriber (useWatch's shape) — here the tree's and search's.
+  it('a tree refresh that shrinks the list keeps the highlight on the LAST row, and Enter opens that row (YAZ-808)', async () => {
+    // The watcher fans out to every subscriber (useWatch's shape); the refresh it triggers is
+    // what re-feeds the result list, because the rows ARE the tree (🔒 D1, YAZ-1491).
     const listeners: ((ev: WatchEvent) => void)[] = []
     const watch = {
       subscribe: (l: (ev: WatchEvent) => void) => {
@@ -1095,15 +936,15 @@ describe('search results (YAZ-803)', () => {
     const { el, input, bridge, props } = await search('a', { watch })
     await press(input, 'ArrowDown')
     expect(activeLabel(el)).toBe('Anchor') // index 1 of two rows
-    bridge.index.mockResolvedValue({ root: '/v', records: [record('Alpha')], generatedAt: 2 } as never)
-    await act(async () => [...listeners].forEach((l) => l({ type: 'unlink', path: '/v/Docs/Anchor.md' })))
+    bridge.tree.mockResolvedValue({ root: '/v', tree: [drawing('Alpha')], generatedAt: 2 })
+    await act(async () => [...listeners].forEach((l) => l({ type: 'unlink', path: '/v/Docs/Anchor.excalidraw' })))
     expect(rowLabels(el)).toEqual(['Alpha'])
     expect(activeLabel(el)).toBe('Alpha') // the stale index 1 clamps onto the last row, not onto nothing
     await press(input, 'Enter')
-    expect(props.onOpenFile).toHaveBeenCalledExactlyOnceWith('/v/Alpha.md')
+    expect(props.onOpenFile).toHaveBeenCalledExactlyOnceWith('/v/Alpha.excalidraw')
   })
 
-  it('right-clicking the results offers no menu — "New note" there would have no target', async () => {
+  it('right-clicking the results offers no menu — "New drawing" there would have no target', async () => {
     const { el } = await search('a')
     act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
     expect(el.querySelector('.ctx-menu')).toBeNull()
@@ -1112,8 +953,8 @@ describe('search results (YAZ-803)', () => {
 
 /**
  * Folders in the search list (YAZ-1491). 🔒 D1: the rows come from the tree the Sidebar already
- * holds (`dirs`), not from the index feed. 🔒 D2: one flat list, the same matcher — a folder is
- * one row, a note still never matches on its folder. 🔒 D3: choosing a folder row REVEALS it in
+ * holds (`dirs`), never a second read of the vault. 🔒 D2: one flat list, the same matcher — a
+ * folder is one row, a file still never matches on its folder. 🔒 D3: choosing a folder row REVEALS it in
  * Files — `onRevealInFiles`, never `onOpenFile` — from EITHER lens and by keyboard OR click, and
  * the Files reveal path accepts a DIR: ancestors AND the dir itself open, the dir row flashes.
  * 🔒 D4: the row looks like a folder.
@@ -1127,23 +968,26 @@ describe('folder rows in search (YAZ-1491)', () => {
     [...el.querySelectorAll<HTMLButtonElement>('.tree__row--dir')].find((row) => row.querySelector('.tree__label')?.textContent === label)
   const expandedState = (el: HTMLElement, label: string) => dirRow(el, label)?.closest('[role="treeitem"]')?.getAttribute('aria-expanded')
 
-  /** A folder AND a note both called `sub`, so the tie-break is observable. */
-  const SUB_NOTE = { path: '/v/sub.md', name: 'sub.md', basename: 'sub', folder: '', ext: 'md', size: 1, ctime: 1, mtime: 1, properties: {}, aliases: [], tags: [], links: [], embeds: [] }
+  /** A folder AND a drawing both called `sub`, so the tie-break is observable. */
+  const SUB_TREE: TreeNode[] = [
+    { type: 'dir', name: 'sub', path: '/v/sub', children: [] },
+    { type: 'file', name: 'sub.excalidraw', path: '/v/sub.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
+  ]
   const search = async (query: string, over: Partial<SidebarProps> = {}) => {
-    const m = await mount(over, (b) => b.index.mockResolvedValue({ root: '/v', records: [SUB_NOTE], generatedAt: 1 } as never))
+    const m = await mount(over, (b) => b.tree.mockResolvedValue({ root: '/v', tree: SUB_TREE, generatedAt: 1 }))
     const input = searchInput(m.el)!
     await type(input, query)
     return { ...m, input }
   }
 
-  it('a folder of the loaded tree is a row — above the same-named note — marked as a folder (🔒 D1/D2/D4)', async () => {
+  it('a folder of the loaded tree is a row — above the same-named drawing — marked as a folder (🔒 D1/D2/D4)', async () => {
     const { el } = await search('sub')
     expect(rowLabels(el)).toEqual(['sub', 'sub'])
-    const [folder, note] = [...el.querySelectorAll('.search-results__row')]
+    const [folder, file] = [...el.querySelectorAll('.search-results__row')]
     expect(folder.classList.contains('search-results__row--dir')).toBe(true)
     expect(folder.getAttribute('aria-label')).toBe('Search result sub, folder')
     expect(folder.querySelector('.search-results__glyph')).not.toBeNull()
-    expect(note.classList.contains('search-results__row--dir')).toBe(false)
+    expect(file.classList.contains('search-results__row--dir')).toBe(false)
   })
 
   it('Enter on a folder row asks App to reveal it in Files and opens nothing (🔒 D3)', async () => {
@@ -1169,16 +1013,16 @@ describe('folder rows in search (YAZ-1491)', () => {
     expect(props.onOpenFile).not.toHaveBeenCalled()
   })
 
-  it('the note row beneath still OPENS — the rule is per row, not per list', async () => {
+  it('the drawing row beneath still OPENS — the rule is per row, not per list', async () => {
     const { input, props } = await search('sub')
     await press(input, 'ArrowDown')
     await press(input, 'Enter')
-    expect(props.onOpenFile).toHaveBeenCalledExactlyOnceWith('/v/sub.md')
+    expect(props.onOpenFile).toHaveBeenCalledExactlyOnceWith('/v/sub.excalidraw')
     expect(props.onRevealInFiles).not.toHaveBeenCalled()
   })
 
-  it('from the TOPICS lens a folder row still reveals in Files (🔒 D3: whichever tab was showing)', async () => {
-    const { el, input, props } = await search('sub', { lens: 'topics' })
+  it('from the FAVORITES lens a folder row still reveals in Files (🔒 D3: whichever tab was showing)', async () => {
+    const { el, input, props } = await search('sub', { lens: 'favorites' })
     expect(dirResult(el)).not.toBeNull()
     await press(input, 'Enter')
     expect(props.onRevealInFiles).toHaveBeenCalledExactlyOnceWith('/v/sub')
@@ -1205,7 +1049,7 @@ describe('folder rows in search (YAZ-1491)', () => {
         type: 'dir', name: 'target', path: '/w/target',
         children: [{
           type: 'dir', name: 'deep', path: DIR,
-          children: [{ type: 'file', name: 'Note.md', path: `${DIR}/Note.md`, size: 1, mtime: 1, kind: 'markdown' }],
+          children: [{ type: 'file', name: 'Note.excalidraw', path: `${DIR}/Note.excalidraw`, size: 1, mtime: 1, kind: 'drawing' }],
         }],
       },
     ]
@@ -1228,129 +1072,114 @@ describe('folder rows in search (YAZ-1491)', () => {
 })
 
 /**
- * The lens tabs (🔒 D4/D5, YAZ-847): chrome v2 ROW 1, above the persistent search bar. Topics is
- * the DEFAULT lens and holds the folder-page tree (YAZ-848, pinned in `TopicsTree.test.tsx` —
- * what matters HERE is only which body the tabs swap in); Files is today's file explorer,
- * unchanged, behind a tab. The VALUE is App's (window identity, `WindowEntry.sidebarLens`, since YAZ-1628): the
+ * The lens tabs (🔒 D4/D5, YAZ-847): chrome v2 ROW 1, above the persistent search bar. Files is
+ * the DEFAULT lens and holds the file explorer; Favorites (YAZ-1766 D1) is the pinned list behind
+ * the heart. The VALUE is App's (window identity, `WindowEntry.sidebarLens`, since YAZ-1628): the
  * sidebar renders the row and reports clicks, and App hands the new lens back down. Switching is
  * a conditional render, never a teardown — the search wave's rule, re-proved here on the tree's
  * expansion. Search keeps working from both lenses and the query survives a lens switch (🔒 D5).
  */
 describe('lens tabs (🔒 D4/D5, YAZ-847)', () => {
-  const record = (basename: string, folder = '') => ({
-    path: `/v/${folder === '' ? '' : `${folder}/`}${basename}.md`, name: `${basename}.md`, basename, folder, ext: 'md',
-    size: 1, ctime: 1, mtime: 1, properties: {}, aliases: [], tags: [], links: [], embeds: [],
-  })
-  const RECORDS = [record('Alpha'), record('Anchor', 'Docs')]
-  const withIndex = (b: ReturnType<typeof installBridge>) => b.index.mockResolvedValue({ root: '/v', records: RECORDS, generatedAt: 1 } as never)
-  /** The window's live feed with a snapshot in it — what the Topics tree reads (YAZ-848). */
-  const topicsFeed = { resolve: () => null, records: RECORDS, subscribe: () => () => undefined }
-
   const tabs = (el: HTMLElement) => [...el.querySelectorAll<HTMLButtonElement>('.sidebar__lenses[role="tablist"] [role="tab"]')]
-  const tabByLabel = (el: HTMLElement, label: string) => tabs(el).find((b) => b.textContent === label)
-  const selectedTabs = (el: HTMLElement) => tabs(el).filter((b) => b.getAttribute('aria-selected') === 'true').map((b) => b.textContent)
+  /** The Favorites tab is a heart, so its name is its `aria-label`; Files spells itself. */
+  const tabName = (b: HTMLButtonElement) => b.textContent || b.getAttribute('aria-label')
+  const tabByLabel = (el: HTMLElement, label: string) => tabs(el).find((b) => tabName(b) === label)
+  const selectedTabs = (el: HTMLElement) => tabs(el).filter((b) => b.getAttribute('aria-selected') === 'true').map(tabName)
   const bodyMsg = (el: HTMLElement) => el.querySelector('.sidebar__body .sidebar__msg')?.textContent ?? null
   const resultLabels = (el: HTMLElement) => [...el.querySelectorAll('.search-results__row .search-results__label')].map((n) => n.textContent)
   const dirItem = (el: HTMLElement) => el.querySelector('.tree__row--dir')?.closest('[role="treeitem"]') ?? null
 
-  it('renders a tablist of exactly Topics, Files then Favorites (YAZ-1766 D1), the active one aria-selected and no other', async () => {
-    const { el } = await mount({ lens: 'topics' })
-    expect(tabs(el).map((b) => b.textContent || b.getAttribute('aria-label'))).toEqual(['Topics', 'Files', 'Favorites'])
-    expect(selectedTabs(el)).toEqual(['Topics'])
-    const files = await mount({ lens: 'files' })
-    expect(selectedTabs(files.el)).toEqual(['Files'])
+  it('renders a tablist of exactly Files then Favorites (YAZ-1766 D1), the active one aria-selected and no other', async () => {
+    const { el } = await mount({ lens: 'files' })
+    expect(tabs(el).map(tabName)).toEqual(['Files', 'Favorites'])
+    expect(selectedTabs(el)).toEqual(['Files'])
+    const favorites = await mount({ lens: 'favorites' })
+    expect(selectedTabs(favorites.el)).toEqual(['Favorites'])
   })
 
-  it('the default lens is Topics: the folder-page tree, never the file tree — and the search bar is still there', async () => {
-    // The harness's index feed is empty (the pre-first-index state), so the Topics tree renders
-    // nothing at all — and above all NOT the file tree, which is the other tab's body.
-    const { el } = await mount({ lens: 'topics' })
-    expect(el.querySelector('.tree__row--file')).toBeNull()
-    expect(el.querySelector('.sidebar__body')?.textContent).toBe('')
-    expect(searchInput(el)).not.toBeNull() // ALWAYS visible, on both lenses (the locked YAZ-739 rule)
-    // With a snapshot in hand it is the MEANING tree: this vault declares no folder page, so
-    // every page lands in Uncategorized (YAZ-848 owns the rest of that behaviour).
-    const fed = await mount({ lens: 'topics', indexSource: topicsFeed })
-    expect(fed.el.querySelector('.tree__row--muted')?.textContent).toBe('Uncategorized2')
-    expect(fed.el.querySelector('.tree__row--file')).toBeNull()
-  })
-
-  it('the Files lens is today\'s tree, unchanged', async () => {
+  it('the default lens is Files: the file tree, and the search bar is still there', async () => {
     const { el } = await mount({ lens: 'files' })
     expect(el.querySelector('.tree')).not.toBeNull()
-    expect(fileRow(el)?.textContent).toBe('a')
+    expect(el.querySelector('.tree__row--file')).not.toBeNull()
+    expect(searchInput(el)).not.toBeNull() // ALWAYS visible, on both lenses (the locked YAZ-739 rule)
+  })
+
+  it('the Favorites lens is the pinned list, never the file tree', async () => {
+    const { el } = await mount({ lens: 'favorites' })
+    expect(el.querySelector('.tree__row--file')).toBeNull()
+    expect(bodyMsg(el)).toBe('No favorites yet. Right-click a file or folder → Add to favorites.')
+    expect(searchInput(el)).not.toBeNull()
   })
 
   it('clicking a tab reports UP to App and flips nothing by itself — the value is App\'s', async () => {
-    const { el, props } = await mount({ lens: 'topics' })
-    act(() => tabByLabel(el, 'Files')?.click())
-    expect(props.onLensChange).toHaveBeenCalledExactlyOnceWith('files')
-    expect(selectedTabs(el)).toEqual(['Topics']) // still Topics until App hands the new lens back
-    expect(el.querySelector('.tree')).toBeNull()
+    const { el, props } = await mount({ lens: 'files' })
+    act(() => tabByLabel(el, 'Favorites')?.click())
+    expect(props.onLensChange).toHaveBeenCalledExactlyOnceWith('favorites')
+    expect(selectedTabs(el)).toEqual(['Files']) // still Files until App hands the new lens back
+    expect(el.querySelector('.tree')).not.toBeNull()
   })
 
   it('App handing the new lens back down is what swaps the body', async () => {
-    const { el, rerender } = await mount({ lens: 'topics' })
-    await rerender({ lens: 'files' })
-    expect(selectedTabs(el)).toEqual(['Files'])
-    expect(el.querySelector('.tree')).not.toBeNull()
-    expect(bodyMsg(el)).toBeNull()
+    const { el, rerender } = await mount({ lens: 'files' })
+    await rerender({ lens: 'favorites' })
+    expect(selectedTabs(el)).toEqual(['Favorites'])
+    expect(el.querySelector('.tree')).toBeNull()
+    expect(bodyMsg(el)).toBe('No favorites yet. Right-click a file or folder → Add to favorites.')
   })
 
-  it('switching Files → Topics → Files never tears the tree down: its expansion is waiting', async () => {
+  it('switching Files → Favorites → Files never tears the tree down: its expansion is waiting', async () => {
     const { el, rerender } = await mount({ lens: 'files' })
     const before = dirItem(el)?.getAttribute('aria-expanded')
     act(() => el.querySelector<HTMLButtonElement>('.tree__row--dir')?.click())
     const toggled = dirItem(el)?.getAttribute('aria-expanded')
     expect(toggled).not.toBe(before)
-    await rerender({ lens: 'topics' })
+    await rerender({ lens: 'favorites' })
     expect(el.querySelector('.tree')).toBeNull()
     await rerender({ lens: 'files' })
     expect(dirItem(el)?.getAttribute('aria-expanded')).toBe(toggled)
+    act(() => el.querySelector<HTMLButtonElement>('.tree__row--dir')?.click()) // fold it back the way it was found
   })
 
-  it('a query on TOPICS replaces the topic tree with the flat results; clearing brings the tree back', async () => {
-    const { el } = await mount({ lens: 'topics', indexSource: topicsFeed }, withIndex)
+  it('a query on FAVORITES replaces the empty list with the flat results; clearing brings the list back', async () => {
+    const { el } = await mount({ lens: 'favorites' })
     const input = searchInput(el)!
     await type(input, 'a')
-    expect(resultLabels(el)).toEqual(['Alpha', 'Anchor'])
-    expect(el.querySelector('.tree')).toBeNull()
+    expect(resultLabels(el)).toEqual(['a'])
+    expect(bodyMsg(el)).toBeNull()
     await type(input, '')
     expect(el.querySelector('.search-results')).toBeNull()
-    expect(el.querySelector('.tree__row--muted')?.textContent).toBe('Uncategorized2')
+    expect(bodyMsg(el)).toBe('No favorites yet. Right-click a file or folder → Add to favorites.')
   })
 
   it('the tabs row stays visible and clickable DURING a search, and a lens switch keeps the query (🔒 D5)', async () => {
-    const { el, props, rerender } = await mount({ lens: 'topics' }, withIndex)
+    const { el, props, rerender } = await mount({ lens: 'favorites' })
     const input = searchInput(el)!
     await type(input, 'a')
-    expect(selectedTabs(el)).toEqual(['Topics'])
+    expect(selectedTabs(el)).toEqual(['Favorites'])
     act(() => tabByLabel(el, 'Files')?.click())
     expect(props.onLensChange).toHaveBeenCalledExactlyOnceWith('files')
     await rerender({ lens: 'files' })
     expect(input.value).toBe('a') // the query is untouched by the switch…
-    expect(resultLabels(el)).toEqual(['Alpha', 'Anchor']) // …and still replaces the ACTIVE tab's body
+    expect(resultLabels(el)).toEqual(['a']) // …and still replaces the ACTIVE tab's body
     expect(el.querySelector('.tree')).toBeNull()
     await type(input, '')
     expect(el.querySelector('.tree')).not.toBeNull() // clearing lands on the lens that is now active
   })
 
   /**
-   * YAZ-948 retires \u{1F512} YAZ-847's withholding: it kept the blank-space menu out of Topics only
-   * until that tree had a menu of its own to be consistent with, which YAZ-865 gave its rows.
-   * Blank space means the same thing in either lens — the vault ROOT — with ONE difference,
-   * ruled by Yasin: the Topics lens never offers "New folder", because a disk folder made from
-   * a lens that browses by MEANING lands where that lens cannot show it.
+   * Blank space means the same thing in either lens — the vault ROOT — and offers the same
+   * root-targeted menu, "New folder" and the root paste target included (YAZ-948 retired the one
+   * lens that withheld them).
    */
-  it('BLANK SPACE in Topics opens the same root-targeted menu — without "New folder"', async () => {
-    const { el } = await mount({ lens: 'topics' })
+  it('BLANK SPACE in Favorites opens the same root-targeted menu as Files', async () => {
+    const { el } = await mount({ lens: 'favorites' })
     act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
     expect(el.querySelector('.ctx-menu')).not.toBeNull()
-    expect(menuItems(el).map((b) => b.textContent)).toEqual(['Copy path', 'New note', 'New folder page', 'Open in'])
+    expect(menuItems(el).map((b) => b.textContent)).toEqual(['Paste', 'Copy path', 'New drawing', 'New folder', 'New dated folder', 'Open in'])
   })
 
   it('a typed query still offers nothing on either lens — a result list has no root to target (YAZ-803)', async () => {
-    const { el } = await mount({ lens: 'topics' }, withIndex)
+    const { el } = await mount({ lens: 'favorites' })
     await type(searchInput(el)!, 'a')
     act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
     expect(el.querySelector('.ctx-menu')).toBeNull()
@@ -1360,22 +1189,22 @@ describe('lens tabs (🔒 D4/D5, YAZ-847)', () => {
 /**
  * Expand / collapse all (⚡ YAZ-862): ONE double-chevron button at the end of the lens row,
  * replacing the whole expanded set in a single dispatch. Anything open means the click collapses;
- * only a fully closed tree expands. This describe is the FILES half; it belongs to the tree BODY,
- * so it is GONE (never disabled) while a query is typed and in a vault with no folders to open.
- * The Topics half — and the two stores' independence — is the ⚡ YAZ-873 describe below.
+ * only a fully closed tree expands. It belongs to the tree BODY, so it is GONE (never disabled)
+ * while a query is typed and in a vault with no folders to open. The Favorites half — the same
+ * button acting on the pinned folders only — is pinned in the favorites describe below.
  */
 describe('expand / collapse all (⚡ YAZ-862)', () => {
-  const note = (path: string): TreeNode => ({ type: 'file', name: 'n.md', path, size: 1, mtime: 1, kind: 'markdown' })
-  /** Two depths of folder: docs/ holding deep/, notes/ empty beside it, and a note at the top. */
+  const drawing = (path: string): TreeNode => ({ type: 'file', name: 'n.excalidraw', path, size: 1, mtime: 1, kind: 'drawing' })
+  /** Two depths of folder: docs/ holding deep/, notes/ empty beside it, and a drawing at the top. */
   const NESTED = (v: string): TreeNode[] => [
     {
       type: 'dir',
       name: 'docs',
       path: `${v}/docs`,
-      children: [{ type: 'dir', name: 'deep', path: `${v}/docs/deep`, children: [note(`${v}/docs/deep/n.md`)] }],
+      children: [{ type: 'dir', name: 'deep', path: `${v}/docs/deep`, children: [drawing(`${v}/docs/deep/n.excalidraw`)] }],
     },
     { type: 'dir', name: 'notes', path: `${v}/notes`, children: [] },
-    note(`${v}/n.md`),
+    drawing(`${v}/n.excalidraw`),
   ]
 
   // Expansion is persisted per ROOT in the app-state cache, which is module-level and outlives a
@@ -1415,7 +1244,7 @@ describe('expand / collapse all (⚡ YAZ-862)', () => {
     expect(label(el)).toBe('Expand all')
   })
 
-  it('there is no button while a query is typed, on the Topics lens, or in a vault with no folders', async () => {
+  it('there is no button while a query is typed, on an empty Favorites tab, or in a vault with no folders', async () => {
     const searched = await mountVault()
     const input = searchInput(searched.el)!
     await type(input, 'a')
@@ -1423,13 +1252,13 @@ describe('expand / collapse all (⚡ YAZ-862)', () => {
     await type(input, '')
     expect(allButton(searched.el)).not.toBeNull() // back with the tree it belongs to
 
-    // The lens row's button acts on the ACTIVE lens since ⚡ YAZ-873, so Topics over this
-    // harness's EMPTY feed has nothing to unfold — the same "nothing to open" rule, not a
-    // lens exclusion. The folder tree standing right there does not lend it one.
-    const topics = await mountVault(NESTED, { lens: 'topics' })
-    expect(allButton(topics.el)).toBeNull()
+    // The lens row's button acts on the ACTIVE lens, so an EMPTY Favorites tab has nothing to
+    // unfold — the same "nothing to open" rule, not a lens exclusion. The folder tree standing
+    // right there does not lend it one.
+    const favorites = await mountVault(NESTED, { lens: 'favorites' })
+    expect(allButton(favorites.el)).toBeNull()
 
-    const flat = await mountVault((v) => [note(`${v}/n.md`)])
+    const flat = await mountVault((v) => [drawing(`${v}/n.excalidraw`)])
     expect(flat.el.querySelector('.tree__row--file')).not.toBeNull()
     expect(allButton(flat.el)).toBeNull()
   })
@@ -1442,22 +1271,22 @@ describe('expand / collapse all (⚡ YAZ-862)', () => {
  * vault and therefore starts from no focus at all.
  */
 describe('focus mode (YAZ-1605)', () => {
-  const note = (path: string, name: string): TreeNode => ({ type: 'file', name, path, size: 1, mtime: 1, kind: 'markdown' })
-  /** Notes/ holding Sub/, Projects/ holding Alpha/, the prefix-sharing Projects-Archive/, and a root note. */
+  const drawing = (path: string, name: string): TreeNode => ({ type: 'file', name, path, size: 1, mtime: 1, kind: 'drawing' })
+  /** Notes/ holding Sub/, Projects/ holding Alpha/, the prefix-sharing Projects-Archive/, and a root drawing. */
   const FOCUS = (v: string): TreeNode[] => [
     {
       type: 'dir', name: 'Notes', path: `${v}/Notes`,
-      children: [{ type: 'dir', name: 'Sub', path: `${v}/Notes/Sub`, children: [] }, note(`${v}/Notes/n.md`, 'n.md')],
+      children: [{ type: 'dir', name: 'Sub', path: `${v}/Notes/Sub`, children: [] }, drawing(`${v}/Notes/n.excalidraw`, 'n.excalidraw')],
     },
     {
       type: 'dir', name: 'Projects', path: `${v}/Projects`,
       children: [
-        { type: 'dir', name: 'Alpha', path: `${v}/Projects/Alpha`, children: [note(`${v}/Projects/Alpha/a.md`, 'a.md')] },
-        note(`${v}/Projects/p.md`, 'p.md'),
+        { type: 'dir', name: 'Alpha', path: `${v}/Projects/Alpha`, children: [drawing(`${v}/Projects/Alpha/a.excalidraw`, 'a.excalidraw')] },
+        drawing(`${v}/Projects/p.excalidraw`, 'p.excalidraw'),
       ],
     },
-    { type: 'dir', name: 'Projects-Archive', path: `${v}/Projects-Archive`, children: [note(`${v}/Projects-Archive/old.md`, 'old.md')] },
-    note(`${v}/top.md`, 'top.md'),
+    { type: 'dir', name: 'Projects-Archive', path: `${v}/Projects-Archive`, children: [drawing(`${v}/Projects-Archive/old.excalidraw`, 'old.excalidraw')] },
+    drawing(`${v}/top.excalidraw`, 'top.excalidraw'),
   ]
 
   let vaults = 0
@@ -1470,7 +1299,7 @@ describe('focus mode (YAZ-1605)', () => {
     const v = `/v-focus-${++vaults}`
     const m = await mount({ root: v, ...over }, async (b) => {
       b.tree.mockResolvedValue({ root: v, tree: (opts.nodes ?? FOCUS)(v), generatedAt: 1 } as never)
-      b.window.identity.mockResolvedValue({ id: 'w1', root: v, file: null, tabs: [], rightPanel: defaultRightPanelIdentity(), sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: (opts.focus ?? []).map((p) => `${v}${p}`), focusTopics: [], focusFavorites: [] })
+      b.window.identity.mockResolvedValue({ id: 'w1', root: v, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: (opts.focus ?? []).map((p) => `${v}${p}`), focusFavorites: [] })
       await storage.init()
     })
     return { ...m, v }
@@ -1498,12 +1327,12 @@ describe('focus mode (YAZ-1605)', () => {
     rightClick(rowByPath(el, `${v}/Projects`))
     expect(itemByLabel(el, 'Focus on folder')).toBeDefined()
     closeMenu(el)
-    rightClick(rowByPath(el, `${v}/top.md`))
+    rightClick(rowByPath(el, `${v}/top.excalidraw`))
     expect(itemByLabel(el, 'Focus on folder')).toBeUndefined()
     closeMenu(el)
     rightClick(el.querySelector('.sidebar__body'))
     expect(itemByLabel(el, 'Focus on folder')).toBeUndefined()
-    expect(itemByLabel(el, 'New note')).toBeDefined() // the menu is there; only Focus is missing
+    expect(itemByLabel(el, 'New drawing')).toBeDefined() // the menu is there; only Focus is missing
   })
 
   it('focusing a folder makes it the only top row, opens it, and stores the one path', async () => {
@@ -1582,20 +1411,20 @@ describe('focus mode (YAZ-1605)', () => {
 
   it('a selection of files only offers no Focus item', async () => {
     const { el, v } = await mountVault()
-    act(() => rowByPath(el, `${v}/Projects`)?.click()) // open it so a nested note is a row too…
+    act(() => rowByPath(el, `${v}/Projects`)?.click()) // open it so a nested drawing is a row too…
     // …and let go of it: since D9 (YAZ-1674) that click SELECTED the folder, and this case is about files only.
     act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })))
-    shiftClickRow(rowByPath(el, `${v}/top.md`))
-    shiftClickRow(rowByPath(el, `${v}/Projects/p.md`))
-    rightClick(rowByPath(el, `${v}/top.md`))
+    shiftClickRow(rowByPath(el, `${v}/top.excalidraw`))
+    shiftClickRow(rowByPath(el, `${v}/Projects/p.excalidraw`))
+    rightClick(rowByPath(el, `${v}/top.excalidraw`))
     expect(menuItems(el).map((b) => b.textContent).some((t) => t?.startsWith('Focus'))).toBe(false)
   })
 
   it('a selection of one folder and one file focuses the folder — "Focus on folder", singular', async () => {
     const { el, v } = await mountVault()
     shiftClickRow(rowByPath(el, `${v}/Projects`))
-    shiftClickRow(rowByPath(el, `${v}/top.md`))
-    rightClick(rowByPath(el, `${v}/top.md`))
+    shiftClickRow(rowByPath(el, `${v}/top.excalidraw`))
+    rightClick(rowByPath(el, `${v}/top.excalidraw`))
     expect(itemByLabel(el, 'Focus on folder')).toBeDefined()
     await act(async () => itemByLabel(el, 'Focus on folder')?.click())
     expect(topLabels(el)).toEqual(['Projects'])
@@ -1651,18 +1480,18 @@ describe('focus mode (YAZ-1605)', () => {
   it('a reveal OUTSIDE the focus ends it and still shows the target', async () => {
     const { el, v, rerender } = await mountVault()
     await focusRow(el, `${v}/Projects`)
-    await rerender({ revealRequest: { id: 1, path: `${v}/Notes/n.md`, lens: 'files' } })
+    await rerender({ revealRequest: { id: 1, path: `${v}/Notes/n.excalidraw`, lens: 'files' } })
     expect(eye(el)).toBeNull()
-    expect(rowByPath(el, `${v}/Notes/n.md`)?.classList.contains('tree__row--revealed')).toBe(true)
+    expect(rowByPath(el, `${v}/Notes/n.excalidraw`)?.classList.contains('tree__row--revealed')).toBe(true)
   })
 
   it('a reveal INSIDE the focus keeps it', async () => {
     const { el, v, rerender } = await mountVault()
     await focusRow(el, `${v}/Projects`)
-    await rerender({ revealRequest: { id: 1, path: `${v}/Projects/Alpha/a.md`, lens: 'files' } })
+    await rerender({ revealRequest: { id: 1, path: `${v}/Projects/Alpha/a.excalidraw`, lens: 'files' } })
     expect(eye(el)).not.toBeNull()
     expect(topLabels(el)).toEqual(['Projects'])
-    expect(rowByPath(el, `${v}/Projects/Alpha/a.md`)?.classList.contains('tree__row--revealed')).toBe(true)
+    expect(rowByPath(el, `${v}/Projects/Alpha/a.excalidraw`)?.classList.contains('tree__row--revealed')).toBe(true)
   })
 
   it('a typed query hides the eye; clearing it brings the eye back, still narrowed', async () => {
@@ -1676,11 +1505,11 @@ describe('focus mode (YAZ-1605)', () => {
     expect(topLabels(el)).toEqual(['Projects'])
   })
 
-  it('a Files focus survives a trip through Topics — the eye belongs to the ACTIVE lens', async () => {
+  it('a Files focus survives a trip through Favorites — the eye belongs to the ACTIVE lens', async () => {
     const { el, v, rerender } = await mountVault()
     await focusRow(el, `${v}/Projects`)
-    await rerender({ lens: 'topics' })
-    expect(eye(el)).toBeNull() // Topics carries its own focus, and it is empty
+    await rerender({ lens: 'favorites' })
+    expect(eye(el)).toBeNull() // Favorites carries its own focus, and it is empty
     await rerender({ lens: 'files' })
     expect(eye(el)).not.toBeNull()
     expect(topLabels(el)).toEqual(['Projects'])
@@ -1697,14 +1526,14 @@ describe('focus mode (YAZ-1605)', () => {
  * block above does it.
  */
 describe('favorites (YAZ-1766)', () => {
-  const note = (path: string, name: string): TreeNode => ({ type: 'file', name, path, size: 1, mtime: 1, kind: 'markdown' })
+  const drawing = (path: string, name: string): TreeNode => ({ type: 'file', name, path, size: 1, mtime: 1, kind: 'drawing' })
   const FAV = (v: string): TreeNode[] => [
-    { type: 'dir', name: 'Notes', path: `${v}/Notes`, children: [note(`${v}/Notes/n.md`, 'n.md')] },
+    { type: 'dir', name: 'Notes', path: `${v}/Notes`, children: [drawing(`${v}/Notes/n.excalidraw`, 'n.excalidraw')] },
     {
       type: 'dir', name: 'Projects', path: `${v}/Projects`,
-      children: [{ type: 'dir', name: 'Alpha', path: `${v}/Projects/Alpha`, children: [] }, note(`${v}/Projects/p.md`, 'p.md')],
+      children: [{ type: 'dir', name: 'Alpha', path: `${v}/Projects/Alpha`, children: [] }, drawing(`${v}/Projects/p.excalidraw`, 'p.excalidraw')],
     },
-    note(`${v}/top.md`, 'top.md'),
+    drawing(`${v}/top.excalidraw`, 'top.excalidraw'),
   ]
 
   let vaults = 0
@@ -1719,7 +1548,7 @@ describe('favorites (YAZ-1766)', () => {
         emit = l
         return () => undefined
       })
-      b.window.identity.mockResolvedValue({ id: 'w1', root: v, file: null, tabs: [], rightPanel: defaultRightPanelIdentity(), sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusTopics: [], focusFavorites: (opts.focusFavorites ?? []).map((p) => `${v}${p}`) })
+      b.window.identity.mockResolvedValue({ id: 'w1', root: v, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: (opts.focusFavorites ?? []).map((p) => `${v}${p}`) })
       await storage.init()
     })
     return { ...m, v, emit: (c: { root: string }) => emit?.(c) }
@@ -1742,32 +1571,32 @@ describe('favorites (YAZ-1766)', () => {
   const drag = (target: Element | null | undefined, type: string, clientY = 0) =>
     act(() => void target?.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, clientY })))
 
-  it('the tab is the third, and starts on the empty hint', async () => {
+  it('the tab is the second, and starts on the empty hint', async () => {
     const { el } = await mountVault({ lens: 'favorites' })
-    expect([...el.querySelectorAll('.sidebar__lenses [role="tab"]')].map((b) => b.textContent || b.getAttribute('aria-label'))).toEqual(['Topics', 'Files', 'Favorites'])
+    expect([...el.querySelectorAll('.sidebar__lenses [role="tab"]')].map((b) => b.textContent || b.getAttribute('aria-label'))).toEqual(['Files', 'Favorites'])
     expect(bodyMsg(el)).toBe('No favorites yet. Right-click a file or folder → Add to favorites.')
     expect(el.querySelector('.tree')).toBeNull()
   })
 
-  it('New note from a ROOT favorited FILE hops to Files — its parent dir is not on the tab; from a favorited FOLDER the input mounts in place (3B1)', async () => {
-    const { el, v, props } = await mountVault({ lens: 'favorites' }, { favorites: ['/Notes/n.md', '/Projects'] })
-    await pick(el, `${v}/Notes/n.md`, 'New note')
+  it('New drawing from a ROOT favorited FILE hops to Files — its parent dir is not on the tab; from a favorited FOLDER the input mounts in place (3B1)', async () => {
+    const { el, v, props } = await mountVault({ lens: 'favorites' }, { favorites: ['/Notes/n.excalidraw', '/Projects'] })
+    await pick(el, `${v}/Notes/n.excalidraw`, 'New drawing')
     expect(props.onLensChange).toHaveBeenCalledExactlyOnceWith('files')
     expect(el.querySelector('.create-inline')).toBeNull() // the tab has no `Notes` node to mount it under
     vi.mocked(props.onLensChange).mockClear()
-    await pick(el, `${v}/Projects`, 'New note')
+    await pick(el, `${v}/Projects`, 'New drawing')
     expect(props.onLensChange).not.toHaveBeenCalled()
     expect(el.querySelector('.create-inline')).not.toBeNull()
   })
 
   it('"Add to favorites" is on file AND folder rows in Files, never on blank space; adding toasts, persists to the vault file and lists the row on the tab', async () => {
     const { el, v, bridge, props, rerender } = await mountVault()
-    rightClick(rowByPath(el, `${v}/top.md`))
+    rightClick(rowByPath(el, `${v}/top.excalidraw`))
     expect(itemByLabel(el, 'Add to favorites')).toBeDefined()
     closeMenu(el)
     rightClick(el.querySelector('.sidebar__body'))
     expect(itemByLabel(el, 'Add to favorites')).toBeUndefined()
-    expect(itemByLabel(el, 'New note')).toBeDefined()
+    expect(itemByLabel(el, 'New drawing')).toBeDefined()
     closeMenu(el)
     await pick(el, `${v}/Projects`, 'Add to favorites')
     expect(props.onNotice).toHaveBeenCalledWith('Added to favorites', 'favorite')
@@ -1786,26 +1615,27 @@ describe('favorites (YAZ-1766)', () => {
   })
 
   it('every favorites row carries the full row menu — Focus, Copy path, Rename, Open in, Delete', async () => {
-    const { el, v } = await mountVault({ lens: 'favorites' }, { favorites: ['/Projects', '/top.md'] })
+    const { el, v } = await mountVault({ lens: 'favorites' }, { favorites: ['/Projects', '/top.excalidraw'] })
     rightClick(rowByPath(el, `${v}/Projects`))
-    for (const label of ['Focus on folder', 'Cut', 'Copy', 'Copy path', 'New note', 'Rename', 'Remove from favorites', 'Open in', 'Delete']) expect(itemByLabel(el, label), label).toBeDefined()
+    for (const label of ['Focus on folder', 'Cut', 'Copy', 'Copy path', 'New drawing', 'Rename', 'Remove from favorites', 'Open in', 'Delete']) expect(itemByLabel(el, label), label).toBeDefined()
     closeMenu(el)
-    rightClick(rowByPath(el, `${v}/top.md`))
-    expect(itemByLabel(el, 'Turn into folder page')).toBeDefined()
+    rightClick(rowByPath(el, `${v}/top.excalidraw`))
+    // A FILE row keeps the rest of the menu and loses only the folder-shaped items.
+    for (const label of ['Cut', 'Copy', 'Copy path', 'New drawing', 'Rename', 'Remove from favorites', 'Open in', 'Delete']) expect(itemByLabel(el, label), label).toBeDefined()
     expect(itemByLabel(el, 'Focus on folder')).toBeUndefined()
   })
 
   it('"Remove from favorites" drops the row, toasts, and persists the shorter list', async () => {
-    const { el, v, bridge, props } = await mountVault({ lens: 'favorites' }, { favorites: ['/Projects', '/top.md'] })
+    const { el, v, bridge, props } = await mountVault({ lens: 'favorites' }, { favorites: ['/Projects', '/top.excalidraw'] })
     expect(topLabels(el)).toEqual(['Projects', 'top'])
     await pick(el, `${v}/Projects`, 'Remove from favorites')
     expect(topLabels(el)).toEqual(['top'])
     expect(props.onNotice).toHaveBeenCalledWith('Removed from favorites', 'favorite')
-    expect(bridge.favorites.set).toHaveBeenLastCalledWith(v, [`${v}/top.md`])
+    expect(bridge.favorites.set).toHaveBeenLastCalledWith(v, [`${v}/top.excalidraw`])
   })
 
   it('a restored list renders in STORED order (not tree order) and is never written back', async () => {
-    const { el, bridge } = await mountVault({ lens: 'favorites' }, { favorites: ['/top.md', '/Projects', '/Notes'] })
+    const { el, bridge } = await mountVault({ lens: 'favorites' }, { favorites: ['/top.excalidraw', '/Projects', '/Notes'] })
     expect(topLabels(el)).toEqual(['top', 'Projects', 'Notes'])
     expect(bridge.favorites.set).not.toHaveBeenCalled()
   })
@@ -1815,16 +1645,16 @@ describe('favorites (YAZ-1766)', () => {
     expect(isOpen(el, `${v}/Projects`)).toBe('false')
     act(() => rowByPath(el, `${v}/Projects`)?.click())
     expect(isOpen(el, `${v}/Projects`)).toBe('true')
-    expect(rowByPath(el, `${v}/Projects/p.md`)).not.toBeNull()
+    expect(rowByPath(el, `${v}/Projects/p.excalidraw`)).not.toBeNull()
     await rerender({ lens: 'files' })
     expect(isOpen(el, `${v}/Projects`)).toBe('true')
   })
 
   it('redundancy: a file AND its parent folder both listed — the file at the root and again inside the folder', async () => {
-    const { el, v } = await mountVault({ lens: 'favorites' }, { favorites: ['/Projects/p.md', '/Projects'] })
+    const { el, v } = await mountVault({ lens: 'favorites' }, { favorites: ['/Projects/p.excalidraw', '/Projects'] })
     expect(topLabels(el)).toEqual(['p', 'Projects'])
     act(() => rowByPath(el, `${v}/Projects`)?.click())
-    expect(rowsByPath(el, `${v}/Projects/p.md`)).toHaveLength(2)
+    expect(rowsByPath(el, `${v}/Projects/p.excalidraw`)).toHaveLength(2)
   })
 
   it('a 2-row selection reads "Add 2 to favorites" and pins both in panel order; a MIXED one reads Add and pins only the missing; all-pinned reads "Remove 2 from favorites"', async () => {
@@ -1836,22 +1666,22 @@ describe('favorites (YAZ-1766)', () => {
     expect(bridge.favorites.set).toHaveBeenLastCalledWith(v, [`${v}/Notes`, `${v}/Projects`])
     act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })))
     shiftClickRow(rowByPath(el, `${v}/Projects`)) // already pinned…
-    shiftClickRow(rowByPath(el, `${v}/top.md`)) // …this one not
-    rightClick(rowByPath(el, `${v}/top.md`))
+    shiftClickRow(rowByPath(el, `${v}/top.excalidraw`)) // …this one not
+    rightClick(rowByPath(el, `${v}/top.excalidraw`))
     expect(itemByLabel(el, 'Add 2 to favorites')).toBeDefined()
     await act(async () => itemByLabel(el, 'Add 2 to favorites')?.click())
-    expect(bridge.favorites.set).toHaveBeenLastCalledWith(v, [`${v}/Notes`, `${v}/Projects`, `${v}/top.md`])
+    expect(bridge.favorites.set).toHaveBeenLastCalledWith(v, [`${v}/Notes`, `${v}/Projects`, `${v}/top.excalidraw`])
     act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })))
     shiftClickRow(rowByPath(el, `${v}/Notes`))
     shiftClickRow(rowByPath(el, `${v}/Projects`))
     rightClick(rowByPath(el, `${v}/Notes`))
     expect(itemByLabel(el, 'Remove 2 from favorites')).toBeDefined()
     await act(async () => itemByLabel(el, 'Remove 2 from favorites')?.click())
-    expect(bridge.favorites.set).toHaveBeenLastCalledWith(v, [`${v}/top.md`])
+    expect(bridge.favorites.set).toHaveBeenLastCalledWith(v, [`${v}/top.excalidraw`])
   })
 
   it('Focus on the Favorites tab writes THIS window\'s focusFavorites — never focusDirs or the vault file — and the eye is lens-local', async () => {
-    const { el, v, bridge, rerender } = await mountVault({ lens: 'favorites' }, { favorites: ['/Notes', '/Projects', '/top.md'] })
+    const { el, v, bridge, rerender } = await mountVault({ lens: 'favorites' }, { favorites: ['/Notes', '/Projects', '/top.excalidraw'] })
     await pick(el, `${v}/Projects`, 'Focus on folder')
     expect(topLabels(el)).toEqual(['Projects'])
     expect(isOpen(el, `${v}/Projects`)).toBe('true')
@@ -1878,21 +1708,21 @@ describe('favorites (YAZ-1766)', () => {
   })
 
   it('root rows drag to reorder: a drop indicator on the hovered edge, the new order persisted; nested rows do not drag; Files is untouched', async () => {
-    const { el, v, bridge, props } = await mountVault({ lens: 'favorites' }, { favorites: ['/Notes', '/Projects', '/top.md'] })
+    const { el, v, bridge, props } = await mountVault({ lens: 'favorites' }, { favorites: ['/Notes', '/Projects', '/top.excalidraw'] })
     expect(rowByPath(el, `${v}/Notes`)?.getAttribute('draggable')).toBe('true')
-    expect(rowByPath(el, `${v}/top.md`)?.getAttribute('draggable')).toBe('true')
+    expect(rowByPath(el, `${v}/top.excalidraw`)?.getAttribute('draggable')).toBe('true')
     act(() => rowByPath(el, `${v}/Projects`)?.click())
     expect(rowByPath(el, `${v}/Projects/Alpha`)?.getAttribute('draggable')).toBe('false')
-    expect(rowByPath(el, `${v}/Projects/p.md`)?.getAttribute('draggable')).toBe('false')
-    drag(rowByPath(el, `${v}/top.md`), 'dragstart')
+    expect(rowByPath(el, `${v}/Projects/p.excalidraw`)?.getAttribute('draggable')).toBe('false')
+    drag(rowByPath(el, `${v}/top.excalidraw`), 'dragstart')
     drag(rowByPath(el, `${v}/Notes`), 'dragover', -1)
     expect(rowByPath(el, `${v}/Notes`)?.classList.contains('tree__row--drop-before')).toBe(true)
     drag(rowByPath(el, `${v}/Notes`), 'drop')
     expect(topLabels(el)).toEqual(['top', 'Notes', 'Projects'])
     expect(el.querySelector('.tree__row--drop-before, .tree__row--drop-after')).toBeNull()
-    expect(bridge.favorites.set).toHaveBeenLastCalledWith(v, [`${v}/top.md`, `${v}/Notes`, `${v}/Projects`])
+    expect(bridge.favorites.set).toHaveBeenLastCalledWith(v, [`${v}/top.excalidraw`, `${v}/Notes`, `${v}/Projects`])
     // Below the midpoint lands AFTER; nothing moved on disk at any point.
-    drag(rowByPath(el, `${v}/top.md`), 'dragstart')
+    drag(rowByPath(el, `${v}/top.excalidraw`), 'dragstart')
     drag(rowByPath(el, `${v}/Projects`), 'dragover', 1)
     expect(rowByPath(el, `${v}/Projects`)?.classList.contains('tree__row--drop-after')).toBe(true)
     drag(rowByPath(el, `${v}/Projects`), 'drop')
@@ -1901,16 +1731,16 @@ describe('favorites (YAZ-1766)', () => {
   })
 
   it('dragging a favorites row onto a nested folder moves nothing on disk, and dragend abandons cleanly', async () => {
-    const { el, v, props } = await mountVault({ lens: 'favorites' }, { favorites: ['/Notes', '/Projects', '/top.md'] })
+    const { el, v, props } = await mountVault({ lens: 'favorites' }, { favorites: ['/Notes', '/Projects', '/top.excalidraw'] })
     act(() => rowByPath(el, `${v}/Projects`)?.click())
-    drag(rowByPath(el, `${v}/top.md`), 'dragstart')
+    drag(rowByPath(el, `${v}/top.excalidraw`), 'dragstart')
     drag(rowByPath(el, `${v}/Projects/Alpha`), 'dragover')
     expect(rowByPath(el, `${v}/Projects/Alpha`)?.classList.contains('tree__row--drop')).toBe(false)
     drag(rowByPath(el, `${v}/Projects/Alpha`), 'drop')
     expect(props.onRenameFile).not.toHaveBeenCalled()
     expect(topLabels(el)).toEqual(['Notes', 'Projects', 'top'])
-    drag(rowByPath(el, `${v}/top.md`), 'dragstart')
-    drag(rowByPath(el, `${v}/top.md`), 'dragend')
+    drag(rowByPath(el, `${v}/top.excalidraw`), 'dragstart')
+    drag(rowByPath(el, `${v}/top.excalidraw`), 'dragend')
     drag(rowByPath(el, `${v}/Notes`), 'dragover', -1)
     expect(el.querySelector('.tree__row--drop-before')).toBeNull()
   })
@@ -1931,7 +1761,7 @@ describe('favorites (YAZ-1766)', () => {
     const reads = bridge.favorites.get.mock.calls.length // the mount read (StrictMode runs the effect twice)
     await act(async () => emit({ root: '/some-other-vault' }))
     expect(bridge.favorites.get).toHaveBeenCalledTimes(reads) // another vault's change is not this window's
-    bridge.favorites.get.mockResolvedValue([`${v}/top.md`])
+    bridge.favorites.get.mockResolvedValue([`${v}/top.excalidraw`])
     await act(async () => emit({ root: v }))
     expect(topLabels(el)).toEqual(['top'])
     expect(bridge.favorites.set).not.toHaveBeenCalled()
@@ -1949,7 +1779,7 @@ describe('favorites (YAZ-1766)', () => {
   it('a favorite the tree lacks (not synced yet, or gone) draws no row and is NOT pruned — no write (D14)', async () => {
     let fire: ((ev: WatchEvent) => void) | undefined
     const watch = { subscribe: (l: (ev: WatchEvent) => void) => ((fire = l), () => undefined) }
-    const { el, v, bridge } = await mountVault({ lens: 'favorites', watch }, { favorites: ['/Ghost.md', '/Notes', '/Projects'] })
+    const { el, v, bridge } = await mountVault({ lens: 'favorites', watch }, { favorites: ['/Ghost.excalidraw', '/Notes', '/Projects'] })
     expect(topLabels(el)).toEqual(['Notes', 'Projects'])
     bridge.tree.mockResolvedValue({ root: v, tree: FAV(v).filter((n) => n.path !== `${v}/Projects`), generatedAt: 2 } as never)
     await act(async () => fire?.({ type: 'unlinkDir', path: `${v}/Projects` }))
@@ -1968,89 +1798,6 @@ describe('favorites (YAZ-1766)', () => {
   })
 })
 
-/**
- * The Topics half of the same button (⚡ YAZ-873): ONE control at the end of the lens row acting
- * on whichever lens is ACTIVE. On Topics it replaces the lifted `topicsExpanded` set with
- * `allExpandableTopics` — the guarded walk's answer — and empties it when anything is open. The
- * two lenses keep their OWN stores: one button, never one set. Gone, as ever, when the active
- * reading has nothing to unfold.
- *
- * YAZ-920 reshapes what it acts ON, not what it does: Home is a pinned leaf and the topics it
- * held stand at the ROOT beside it, so "expand all" now opens one rung shallower and "collapse
- * all" comes back down to that wider set of roots.
- */
-describe('expand / collapse all on TOPICS (⚡ YAZ-873)', () => {
-  const rec = (v: string, basename: string, properties: Record<string, unknown> = {}) => ({
-    path: `${v}/${basename}.md`, name: `${basename}.md`, basename, folder: '', ext: 'md',
-    size: 1, ctime: 1, mtime: 1, properties, aliases: [] as string[], tags: [] as string[], links: [] as string[], embeds: [] as string[],
-  })
-  const folder = (v: string, basename: string, properties: Record<string, unknown> = {}) => rec(v, basename, { folder_page: true, ...properties })
-  const belongs = (...entries: string[]): Record<string, unknown> => ({ folder_pages: entries })
-  /** The window's feed over one snapshot, resolved by basename the way `makeResolver` keys it. */
-  const feedOver = (records: ReturnType<typeof rec>[]) => ({
-    records,
-    resolve: (target: string) => records.find((r) => r.basename.toLowerCase() === target.replace(/[[\]]/g, '').trim().toLowerCase())?.path ?? null,
-    subscribe: () => () => undefined,
-  })
-  /**
-   * Two depths of meaning: Metrics names Home and so stands beside it as a ROOT (YAZ-920), and
-   * Metrics holds a leaf that never unfolds.
-   */
-  const TOPICS = (v: string) => [folder(v, 'Home'), folder(v, 'Metrics', belongs('[[Home]]')), rec(v, 'Revenue', belongs('[[Metrics]]'))]
-  /** One folder on disk beside them, so the FILES lens has something of its own to open. */
-  const FILES = (v: string): TreeNode[] => [{ type: 'dir', name: 'docs', path: `${v}/docs`, children: [] }]
-
-  // Both buckets are per ROOT in the module-level app-state cache, so every mount opens its OWN
-  // vault and starts closed — the YAZ-862 describe's isolation idiom.
-  let vaults = 0
-  const mountVault = async (records: (v: string) => ReturnType<typeof rec>[] = TOPICS, over: Partial<SidebarProps> = {}) => {
-    const vault = `/v-topics-${++vaults}`
-    return mount({ root: vault, lens: 'topics', indexSource: feedOver(records(vault)), ...over }, (b) =>
-      b.tree.mockResolvedValue({ root: vault, tree: FILES(vault), generatedAt: 1 } as never),
-    )
-  }
-  const allButton = (el: HTMLElement) => el.querySelector<HTMLButtonElement>('.sidebar__lenses .sidebar__expand-all')
-  const label = (el: HTMLElement) => allButton(el)?.getAttribute('aria-label') ?? null
-  const topicLabels = (el: HTMLElement) => [...el.querySelectorAll('[aria-label="Topics"] .tree__label')].map((n) => n.textContent)
-
-  it('a closed topic tree offers "Expand all", and one click unfolds every page at every depth', async () => {
-    const { el } = await mountVault()
-    expect(topicLabels(el)).toEqual(['Home', 'Metrics'])
-    expect(label(el)).toBe('Expand all')
-    act(() => allButton(el)?.click())
-    expect(topicLabels(el)).toEqual(['Home', 'Metrics', 'Revenue'])
-    expect(label(el)).toBe('Collapse all')
-  })
-
-  it('and the click back is "Collapse all" — down to the roots, in one dispatch', async () => {
-    const { el } = await mountVault()
-    act(() => allButton(el)?.click())
-    act(() => allButton(el)?.click())
-    // The roots are the pinned Home AND every topic promoted beside it (YAZ-920).
-    expect(topicLabels(el)).toEqual(['Home', 'Metrics'])
-    expect(label(el)).toBe('Expand all')
-  })
-
-  it('the two lenses keep their OWN stores: expanding all of Files leaves Topics fully closed', async () => {
-    const { el, rerender } = await mountVault(TOPICS, { lens: 'files' })
-    act(() => allButton(el)?.click())
-    expect(label(el)).toBe('Collapse all')
-    await rerender({ lens: 'topics' })
-    // One button, two readings of the vault: the folder tree being open says nothing about
-    // whether a topic is, so Topics still offers to expand.
-    expect(label(el)).toBe('Expand all')
-    expect(topicLabels(el)).toEqual(['Home', 'Metrics'])
-    await rerender({ lens: 'files' })
-    expect(label(el)).toBe('Collapse all') // …and the Files store was never touched meanwhile
-  })
-
-  it('there is no button on Topics when nothing can unfold — a vault of leaves offers nothing', async () => {
-    const { el } = await mountVault((v) => [folder(v, 'Home'), rec(v, 'Loose')])
-    expect(topicLabels(el)).toEqual(['Home'])
-    expect(allButton(el)).toBeNull()
-  })
-})
-
 describe('context menu order (GRO-2272 C1a)', () => {
   it('a FILE row renders utilities, then create actions, then Rename and Delete last', async () => {
     const { el } = await mount()
@@ -2064,18 +1811,12 @@ describe('context menu order (GRO-2272 C1a)', () => {
       'Copy',
       'Paste',
       'Copy path',
-      'Copy for Agent',
-      'New note',
-      // "New folder page" (🔒 D4, YAZ-817): second in the create group, directly after the
-      // note it is a kind of — it CREATES beside the right-clicked row, so it stays in the
-      // create group and never drifts down to the act-on-this-row toggle.
-      'New folder page',
+      // The create group: the one document birth first, then the two folder births — every one
+      // of them targets a DIRECTORY (the row's parent), never the row itself.
+      'New drawing',
       'New folder',
       'New dated folder',
-      // The folder-page toggle joins the row between the create group and Rename (🔒 D2,
-      // YAZ-817): it acts on the right-clicked page, so it belongs with the other
-      // act-on-this-row items — and above the destructive pair, which stays last.
-      'Turn into folder page',
+      // The act-on-this-row group, above the destructive pair, which stays last.
       'Rename',
       // The favorite toggle (YAZ-1766 D3) leads the "Open in ▸" group, one hairline above Delete.
       'Add to favorites',
@@ -2095,672 +1836,6 @@ describe('context menu order (GRO-2272 C1a)', () => {
 })
 
 /**
- * "New folder page" (YAZ-841 — 🔒 D4 + D1 on YAZ-817): the create group's second item, and the
- * only birth gesture for a folder page. It is the EXISTING inline-create flow with one branch at
- * the end — same validation, same placement rule (the file lands where the right-click happened),
- * same open-after-create — so the page is born through `createNewNote` carrying the flag and
- * (since YAZ-1513) the default `status` Select declaration under `folder_page_settings` — spelled
- * by `newFolderPageProperties`, never a sidebar literal — with no body and no `folder_pages`.
- */
-describe('New folder page (🔒 D4 / 🔒 D1, YAZ-841)', () => {
-  const openOn = async (selector: string) => {
-    const m = await mount()
-    act(() => void m.el.querySelector(selector)?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
-    return m
-  }
-  const input = (el: HTMLElement) => el.querySelector<HTMLInputElement>('.create-inline__input')
-  const errorText = (el: HTMLElement) => el.querySelector('.create-inline__error')?.textContent ?? null
-  /** Type a name into the open inline input and commit it with Enter. */
-  const commit = async (el: HTMLElement, name: string) => {
-    const field = input(el)!
-    await act(async () => {
-      field.value = name
-      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-    })
-  }
-  /** The birth content (🔒 D1, amended YAZ-1513): one frontmatter block — the flag and the default `status` column — no body. */
-  const BORN = '---\nfolder_page: true\nfolder_page_settings:\n  columns:\n    status:\n      kind: select\n      options:\n        - 1-Backlog\n        - 2-Todo\n        - 3-In-Progress\n        - 4-Done\n---\n'
-
-  it('is offered wherever the create group is — file rows, folder rows and blank space alike', async () => {
-    for (const selector of ['.tree__row--file', '.tree__row--dir', '.sidebar__body']) {
-      const { el } = await openOn(selector)
-      expect(itemByLabel(el, 'New folder page')).toBeDefined()
-    }
-  })
-
-  it('opens the SAME inline input as New note, under its own placeholder, and closes the menu', async () => {
-    const { el } = await openOn('.tree__row--dir')
-    act(() => itemByLabel(el, 'New folder page')?.click())
-    expect(el.querySelector('.ctx-menu')).toBeNull()
-    expect(input(el)).not.toBeNull()
-    expect(input(el)?.placeholder).toBe('New folder page')
-  })
-
-  it('committing a name creates the page born with the flag AND the default status column, in the right-clicked folder, then opens it', async () => {
-    const { el, bridge, props } = await openOn('.tree__row--dir')
-    act(() => itemByLabel(el, 'New folder page')?.click())
-    await commit(el, 'Growth')
-    expect(bridge.createFile).toHaveBeenCalledExactlyOnceWith({ path: '/v/sub/Growth.md', content: BORN })
-    expect(props.onOpenFile).toHaveBeenCalledExactlyOnceWith('/v/sub/Growth.md')
-    expect(input(el)).toBeNull() // the input is done
-  })
-
-  it('takes the same placement rule as New note: a FILE row creates beside it, blank space at the root', async () => {
-    const onFile = await openOn('.tree__row--file')
-    act(() => itemByLabel(onFile.el, 'New folder page')?.click())
-    await commit(onFile.el, 'Growth')
-    expect(onFile.bridge.createFile).toHaveBeenCalledExactlyOnceWith({ path: '/v/Growth.md', content: BORN })
-
-    const onBlank = await openOn('.sidebar__body')
-    act(() => itemByLabel(onBlank.el, 'New folder page')?.click())
-    await commit(onBlank.el, 'Growth')
-    expect(onBlank.bridge.createFile).toHaveBeenCalledExactlyOnceWith({ path: '/v/Growth.md', content: BORN })
-  })
-
-  it('leaves New note alone — the same flow with no seed at all, still the bare-path call', async () => {
-    const { el, bridge } = await openOn('.tree__row--dir')
-    act(() => itemByLabel(el, 'New note')?.click())
-    await commit(el, 'Growth')
-    expect(bridge.createFile).toHaveBeenCalledExactlyOnceWith('/v/sub/Growth.md')
-  })
-
-  it('validates through the SHARED path: an invalid name gives New note\'s exact error and writes nothing', async () => {
-    const note = await openOn('.tree__row--dir')
-    act(() => itemByLabel(note.el, 'New note')?.click())
-    await commit(note.el, 'a/b')
-    const shared = errorText(note.el)
-    expect(shared).not.toBeNull()
-    expect(note.bridge.createFile).not.toHaveBeenCalled()
-
-    const page = await openOn('.tree__row--dir')
-    act(() => itemByLabel(page.el, 'New folder page')?.click())
-    await commit(page.el, 'a/b')
-    expect(errorText(page.el)).toBe(shared)
-    expect(page.bridge.createFile).not.toHaveBeenCalled()
-    expect(input(page.el)).not.toBeNull() // the input stays open to fix the name
-  })
-})
-
-/**
- * The folder-page toggle (YAZ-840 — 🔒 D1/D2/D3/D5 on YAZ-817): the first user-facing
- * folder-page gesture. ONE state-aware item on MARKDOWN FILE rows.
- *
- *  - forward (🔒 D1) is IMMEDIATE and goes through ONE content transform — `turnIntoFolderPage`,
- *    the settings module's own, which writes the flag and seeds the default `status` column only
- *    when the page has no settings yet (YAZ-1513) — with no confirm to click through for
- *    something this same item undoes;
- *  - reverse (🔒 D5) asks first, restores the migrated outline to the Markdown body, removes the
- *    active outline value and flag together, and leaves every other setting and member entry.
- *
- * The flag state behind the label comes off the window's ALREADY-ON index feed (the same
- * snapshot WikilinkIndexBridge pushes at the wikilink resolver), read when the menu opens — no
- * second feed and no fetch of its own.
- */
-describe('folder-page toggle (YAZ-840)', () => {
-  const transform = vi.mocked(transformFile)
-  const write = vi.mocked(writeProperty)
-
-  const MIXED_TREE: TreeNode[] = [
-    { type: 'dir', name: 'sub', path: '/v/sub', children: [] },
-    { type: 'file', name: 'a.md', path: '/v/a.md', size: 1, mtime: 1, kind: 'markdown' },
-  ]
-
-  const record = (path: string, properties: Record<string, unknown> = {}) => {
-    const name = path.slice(path.lastIndexOf('/') + 1)
-    return { path, name, basename: name.replace(/\.[^.]+$/, ''), folder: '', ext: 'md', size: 1, ctime: 1, mtime: 1, properties, aliases: [], tags: [], links: [], embeds: [] }
-  }
-  /** A stubbed index feed holding this snapshot — the shape App hands over from the bridge's source. */
-  const feed = (...records: ReturnType<typeof record>[]): SidebarProps['indexSource'] =>
-    ({ resolve: null, records, subscribe: () => () => undefined }) as SidebarProps['indexSource']
-
-  /** Mount over the mixed tree, then right-click one row (or the blank body). */
-  const openOn = async (selector: string, indexSource: SidebarProps['indexSource']) => {
-    const m = await mount({ indexSource }, (b) =>
-      b.tree.mockImplementation(async (r: string) => ({ root: r, tree: MIXED_TREE, generatedAt: 1 })),
-    )
-    act(() => void m.el.querySelector(selector)?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
-    return m
-  }
-
-  const sheetText = (el: HTMLElement) => el.querySelector('#confirm-turn-back-text')?.textContent ?? null
-  const sheetBtn = (el: HTMLElement, label: string) => [...el.querySelectorAll<HTMLButtonElement>('.confirm__btn')].find((b) => b.textContent === label)
-
-  beforeEach(() => {
-    transform.mockReset()
-    transform.mockResolvedValue({ mtime: 2, content: '' })
-    write.mockReset()
-    write.mockResolvedValue({ mtime: 2 })
-  })
-
-  it('offers "Turn into folder page" on a markdown row whose flag is off', async () => {
-    const { el } = await openOn('[title="/v/a.md"]', feed(record('/v/a.md')))
-    expect(itemByLabel(el, 'Turn into folder page')).toBeDefined()
-    expect(itemByLabel(el, 'Turn back into normal page')).toBeUndefined()
-  })
-
-  it('offers "Turn back into normal page" once that row IS a folder page', async () => {
-    const { el } = await openOn('[title="/v/a.md"]', feed(record('/v/a.md', { folder_page: true })))
-    expect(itemByLabel(el, 'Turn back into normal page')).toBeDefined()
-    expect(itemByLabel(el, 'Turn into folder page')).toBeUndefined()
-  })
-
-  it('reads the flag through isFolderPage — only the boolean true is on', async () => {
-    const { el } = await openOn('[title="/v/a.md"]', feed(record('/v/a.md', { folder_page: 'true' })))
-    expect(itemByLabel(el, 'Turn into folder page')).toBeDefined()
-  })
-
-  it('shows no toggle at all on folder rows or on blank space', async () => {
-    for (const selector of ['.tree__row--dir', '.sidebar__body']) {
-      const { el } = await openOn(selector, feed(record('/v/a.md', { folder_page: true })))
-      expect(itemByLabel(el, 'Turn into folder page')).toBeUndefined()
-      expect(itemByLabel(el, 'Turn back into normal page')).toBeUndefined()
-      expect(el.querySelector('.ctx-menu')).not.toBeNull() // the menu itself is still there
-    }
-  })
-
-  it('FORWARD is ONE transform through turnIntoFolderPage — the flag plus the seeded default column — with NO confirm sheet (🔒 D1, YAZ-1513)', async () => {
-    const { el } = await openOn('[title="/v/a.md"]', feed(record('/v/a.md')))
-    await act(async () => itemByLabel(el, 'Turn into folder page')?.click())
-    expect(transform).toHaveBeenCalledExactlyOnceWith('/v/a.md', turnIntoFolderPage)
-    expect(write).not.toHaveBeenCalled()
-    expect(el.querySelector('.confirm')).toBeNull()
-    expect(el.querySelector('.ctx-menu')).toBeNull()
-  })
-
-  it('REVERSE opens the sheet with the LOCKED copy and writes nothing yet (🔒 D5)', async () => {
-    const { el } = await openOn('[title="/v/a.md"]', feed(record('/v/a.md', { folder_page: true })))
-    act(() => itemByLabel(el, 'Turn back into normal page')?.click())
-    expect(sheetText(el)).toBe(
-      "Turn 'a.md' back into a normal page? Pages that belong to it keep their entries — any that belong nowhere else will appear in Uncategorized until this is a folder page again. Nothing is deleted.",
-    )
-    expect(write).not.toHaveBeenCalled()
-  })
-
-  it('Cancel on the sheet writes NOTHING and closes it', async () => {
-    const { el } = await openOn('[title="/v/a.md"]', feed(record('/v/a.md', { folder_page: true })))
-    act(() => itemByLabel(el, 'Turn back into normal page')?.click())
-    await act(async () => sheetBtn(el, 'Cancel')?.click())
-    expect(write).not.toHaveBeenCalled()
-    expect(el.querySelector('.confirm')).toBeNull()
-  })
-
-  it('confirming restores the body through one whole-file transform (🔒 D3)', async () => {
-    const { el } = await openOn('[title="/v/a.md"]', feed(record('/v/a.md', { folder_page: true })))
-    act(() => itemByLabel(el, 'Turn back into normal page')?.click())
-    await act(async () => sheetBtn(el, 'Turn back')?.click())
-    expect(transform).toHaveBeenCalledExactlyOnceWith('/v/a.md', expect.any(Function))
-    expect(write).not.toHaveBeenCalled()
-    expect(el.querySelector('.confirm')).toBeNull()
-  })
-
-  it('a failed write surfaces as the passive notice — never a dialog', async () => {
-    transform.mockRejectedValue(new Error('read-only volume'))
-    const { el, props } = await openOn('[title="/v/a.md"]', feed(record('/v/a.md')))
-    await act(async () => itemByLabel(el, 'Turn into folder page')?.click())
-    expect(props.onNotice).toHaveBeenCalledWith(expect.stringContaining('read-only volume'), 'error')
-    expect(el.querySelector('.confirm')).toBeNull()
-  })
-
-  it('a failed turn-BACK names that direction in the notice', async () => {
-    transform.mockRejectedValue(new Error('read-only volume'))
-    const { el, props } = await openOn('[title="/v/a.md"]', feed(record('/v/a.md', { folder_page: true })))
-    act(() => itemByLabel(el, 'Turn back into normal page')?.click())
-    await act(async () => sheetBtn(el, 'Turn back')?.click())
-    expect(props.onNotice).toHaveBeenCalledWith(expect.stringContaining('back into a normal page'), 'error')
-  })
-})
-
-/**
- * The TOPICS context menu (8G-, YAZ-865 — the ⚡ amendment on YAZ-821, ruled by Yasin): a Topics
- * PAGE row gets the SAME menu a FILE row gets, on the page's own file. Not a menu of that lens'
- * own — `TopicsTree` reports the row and the Sidebar opens its ONE `ContextMenu`, so the items,
- * their order, every target (GRO-2296) and every pipeline behind them are literally the file
- * tree's and cannot drift between the two readings of one vault.
- *
- * What gets NOTHING: the Uncategorized HEADER (there is no page behind it), the offer card, and
- * blank space — whose menu stays the FILE tree's, its guard untouched (🔒 D7 and YAZ-847 both hold).
- */
-describe('the Topics context menu (8G-, YAZ-865)', () => {
-  const record = (path: string, properties: Record<string, unknown> = {}) => {
-    const name = path.slice(path.lastIndexOf('/') + 1)
-    const rel = path.slice('/v/'.length)
-    return {
-      path,
-      name,
-      basename: name.replace(/\.[^.]+$/, ''),
-      folder: rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '',
-      ext: 'md', size: 1, ctime: 1, mtime: 1, properties, aliases: [], tags: [], links: [], embeds: [],
-    }
-  }
-  /**
-   * Docs is a topic under Home — and since YAZ-920 Home is a PINNED LEAF, so a member hangs off
-   * Docs, never off Home itself. Docs has ONE member, and that member lives in a SUBFOLDER — so
-   * "create beside the page's file" has a folder of its own to prove, which is exactly the fact
-   * this lens hides. Loose belongs nowhere and waits under Uncategorized.
-   */
-  const HOME = record('/v/Home.md', { folder_page: true })
-  const DOCS = record('/v/Docs.md', { folder_page: true, folder_pages: ['[[Home]]'] })
-  const GUIDE = record('/v/Docs/Guide.md', { folder_pages: ['[[Docs]]'] })
-  const LOOSE = record('/v/Loose.md')
-  const INBOX_NOTE = record('/v/inbox/Loose.md')
-  /**
-   * A folder page that DECLARES things (8H, YAZ-869): two columns for the scaffold to empty out
-   * and a parking `folder`, so a birth from its row has something to prove beyond "it happened".
-   */
-  const METRICS = record('/v/Metrics.md', {
-    folder_page: true,
-    folder_pages: ['[[Home]]'],
-    folder_page_settings: { folder: 'KPIs', columns: { owner: { kind: 'text' }, funnels: { kind: 'multi-link' } } },
-  })
-  const feedOver = (...records: ReturnType<typeof record>[]): SidebarProps['indexSource'] =>
-    ({
-      // The links this vault declares, keyed like the real resolver (lowered, brackets and all).
-      resolve: (target: string) =>
-        ({
-          '[[home]]': records.includes(HOME) ? HOME.path : null,
-          '[[docs]]': records.includes(DOCS) ? DOCS.path : null,
-          '[[metrics]]': records.includes(METRICS) ? METRICS.path : null,
-        })[target.trim().toLowerCase()] ?? null,
-      records,
-      subscribe: () => () => undefined,
-    }) as SidebarProps['indexSource']
-
-  const topics = (over: Partial<SidebarProps> = {}) => mount({ lens: 'topics', indexSource: feedOver(HOME, DOCS, GUIDE, LOOSE), ...over })
-  const topicsWithInbox = (over: Partial<SidebarProps> = {}) =>
-    mount({ lens: 'topics', indexSource: feedOver(HOME, DOCS, GUIDE, INBOX_NOTE), ...over })
-  const rowFor = (el: HTMLElement, label: string) =>
-    [...el.querySelectorAll<HTMLButtonElement>('.tree__row')].find((r) => r.querySelector('.tree__label')?.textContent === label)
-  const rightClick = (node: Element | null | undefined) => act(() => void node?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
-  /**
-   * 🔒 D3: the chevron is the expand gesture; the row itself opens the page. It is DOCS' chevron
-   * since YAZ-920 — Home is a pinned leaf now and offers none at all.
-   */
-  const expandDocs = (el: HTMLElement) => act(() => el.querySelector<HTMLElement>('[aria-label="Expand Docs"]')?.click())
-  const inlineInput = (el: HTMLElement) => el.querySelector<HTMLInputElement>('.create-inline__input')
-  const commit = async (el: HTMLElement, name: string) => {
-    const field = inlineInput(el)!
-    await act(async () => {
-      field.value = name
-      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-    })
-  }
-  const confirmBtn = (el: HTMLElement, label: string) => [...el.querySelectorAll<HTMLButtonElement>('.confirm__btn')].find((b) => b.textContent === label)
-  function installClipboard() {
-    const writeText = vi.fn(async () => undefined)
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
-    return writeText
-  }
-
-  it('a PAGE row opens the file tree\'s OWN menu — item for item, in the same order (GRO-2272 C1a)', async () => {
-    const { el } = await topics()
-    await rightClick(rowFor(el, 'Home'))
-    expect(menuItems(el).map((b) => b.textContent)).toEqual([
-      // Cut / Copy on any row (🔒 D5, YAZ-1674) — but NO Paste: a PAGE row is a meaning row, and
-      // Paste goes exactly where "New folder" goes.
-      'Cut',
-      'Copy',
-      'Copy path',
-      'Copy for Agent',
-      'New note',
-      'New folder page',
-      // …and NOT 'New folder' (YAZ-948, ruled by Yasin): this lens browses by MEANING, so a disk
-      // folder made from it would land where the lens cannot show it. The Files lens keeps it.
-      // Home IS a folder page, so the ONE state-aware item shows the REVERSE label (🔒 D2).
-      'Turn back into normal page',
-      'Rename',
-      'Add to favorites',
-      'Open in',
-      'Delete',
-    ])
-  })
-
-  it('the toggle\'s label follows THAT row\'s flag: a leaf is offered the forward direction', async () => {
-    const { el } = await topics()
-    await expandDocs(el)
-    await rightClick(rowFor(el, 'Guide'))
-    expect(itemByLabel(el, 'Turn into folder page')).toBeDefined()
-    expect(itemByLabel(el, 'Turn back into normal page')).toBeUndefined()
-  })
-
-  it('every item resolves the PAGE\'s own file: Reveal and Copy path name it exactly (GRO-2296)', async () => {
-    const writeText = installClipboard()
-    const { el, bridge } = await topics()
-    await expandDocs(el)
-    await rightClick(rowFor(el, 'Guide'))
-    clickSub(el, 'Reveal in Finder')
-    expect(bridge.shell.reveal).toHaveBeenCalledExactlyOnceWith({ path: '/v/Docs/Guide.md' })
-    await rightClick(rowFor(el, 'Guide'))
-    act(() => itemByLabel(el, 'Copy path')?.click())
-    // The PAGE's path, never the vault root's — the blank-space fallback stays where it belongs.
-    expect(writeText).toHaveBeenCalledExactlyOnceWith('/v/Docs/Guide.md')
-  })
-
-  it('Delete flows through the EXISTING pipeline: the same sheet, then onDeleteFile with the page\'s path', async () => {
-    const { el, props } = await topics()
-    await expandDocs(el)
-    await rightClick(rowFor(el, 'Guide'))
-    await act(async () => itemByLabel(el, 'Delete')?.click())
-    expect(el.querySelector('.confirm')).not.toBeNull()
-    expect(props.onDeleteFile).not.toHaveBeenCalled() // opening the sheet deletes nothing
-    await act(async () => confirmBtn(el, 'Delete')?.click())
-    expect(props.onDeleteFile).toHaveBeenCalledExactlyOnceWith('/v/Docs/Guide.md')
-  })
-
-  it('Rename opens the inline input ON the Topics row and commits through the rename pipeline', async () => {
-    const { el, props } = await topics()
-    await expandDocs(el)
-    await rightClick(rowFor(el, 'Guide'))
-    act(() => itemByLabel(el, 'Rename')?.click())
-    expect(inlineInput(el)?.value).toBe('Guide') // the name minus its extension — the file tree's prefill
-    expect(rowFor(el, 'Guide')).toBeUndefined() // …IN PLACE of the row, never beside it
-    await commit(el, 'Manual')
-    expect(props.onRenameFile).toHaveBeenCalledExactlyOnceWith('/v/Docs/Guide.md', '/v/Docs/Manual.md', 'file')
-  })
-
-  it('a page standing under TWO parents renames through ONE input — two autofocused ones would fight', async () => {
-    // The diamond (⚡ D6): Guide belongs to two topics, so it renders twice. An inline input is
-    // ONE input — the second's mount would blur, and so CANCEL, the first. Both parents are real
-    // topics: since YAZ-920 Home descends into nothing, so it can never be one half of a diamond.
-    const OPS = record('/v/Ops.md', { folder_page: true })
-    const SHARED = record('/v/Docs/Guide.md', { folder_pages: ['[[Docs]]', '[[Ops]]'] })
-    const both = {
-      records: [HOME, DOCS, OPS, SHARED],
-      resolve: (target: string) =>
-        ({ '[[home]]': HOME.path, '[[docs]]': DOCS.path, '[[ops]]': OPS.path })[target.trim().toLowerCase()] ?? null,
-      subscribe: () => () => undefined,
-    } as SidebarProps['indexSource']
-    const { el } = await topics({ indexSource: both })
-    await expandDocs(el)
-    await act(() => el.querySelector<HTMLElement>('[aria-label="Expand Ops"]')?.click())
-    const guides = () => [...el.querySelectorAll('.tree__row .tree__label')].filter((n) => n.textContent === 'Guide').length
-    expect(guides()).toBe(2)
-    await rightClick(rowFor(el, 'Guide'))
-    act(() => itemByLabel(el, 'Rename')?.click())
-    expect(el.querySelectorAll('.create-inline__input')).toHaveLength(1)
-    expect(guides()).toBe(1) // the FIRST occurrence became the input; the other stays a row
-  })
-
-  it('the create group lands BESIDE the page\'s file on disk — the file tree\'s own rule', async () => {
-    const { el, bridge, props } = await topics()
-    await expandDocs(el)
-    await rightClick(rowFor(el, 'Guide'))
-    act(() => itemByLabel(el, 'New note')?.click())
-    // The input is drawn under the row it was asked from; the row itself stays put.
-    expect(inlineInput(el)?.placeholder).toBe('New note')
-    expect(rowFor(el, 'Guide')).toBeDefined()
-    await commit(el, 'Nearby')
-    // `/v/Docs`, the folder this lens never shows — belonging is meaning, the file is still a file.
-    expect(bridge.createFile).toHaveBeenCalledExactlyOnceWith('/v/Docs/Nearby.md')
-    expect(props.onOpenFile).toHaveBeenCalledExactlyOnceWith('/v/Docs/Nearby.md')
-  })
-
-  /**
-   * YAZ-948 follow-up (Yasin, dogfooding: "i just tried to click 'create folder page' and its not
-   * working"): the blank-space menu opened a create whose inline input had NOWHERE to draw. The
-   * Topics tree only ever rendered the input BESIDE its anchor row, and blank space has no row —
-   * so the item silently did nothing. A blank-space create is a ROOT create, so the input belongs
-   * at the top of the tree, above the roots, at their own indent.
-   */
-  it('"New folder page" from BLANK SPACE draws its input at the root and is born there', async () => {
-    const { el, bridge } = await topics()
-    await rightClick(el.querySelector('.sidebar__body'))
-    act(() => itemByLabel(el, 'New folder page')?.click())
-    const field = inlineInput(el)
-    expect(field).not.toBeNull() // the bug: no input rendered at all, so the click did nothing
-    expect(field?.closest('.tree')).not.toBeNull() // …and it belongs INSIDE the tree, not floating
-    await commit(el, 'Growth')
-    expect(bridge.createFile).toHaveBeenCalledExactlyOnceWith({ path: '/v/Growth.md', content: '---\nfolder_page: true\nfolder_page_settings:\n  columns:\n    status:\n      kind: select\n      options:\n        - 1-Backlog\n        - 2-Todo\n        - 3-In-Progress\n        - 4-Done\n---\n' })
-  })
-
-  it('"New note" from BLANK SPACE lands in the vault root too — the same anchorless path', async () => {
-    const { el, bridge } = await topics()
-    await rightClick(el.querySelector('.sidebar__body'))
-    act(() => itemByLabel(el, 'New note')?.click())
-    expect(inlineInput(el)).not.toBeNull()
-    await commit(el, 'Loose thought')
-    expect(bridge.createFile).toHaveBeenCalledExactlyOnceWith('/v/Loose thought.md')
-  })
-
-  it('"New folder page" on a LEAF Topics row is born with the flag and the default status column, beside that page (🔒 D1 + YAZ-1513)', async () => {
-    const { el, bridge } = await topics()
-    await expandDocs(el)
-    await rightClick(rowFor(el, 'Guide')) // a leaf: nothing to belong to, so nothing is declared
-    act(() => itemByLabel(el, 'New folder page')?.click())
-    await commit(el, 'Growth')
-    expect(bridge.createFile).toHaveBeenCalledExactlyOnceWith({ path: '/v/Docs/Growth.md', content: '---\nfolder_page: true\nfolder_page_settings:\n  columns:\n    status:\n      kind: select\n      options:\n        - 1-Backlog\n        - 2-Todo\n        - 3-In-Progress\n        - 4-Done\n---\n' })
-  })
-
-  /**
-   * 8H (⚡ YAZ-869, Yasin's dogfooding ruling): "New note" ON a topic means "a note IN this topic".
-   * The birth travels the folder page's OWN declaration path — the same `newPageFromFolderPage`
-   * the contents block's New uses — and parks where that page's members live. Pinned here rather
-   * than in a unit: the whole point is that the SIDEBAR's create group reaches it.
-   *
-   * Metrics names only Home, so since YAZ-920 it stands at the ROOT: these cases right-click it
-   * where it sits, with nothing to unfold first.
-   */
-  const topicsWithMetrics = (over: Partial<SidebarProps> = {}, tweak?: (b: ReturnType<typeof installBridge>) => void) =>
-    mount({ lens: 'topics', indexSource: feedOver(HOME, DOCS, METRICS, GUIDE, LOOSE), ...over }, tweak)
-  /** The frontmatter of the single content-at-create call, parsed — key ORDER included. */
-  const born = (bridge: ReturnType<typeof installBridge>) => {
-    expect(bridge.createFile).toHaveBeenCalledTimes(1)
-    const req = bridge.createFile.mock.calls[0][0] as { path: string; content: string }
-    const { frontmatter, body } = splitFrontmatter(req.content)
-    return { path: req.path, properties: parseFrontmatter(frontmatter).properties, body }
-  }
-
-  it('"New note" on a FLAGGED row births a MEMBER: declared columns empty, folder_pages LAST, parked per settings', async () => {
-    const { el, bridge, props } = await topicsWithMetrics()
-    await rightClick(rowFor(el, 'Metrics'))
-    act(() => itemByLabel(el, 'New note')?.click())
-    await commit(el, 'Growth')
-    // The parking folder is created level by level before the file lands (locked Q5/Q6).
-    expect(bridge.createDir).toHaveBeenCalledExactlyOnceWith('/v/KPIs')
-    const page = born(bridge)
-    expect(page.path).toBe('/v/KPIs/Growth.md')
-    // The DECLARATION is the schema: every column, empty by kind — and the birth key LAST, so the
-    // card reads columns-then-parent.
-    expect(Object.keys(page.properties)).toEqual(['owner', 'funnels', 'folder_pages'])
-    expect(page.properties).toEqual({ owner: null, funnels: [], folder_pages: ['[[Metrics]]'] })
-    expect(page.body).toBe('')
-    expect(props.onOpenFile).toHaveBeenCalledExactlyOnceWith('/v/KPIs/Growth.md')
-  })
-
-  it("…and the folder page's TEMPLATE rides along, without ever displacing the birth key", async () => {
-    const { el, bridge } = await topicsWithMetrics({}, (b) => {
-      b.readFile = vi.fn(async (path: string) => {
-        if (path !== '/v/.yaseendraw/templates/Metrics.md') throw { code: 'NOT_FOUND', message: path }
-        return { path, content: '---\nowner: Yasin\nstage: draft\nfolder_pages: ["[[Elsewhere]]"]\n---\n\n## Notes\n', mtime: 1, size: 1 }
-      })
-    })
-    await rightClick(rowFor(el, 'Metrics'))
-    act(() => itemByLabel(el, 'New note')?.click())
-    await commit(el, 'Growth')
-    const page = born(bridge)
-    // Template values win over the empty scaffold, template-only keys are KEPT (frontmatter is the
-    // source of truth and the declaration gates no content) — and the template's own attempt to
-    // redirect the belonging is overwritten AND pushed back to last.
-    expect(Object.keys(page.properties)).toEqual(['owner', 'funnels', 'stage', 'folder_pages'])
-    expect(page.properties).toEqual({ owner: 'Yasin', funnels: [], stage: 'draft', folder_pages: ['[[Metrics]]'] })
-    expect(page.body).toBe('\n## Notes\n')
-  })
-
-  it('"New folder page" on a FLAGGED row is a SUB-TOPIC: the flag, and the belonging beside it', async () => {
-    const { el, bridge } = await topicsWithMetrics()
-    await rightClick(rowFor(el, 'Metrics'))
-    act(() => itemByLabel(el, 'New folder page')?.click())
-    await commit(el, 'Retention')
-    const page = born(bridge)
-    expect(page.path).toBe('/v/KPIs/Retention.md') // parked with Metrics' other members
-    // YAZ-1513: born like every folder page — the flag AND the default `status` declaration —
-    // and 8H adds only the one entry that nests it. Still no template, no body.
-    expect(Object.keys(page.properties)).toEqual(['folder_page', 'folder_page_settings', 'folder_pages'])
-    expect(page.properties).toEqual({ ...newFolderPageProperties(), folder_pages: ['[[Metrics]]'] })
-    expect(page.body).toBe('')
-    expect(bridge.readFile).not.toHaveBeenCalled()
-  })
-
-  it('"New folder" is not offered from a Topics row at all (YAZ-948) — the create group keeps the rest', async () => {
-    // It USED to create beside the page's file (a folder is never a member, so the flag was
-    // irrelevant). YAZ-948 removes the item from this lens instead: browsing by meaning cannot
-    // show what a disk folder is, so the honest answer is not to offer it. Files keeps it.
-    const { el, bridge } = await topicsWithMetrics()
-    await rightClick(rowFor(el, 'Metrics'))
-    expect(itemByLabel(el, 'New folder')).toBeUndefined()
-    expect(itemByLabel(el, 'New dated folder')).toBeUndefined()
-    expect(itemByLabel(el, 'New note')).toBeDefined()
-    expect(itemByLabel(el, 'New folder page')).toBeDefined()
-    expect(bridge.createDir).not.toHaveBeenCalled()
-  })
-
-  it('the FILES lens is untouched, even on a row whose file IS a folder page', async () => {
-    // The same kind of record that births members in Topics, right-clicked in the FILE tree:
-    // `topicsAnchor` is null there, so the create group falls straight through to the file rule.
-    const A = record('/v/a.md', { folder_page: true, folder_page_settings: { folder: 'KPIs' } })
-    const { el, bridge } = await mount({ lens: 'files', indexSource: feedOver(A) })
-    await rightClick(fileRow(el))
-    act(() => itemByLabel(el, 'New note')?.click())
-    await commit(el, 'Nearby')
-    expect(bridge.createFile).toHaveBeenCalledExactlyOnceWith('/v/Nearby.md')
-    expect(bridge.createDir).not.toHaveBeenCalled()
-  })
-
-  it('an UNCATEGORIZED member is a page like any other: same menu, its own path', async () => {
-    const { el, bridge } = await topics()
-    act(() => el.querySelector<HTMLButtonElement>('.tree__row--muted')?.click()) // expand the section
-    await rightClick(rowFor(el, 'Loose'))
-    expect(itemByLabel(el, 'Turn into folder page')).toBeDefined()
-    clickSub(el, 'Reveal in Finder')
-    expect(bridge.shell.reveal).toHaveBeenCalledExactlyOnceWith({ path: '/v/Loose.md' })
-  })
-
-  it('an Uncategorized DISK FOLDER opens the exact applicable Files folder menu', async () => {
-    const { el } = await topicsWithInbox()
-    act(() => el.querySelector<HTMLButtonElement>('.tree__row--muted')?.click())
-    await rightClick(rowFor(el, 'inbox'))
-
-    // 🔒 D7 (YAZ-1674) order — and a DISK-folder row is the honest exception in this lens: it gets
-    // the disk verb Paste (disabled while the clipboard is empty) exactly as it gets "New folder".
-    expect(menuItems(el).map((button) => button.textContent)).toEqual([
-      'Cut',
-      'Copy',
-      'Paste',
-      'Copy path',
-      'New note',
-      'New folder page',
-      'New folder',
-      'New dated folder',
-      'Rename',
-      'Add to favorites',
-      'Open in',
-      'Delete',
-    ])
-  })
-
-  it('folder utilities target the selected disk folder rather than the vault root', async () => {
-    const writeText = installClipboard()
-    const { el, bridge } = await topicsWithInbox()
-    act(() => el.querySelector<HTMLButtonElement>('.tree__row--muted')?.click())
-
-    await rightClick(rowFor(el, 'inbox'))
-    act(() => itemByLabel(el, 'Copy path')?.click())
-    expect(writeText).toHaveBeenCalledExactlyOnceWith('/v/inbox')
-
-    await rightClick(rowFor(el, 'inbox'))
-    clickSub(el, 'Reveal in Finder')
-    expect(bridge.shell.reveal).toHaveBeenCalledExactlyOnceWith({ path: '/v/inbox' })
-  })
-
-  it('folder Rename replaces that mini-tree row and commits through the shared directory pipeline', async () => {
-    const { el, props } = await topicsWithInbox()
-    act(() => el.querySelector<HTMLButtonElement>('.tree__row--muted')?.click())
-    await rightClick(rowFor(el, 'inbox'))
-    act(() => itemByLabel(el, 'Rename')?.click())
-
-    expect(inlineInput(el)?.value).toBe('inbox')
-    expect(rowFor(el, 'inbox')).toBeUndefined()
-    await commit(el, 'Archive')
-    expect(props.onRenameFile).toHaveBeenCalledExactlyOnceWith('/v/inbox', '/v/Archive', 'dir')
-  })
-
-  it('folder create actions draw beneath the selected branch and use it as the filesystem parent', async () => {
-    const { el, bridge } = await topicsWithInbox()
-    act(() => el.querySelector<HTMLButtonElement>('.tree__row--muted')?.click())
-    act(() => rowFor(el, 'inbox')?.click()) // create must reopen a collapsed target, as Files does
-    await rightClick(rowFor(el, 'inbox'))
-    act(() => itemByLabel(el, 'New note')?.click())
-
-    expect(inlineInput(el)?.placeholder).toBe('New note')
-    expect(inlineInput(el)?.parentElement?.style.paddingLeft).toBe('36px')
-    await commit(el, 'Nearby')
-    expect(bridge.createFile).toHaveBeenCalledExactlyOnceWith('/v/inbox/Nearby.md')
-  })
-
-  it('New folder remains hidden from Topics pages and blank space but works on a disk-folder row', async () => {
-    const { el, bridge } = await topicsWithInbox()
-    act(() => el.querySelector<HTMLButtonElement>('.tree__row--muted')?.click())
-
-    await rightClick(rowFor(el, 'Loose'))
-    expect(itemByLabel(el, 'New folder')).toBeUndefined()
-    expect(itemByLabel(el, 'New dated folder')).toBeUndefined()
-    await rightClick(rowFor(el, 'inbox'))
-    act(() => itemByLabel(el, 'New folder')?.click())
-    expect(inlineInput(el)?.placeholder).toBe('New folder')
-    await commit(el, 'Later')
-    expect(bridge.createDir).toHaveBeenCalledExactlyOnceWith('/v/inbox/Later')
-  })
-
-  // The caret and the no-op Enter on a bare seed are CreateInline.test's; this pins only the wiring:
-  // the item opens the SAME box, seeded with today's date, in the right-clicked folder.
-  it('New dated folder opens the create box pre-filled with today\'s `MM_DD- ` in that folder (YAZ-1604)', async () => {
-    const { el, bridge } = await topicsWithInbox()
-    act(() => el.querySelector<HTMLButtonElement>('.tree__row--muted')?.click())
-    vi.useFakeTimers({ toFake: ['Date'] }) // only Date: the seed is read when the item is clicked
-    vi.setSystemTime(new Date(2026, 5, 22))
-    try {
-      await rightClick(rowFor(el, 'inbox'))
-      act(() => itemByLabel(el, 'New dated folder')?.click())
-      expect(inlineInput(el)?.value).toBe('06_22- ')
-      await commit(el, '06_22- Launch')
-      expect(bridge.createDir).toHaveBeenCalledExactlyOnceWith('/v/inbox/06_22- Launch')
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  /**
-   * YAZ-948: ONE rule for this lens — a PAGE row opens that page's menu, and everything else in
-   * the body (blank space, the Uncategorized header, the offer card) opens the VAULT ROOT's, the
-   * same menu Files has always given its blank space. Neither the header nor the card is a page,
-   * so neither claims the event; they fall through to the body exactly as bare space does. What
-   * used to be "no menu at all" was never a decision about these two — it was 🔒 YAZ-847
-   * withholding the blank-space menu from the whole lens, which YAZ-948 retires.
-   */
-  it('the Uncategorized HEADER has no page behind it, so it opens the ROOT menu, not a page menu', async () => {
-    const { el } = await topics()
-    await rightClick(el.querySelector('.tree__row--muted'))
-    expect(menuItems(el).map((b) => b.textContent)).toEqual(['Copy path', 'New note', 'New folder page', 'Open in'])
-    // No page target anywhere in it: the row-only items stay absent.
-    expect(itemByLabel(el, 'Rename')).toBeUndefined()
-    expect(itemByLabel(el, 'Delete')).toBeUndefined()
-  })
-
-  it('the offer card and BLANK SPACE open that same root menu — nothing in this lens offers "New folder"', async () => {
-    // Un-adopted AND nothing answers [[Home]]: the 6C card is up, over an otherwise bare lens.
-    const { el } = await topics({ unadopted: true, indexSource: feedOver(LOOSE) })
-    expect(el.querySelector('.topics-offer')).not.toBeNull()
-    await rightClick(el.querySelector('.topics-offer'))
-    expect(itemByLabel(el, 'New folder page')).toBeDefined()
-    expect(itemByLabel(el, 'New folder')).toBeUndefined()
-    expect(itemByLabel(el, 'New dated folder')).toBeUndefined()
-    await rightClick(el.querySelector('.sidebar__body'))
-    expect(itemByLabel(el, 'Copy path')).toBeDefined()
-    expect(itemByLabel(el, 'New folder')).toBeUndefined()
-    expect(itemByLabel(el, 'New dated folder')).toBeUndefined()
-  })
-})
-
-/**
  * Multi-select (YAZ-1334 → YAZ-1336). Shift+click TOGGLES a file row in/out of a path-keyed
  * selection (🔒 D2 amended: toggle-accumulate, range is out of v1) — it never opens, never
  * previews. Selection is Sidebar-owned view state (🔒 D1): Escape and a lens switch clear it;
@@ -2770,9 +1845,9 @@ describe('the Topics context menu (8G-, YAZ-865)', () => {
 describe('Sidebar multi-select via shift+click (YAZ-1336)', () => {
   const MULTI_TREE: TreeNode[] = [
     { type: 'dir', name: 'sub', path: '/v/sub', children: [] },
-    { type: 'file', name: 'a.md', path: '/v/a.md', size: 1, mtime: 1, kind: 'markdown' },
-    { type: 'file', name: 'b.md', path: '/v/b.md', size: 1, mtime: 1, kind: 'markdown' },
-    { type: 'file', name: 'c.md', path: '/v/c.md', size: 1, mtime: 1, kind: 'markdown' },
+    { type: 'file', name: 'a.excalidraw', path: '/v/a.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
+    { type: 'file', name: 'b.excalidraw', path: '/v/b.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
+    { type: 'file', name: 'c.excalidraw', path: '/v/c.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
   ]
   const withMultiTree = (bridge: ReturnType<typeof installBridge>) =>
     bridge.tree.mockResolvedValue({ root: '/v', tree: MULTI_TREE, generatedAt: 1 })
@@ -2785,76 +1860,68 @@ describe('Sidebar multi-select via shift+click (YAZ-1336)', () => {
 
   it('shift+click toggles file rows into and out of the selection without opening anything', async () => {
     const { el, props } = await mount({}, withMultiTree)
-    shiftClick(rowByPath(el, '/v/a.md'))
-    shiftClick(rowByPath(el, '/v/b.md'))
-    expect(selectedPaths(el)).toEqual(['/v/a.md', '/v/b.md'])
-    expect(rowByPath(el, '/v/a.md')?.closest('[role="treeitem"]')?.getAttribute('aria-selected')).toBe('true')
-    shiftClick(rowByPath(el, '/v/a.md'))
-    expect(selectedPaths(el)).toEqual(['/v/b.md'])
+    shiftClick(rowByPath(el, '/v/a.excalidraw'))
+    shiftClick(rowByPath(el, '/v/b.excalidraw'))
+    expect(selectedPaths(el)).toEqual(['/v/a.excalidraw', '/v/b.excalidraw'])
+    expect(rowByPath(el, '/v/a.excalidraw')?.closest('[role="treeitem"]')?.getAttribute('aria-selected')).toBe('true')
+    shiftClick(rowByPath(el, '/v/a.excalidraw'))
+    expect(selectedPaths(el)).toEqual(['/v/b.excalidraw'])
     expect(props.onOpenFile).not.toHaveBeenCalled()
     expect(props.onOpenFileBackground).not.toHaveBeenCalled()
   })
 
   it('plain click makes the selection EXACTLY the clicked file and opens it as before (D9, YAZ-1674)', async () => {
     const { el, props } = await mount({}, withMultiTree)
-    shiftClick(rowByPath(el, '/v/a.md'))
-    shiftClick(rowByPath(el, '/v/b.md'))
-    act(() => rowByPath(el, '/v/c.md')?.click())
-    expect(props.onOpenFile).toHaveBeenCalledExactlyOnceWith('/v/c.md')
-    expect(selectedPaths(el)).toEqual(['/v/c.md'])
+    shiftClick(rowByPath(el, '/v/a.excalidraw'))
+    shiftClick(rowByPath(el, '/v/b.excalidraw'))
+    act(() => rowByPath(el, '/v/c.excalidraw')?.click())
+    expect(props.onOpenFile).toHaveBeenCalledExactlyOnceWith('/v/c.excalidraw')
+    expect(selectedPaths(el)).toEqual(['/v/c.excalidraw'])
   })
 
-  it('a MOUSE click on the file ALREADY open only selects it — no re-open, no caret jump into the editor (D11, YAZ-1674)', async () => {
-    // Click-then-⌘C must work on the open note too: YAZ-961's "take me in" is Enter's (detail 0), never the mouse's.
-    const instance = document.createElement('div')
-    instance.className = 'editor-instance'
-    const pm = document.createElement('div')
-    pm.className = 'ProseMirror'
-    pm.tabIndex = -1
-    Object.defineProperty(pm, 'offsetParent', { get: () => document.body })
-    instance.appendChild(pm)
-    document.body.appendChild(instance)
-    const { el, props } = await mount({ activeFile: '/v/a.md' }, withMultiTree)
-    act(() => void rowByPath(el, '/v/a.md')?.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })))
+  it('a click on the file ALREADY open only selects it — no re-open (D11, YAZ-1674)', async () => {
+    // Click-then-⌘C must work on the open drawing too, so the click still makes it the selection.
+    const { el, props } = await mount({ activeFile: '/v/a.excalidraw' }, withMultiTree)
+    act(() => void rowByPath(el, '/v/a.excalidraw')?.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })))
     expect(props.onOpenFile).not.toHaveBeenCalled()
-    expect(selectedPaths(el)).toEqual(['/v/a.md'])
-    expect(document.activeElement).not.toBe(pm)
-    act(() => void rowByPath(el, '/v/a.md')?.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 })))
-    expect(document.activeElement).toBe(pm) // Enter (detail 0) still takes the caret in (YAZ-961)
-    instance.remove()
+    expect(selectedPaths(el)).toEqual(['/v/a.excalidraw'])
+    // A second click is the same answer — the row never re-opens what is already active.
+    act(() => void rowByPath(el, '/v/a.excalidraw')?.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })))
+    expect(props.onOpenFile).not.toHaveBeenCalled()
+    expect(selectedPaths(el)).toEqual(['/v/a.excalidraw'])
   })
 
   it('⌘-click selects the clicked row too and still opens a background tab (LOCKED I3)', async () => {
     const { el, props } = await mount({}, withMultiTree)
-    shiftClick(rowByPath(el, '/v/a.md'))
-    act(() => void rowByPath(el, '/v/b.md')?.dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: true })))
-    expect(props.onOpenFileBackground).toHaveBeenCalledExactlyOnceWith('/v/b.md')
-    expect(selectedPaths(el)).toEqual(['/v/b.md'])
+    shiftClick(rowByPath(el, '/v/a.excalidraw'))
+    act(() => void rowByPath(el, '/v/b.excalidraw')?.dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: true })))
+    expect(props.onOpenFileBackground).toHaveBeenCalledExactlyOnceWith('/v/b.excalidraw')
+    expect(selectedPaths(el)).toEqual(['/v/b.excalidraw'])
   })
 
   it('shift+click on a dir row toggles it in and out beside files — folders select too (YAZ-1578, 🔒 D1)', async () => {
     const { el, props } = await mount({}, withMultiTree)
-    shiftClick(rowByPath(el, '/v/a.md'))
+    shiftClick(rowByPath(el, '/v/a.excalidraw'))
     shiftClick(rowByPath(el, '/v/sub'))
-    expect(selectedPaths(el)).toEqual(['/v/sub', '/v/a.md']) // panel order, not click order
+    expect(selectedPaths(el)).toEqual(['/v/sub', '/v/a.excalidraw']) // panel order, not click order
     expect(rowByPath(el, '/v/sub')?.closest('[role="treeitem"]')?.getAttribute('aria-selected')).toBe('true')
     shiftClick(rowByPath(el, '/v/sub'))
-    expect(selectedPaths(el)).toEqual(['/v/a.md'])
+    expect(selectedPaths(el)).toEqual(['/v/a.excalidraw'])
     expect(props.onOpenFile).not.toHaveBeenCalled()
   })
 
   it('Escape clears the selection', async () => {
     const { el } = await mount({}, withMultiTree)
-    shiftClick(rowByPath(el, '/v/a.md'))
-    expect(selectedPaths(el)).toEqual(['/v/a.md'])
+    shiftClick(rowByPath(el, '/v/a.excalidraw'))
+    expect(selectedPaths(el)).toEqual(['/v/a.excalidraw'])
     act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
     expect(selectedPaths(el)).toEqual([])
   })
 
   it('switching lens clears the selection', async () => {
     const { el, rerender } = await mount({}, withMultiTree)
-    shiftClick(rowByPath(el, '/v/a.md'))
-    await rerender({ lens: 'topics' })
+    shiftClick(rowByPath(el, '/v/a.excalidraw'))
+    await rerender({ lens: 'favorites' })
     await rerender({ lens: 'files' })
     expect(selectedPaths(el)).toEqual([])
   })
@@ -2894,8 +1961,8 @@ describe('Sidebar multi-select: search, Escape-when-empty, and the prune', () =>
   })
 
   it('a file that leaves the tree leaves the selection with it, and the rest stays selected', async () => {
-    const A: TreeNode = { type: 'file', name: 'a.md', path: '/v/a.md', size: 1, mtime: 1, kind: 'markdown' }
-    const B: TreeNode = { type: 'file', name: 'b.md', path: '/v/b.md', size: 1, mtime: 1, kind: 'markdown' }
+    const A: TreeNode = { type: 'file', name: 'a.excalidraw', path: '/v/a.excalidraw', size: 1, mtime: 1, kind: 'drawing' }
+    const B: TreeNode = { type: 'file', name: 'b.excalidraw', path: '/v/b.excalidraw', size: 1, mtime: 1, kind: 'drawing' }
     let emit: ((ev: WatchEvent) => void) | undefined
     const watch = {
       subscribe: (l: (ev: WatchEvent) => void) => {
@@ -2908,12 +1975,12 @@ describe('Sidebar multi-select: search, Escape-when-empty, and the prune', () =>
     expect(selectedRows(el)).toHaveLength(2)
     // b is deleted on disk: the watcher-driven refresh brings the tree that no longer has it.
     bridge.tree.mockResolvedValue({ root: '/v', tree: [A], generatedAt: 2 })
-    await act(async () => emit?.({ type: 'unlink', path: '/v/b.md' }))
-    expect(selectedRows(el).map((r) => r.dataset.path)).toEqual(['/v/a.md'])
+    await act(async () => emit?.({ type: 'unlink', path: '/v/b.excalidraw' }))
+    expect(selectedRows(el).map((r) => r.dataset.path)).toEqual(['/v/a.excalidraw'])
   })
 
   it('a refresh keeps a selected FOLDER that is still on disk and drops one that left (YAZ-1578)', async () => {
-    const A: TreeNode = { type: 'file', name: 'a.md', path: '/v/a.md', size: 1, mtime: 1, kind: 'markdown' }
+    const A: TreeNode = { type: 'file', name: 'a.excalidraw', path: '/v/a.excalidraw', size: 1, mtime: 1, kind: 'drawing' }
     const KEPT: TreeNode = { type: 'dir', name: 'kept', path: '/v/kept', children: [] }
     const GONE: TreeNode = { type: 'dir', name: 'gone', path: '/v/gone', children: [] }
     let emit: ((ev: WatchEvent) => void) | undefined
@@ -2928,7 +1995,7 @@ describe('Sidebar multi-select: search, Escape-when-empty, and the prune', () =>
     expect(selectedRows(el)).toHaveLength(3)
     bridge.tree.mockResolvedValue({ root: '/v', tree: [KEPT, A], generatedAt: 2 })
     await act(async () => emit?.({ type: 'unlinkDir', path: '/v/gone' }))
-    expect(selectedRows(el).map((r) => r.dataset.path)).toEqual(['/v/kept', '/v/a.md'])
+    expect(selectedRows(el).map((r) => r.dataset.path)).toEqual(['/v/kept', '/v/a.excalidraw'])
   })
 })
 
@@ -2942,9 +2009,9 @@ describe('Sidebar multi-select: search, Escape-when-empty, and the prune', () =>
 describe('Sidebar multi-select context menu (YAZ-1337)', () => {
   const MULTI_TREE: TreeNode[] = [
     { type: 'dir', name: 'sub', path: '/v/sub', children: [] },
-    { type: 'file', name: 'a.md', path: '/v/a.md', size: 1, mtime: 1, kind: 'markdown' },
-    { type: 'file', name: 'b.md', path: '/v/b.md', size: 1, mtime: 1, kind: 'markdown' },
-    { type: 'file', name: 'c.md', path: '/v/c.md', size: 1, mtime: 1, kind: 'markdown' },
+    { type: 'file', name: 'a.excalidraw', path: '/v/a.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
+    { type: 'file', name: 'b.excalidraw', path: '/v/b.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
+    { type: 'file', name: 'c.excalidraw', path: '/v/c.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
   ]
   const withMultiTree = (bridge: ReturnType<typeof installBridge>) =>
     bridge.tree.mockResolvedValue({ root: '/v', tree: MULTI_TREE, generatedAt: 1 })
@@ -2964,9 +2031,9 @@ describe('Sidebar multi-select context menu (YAZ-1337)', () => {
   it('right-click inside a 2-selection: "Open 2 in new tabs" LEADS, "Copy 2 paths" leads the clipboard group; copy is VISIBLE order, selection survives', async () => {
     const writeText = installClipboard()
     const { el, props } = await mount({}, withMultiTree)
-    shiftClickRow(rowByPath(el, '/v/c.md')) // click order c → a…
-    shiftClickRow(rowByPath(el, '/v/a.md'))
-    rightClick(rowByPath(el, '/v/a.md'))
+    shiftClickRow(rowByPath(el, '/v/c.excalidraw')) // click order c → a…
+    shiftClickRow(rowByPath(el, '/v/a.excalidraw'))
+    rightClick(rowByPath(el, '/v/a.excalidraw'))
     const labels = menuItems(el).map((b) => b.textContent)
     // 🔒 D7 (YAZ-1674) loosens YAZ-1337's "the plural pair leads": the plural OPEN still leads the
     // whole menu, but the plural COPY now sits in the clipboard group, below the Open group —
@@ -2977,7 +2044,7 @@ describe('Sidebar multi-select context menu (YAZ-1337)', () => {
     expect(labels).toContain('Open 2 in new tabs')
     expect(labels).toContain('Copy path') // singular items still target the clicked row
     act(() => itemByLabel(el, 'Copy 2 paths')?.click())
-    expect(writeText).toHaveBeenCalledExactlyOnceWith('/v/a.md\n/v/c.md') // …but tree order out
+    expect(writeText).toHaveBeenCalledExactlyOnceWith('/v/a.excalidraw\n/v/c.excalidraw') // …but tree order out
     expect(el.querySelector('.ctx-menu')).toBeNull()
     expect(selectedCount(el)).toBe(2)
     await act(async () => {})
@@ -2987,7 +2054,7 @@ describe('Sidebar multi-select context menu (YAZ-1337)', () => {
   it('the singular "Copy path" confirms too — every copy speaks with the one voice (YAZ-1341)', async () => {
     installClipboard()
     const { el, props } = await mount({}, withMultiTree)
-    rightClick(rowByPath(el, '/v/a.md'))
+    rightClick(rowByPath(el, '/v/a.excalidraw'))
     act(() => itemByLabel(el, 'Copy path')?.click())
     await act(async () => {})
     expect(props.onNotice).toHaveBeenCalledExactlyOnceWith('Copied path')
@@ -2995,13 +2062,13 @@ describe('Sidebar multi-select context menu (YAZ-1337)', () => {
 
   it('"Open N in new tabs" background-opens every selected path and keeps the selection', async () => {
     const { el, props } = await mount({}, withMultiTree)
-    shiftClickRow(rowByPath(el, '/v/a.md'))
-    shiftClickRow(rowByPath(el, '/v/b.md'))
-    shiftClickRow(rowByPath(el, '/v/c.md'))
-    rightClick(rowByPath(el, '/v/b.md'))
+    shiftClickRow(rowByPath(el, '/v/a.excalidraw'))
+    shiftClickRow(rowByPath(el, '/v/b.excalidraw'))
+    shiftClickRow(rowByPath(el, '/v/c.excalidraw'))
+    rightClick(rowByPath(el, '/v/b.excalidraw'))
     act(() => itemByLabel(el, 'Open 3 in new tabs')?.click())
     expect(props.onOpenFileBackground).toHaveBeenCalledTimes(3)
-    expect((props.onOpenFileBackground as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0])).toEqual(['/v/a.md', '/v/b.md', '/v/c.md'])
+    expect((props.onOpenFileBackground as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0])).toEqual(['/v/a.excalidraw', '/v/b.excalidraw', '/v/c.excalidraw'])
     expect(props.onOpenFile).not.toHaveBeenCalled()
     expect(el.querySelector('.ctx-menu')).toBeNull()
     expect(selectedCount(el)).toBe(3)
@@ -3009,8 +2076,8 @@ describe('Sidebar multi-select context menu (YAZ-1337)', () => {
 
   it('a 1-selection gets no plural items — the singular menu already is that menu', async () => {
     const { el } = await mount({}, withMultiTree)
-    shiftClickRow(rowByPath(el, '/v/a.md'))
-    rightClick(rowByPath(el, '/v/a.md'))
+    shiftClickRow(rowByPath(el, '/v/a.excalidraw'))
+    rightClick(rowByPath(el, '/v/a.excalidraw'))
     expect(itemByLabel(el, 'Copy 1 paths')).toBeUndefined()
     expect(itemByLabel(el, 'Copy 1 path')).toBeUndefined()
     expect(itemByLabel(el, 'Copy path')).toBeDefined()
@@ -3018,22 +2085,22 @@ describe('Sidebar multi-select context menu (YAZ-1337)', () => {
 
   it('right-click on a row OUTSIDE the selection SELECTS that row (D9, Finder) and shows the ordinary menu', async () => {
     const { el } = await mount({}, withMultiTree)
-    shiftClickRow(rowByPath(el, '/v/a.md'))
-    shiftClickRow(rowByPath(el, '/v/b.md'))
-    rightClick(rowByPath(el, '/v/c.md'))
+    shiftClickRow(rowByPath(el, '/v/a.excalidraw'))
+    shiftClickRow(rowByPath(el, '/v/b.excalidraw'))
+    rightClick(rowByPath(el, '/v/c.excalidraw'))
     expect(itemByLabel(el, 'Copy 2 paths')).toBeUndefined()
     expect(itemByLabel(el, 'Copy path')).toBeDefined()
     expect(selectedCount(el)).toBe(1)
-    expect(rowByPath(el, '/v/c.md')?.classList.contains('tree__row--selected')).toBe(true)
+    expect(rowByPath(el, '/v/c.excalidraw')?.classList.contains('tree__row--selected')).toBe(true)
   })
 
   it('right-click on blank space leaves the selection alone and stays plural-free', async () => {
     const { el } = await mount({}, withMultiTree)
-    shiftClickRow(rowByPath(el, '/v/a.md'))
-    shiftClickRow(rowByPath(el, '/v/b.md'))
+    shiftClickRow(rowByPath(el, '/v/a.excalidraw'))
+    shiftClickRow(rowByPath(el, '/v/b.excalidraw'))
     rightClick(el.querySelector('.sidebar__body'))
     expect(itemByLabel(el, 'Copy 2 paths')).toBeUndefined()
-    expect(itemByLabel(el, 'New note')).toBeDefined()
+    expect(itemByLabel(el, 'New drawing')).toBeDefined()
     expect(selectedCount(el)).toBe(2)
   })
 
@@ -3042,20 +2109,20 @@ describe('Sidebar multi-select context menu (YAZ-1337)', () => {
   it('right-click a selected FOLDER in a mixed selection: "Copy N paths" lists all N, "Open N in new tabs" opens only the files', async () => {
     const writeText = installClipboard()
     const { el, props } = await mount({}, withMultiTree)
-    shiftClickRow(rowByPath(el, '/v/b.md'))
+    shiftClickRow(rowByPath(el, '/v/b.excalidraw'))
     shiftClickRow(rowByPath(el, '/v/sub'))
-    shiftClickRow(rowByPath(el, '/v/a.md'))
+    shiftClickRow(rowByPath(el, '/v/a.excalidraw'))
     rightClick(rowByPath(el, '/v/sub'))
     expect(itemByLabel(el, 'Copy 3 paths')).toBeDefined()
     expect(itemByLabel(el, 'Open 2 in new tabs')).toBeDefined()
     expect(itemByLabel(el, 'Copy path')).toBeDefined() // the singular items still target the folder
     act(() => itemByLabel(el, 'Copy 3 paths')?.click())
-    expect(writeText).toHaveBeenCalledExactlyOnceWith('/v/sub\n/v/a.md\n/v/b.md') // panel order
+    expect(writeText).toHaveBeenCalledExactlyOnceWith('/v/sub\n/v/a.excalidraw\n/v/b.excalidraw') // panel order
     rightClick(rowByPath(el, '/v/sub'))
     act(() => itemByLabel(el, 'Open 2 in new tabs')?.click())
     expect(props.onOpenFileBackground).toHaveBeenCalledTimes(2)
-    expect(props.onOpenFileBackground).toHaveBeenNthCalledWith(1, '/v/a.md')
-    expect(props.onOpenFileBackground).toHaveBeenNthCalledWith(2, '/v/b.md')
+    expect(props.onOpenFileBackground).toHaveBeenNthCalledWith(1, '/v/a.excalidraw')
+    expect(props.onOpenFileBackground).toHaveBeenNthCalledWith(2, '/v/b.excalidraw')
     expect(selectedCount(el)).toBe(3)
   })
 
@@ -3063,7 +2130,7 @@ describe('Sidebar multi-select context menu (YAZ-1337)', () => {
     const TWO_DIRS: TreeNode[] = [
       { type: 'dir', name: 'one', path: '/v/one', children: [] },
       { type: 'dir', name: 'two', path: '/v/two', children: [] },
-      { type: 'file', name: 'a.md', path: '/v/a.md', size: 1, mtime: 1, kind: 'markdown' },
+      { type: 'file', name: 'a.excalidraw', path: '/v/a.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
     ]
     const { el } = await mount({}, (b) => b.tree.mockResolvedValue({ root: '/v', tree: TWO_DIRS, generatedAt: 1 }))
     shiftClickRow(rowByPath(el, '/v/one'))
@@ -3094,9 +2161,9 @@ describe('Sidebar multi-select context menu (YAZ-1337)', () => {
 
   it('Escape with the context menu open closes the MENU and leaves the selection standing', async () => {
     const { el } = await mount({}, withMultiTree)
-    shiftClickRow(rowByPath(el, '/v/a.md'))
-    shiftClickRow(rowByPath(el, '/v/b.md'))
-    rightClick(rowByPath(el, '/v/a.md'))
+    shiftClickRow(rowByPath(el, '/v/a.excalidraw'))
+    shiftClickRow(rowByPath(el, '/v/b.excalidraw'))
+    rightClick(rowByPath(el, '/v/a.excalidraw'))
     expect(itemByLabel(el, 'Copy 2 paths')).toBeDefined()
     act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })))
     expect(el.querySelector('.ctx-menu')).toBeNull()
@@ -3105,80 +2172,14 @@ describe('Sidebar multi-select context menu (YAZ-1337)', () => {
 })
 
 /**
- * The plural items' harder halves (YAZ-1337): the TOPICS lens reaches them through the very same
- * `openMenu` (`openTopicsMenu` only adds the anchor), where one page can stand under two parents —
- * so the count and the copied text must say ONE path, not one per row (🔒 D3). And a clipboard the
- * OS refuses has to be reported, not swallowed.
+ * The plural items' harder halves (YAZ-1337): a clipboard the OS refuses has to be reported, not
+ * swallowed, and a right-click that lands OUTSIDE the selection re-picks the row it landed on.
  */
-describe('Sidebar multi-select context menu: Topics dedup and the copy failure (YAZ-1337)', () => {
-  const record = (path: string, properties: Record<string, unknown> = {}) => {
-    const name = path.slice(path.lastIndexOf('/') + 1)
-    const rel = path.slice('/v/'.length)
-    return {
-      path,
-      name,
-      basename: name.replace(/\.[^.]+$/, ''),
-      folder: rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '',
-      ext: 'md', size: 1, ctime: 1, mtime: 1, properties, aliases: [], tags: [], links: [], embeds: [],
-    }
-  }
-  // Shared is claimed by BOTH topics, so the tree draws it twice (⚡ D6 of YAZ-814); Loose belongs
-  // nowhere and waits under Uncategorized, which puts it LAST in visible order.
-  const HOME = record('/v/Home.md', { folder_page: true })
-  const DOCS = record('/v/Docs.md', { folder_page: true, folder_pages: ['[[Home]]'] })
-  const NOTES = record('/v/Notes.md', { folder_page: true, folder_pages: ['[[Home]]'] })
-  const SHARED = record('/v/Shared.md', { folder_pages: ['[[Docs]]', '[[Notes]]'] })
-  const LOOSE = record('/v/Loose.md')
-  const feed = (...records: ReturnType<typeof record>[]): SidebarProps['indexSource'] =>
-    ({
-      resolve: (target: string) =>
-        ({ '[[home]]': HOME.path, '[[docs]]': DOCS.path, '[[notes]]': NOTES.path })[target.trim().toLowerCase()] ?? null,
-      records,
-      subscribe: () => () => undefined,
-    }) as SidebarProps['indexSource']
-  /** The same files on disk, so the tree-backed prune (YAZ-1336) has nothing to take away. */
-  const DISK: TreeNode[] = [HOME, DOCS, NOTES, SHARED, LOOSE].map((r) => ({ type: 'file', name: r.name, path: r.path, size: 1, mtime: 1, kind: 'markdown' }) as const)
-  const rowsByPath = (el: HTMLElement, path: string) => [...el.querySelectorAll<HTMLElement>(`.tree__row[data-path="${path}"]`)]
+describe('Sidebar multi-select context menu: the copy failure (YAZ-1337)', () => {
   const shiftClickRow = (row: HTMLElement | undefined) =>
     act(() => void row?.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true })))
   const rightClick = (target: Element | null | undefined) =>
     act(() => void target?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
-  const expand = (el: HTMLElement, label: string) => act(() => el.querySelector<HTMLElement>(`[aria-label="Expand ${label}"]`)?.click())
-  /** Both topics open, plus Uncategorized (🔒 D7 starts closed) — so all four rows are on screen. */
-  const mountTopics = async () => {
-    const mounted = await mount({ lens: 'topics', indexSource: feed(HOME, DOCS, NOTES, SHARED, LOOSE) }, (b) =>
-      b.tree.mockResolvedValue({ root: '/v', tree: DISK, generatedAt: 1 }),
-    )
-    await expand(mounted.el, 'Docs')
-    await expand(mounted.el, 'Notes')
-    await act(async () => mounted.el.querySelector<HTMLElement>('.tree__row--muted')?.click())
-    return mounted
-  }
-
-  it('a page standing under TWO parents counts and copies ONCE (🔒 D3), still in visible order', async () => {
-    const writeText = vi.fn(async () => undefined)
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
-    const { el } = await mountTopics()
-    expect(rowsByPath(el, SHARED.path)).toHaveLength(2) // both occurrences are on screen…
-    shiftClickRow(rowsByPath(el, SHARED.path)[0])
-    shiftClickRow(rowsByPath(el, LOOSE.path)[0])
-    // …and BOTH light up off the ONE selected path, which is the whole reason the count can lie.
-    expect(el.querySelectorAll('.tree__row--selected')).toHaveLength(3)
-    rightClick(rowsByPath(el, SHARED.path)[1]) // the occurrence under Notes: either one is the page
-    expect(itemByLabel(el, 'Copy 2 paths')).toBeDefined()
-    expect(itemByLabel(el, 'Copy 3 paths')).toBeUndefined()
-    act(() => itemByLabel(el, 'Copy 2 paths')?.click())
-    expect(writeText).toHaveBeenCalledExactlyOnceWith('/v/Shared.md\n/v/Loose.md')
-  })
-
-  it('"Open 2 in new tabs" from a Topics row opens each page once, dedup included', async () => {
-    const { el, props } = await mountTopics()
-    shiftClickRow(rowsByPath(el, SHARED.path)[0])
-    shiftClickRow(rowsByPath(el, LOOSE.path)[0])
-    rightClick(rowsByPath(el, SHARED.path)[0])
-    act(() => itemByLabel(el, 'Open 2 in new tabs')?.click())
-    expect((props.onOpenFileBackground as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0])).toEqual(['/v/Shared.md', '/v/Loose.md'])
-  })
 
   it('a clipboard the OS refuses is REPORTED through the panel notice, never swallowed', async () => {
     const writeText = vi.fn(async () => {
@@ -3186,12 +2187,12 @@ describe('Sidebar multi-select context menu: Topics dedup and the copy failure (
     })
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     const MULTI: TreeNode[] = [
-      { type: 'file', name: 'a.md', path: '/v/a.md', size: 1, mtime: 1, kind: 'markdown' },
-      { type: 'file', name: 'b.md', path: '/v/b.md', size: 1, mtime: 1, kind: 'markdown' },
+      { type: 'file', name: 'a.excalidraw', path: '/v/a.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
+      { type: 'file', name: 'b.excalidraw', path: '/v/b.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
     ]
     const { el, props } = await mount({}, (b) => b.tree.mockResolvedValue({ root: '/v', tree: MULTI, generatedAt: 1 }))
     for (const row of el.querySelectorAll<HTMLElement>('.tree__row--file')) shiftClickRow(row)
-    rightClick(el.querySelector('.tree__row[data-path="/v/a.md"]'))
+    rightClick(el.querySelector('.tree__row[data-path="/v/a.excalidraw"]'))
     await act(async () => itemByLabel(el, 'Copy 2 paths')?.click())
     expect(props.onNotice).toHaveBeenCalledWith("Can't copy paths: DENIED")
   })
@@ -3199,8 +2200,8 @@ describe('Sidebar multi-select context menu: Topics dedup and the copy failure (
   it('a right-click on a DIR row outside the selection makes the selection THAT folder (D9)', async () => {
     const TREE_WITH_DIR: TreeNode[] = [
       { type: 'dir', name: 'sub', path: '/v/sub', children: [] },
-      { type: 'file', name: 'a.md', path: '/v/a.md', size: 1, mtime: 1, kind: 'markdown' },
-      { type: 'file', name: 'b.md', path: '/v/b.md', size: 1, mtime: 1, kind: 'markdown' },
+      { type: 'file', name: 'a.excalidraw', path: '/v/a.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
+      { type: 'file', name: 'b.excalidraw', path: '/v/b.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
     ]
     const { el } = await mount({}, (b) => b.tree.mockResolvedValue({ root: '/v', tree: TREE_WITH_DIR, generatedAt: 1 }))
     for (const row of el.querySelectorAll<HTMLElement>('.tree__row--file')) shiftClickRow(row)
@@ -3214,14 +2215,14 @@ describe('Sidebar multi-select context menu: Topics dedup and the copy failure (
 
 /**
  * ⚡ Fable's ruling on YAZ-1338, at the panel: THE SELECTION IS THE TRUTH, THE DOM IS ONLY THE
- * ORDER. Folding a folder over a selected note hides its ROW; the note stays picked, so N keeps
+ * ORDER. Folding a folder over a selected drawing hides its ROW; it stays picked, so N keeps
  * counting it and the copy keeps carrying it — after the paths still on screen. The `selectionRef`
- * window App reads for ⌘⇧C is the same fact, handed up.
+ * window App reads is the same fact, handed up.
  */
-describe('Sidebar multi-select: folded rows and the ⌘⇧C window (YAZ-1338)', () => {
+describe('Sidebar multi-select: folded rows and the selection window (YAZ-1338)', () => {
   const NESTED: TreeNode[] = [
-    { type: 'dir', name: 'sub', path: '/v/sub', children: [{ type: 'file', name: 'b.md', path: '/v/sub/b.md', size: 1, mtime: 1, kind: 'markdown' }] },
-    { type: 'file', name: 'a.md', path: '/v/a.md', size: 1, mtime: 1, kind: 'markdown' },
+    { type: 'dir', name: 'sub', path: '/v/sub', children: [{ type: 'file', name: 'b.excalidraw', path: '/v/sub/b.excalidraw', size: 1, mtime: 1, kind: 'drawing' }] },
+    { type: 'file', name: 'a.excalidraw', path: '/v/a.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
   ]
   const withNested = (bridge: ReturnType<typeof installBridge>) => bridge.tree.mockResolvedValue({ root: '/v', tree: NESTED, generatedAt: 1 })
   const rowByPath = (el: HTMLElement, path: string) => el.querySelector<HTMLElement>(`.tree__row[data-path="${path}"]`)
@@ -3236,32 +2237,32 @@ describe('Sidebar multi-select: folded rows and the ⌘⇧C window (YAZ-1338)', 
   const rightClickRow = (row: HTMLElement | null) =>
     act(() => void row?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
 
-  it('a selected note inside a folder the user then FOLDS still counts, and copies after the visible ones', async () => {
+  it('a selected drawing inside a folder the user then FOLDS still counts, and copies after the visible ones', async () => {
     const writeText = vi.fn(async () => undefined)
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     const { el } = await mount({}, withNested)
     // Expansion persists per root across mounts in this file, so ENSURE the states rather than
     // toggling blind — this test must not care what its neighbours left behind.
-    if (rowByPath(el, '/v/sub/b.md') === null) foldAll(el) // "Expand all": open `sub` so its note has a row to pick
-    shiftClickRow(rowByPath(el, '/v/sub/b.md'))
-    shiftClickRow(rowByPath(el, '/v/a.md'))
+    if (rowByPath(el, '/v/sub/b.excalidraw') === null) foldAll(el) // "Expand all": open `sub` so its drawing has a row to pick
+    shiftClickRow(rowByPath(el, '/v/sub/b.excalidraw'))
+    shiftClickRow(rowByPath(el, '/v/a.excalidraw'))
     foldAll(el) // "Collapse all": the row goes, the pick does not
-    expect(rowByPath(el, '/v/sub/b.md')).toBeNull()
+    expect(rowByPath(el, '/v/sub/b.excalidraw')).toBeNull()
     expect(el.querySelectorAll('.tree__row--selected')).toHaveLength(1)
-    rightClickRow(rowByPath(el, '/v/a.md'))
+    rightClickRow(rowByPath(el, '/v/a.excalidraw'))
     expect(itemByLabel(el, 'Copy 2 paths')).toBeDefined() // N is the SELECTION's size, not the DOM's
     act(() => itemByLabel(el, 'Copy 2 paths')?.click())
-    expect(writeText).toHaveBeenCalledExactlyOnceWith('/v/a.md\n/v/sub/b.md')
+    expect(writeText).toHaveBeenCalledExactlyOnceWith('/v/a.excalidraw\n/v/sub/b.excalidraw')
   })
 
   it('hands its selection up through selectionRef and empties it on the way out (🔒 D4)', async () => {
     const selectionRef = { current: EMPTY_SELECTION }
     const { el } = await mount({ selectionRef }, withNested)
     expect(selectionRef.current.size).toBe(0)
-    shiftClickRow(rowByPath(el, '/v/a.md'))
-    expect([...selectionRef.current]).toEqual(['/v/a.md'])
-    // D9: a PLAIN click is a one-row selection, so App's ⌘⇧C copies the clicked row's path.
-    act(() => rowByPath(el, '/v/sub/b.md')?.click() ?? el.querySelector<HTMLButtonElement>('.tree__row--dir')?.click())
+    shiftClickRow(rowByPath(el, '/v/a.excalidraw'))
+    expect([...selectionRef.current]).toEqual(['/v/a.excalidraw'])
+    // D9: a PLAIN click is a one-row selection, so "Copy path" copies the clicked row's path.
+    act(() => rowByPath(el, '/v/sub/b.excalidraw')?.click() ?? el.querySelector<HTMLButtonElement>('.tree__row--dir')?.click())
     expect(selectionRef.current.size).toBe(1)
     // The sidebar collapsing IS this component unmounting (App renders it conditionally), and a
     // chord must never copy a selection nobody can see any more.
@@ -3290,8 +2291,8 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
   type ClipState = { count: number; op: 'copy' | 'cut' } | null
   const MULTI_TREE: TreeNode[] = [
     { type: 'dir', name: 'sub', path: '/v/sub', children: [] },
-    { type: 'file', name: 'a.md', path: '/v/a.md', size: 1, mtime: 1, kind: 'markdown' },
-    { type: 'file', name: 'c.md', path: '/v/c.md', size: 1, mtime: 1, kind: 'markdown' },
+    { type: 'file', name: 'a.excalidraw', path: '/v/a.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
+    { type: 'file', name: 'c.excalidraw', path: '/v/c.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
   ]
   /** The bridge's clipboard push, captured so a test can play "another window just copied". */
   let pushClip: ((state: ClipState) => void) | null = null
@@ -3313,13 +2314,13 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
 
   it('a row offers Cut and Copy with their hints, and a DISABLED Paste while the clipboard is empty (🔒 D5)', async () => {
     const { el } = await mount({}, withClipboard)
-    rightClick(rowByPath(el, '/v/a.md'))
+    rightClick(rowByPath(el, '/v/a.excalidraw'))
     expect(itemByLabel(el, 'Cut')?.getAttribute('data-hint')).toBe('⌘X')
     expect(itemByLabel(el, 'Copy')?.getAttribute('data-hint')).toBe('⌘C')
     const paste = itemByLabel(el, 'Paste')
     expect(paste?.disabled).toBe(true)
     expect(paste?.getAttribute('data-hint')).toBe('⌘V')
-    // Five groups drawn on one Markdown file row: clipboard, create, this-row, "Open in" alone, Delete —
+    // Five groups drawn on one drawing row: clipboard, create, this-row, "Open in" alone, Delete —
     // the Open group is empty here (no plural open, nothing to focus) and the renderer skips it.
     expect(el.querySelectorAll('.ctx-menu__group')).toHaveLength(5)
   })
@@ -3336,28 +2337,28 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
 
   it('Cut on a single row clips that one path and SAYS SO (YAZ-1341); the menu closes', async () => {
     const { el, bridge, props } = await mount({}, withClipboard)
-    rightClick(rowByPath(el, '/v/a.md'))
+    rightClick(rowByPath(el, '/v/a.excalidraw'))
     await act(async () => itemByLabel(el, 'Cut')?.click())
-    expect(bridge.file.clip).toHaveBeenCalledExactlyOnceWith({ paths: ['/v/a.md'], op: 'cut' })
+    expect(bridge.file.clip).toHaveBeenCalledExactlyOnceWith({ paths: ['/v/a.excalidraw'], op: 'cut' })
     expect(props.onNotice).toHaveBeenCalledExactlyOnceWith('Cut 1 item', 'cut')
     expect(el.querySelector('.ctx-menu')).toBeNull()
   })
 
   it('inside a 2-selection the items count it — "Copy 2 items" — and clip the ORDERED selection, which stands', async () => {
     const { el, bridge, props } = await mount({}, withClipboard)
-    shiftClickRow(rowByPath(el, '/v/c.md')) // click order c → a…
-    shiftClickRow(rowByPath(el, '/v/a.md'))
-    rightClick(rowByPath(el, '/v/a.md'))
+    shiftClickRow(rowByPath(el, '/v/c.excalidraw')) // click order c → a…
+    shiftClickRow(rowByPath(el, '/v/a.excalidraw'))
+    rightClick(rowByPath(el, '/v/a.excalidraw'))
     expect(itemByLabel(el, 'Cut 2 items')).toBeDefined()
     await act(async () => itemByLabel(el, 'Copy 2 items')?.click())
-    expect(bridge.file.clip).toHaveBeenCalledExactlyOnceWith({ paths: ['/v/a.md', '/v/c.md'], op: 'copy' }) // …tree order out
+    expect(bridge.file.clip).toHaveBeenCalledExactlyOnceWith({ paths: ['/v/a.excalidraw', '/v/c.excalidraw'], op: 'copy' }) // …tree order out
     expect(props.onNotice).toHaveBeenCalledExactlyOnceWith('Copied 2 items', 'copy')
     expect(el.querySelectorAll('.tree__row--selected')).toHaveLength(2)
   })
 
   it('a clipboard push labels Paste "Paste 2 items"; clicking it pastes into the row\'s targetDir, refreshes and reports', async () => {
     const { el, bridge, props } = await mount({}, withClipboard)
-    bridge.file.paste.mockResolvedValue({ pasted: [{ from: '/w/x.md', to: '/v/sub/x.md', kind: 'file' }, { from: '/w/y.md', to: '/v/sub/y.md', kind: 'file' }], failed: [] })
+    bridge.file.paste.mockResolvedValue({ pasted: [{ from: '/w/x.excalidraw', to: '/v/sub/x.excalidraw', kind: 'file' }, { from: '/w/y.excalidraw', to: '/v/sub/y.excalidraw', kind: 'file' }], failed: [] })
     const treeReads = bridge.tree.mock.calls.length
     act(() => pushClip?.({ count: 2, op: 'copy' }))
     rightClick(rowByPath(el, '/v/sub'))
@@ -3369,23 +2370,23 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
     expect(bridge.tree.mock.calls.length).toBe(treeReads + 1) // the explicit refresh: a copy broadcasts nothing
   })
 
-  it('a FILE row pastes into its PARENT (the "New note" rule), and per-entry failures are counted and named', async () => {
+  it('a FILE row pastes into its PARENT (the "New drawing" rule), and per-entry failures are counted and named', async () => {
     const { el, bridge, props } = await mount({}, withClipboard)
-    bridge.file.paste.mockResolvedValue({ pasted: [{ from: '/w/x.md', to: '/v/x.md', kind: 'file' }], failed: [{ from: '/w/Note.md', code: 'ALREADY_EXISTS', message: 'already exists' }] })
+    bridge.file.paste.mockResolvedValue({ pasted: [{ from: '/w/x.excalidraw', to: '/v/x.excalidraw', kind: 'file' }], failed: [{ from: '/w/Note.excalidraw', code: 'ALREADY_EXISTS', message: 'already exists' }] })
     act(() => pushClip?.({ count: 2, op: 'cut' }))
-    rightClick(rowByPath(el, '/v/a.md'))
+    rightClick(rowByPath(el, '/v/a.excalidraw'))
     await act(async () => itemByLabel(el, 'Paste 2 items')?.click())
     expect(bridge.file.paste).toHaveBeenCalledExactlyOnceWith({ targetDir: '/v' })
-    expect(props.onNotice).toHaveBeenCalledExactlyOnceWith('Pasted 1 item, skipped 1: Note.md — already exists', 'paste')
+    expect(props.onNotice).toHaveBeenCalledExactlyOnceWith('Pasted 1 item, skipped 1: Note.excalidraw — already exists', 'paste')
   })
 
   it('nothing pasted → "Couldn\'t paste: …"; a rejected paste → a notice, never a throw', async () => {
     const { el, bridge, props } = await mount({}, withClipboard)
-    bridge.file.paste.mockResolvedValueOnce({ pasted: [], failed: [{ from: '/w/Note.md', code: 'NOT_FOUND', message: 'gone' }] })
+    bridge.file.paste.mockResolvedValueOnce({ pasted: [], failed: [{ from: '/w/Note.excalidraw', code: 'NOT_FOUND', message: 'gone' }] })
     act(() => pushClip?.({ count: 1, op: 'copy' }))
     rightClick(body(el))
     await act(async () => itemByLabel(el, 'Paste 1 item')?.click())
-    expect(props.onNotice).toHaveBeenLastCalledWith("Couldn't paste: Note.md — gone", 'error')
+    expect(props.onNotice).toHaveBeenLastCalledWith("Couldn't paste: Note.excalidraw — gone", 'error')
     bridge.file.paste.mockRejectedValueOnce({ code: 'NOT_FOUND', message: 'target dir is gone' })
     rightClick(body(el))
     await act(async () => itemByLabel(el, 'Paste 1 item')?.click())
@@ -3415,19 +2416,6 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
     expect(itemByLabel(el, 'Paste 3 items')).toBeDefined()
   })
 
-  it('Topics: a PAGE row gets Cut / Copy but no Paste — a disk verb never lands on a meaning row (🔒 D5)', async () => {
-    const record = { path: '/v/Home.md', name: 'Home.md', basename: 'Home', folder: '', ext: 'md', size: 1, ctime: 1, mtime: 1, properties: { folder_page: true }, aliases: [], tags: [], links: [], embeds: [] }
-    // The feed's resolver is keyed like the real one (lowered, brackets and all) — the YAZ-865 harness's idiom.
-    const indexSource = { resolve: (target: string) => (target.trim().toLowerCase() === '[[home]]' ? '/v/Home.md' : null), records: [record], subscribe: () => () => undefined } as SidebarProps['indexSource']
-    const { el } = await mount({ lens: 'topics', indexSource }, withClipboard)
-    const home = [...el.querySelectorAll<HTMLButtonElement>('.tree__row')].find((r) => r.querySelector('.tree__label')?.textContent === 'Home') ?? null
-    expect(home).not.toBeNull()
-    rightClick(home)
-    expect(itemByLabel(el, 'Cut')).toBeDefined()
-    expect(itemByLabel(el, 'Copy')).toBeDefined()
-    expect(itemByLabel(el, 'Paste')).toBeUndefined()
-  })
-
   // ---- The chords' handle (D6 amended): App's window listener asks these; the RULES are here ----
 
   /** A box App would hold; the Sidebar fills it every render and empties it on unmount. */
@@ -3438,12 +2426,12 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
   it('cutOrCopy with a selection clips the ORDERED paths and answers true; the cut is the same call with its op', async () => {
     const clipboardRef = box()
     const { el, bridge } = await mount({ clipboardRef }, withClipboard)
-    shiftClickRow(rowByPath(el, '/v/c.md'))
-    shiftClickRow(rowByPath(el, '/v/a.md'))
+    shiftClickRow(rowByPath(el, '/v/c.excalidraw'))
+    shiftClickRow(rowByPath(el, '/v/a.excalidraw'))
     expect(verb(clipboardRef, 'copy')).toBe(true)
-    expect(bridge.file.clip).toHaveBeenCalledExactlyOnceWith({ paths: ['/v/a.md', '/v/c.md'], op: 'copy' })
+    expect(bridge.file.clip).toHaveBeenCalledExactlyOnceWith({ paths: ['/v/a.excalidraw', '/v/c.excalidraw'], op: 'copy' })
     expect(verb(clipboardRef, 'cut')).toBe(true)
-    expect(bridge.file.clip).toHaveBeenLastCalledWith({ paths: ['/v/a.md', '/v/c.md'], op: 'cut' })
+    expect(bridge.file.clip).toHaveBeenLastCalledWith({ paths: ['/v/a.excalidraw', '/v/c.excalidraw'], op: 'cut' })
     expect(el.querySelectorAll('.tree__row--selected')).toHaveLength(2) // the selection stands
   })
 
@@ -3466,7 +2454,7 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
     await act(async () => void verb(clipboardRef, 'paste'))
     expect(bridge.file.paste).toHaveBeenLastCalledWith({ targetDir: '/v/sub' })
     act(() => void body(el)?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })))
-    shiftClickRow(rowByPath(el, '/v/a.md'))
+    shiftClickRow(rowByPath(el, '/v/a.excalidraw'))
     await act(async () => void verb(clipboardRef, 'paste'))
     expect(bridge.file.paste).toHaveBeenLastCalledWith({ targetDir: '/v' })
     expect(bridge.file.paste).toHaveBeenCalledTimes(3)
@@ -3476,8 +2464,8 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
     const clipboardRef = box()
     const { el, bridge } = await mount({ clipboardRef }, withClipboard)
     act(() => pushClip?.({ count: 1, op: 'copy' }))
-    shiftClickRow(rowByPath(el, '/v/a.md'))
-    rightClick(rowByPath(el, '/v/a.md'))
+    shiftClickRow(rowByPath(el, '/v/a.excalidraw'))
+    rightClick(rowByPath(el, '/v/a.excalidraw'))
     expect(verb(clipboardRef, 'copy')).toBe(false)
     expect(verb(clipboardRef, 'paste')).toBe(false)
     expect(bridge.file.clip).not.toHaveBeenCalled()
@@ -3493,15 +2481,15 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
     expect(clipboardRef.current).toBeNull()
   })
 
-  it('D9: a plain click on a file, then copy, clips exactly that file; ⌘⇧C sees the same one-row selection', async () => {
+  it('D9: a plain click on a file, then copy, clips exactly that file; the selection box sees the same one row', async () => {
     const clipboardRef = box()
     const selectionRef = { current: EMPTY_SELECTION }
     const { el, bridge, props } = await mount({ selectionRef, clipboardRef }, withClipboard)
-    act(() => rowByPath(el, '/v/a.md')?.click())
-    expect(props.onOpenFile).toHaveBeenCalledExactlyOnceWith('/v/a.md')
-    expect([...selectionRef.current]).toEqual(['/v/a.md'])
+    act(() => rowByPath(el, '/v/a.excalidraw')?.click())
+    expect(props.onOpenFile).toHaveBeenCalledExactlyOnceWith('/v/a.excalidraw')
+    expect([...selectionRef.current]).toEqual(['/v/a.excalidraw'])
     expect(verb(clipboardRef, 'copy')).toBe(true)
-    expect(bridge.file.clip).toHaveBeenCalledExactlyOnceWith({ paths: ['/v/a.md'], op: 'copy' })
+    expect(bridge.file.clip).toHaveBeenCalledExactlyOnceWith({ paths: ['/v/a.excalidraw'], op: 'copy' })
   })
 
   it('D9: a plain click on a FOLDER selects it, so paste goes INTO it', async () => {
@@ -3531,9 +2519,9 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
 
   it('a LEFT mousedown ON a row is the row\'s own gesture — it never clears through the body', async () => {
     const { el } = await mount({}, withClipboard)
-    shiftClickRow(rowByPath(el, '/v/a.md'))
-    shiftClickRow(rowByPath(el, '/v/c.md'))
-    act(() => void rowByPath(el, '/v/a.md')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 })))
+    shiftClickRow(rowByPath(el, '/v/a.excalidraw'))
+    shiftClickRow(rowByPath(el, '/v/c.excalidraw'))
+    act(() => void rowByPath(el, '/v/a.excalidraw')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 })))
     expect(el.querySelectorAll('.tree__row--selected')).toHaveLength(2)
   })
 })

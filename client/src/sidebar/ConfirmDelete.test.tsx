@@ -7,34 +7,30 @@ import { ConfirmDelete, deleteConfirmMessage, type DeleteTarget } from './Confir
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 describe('deleteConfirmMessage', () => {
-  it('a file with no backlinks says only what happens', () => {
-    expect(deleteConfirmMessage({ path: '/v/Roadmap.md', kind: 'file', backlinks: 0 })).toBe('Delete "Roadmap.md"? It moves to the Trash.')
+  it('a file says only what happens', () => {
+    expect(deleteConfirmMessage({ path: '/v/Roadmap.excalidraw', kind: 'file' })).toBe('Delete "Roadmap.excalidraw"? It moves to the Trash.')
   })
 
-  it('a file with backlinks appends the count, pluralised', () => {
-    expect(deleteConfirmMessage({ path: '/v/Roadmap.md', kind: 'file', backlinks: 3 })).toBe('Delete "Roadmap.md"? It moves to the Trash. 3 notes link to this.')
-    expect(deleteConfirmMessage({ path: '/v/Roadmap.md', kind: 'file', backlinks: 1 })).toBe('Delete "Roadmap.md"? It moves to the Trash. 1 note links to this.')
-  })
 
   it('an unavailable backlink count prints no count line at all', () => {
     expect(deleteConfirmMessage({ path: '/v/Roadmap.md', kind: 'file' })).toBe('Delete "Roadmap.md"? It moves to the Trash.')
   })
 
   it('a folder reports its contents, pluralised on each half', () => {
-    expect(deleteConfirmMessage({ path: '/v/Docs', kind: 'dir', children: { notes: 12, folders: 2 } })).toBe('Delete "Docs"? 12 notes and 2 folders move to the Trash.')
-    expect(deleteConfirmMessage({ path: '/v/Docs', kind: 'dir', children: { notes: 1, folders: 1 } })).toBe('Delete "Docs"? 1 note and 1 folder move to the Trash.')
+    expect(deleteConfirmMessage({ path: '/v/Docs', kind: 'dir', children: { files: 12, folders: 2 } })).toBe('Delete "Docs"? 12 files and 2 folders move to the Trash.')
+    expect(deleteConfirmMessage({ path: '/v/Docs', kind: 'dir', children: { files: 1, folders: 1 } })).toBe('Delete "Docs"? 1 file and 1 folder move to the Trash.')
     // A single item takes a singular verb: "1 note moves", not "1 note move".
-    expect(deleteConfirmMessage({ path: '/v/Docs', kind: 'dir', children: { notes: 1, folders: 0 } })).toBe('Delete "Docs"? 1 note moves to the Trash.')
-    expect(deleteConfirmMessage({ path: '/v/Docs', kind: 'dir', children: { notes: 0, folders: 1 } })).toBe('Delete "Docs"? 1 folder moves to the Trash.')
+    expect(deleteConfirmMessage({ path: '/v/Docs', kind: 'dir', children: { files: 1, folders: 0 } })).toBe('Delete "Docs"? 1 file moves to the Trash.')
+    expect(deleteConfirmMessage({ path: '/v/Docs', kind: 'dir', children: { files: 0, folders: 1 } })).toBe('Delete "Docs"? 1 folder moves to the Trash.')
   })
 
-  it('a folder with only notes, or only subfolders, omits the empty half', () => {
-    expect(deleteConfirmMessage({ path: '/v/Docs', kind: 'dir', children: { notes: 4, folders: 0 } })).toBe('Delete "Docs"? 4 notes move to the Trash.')
-    expect(deleteConfirmMessage({ path: '/v/Docs', kind: 'dir', children: { notes: 0, folders: 3 } })).toBe('Delete "Docs"? 3 folders move to the Trash.')
+  it('a folder with only files, or only subfolders, omits the empty half', () => {
+    expect(deleteConfirmMessage({ path: '/v/Docs', kind: 'dir', children: { files: 4, folders: 0 } })).toBe('Delete "Docs"? 4 files move to the Trash.')
+    expect(deleteConfirmMessage({ path: '/v/Docs', kind: 'dir', children: { files: 0, folders: 3 } })).toBe('Delete "Docs"? 3 folders move to the Trash.')
   })
 
-  it('an EMPTY folder never prints "0 notes and 0 folders"', () => {
-    expect(deleteConfirmMessage({ path: '/v/Docs', kind: 'dir', children: { notes: 0, folders: 0 } })).toBe('Delete "Docs"? It moves to the Trash.')
+  it('an EMPTY folder never prints "0 files and 0 folders"', () => {
+    expect(deleteConfirmMessage({ path: '/v/Docs', kind: 'dir', children: { files: 0, folders: 0 } })).toBe('Delete "Docs"? It moves to the Trash.')
   })
 })
 
@@ -57,7 +53,7 @@ function mount(target: DeleteTarget, over: { onConfirm?: (d: boolean) => void; o
   return { el: container, onConfirm, onCancel }
 }
 
-const FILE: DeleteTarget = { path: '/v/a.md', kind: 'file', backlinks: 0 }
+const FILE: DeleteTarget = { path: '/v/a.excalidraw', kind: 'file' }
 const btn = (el: HTMLElement, label: string) => [...el.querySelectorAll<HTMLButtonElement>('.confirm__btn')].find((b) => b.textContent === label)
 
 describe('ConfirmDelete', () => {

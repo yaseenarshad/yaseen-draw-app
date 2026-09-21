@@ -90,5 +90,5 @@ function gitLocation(platform: string): { os: string; where: string } {
  */
 export function buildSetupPrompt(root: string, attention: GithubSyncAttention, platform: string = navigator.platform): string {
   const { os, where } = gitLocation(platform)
-  return `I'm using a ${os} desktop app that syncs a folder of markdown notes to GitHub using my computer's own git. It reported: ${REASON[attention]}. Please walk me through fixing this step by step, checking as we go: (1) ${where}, (2) \`git config --global user.name\` and \`user.email\` set, (3) GitHub authentication working for HTTPS (credential helper, e.g. via GitHub Desktop sign-in) or SSH — whichever my repo's remote uses, (4) a test \`git push\` from my notes folder succeeds. My notes folder is: ${root}.`
+  return `I'm using a ${os} desktop app that syncs a folder of drawings to GitHub using my computer's own git. It reported: ${REASON[attention]}. Please walk me through fixing this step by step, checking as we go: (1) ${where}, (2) \`git config --global user.name\` and \`user.email\` set, (3) GitHub authentication working for HTTPS (credential helper, e.g. via GitHub Desktop sign-in) or SSH — whichever my repo's remote uses, (4) a test \`git push\` from my notes folder succeeds. My notes folder is: ${root}.`
 }

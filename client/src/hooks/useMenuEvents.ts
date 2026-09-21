@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import type { ZoomStep } from '@shared/types'
 
 interface UseMenuEventsOptions {
   /** File › Open Folder… (⌘⇧O) targeted this window: run the pick-folder flow. */
@@ -20,15 +19,13 @@ interface UseMenuEventsOptions {
   onNextTab: () => void
   /** Window › Previous Tab (⌃⇧Tab / ⌘⇧[): activate the tab to the left, wrapping (GRO-2234). */
   onPrevTab: () => void
-  /** View › Zoom In / Out / Actual Size (⌘+ / ⌘− / ⌘0): the focused note, else the whole app (YAZ-1710). */
-  onZoom: (step: ZoomStep) => void
 }
 
 /** Menu gestures from the main process (GRO-2161, tabs GRO-2232); main sends them to the focused window only. */
-export function useMenuEvents({ onOpenFolder, onOpenRoot, onSearch, onSwitchVault, onSettings, onToggleSidebar, onCloseTab, onNextTab, onPrevTab, onZoom }: UseMenuEventsOptions): void {
+export function useMenuEvents({ onOpenFolder, onOpenRoot, onSearch, onSwitchVault, onSettings, onToggleSidebar, onCloseTab, onNextTab, onPrevTab }: UseMenuEventsOptions): void {
   useEffect(() => {
     const menu = window.yaseenDraw.menu
-    const offs = [menu.onOpenFolder(onOpenFolder), menu.onOpenRoot(onOpenRoot), menu.onSearch(onSearch), menu.onSwitchVault(onSwitchVault), menu.onSettings(onSettings), menu.onToggleSidebar(onToggleSidebar), menu.onCloseTab(onCloseTab), menu.onNextTab(onNextTab), menu.onPrevTab(onPrevTab), menu.onZoom(onZoom)]
+    const offs = [menu.onOpenFolder(onOpenFolder), menu.onOpenRoot(onOpenRoot), menu.onSearch(onSearch), menu.onSwitchVault(onSwitchVault), menu.onSettings(onSettings), menu.onToggleSidebar(onToggleSidebar), menu.onCloseTab(onCloseTab), menu.onNextTab(onNextTab), menu.onPrevTab(onPrevTab)]
     return () => offs.forEach((off) => off())
-  }, [onOpenFolder, onOpenRoot, onSearch, onSwitchVault, onSettings, onToggleSidebar, onCloseTab, onNextTab, onPrevTab, onZoom])
+  }, [onOpenFolder, onOpenRoot, onSearch, onSwitchVault, onSettings, onToggleSidebar, onCloseTab, onNextTab, onPrevTab])
 }

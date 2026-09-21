@@ -65,36 +65,25 @@ export interface MenuHandlers {
   onOpenVsCode: (path: string) => void
   onOpenDefault: (path: string) => void
   onReveal: (path: string) => void
-  /** "Focus on folder" / "Focus on N topics" (YAZ-1605) — the caller spells the label: it knows the lens and the count. */
+  /** "Focus on folder" / "Focus on N folders" (YAZ-1605) — the caller spells the label: it knows the count. */
   focusLabel: string
   onFocus: (paths: string[]) => void
   /** Cut / Copy (YAZ-1674): the paths go to main's ONE app-wide clipboard (🔒 D1); the caller reports. */
   onCut: (paths: string[]) => void
   onCopy: (paths: string[]) => void
-  /**
-   * Paste into the menu's target dir — null WITHHOLDS the item (🔒 D5, YAZ-1674): Paste is offered
-   * exactly where "New folder" is, so a Topics PAGE row (a meaning row) never gets a disk verb.
-   */
+  /** Paste into the menu's target dir — null WITHHOLDS the item (🔒 D5, YAZ-1674): Paste is offered exactly where "New folder" is. */
   onPaste: (() => void) | null
   /**
    * The panel's passive notice (YAZ-1337): a clipboard write that never lands says so, the way
    * `PageContextMenu` reports it — a copy that quietly did nothing is the worst kind of no-op.
    */
   onNotice: (message: string) => void
-  onCopyForAgent: (path: string) => void
-  onNewNote: () => void
-  /** Create a note born a folder page — the flag and nothing else (🔒 D4 + D1, YAZ-841). */
-  onNewFolderPage: () => void
-  /**
-   * Create a DISK folder — null hides the item (YAZ-948). Topics pages and blank space still
-   * browse by meaning and omit it; YAZ-1080's explicit Uncategorized disk-folder targets reuse
-   * the Files directory menu and therefore supply it.
-   */
+  /** "New drawing" (⚡ D8 amended): the one document birth, and the first row of the create group. */
+  onNewDrawing: () => void
+  /** Create a DISK folder — null hides the item (YAZ-948). */
   onNewFolder: (() => void) | null
   /** "New dated folder" (YAZ-1604): a disk folder born with today's `MM_DD- ` seed. Same gate as `onNewFolder`. */
   onNewDatedFolder: (() => void) | null
-  /** The direction rides along with the target so the caller never re-derives it after the close (🔒 D2, YAZ-817). */
-  onToggleFolderPage: (path: string, isOn: boolean) => void
   /** "Add to favorites" / "Remove N from favorites" (YAZ-1766 D3): the paths and the direction the menu read, same idiom. */
   onToggleFavorite: (paths: string[], isOn: boolean) => void
   onRename: (path: string) => void
@@ -124,7 +113,7 @@ const openInNewTabs: Leaf = (t, h) => {
 }
 
 /**
- * Focus on folder / topic (YAZ-1605): a read-only VIEW verb, so it closes the Open group — it
+ * Focus on folder (YAZ-1605): a read-only VIEW verb, so it closes the Open group — it
  * changes what the tree shows, never what is on disk. An EMPTY list hides it too (the caller's
  * "nothing here can be focused" answer).
  */
@@ -187,7 +176,8 @@ const copyPaths: Leaf = (t, h) => {
 /**
  * "Copy path" — the row, or the vault ROOT for blank space (GRO-2273). Every copy confirms
  * through the one notice (YAZ-1341) — this item long predates it, so it also gained the failure
- * report it never had. The hint is ⌘⇧C, App's chord (🔒 D4, YAZ-1338): selection first, open file after.
+ * report it never had. No shortcut hint: the chord that used to carry one went with the old
+ * document layer (YAZ-1808), so the menu row is the whole gesture.
  */
 const copyPath: Leaf = (t, h) => {
   const path = t.copyPath
@@ -195,7 +185,6 @@ const copyPath: Leaf = (t, h) => {
   return {
     id: 'copy-path',
     label: 'Copy path',
-    hint: '⌘⇧C',
     onSelect: () => {
       void navigator.clipboard.writeText(path).then(
         () => h.onNotice('Copied path'),
@@ -205,24 +194,9 @@ const copyPath: Leaf = (t, h) => {
   }
 }
 
-/** Right under Copy path (YAZ-1617 🔒 D2): a Markdown PAGE row only — the same path, plus the handshake an agent needs. */
-const copyForAgent: Leaf = (t, h) => {
-  const path = t.agentPath
-  if (path === null) return null
-  return { id: 'copy-agent', label: 'Copy for Agent', onSelect: () => h.onCopyForAgent(path) }
-}
-
 // ---- (3) Create: births BESIDE the right-clicked row — the group targets a DIRECTORY, never the row ----
 
-const newNote: Leaf = (_t, h) => ({ id: 'new-note', label: 'New note', onSelect: h.onNewNote })
-
-/**
- * Directly after "New note" (🔒 D4, YAZ-817): a folder page is a NOTE born with one flag (🔒 D1),
- * so it belongs beside the note it is a kind of. It creates beside the right-clicked row like
- * the rest of this group — the act-on-this-row toggle below is the other half of the gesture,
- * and the two must not drift together.
- */
-const newFolderPage: Leaf = (_t, h) => ({ id: 'new-folder-page', label: 'New folder page', onSelect: h.onNewFolderPage })
+const newDrawing: Leaf = (_t, h) => ({ id: 'new-drawing', label: 'New drawing', onSelect: h.onNewDrawing })
 
 const newFolder: Leaf = (_t, h) => (h.onNewFolder === null ? null : { id: 'new-folder', label: 'New folder', onSelect: h.onNewFolder })
 
@@ -230,20 +204,6 @@ const newDatedFolder: Leaf = (_t, h) =>
   h.onNewDatedFolder === null ? null : { id: 'new-dated-folder', label: 'New dated folder', onSelect: h.onNewDatedFolder }
 
 // ---- (4) This row: acts ON the right-clicked row, so it sits after the create group ----
-
-/**
- * The folder-page toggle (🔒 D2, YAZ-817): ONE state-aware item, both directions, MARKDOWN FILE
- * rows only — folders and blank space can no more carry the flag than the root can. Above
- * Rename, because the destructive pair keeps the bottom. The reverse label is the one that opens
- * a confirm sheet (🔒 D5); the forward one writes immediately (🔒 D1), which is why neither reads
- * like a warning. The direction rides along with the target (GRO-2296).
- */
-const toggleFolderPage: Leaf = (t, h) => {
-  const path = t.folderPagePath
-  if (path === null) return null
-  const isOn = t.folderPageIsOn
-  return { id: 'toggle-folder-page', label: isOn ? 'Turn back into normal page' : 'Turn into folder page', onSelect: () => h.onToggleFolderPage(path, isOn) }
-}
 
 /** Rename — a concrete row only, NEVER blank space: main refuses to rename a window's own vault root (E1b, GRO-2241). */
 const rename: Leaf = (t, h) => {
@@ -334,9 +294,9 @@ const del: Leaf = (t, h) => {
 }
 
 const OPEN_GROUP: readonly Item[] = [openInNewTabs, focus]
-const CLIPBOARD_GROUP: readonly Item[] = [cut, copy, paste, copyPaths, copyPath, copyForAgent]
-const CREATE_GROUP: readonly Item[] = [newNote, newFolderPage, newFolder, newDatedFolder]
-const ROW_GROUP: readonly Item[] = [toggleFolderPage, rename]
+const CLIPBOARD_GROUP: readonly Item[] = [cut, copy, paste, copyPaths, copyPath]
+const CREATE_GROUP: readonly Item[] = [newDrawing, newFolder, newDatedFolder]
+const ROW_GROUP: readonly Item[] = [rename]
 const OPEN_IN_GROUP: readonly Item[] = [toggleFavorite, openIn]
 const DELETE_GROUP: readonly Item[] = [del]
 

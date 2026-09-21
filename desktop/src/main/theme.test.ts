@@ -58,7 +58,7 @@ describe('subscribeNativeTheme', () => {
     expect(apply).toHaveBeenCalledExactlyOnceWith('system')
 
     store.setSidebarWidth(321) // unrelated write
-    store.setSettings({ ...DEFAULT_SETTINGS, lineSpacing: 2 }) // settings write, same theme
+    store.setSettings({ ...DEFAULT_SETTINGS, confirmDelete: false }) // settings write, same theme
     expect(apply).toHaveBeenCalledTimes(1)
 
     store.setSettings({ ...DEFAULT_SETTINGS, theme: 'dark' })

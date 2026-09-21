@@ -1,23 +1,17 @@
-import { app, BrowserWindow, clipboard, Menu, nativeTheme, net, powerMonitor, protocol, screen, shell } from 'electron'
+import { app, BrowserWindow, Menu, nativeTheme, net, powerMonitor, protocol, screen, shell } from 'electron'
 import { statSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { fileLink, parseFileLink } from '@shared/links'
-import type { ClipboardPasteRequest, WindowEntry } from '@shared/types'
-import { CH } from '../channels'
+import type { WindowEntry } from '@shared/types'
 import type { GitSyncManager } from './git/manager'
 import { registerIpc } from './ipc'
-import { registerAgentIpc } from './ipc/agent'
-import { registerClipboardIpc } from './ipc/clipboard'
 import { createLinkQueue } from './linkQueue'
 import { openLink } from './fs/openLink'
 import { buildContextMenuTemplate, buildMenuTemplate, createMenuHandlers, pickMenuTargetWindow, subscribeMenuRebuild } from './menu'
-import { revealItem } from './fs/reveal'
-import { revealVaultImage, serveVaultImage } from './vaultProtocol'
 import { createStore } from './store'
 import { subscribeNativeTheme, windowBackgroundColor } from './theme'
 import { applyUserDataOverride } from './userData'
-import { flushIndexCache, initIndexCache } from './vaultIndex'
 import { createWindowManager } from './windows'
 import { createWindowOpenHandler } from './windowOpenPolicy'
 
@@ -63,7 +57,7 @@ app.on('open-url', (event, url) => {
 
 // Finder "Open With" (E2, GRO-2172) hands a plain absolute path — also before `ready` on cold
 // start. Encoding it as a yaseendraw:// link reuses the whole E1 pipeline (queue, parse, routing,
-// markdown/exists guards); fileLink ↔ parseFileLink is lossless (links.test.ts round trips). The
+// kind/exists guards); fileLink ↔ parseFileLink is lossless (links.test.ts round trips). The
 // packaged bundle's `fileAssociations` (role Alternate) declaration is F1's job.
 app.on('open-file', (event, path) => {
   event.preventDefault()
@@ -80,7 +74,6 @@ const RENDERER_DIR = join(__dirname, '../renderer')
 const store = createStore(join(app.getPath('userData'), 'yaseendraw.json'))
 
 /** Persistent vault-index cache (GRO-2223 D1): one JSON per vault under userData, never in the vault. */
-initIndexCache(join(app.getPath('userData'), 'index-cache'))
 
 /** Window lifecycle (GRO-2160) lives in windows.ts; this host is its Electron-only half. */
 const manager = createWindowManager(store, {
@@ -96,14 +89,8 @@ const manager = createWindowManager(store, {
     // otherwise be unactionable; the template itself is pure and lives in menu.ts.
     win.webContents.on('context-menu', (_event, params) =>
       Menu.buildFromTemplate(buildContextMenuTemplate(params, {
-        copyAs: (mode) => win.webContents.send(CH.menuCopyAs, mode),
-        pasteAs: (mode) => win.webContents.send(CH.menuPasteAs, { mode, text: clipboard.readText() } satisfies ClipboardPasteRequest),
         replace: (s) => win.webContents.replaceMisspelling(s),
         addToDictionary: (w) => win.webContents.session.addWordToSpellCheckerDictionary(w),
-        // Image rows (YAZ-1666): Chromium copies the decoded pixels at the click point; reveal
-        // resolves the `<img src>` through vaultProtocol.ts, so a non-vault source is a no-op there.
-        copyImage: () => win.webContents.copyImageAt(params.x, params.y),
-        revealImage: (src) => void revealVaultImage(src, (file) => revealItem({ path: file })),
       })).popup({ window: win }))
     // `<renderer>?win=<id>` so the renderer can ask `window.identity()` who it is.
     const url = new URL(process.env.ELECTRON_RENDERER_URL ?? 'app://yaseen/index.html')
@@ -160,10 +147,7 @@ app.whenReady().then(() => {
     nativeTheme.themeSource = theme
   })
   protocol.handle('app', (req) => {
-    const { host, pathname } = new URL(req.url)
-    // `app://vault/…` (YAZ-1658): vault images for `<img src>`, resolved by vaultProtocol.ts;
-    // every other host is the renderer bundle, exactly as before.
-    if (host === 'vault') return serveVaultImage(req, (u) => net.fetch(u))
+    const { pathname } = new URL(req.url)
     const file = join(RENDERER_DIR, pathname === '/' ? 'index.html' : pathname)
     return net.fetch(pathToFileURL(file).toString())
   })
@@ -172,16 +156,12 @@ app.whenReady().then(() => {
   // focused window while the app is not frontmost, and a menu action must never silently no-op
   // — so the last-focused live window (tracked below) is the documented fallback target.
   const menuTarget = () => pickMenuTargetWindow(BrowserWindow.getFocusedWindow(), BrowserWindow.getAllWindows(), lastFocusedWcId)?.webContents
-  registerClipboardIpc(manager, {
-    target: menuTarget,
-    writeText: (text) => clipboard.writeText(text),
-    rendererUrl: process.env.ELECTRON_RENDERER_URL ?? 'app://yaseen/index.html',
-  })
-  // Copy for Agent (YAZ-1617): main knows where the `yaseendraw` command lives; the renderer only asks.
-  registerAgentIpc({ packaged: app.isPackaged, resourcesPath: process.resourcesPath, mainDir: __dirname })
   const handlers = createMenuHandlers(store, manager, {
     focusedWebContents: menuTarget,
-    readClipboardText: () => clipboard.readText(),
+    zoom: (step) => {
+      const wc = menuTarget()
+      if (wc !== undefined) wc.setZoomLevel(step === 0 ? 0 : wc.getZoomLevel() + 0.5 * step)
+    },
     openExternal: (url) => void shell.openExternal(url),
   })
   const applyMenu = (): void =>
@@ -210,7 +190,6 @@ app.on('before-quit', (event) => {
   quitting = true
   void manager
     .flushAllForQuit()
-    .then(() => Promise.all([store.flush(), flushIndexCache(), gitSync?.flushForQuit()]))
     .finally(() => app.exit(0))
 })
 

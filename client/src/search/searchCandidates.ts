@@ -1,29 +1,24 @@
 /**
  * Title search candidates (YAZ-802): the rows the search box matches a query against, ranked by
- * the ONE completion matcher (`links/completion.ts`) so search ranks exactly like `[[`
- * completion does. 🔒 D3 on YAZ-739: the query matches the note's BASENAME and its frontmatter
- * ALIASES only — `folder` rides along as the row's display label and is never matched. Amended
- * by 🔒 D2 on YAZ-1491: a note STILL never matches on its folder; the folder itself is one row
- * (`folderCandidates`, fed from the tree the Sidebar already holds — 🔒 D1), matched by its own
- * name through the same matcher, in the same flat list.
- *
- * Deliberately NOT `linkCandidates`: a link candidate must insert text that resolves back to its
- * own record, so duplicate basenames there are folder-disambiguated and only the shallowest keeps
- * the bare name. Search opens `path` directly, so there is nothing to disambiguate — every note
- * gets a row under its own basename, and duplicates are told apart by the folder label.
+ * the ONE matcher (`search/matchCandidates.ts`). 🔒 D3 on YAZ-739: the query matches the file's
+ * NAME only — `folder` rides along as the row's display label and is never matched. Amended by
+ * 🔒 D2 on YAZ-1491: a file STILL never matches on its folder; the folder itself is one row,
+ * matched by its own name through the same matcher, in the same flat list. Both feeds are the
+ * tree the Sidebar already holds (🔒 D1) — no second read of the vault.
  */
-import type { IndexRecord } from '@shared/types'
-import { matchLinkCandidates } from '../links/completion'
+import type { TreeNode } from '@shared/types'
+import { stripExt } from '../lib/paths'
+import { matchCandidates } from './matchCandidates'
 
 /** One search row: what the query matches, what it reads as, what activating it targets. */
 export interface SearchCandidate {
   /** What activating the row does (🔒 D3, YAZ-1491): a `dir` row REVEALS itself in Files; a `file` row OPENS. */
   kind: 'file' | 'dir'
-  /** The text the query matches: the note's basename, one of its aliases, or the folder's name. */
+  /** The text the query matches: the file's name (a drawing without its extension) or the folder's name. */
   name: string
   /** `name.toLowerCase()`, precomputed so the ranking scan (GRO-2197) allocates nothing per keystroke. */
   lower: string
-  /** Row text: the basename, or `Alias — Basename` (the alias row's disambiguation). */
+  /** Row text — the same name. */
   label: string
   /** Absolute path — the open (or reveal) action's target. */
   path: string
@@ -35,16 +30,17 @@ export interface SearchCandidate {
 export const SEARCH_CAP = 50
 
 /**
- * Candidates for one index snapshot, in records order (i.e. path-sorted): every record under its
- * basename, followed by one row per frontmatter alias. An alias equal to its own basename
- * (case-insensitively) is SKIPPED — it would only duplicate the row above it (mirrors
- * `linkCandidates`' degenerate-alias skip).
+ * One row per FILE in the loaded tree, in tree order — the same feed the folder rows come from
+ * (🔒 D1, YAZ-1491), so search costs no second read of the vault. A drawing matches and reads
+ * under its name without the extension, exactly as the tree and the tab strip spell it.
  */
-export function searchCandidates(records: readonly IndexRecord[]): SearchCandidate[] {
-  return records.flatMap((r) => {
-    const row = (name: string, label: string): SearchCandidate => ({ kind: 'file', name, lower: name.toLowerCase(), label, path: r.path, folder: r.folder })
-    const aliases = r.aliases.filter((alias) => alias.toLowerCase() !== r.basename.toLowerCase())
-    return [row(r.basename, r.basename), ...aliases.map((alias) => row(alias, `${alias} — ${r.basename}`))]
+export function searchCandidates(root: string, files: readonly TreeNode[]): SearchCandidate[] {
+  const prefix = `${root.replace(/\/+$/, '')}/`
+  return files.map((file) => {
+    const rel = file.path.startsWith(prefix) ? file.path.slice(prefix.length) : file.path
+    const cut = rel.lastIndexOf('/')
+    const name = stripExt(file.name)
+    return { kind: 'file', name, lower: name.toLowerCase(), label: name, path: file.path, folder: cut === -1 ? '' : rel.slice(0, cut) }
   })
 }
 
@@ -52,8 +48,8 @@ export function searchCandidates(records: readonly IndexRecord[]): SearchCandida
  * One row per folder in the loaded tree (🔒 D1, YAZ-1491): matched by its own name, labelled by
  * its parent. `dirs` are ABSOLUTE paths in tree order (`allDirs`, treeState.ts), so a folder's
  * row sits above its children's — and, spliced ahead of `searchCandidates`, above any note that
- * ties with it in a rank bucket. `folder` follows `IndexRecord.folder`: root-relative, `/`
- * separated, `''` directly under the root.
+ * ties with it in a rank bucket. `folder` is root-relative, `/` separated, `''` directly under
+ * the root.
  */
 export function folderCandidates(root: string, dirs: readonly string[]): SearchCandidate[] {
   const prefix = `${root.replace(/\/+$/, '')}/`
@@ -67,5 +63,5 @@ export function folderCandidates(root: string, dirs: readonly string[]): SearchC
 
 /** Rows matching `query`, ranked exact → prefix → substring by the shared matcher, capped at SEARCH_CAP. */
 export function searchTitles(candidates: readonly SearchCandidate[], query: string): SearchCandidate[] {
-  return matchLinkCandidates(candidates, query, SEARCH_CAP)
+  return matchCandidates(candidates, query, SEARCH_CAP)
 }

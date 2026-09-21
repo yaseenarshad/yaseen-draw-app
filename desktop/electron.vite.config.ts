@@ -59,8 +59,7 @@ export default defineConfig({
     // No externalizeDepsPlugin: chokidar 4 is pure JS and gets bundled, so the packaged app
     // needs no node_modules at all (spike decision, see GRO-2151 findings).
     resolve: { alias: { '@shared': shared } },
-    // Two entries (YAZ-1617): the app, and the `yaseendraw` command the packaged shim runs as plain Node.
-    build: { rollupOptions: { input: { index: resolve(here, 'src/main/index.ts'), cli: resolve(here, 'src/cli/index.ts') } } },
+    build: { rollupOptions: { input: { index: resolve(here, 'src/main/index.ts') } } },
   },
   preload: {
     resolve: { alias: { '@shared': shared } },
@@ -75,9 +74,9 @@ export default defineConfig({
        * 🔒 ONE React in the renderer (YAZ-879). npm hoists a SECOND, older `react` to the repo
        * root (a transitive peer of the Excalidraw tree), and `@excalidraw/excalidraw` lives up
        * there too — so without this its bundle carried its own React while `client/` used 19.x,
-       * and the first `<Excalidraw>` mount died on a null dispatcher ("Cannot read properties of
-       * null (reading 'useEffect')"). Invisible until now only because YAZ-878's previews call
-       * `exportToSvg` and render no components at all.
+       * and the first `<Excalidraw>` mount died on a null dispatcher — the React "useEffect of
+       * null" crash. Invisible until now only because YAZ-878's previews call `exportToSvg` and
+       * render no components at all.
        */
       dedupe: ['react', 'react-dom'],
     },
