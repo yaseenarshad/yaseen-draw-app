@@ -13,6 +13,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { DrawingLoadResponse, GithubSyncStatus } from '@shared/types'
 import type { WatchEvent } from '@shared/types'
+import type { DrawingFileData } from '@shared/drawingAssets'
 import type { DrawingSnapshot, DrawingSurfaceApi, DrawingSurfaceProps } from './ExcalidrawSurface'
 
 vi.mock('../api', async (importOriginal) => ({
@@ -100,9 +101,9 @@ async function flush(): Promise<void> {
   })
 }
 
-/** Emit a snapshot whose `serialize()` answers `json`. */
-function emit(version: number, json = scene([{ id: 'a' }])): void {
-  act(() => surface.emit?.({ version, serialize: () => json }))
+/** Emit a snapshot whose `serialize()` answers `json` and, optionally, live engine files. */
+function emit(version: number, json = scene([{ id: 'a' }]), files: Record<string, DrawingFileData> = {}, referenced = new Set(Object.keys(files))): void {
+  act(() => surface.emit?.({ version, serialize: () => ({ json, files, referenced }) }))
 }
 
 const chips = (): string => container.textContent ?? ''
@@ -200,7 +201,7 @@ describe('autosave', () => {
     render()
     await flush()
     emit(7)
-    const serialize = vi.fn(() => scene([{ id: 'b' }]))
+    const serialize = vi.fn(() => ({ json: scene([{ id: 'b' }]), files: {}, referenced: new Set<string>() }))
     act(() => surface.emit?.({ version: 8, serialize }))
     expect(chips()).toContain('Unsaved')
     act(() => surface.emit?.({ version: 9, serialize }))
@@ -411,6 +412,69 @@ describe('external changes', () => {
     watcherSaw({ type: 'change', path: '/vault/Other.excalidraw', mtime: 400 })
     await flush()
     expect(load).not.toHaveBeenCalled()
+  })
+})
+
+describe('🔒 D3 — which image bytes a save ships', () => {
+  const png = (payload: string): DrawingFileData => ({ mimeType: 'image/png', dataURL: `data:image/png;base64,${payload}` })
+
+  it('ships only the files the store lacks, and never ships one twice', async () => {
+    load.mockResolvedValue(loaded({ files: { old: png('bw==') }, stored: ['old'] }))
+    render()
+    await flush()
+    emit(1)
+    save.mockResolvedValue({ path: PATH, mtime: 200, size: 50, persisted: ['fresh'] })
+    emit(2, scene([{ type: 'image', fileId: 'old' }, { type: 'image', fileId: 'fresh' }]), { old: png('bw=='), fresh: png('Zg==') }, new Set(['old', 'fresh']))
+    await act(async () => {
+      vi.advanceTimersByTime(500)
+    })
+    // `old` came back from load as already stored; only `fresh` travels.
+    expect(save.mock.calls[0][0].newFiles).toEqual([{ fileId: 'fresh', ...png('Zg==') }])
+
+    // A later save in the same session must not ship `fresh` again: the receipt added it.
+    emit(3, scene([{ type: 'image', fileId: 'fresh' }]), { old: png('bw=='), fresh: png('Zg==') }, new Set(['old', 'fresh']))
+    await act(async () => {
+      vi.advanceTimersByTime(500)
+    })
+    expect(save.mock.calls[1][0].newFiles).toEqual([])
+  })
+
+  it('never ships a pasted-then-deleted image: only what the scene still references', async () => {
+    render()
+    await flush()
+    emit(1)
+    emit(2, scene(), { dropped: png('ZA==') }, new Set())
+    await act(async () => {
+      vi.advanceTimersByTime(500)
+    })
+    expect(save.mock.calls[0][0].newFiles).toEqual([])
+  })
+
+  it('a LEGACY embedded board comes back as not-stored, so its first save ships the bytes out', async () => {
+    load.mockResolvedValue(loaded({ json: scene([{ type: 'image', fileId: 'emb' }]), files: { emb: png('ZQ==') }, stored: [] }))
+    render()
+    await flush()
+    emit(1)
+    emit(2, scene([{ type: 'image', fileId: 'emb' }]), { emb: png('ZQ==') }, new Set(['emb']))
+    await act(async () => {
+      vi.advanceTimersByTime(500)
+    })
+    expect(save.mock.calls[0][0].newFiles).toEqual([{ fileId: 'emb', ...png('ZQ==') }])
+  })
+
+  it('a reload resets the persisted set to what the disk now holds', async () => {
+    render()
+    await flush()
+    emit(1)
+    load.mockResolvedValue(loaded({ json: scene([{ type: 'image', fileId: 'disk' }]), files: { disk: png('ZA==') }, stored: ['disk'], mtime: 400 }))
+    watcherSaw({ type: 'change', path: PATH, mtime: 400 })
+    await flush()
+    emit(0) // the engine's post-reload snapshot lands as the baseline
+    emit(9, scene([{ type: 'image', fileId: 'disk' }]), { disk: png('ZA==') }, new Set(['disk']))
+    await act(async () => {
+      vi.advanceTimersByTime(500)
+    })
+    expect(save.mock.calls[0][0].newFiles).toEqual([])
   })
 })
 

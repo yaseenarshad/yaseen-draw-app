@@ -10,6 +10,10 @@ export async function makeFixture(): Promise<{ root: string; cleanup: () => Prom
   await mkdir(path.join(root, 'alpha'), { recursive: true })
   await mkdir(path.join(root, 'Empty'), { recursive: true })
   await mkdir(path.join(root, 'assets-only'), { recursive: true })
+  // The image store (🔒 D3) and a user folder of the same name one level down: the tree hides
+  // the first and shows the second, and `tree.test.ts` holds that line.
+  await mkdir(path.join(root, 'assets'), { recursive: true })
+  await mkdir(path.join(root, 'Zeta', 'assets'), { recursive: true })
   await mkdir(path.join(root, '.obsidian'), { recursive: true })
   await mkdir(path.join(root, '.yaseendraw'), { recursive: true })
   await mkdir(path.join(root, '.git'), { recursive: true })
@@ -24,6 +28,8 @@ export async function makeFixture(): Promise<{ root: string; cleanup: () => Prom
     writeFile(path.join(root, 'Zeta', 'z.excalidraw'), 'z'),
     writeFile(path.join(root, 'alpha', 'a.excalidraw'), 'a'),
     writeFile(path.join(root, 'assets-only', 'img.png'), 'png'),
+    writeFile(path.join(root, 'assets', 'deadbeef.png'), 'stored bytes'),
+    writeFile(path.join(root, 'Zeta', 'assets', 'theirs.excalidraw'), '{"elements":[]}'),
     writeFile(path.join(root, '.obsidian', 'workspace.excalidraw'), 'ws'),
     writeFile(path.join(root, '.yaseendraw', 'foo.json'), '{"a":1}'),
     writeFile(path.join(root, 'node_modules', 'pkg', 'README.excalidraw'), 'readme'),

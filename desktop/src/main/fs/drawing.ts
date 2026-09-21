@@ -22,17 +22,31 @@
  * Requests cross IPC from a sandboxed renderer, so their shape is checked like a request body,
  * never trusted from the type.
  *
- * IMAGE BYTES ARE YAZ-1811's (🔒 D3). This file already carries their fields — `files` /
- * `stored` on the way out, `newFiles` / `persisted` on the way back — so the contract does not
- * change shape when the store lands; until it does, load reports no images (the engine draws its
- * placeholder) and `persisted: []` says exactly which of a caller's `newFiles` reached disk:
- * none.
+ * 🔒 D3 ON DISK: the scene carries `files: {}`; image elements keep only their `fileId`; the
+ * bytes sit at `<root>/assets/<fileId>.<ext>` (the engine's own SHA-1 id, the mime's extension).
+ * An asset is IMMUTABLE — the same bytes always get the same name — so a save never rewrites one
+ * (`wx`; EEXIST means it is already exactly these bytes). A LEGACY export that still embeds
+ * `files` opens (its entries pass straight through the load) and SHRINKS on its first save:
+ * `stripEmbeddedFiles` lifts the bytes into the store and writes the scene lean.
+ *
+ * ASSETS FIRST, THEN THE SCENE. A scene on disk must never name bytes that are not there, so
+ * every asset lands before the file that references it. The reverse order would leave a crash
+ * window in which the document is broken; this order's worst case is an unreferenced asset,
+ * which the orphan sweep collects a day later.
+ *
+ * A REFERENCED ID WITH NO BYTES ANYWHERE is left OUT of the response rather than raised as an
+ * error: the engine draws its missing-image placeholder and the document still opens. Losing a
+ * picture must never cost the user the board it was on.
+ *
+ * Pure rules (`referencedFileIds`, `stripEmbeddedFiles`, `extForMime`, …) live in
+ * `shared/drawingAssets.ts`; this file is the fs around them.
  */
-import { stat } from 'node:fs/promises'
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import type { DrawingLoadRequest, DrawingLoadResponse, DrawingSaveRequest, DrawingSaveResponse } from '@shared/types'
+import type { DrawingFileEntry, DrawingLoadRequest, DrawingLoadResponse, DrawingSaveRequest, DrawingSaveResponse } from '@shared/types'
 import { MAX_DRAWING_BYTES } from '@shared/types'
 import { isDrawing } from '@shared/fileKind'
+import { ASSETS_DIR, assetFileName, extForMime, fileIdOfAssetName, isValidFileId, mimeForAssetExt, parseDataUrl, referencedFileIds, stripEmbeddedFiles } from '@shared/drawingAssets'
 import { readBoundedRegularFile } from './boundedRead'
 import { atomicWrite, BridgeFailure, fsCall, requireAbsPath, requireDir } from './fsUtils'
 
@@ -75,14 +89,67 @@ function sceneElements(json: string, file: string, code: 'IO_ERROR' | 'BAD_REQUE
   return Array.isArray(elements) ? elements : bad()
 }
 
+/** `assets/` as a map fileId → file name (first match wins); an absent folder is an empty store. */
+async function listStore(dir: string): Promise<Map<string, string>> {
+  const store = new Map<string, string>()
+  const names = await readdir(path.join(dir, ASSETS_DIR)).catch(() => [] as string[])
+  // Sorted so a duplicate id spelled two ways (`x.png` and `x.jpg`) always resolves to the same one.
+  for (const name of names.sort()) {
+    const id = fileIdOfAssetName(name)
+    const ext = name.slice(name.lastIndexOf('.') + 1)
+    if (id === null || mimeForAssetExt(ext) === null || store.has(id)) continue
+    store.set(id, name)
+  }
+  return store
+}
+
 export async function loadDrawing(req: DrawingLoadRequest): Promise<DrawingLoadResponse> {
   const { dir, file } = target(req)
   await requireDir(dir)
   const snapshot = await readBoundedRegularFile(file, MAX_DRAWING_BYTES, TOO_LARGE)
   const json = snapshot.data.toString('utf8')
-  sceneElements(json, file, 'IO_ERROR')
-  // Images are YAZ-1811's; the two fields ride along empty so the envelope never changes shape.
-  return { path: file, json, mtime: snapshot.mtime, size: snapshot.size, files: {}, stored: [] }
+  const elements = sceneElements(json, file, 'IO_ERROR')
+  // A legacy scene's own embedded entries are the fallback when the store has nothing.
+  const { embedded } = stripEmbeddedFiles(json)
+  const store = await listStore(dir)
+  const files: Record<string, DrawingFileEntry> = {}
+  const stored: string[] = []
+  for (const id of [...referencedFileIds(elements)].sort()) {
+    const name = store.get(id)
+    if (name !== undefined) {
+      const mimeType = mimeForAssetExt(name.slice(name.lastIndexOf('.') + 1))
+      const bytes = await readFile(path.join(dir, ASSETS_DIR, name)).catch(() => null)
+      // Unreadable bytes are the same as absent bytes: the placeholder, not a failed open.
+      if (bytes !== null && mimeType !== null) {
+        files[id] = { mimeType, dataURL: `data:${mimeType};base64,${bytes.toString('base64')}` }
+        stored.push(id)
+        continue
+      }
+    }
+    const legacy = embedded[id]
+    if (legacy !== undefined) files[id] = legacy
+  }
+  return { path: file, json, mtime: snapshot.mtime, size: snapshot.size, files, stored }
+}
+
+/** One asset to land: validated shape, resolved name, decoded bytes. */
+interface PendingAsset {
+  fileId: string
+  name: string
+  bytes: Buffer
+}
+
+/** One `newFiles` entry, checked like a request body — it names a file the renderer wants created. */
+function checkAsset(entry: unknown, file: string): PendingAsset {
+  if (typeof entry !== 'object' || entry === null) throw new BridgeFailure('BAD_REQUEST', 'newFiles entries must be objects', { path: file })
+  const { fileId, mimeType, dataURL } = entry as Record<string, unknown>
+  if (!isValidFileId(fileId)) throw new BridgeFailure('BAD_REQUEST', "'fileId' must be a plain id", { path: file })
+  if (typeof mimeType !== 'string' || extForMime(mimeType) === null) throw new BridgeFailure('BAD_REQUEST', `unsupported image type for ${fileId}`, { path: file })
+  const data = typeof dataURL === 'string' ? parseDataUrl(dataURL) : null
+  if (data === null) throw new BridgeFailure('BAD_REQUEST', `'dataURL' for ${fileId} must be a base64 data URL`, { path: file })
+  const name = assetFileName(fileId, mimeType)
+  if (name === null) throw new BridgeFailure('BAD_REQUEST', `unsupported image type for ${fileId}`, { path: file })
+  return { fileId, name, bytes: Buffer.from(data.base64, 'base64') }
 }
 
 export async function saveDrawing(req: DrawingSaveRequest): Promise<DrawingSaveResponse> {
@@ -92,8 +159,20 @@ export async function saveDrawing(req: DrawingSaveRequest): Promise<DrawingSaveR
   if (expectedMtime !== undefined && typeof expectedMtime !== 'number') throw new BridgeFailure('BAD_REQUEST', "'expectedMtime' must be a number", { path: file })
   if (!Array.isArray(newFiles)) throw new BridgeFailure('BAD_REQUEST', "'newFiles' must be an array", { path: file })
   // Every check before any write: a half-landed save is worse than a refused one.
-  sceneElements(json, file, 'BAD_REQUEST')
-  if (Buffer.byteLength(json, 'utf8') > MAX_DRAWING_BYTES) throw new BridgeFailure('TOO_LARGE', TOO_LARGE, { path: file })
+  const elements = sceneElements(json, file, 'BAD_REQUEST')
+  const pending = newFiles.map((entry) => checkAsset(entry, file))
+  const { json: lean, embedded } = stripEmbeddedFiles(json)
+  // A legacy scene's still-embedded bytes shrink into the store on THIS save — only the ones the
+  // scene still references, and only those the renderer did not already ship as `newFiles`.
+  const referenced = referencedFileIds(elements)
+  for (const [fileId, entry] of Object.entries(embedded)) {
+    if (!referenced.has(fileId) || !isValidFileId(fileId) || pending.some((p) => p.fileId === fileId)) continue
+    const data = parseDataUrl(entry.dataURL)
+    const name = assetFileName(fileId, entry.mimeType)
+    if (data === null || name === null) continue
+    pending.push({ fileId, name, bytes: Buffer.from(data.base64, 'base64') })
+  }
+  if (Buffer.byteLength(lean, 'utf8') > MAX_DRAWING_BYTES) throw new BridgeFailure('TOO_LARGE', TOO_LARGE, { path: file })
   await requireDir(dir)
   if (expectedMtime !== undefined) {
     // A file that is GONE is not a conflict: the tab's own copy is the only one left, and
@@ -103,7 +182,25 @@ export async function saveDrawing(req: DrawingSaveRequest): Promise<DrawingSaveR
       throw new BridgeFailure('CONFLICT', 'drawing changed on disk since last read', { path: file, mtime: st.mtimeMs })
     }
   }
-  const { mtime, size } = await fsCall(file, () => atomicWrite(file, json))
-  // No store yet (YAZ-1811): the honest answer to "which ids are on disk now" is none.
-  return { path: file, mtime, size, persisted: [] }
+  // Assets first (see the module doc), and only once the conflict guard has passed — a refused
+  // save must leave the vault exactly as it found it.
+  const persisted: string[] = []
+  if (pending.length > 0) {
+    const store = path.join(dir, ASSETS_DIR)
+    await fsCall(store, () => mkdir(store, { recursive: true }))
+    for (const asset of pending) {
+      const to = path.join(store, asset.name)
+      await fsCall(to, async () => {
+        try {
+          // `wx`: an existing file is left exactly as it is — content-addressed means it IS these bytes.
+          await writeFile(to, asset.bytes, { flag: 'wx' })
+        } catch (err) {
+          if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
+        }
+      })
+      persisted.push(asset.fileId)
+    }
+  }
+  const { mtime, size } = await fsCall(file, () => atomicWrite(file, lean))
+  return { path: file, mtime, size, persisted }
 }
