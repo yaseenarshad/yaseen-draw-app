@@ -18,7 +18,7 @@ let root: string
 let cleanup: () => Promise<void>
 beforeAll(async () => {
   ;({ root, cleanup } = await makeFixture())
-  await writeFile(path.join(root, 'My Note.md'), 'has a space')
+  await writeFile(path.join(root, 'My Note.excalidraw'), 'has a space')
 })
 afterAll(() => cleanup())
 
@@ -29,15 +29,15 @@ beforeEach(() => {
 
 describe('openInVsCode (YAZ-963)', () => {
   it('opens a file through the vscode:// deep link at its exact path', async () => {
-    const p = path.join(root, 'b.md')
+    const p = path.join(root, 'b.excalidraw')
     expect(await openInVsCode({ path: p })).toEqual({ path: p })
     expect(open).toHaveBeenCalledExactlyOnceWith(`vscode://file${p}`)
   })
 
   it('a space in the name is percent-encoded — the URL survives, the file opens', async () => {
-    const p = path.join(root, 'My Note.md')
+    const p = path.join(root, 'My Note.excalidraw')
     expect(await openInVsCode({ path: p })).toEqual({ path: p })
-    expect(open).toHaveBeenCalledExactlyOnceWith(`vscode://file${path.join(root, 'My%20Note.md')}`)
+    expect(open).toHaveBeenCalledExactlyOnceWith(`vscode://file${path.join(root, 'My%20Note.excalidraw')}`)
   })
 
   it('opens a FOLDER the same way — VS Code decides what a folder means, not this menu', async () => {
@@ -52,7 +52,7 @@ describe('openInVsCode (YAZ-963)', () => {
   })
 
   it('a missing path is NOT_FOUND and openExternal is never called (the stale-row case)', async () => {
-    expect((await failure(openInVsCode({ path: path.join(root, 'nope.md') }))).code).toBe('NOT_FOUND')
+    expect((await failure(openInVsCode({ path: path.join(root, 'nope.excalidraw') }))).code).toBe('NOT_FOUND')
     expect(open).not.toHaveBeenCalled()
   })
 
@@ -65,7 +65,7 @@ describe('openInVsCode (YAZ-963)', () => {
 
   it('rejects a missing or relative path argument before touching the disk', async () => {
     expect((await failure(openInVsCode({}))).code).toBe('BAD_REQUEST')
-    expect((await failure(openInVsCode({ path: 'relative/x.md' }))).code).toBe('NOT_ABSOLUTE')
+    expect((await failure(openInVsCode({ path: 'relative/x.excalidraw' }))).code).toBe('NOT_ABSOLUTE')
     expect((await failure(openInVsCode(null))).code).toBe('BAD_REQUEST')
     expect(open).not.toHaveBeenCalled()
   })

@@ -40,7 +40,7 @@ function fakeWindow() {
 
 const bounds = { x: 0, y: 0, width: 800, height: 600 }
 const sender = { id: 1 }
-const win = (id: string, root: string | null) => ({ id, root, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'topics' as const, focusDirs: [], focusTopics: [], focusFavorites: [], bounds })
+const win = (id: string, root: string | null) => ({ id, root, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files' as const, focusDirs: [], focusFavorites: [], bounds })
 
 let dir: string
 let vault: string

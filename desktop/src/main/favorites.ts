@@ -8,10 +8,10 @@ import { readConfigDetailed, subscribeConfig, writeConfig } from './vaultConfig'
 /**
  * The Favorites list in the vault (YAZ-1766 6A, D11): `<root>/.yaseendraw/favorites.json` =
  * `{ version: 1, favorites: string[] }` of VAULT-RELATIVE POSIX paths in the user's order, so
- * GitHub sync carries it between machines. Electron-free, over the vaultConfig plumbing like
- * `properties/`. The API speaks ABSOLUTE paths; the file never does.
+ * GitHub sync carries it between machines. Electron-free, over the `vaultConfig` plumbing.
+ * The API speaks ABSOLUTE paths; the file never does.
  *
- * Corrupt-file policy (properties' R2.5): unparsable JSON or a wrong shape reads as `[]` and
+ * Corrupt-file policy (R2.5): unparsable JSON or a wrong shape reads as `[]` and
  * refuses every write with `INVALID_CONFIG` — the file is never overwritten or moved aside.
  * Dead-entry cleanup (D14): a write drops entries whose path no longer exists on disk; the
  * renderer never prunes. Repair (D13): `renamePath` / `removePath` remap or drop entries in the
@@ -41,7 +41,7 @@ async function readRaw(root: string): Promise<Raw> {
   return { state: 'ok', rels: clean(v.favorites) }
 }
 
-/** Per-root promise chain (properties' idiom): writes and repairs on one root never interleave. */
+/** Per-root promise chain: writes and repairs on one root never interleave. */
 const chains = new Map<string, Promise<unknown>>()
 
 function chained<T>(root: string, fn: () => Promise<T>): Promise<T> {

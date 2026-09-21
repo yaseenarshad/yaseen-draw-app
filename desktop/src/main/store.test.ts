@@ -3,7 +3,7 @@ import { mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promi
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { DEFAULT_SETTINGS, MAX_COLLAPSED_GROUP_KEYS, MAX_FOLD_KEYS_PER_FILE, MAX_RECENT_ROOTS, MAX_TOPICS_EXPANDED_PAGES, SIDEBAR_DEFAULT_W, SIDEBAR_MAX_W, SIDEBAR_MIN_W, addRecentRoot, defaultAppState, defaultRightPanelIdentity, type AppState, type WindowEntry } from '@shared/types'
+import { DEFAULT_SETTINGS, MAX_RECENT_ROOTS, SIDEBAR_DEFAULT_W, SIDEBAR_MAX_W, SIDEBAR_MIN_W, addRecentRoot, defaultAppState, type AppState, type WindowEntry } from '@shared/types'
 import { createStore } from './store'
 
 // `rename` is the atomic write's last step: one rename = one write to disk.
@@ -28,7 +28,7 @@ afterEach(async () => {
 const seed = (v: unknown) => writeFile(file, typeof v === 'string' ? v : JSON.stringify(v))
 const onDisk = async (): Promise<AppState> => JSON.parse(await readFile(file, 'utf8')) as AppState
 const bounds = { x: 1, y: 2, width: 300, height: 200 }
-const win = (id: string, extra: Partial<WindowEntry> = {}): WindowEntry => ({ id, root: null, file: null, tabs: [], rightPanel: defaultRightPanelIdentity(), sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds, ...extra })
+const win = (id: string, extra: Partial<WindowEntry> = {}): WindowEntry => ({ id, root: null, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'favorites', focusDirs: [], focusFavorites: [], bounds, ...extra })
 /** A seed with every field valid, to vary one field at a time. */
 const valid = (over: Record<string, unknown> = {}) => ({ ...defaultAppState(), ...over })
 
@@ -54,30 +54,26 @@ describe('createStore: loading', () => {
     expect(existsSync(file)).toBe(false)
   })
 
-  it('a valid file loads as is — except the two session lists, which a launch never restores (YAZ-1642)', async () => {
+  it('a valid file loads as is — except the session list, which a launch never restores (YAZ-1642)', async () => {
     const state: AppState = {
       version: 1,
-      settings: { ...DEFAULT_SETTINGS, lineSpacing: 2, threadColor: '#00aaff' },
+      settings: { ...DEFAULT_SETTINGS, theme: 'dark', confirmDelete: false },
       sidebarWidth: 320,
       recents: [{ path: '/v', lastOpened: 5 }],
-      windows: [win('w1', { root: '/v', file: '/v/a.md', tabs: ['/v/a.md', '/v/b.md'], sidebarCollapsed: true, sidebarLens: 'files' })],
-      folders: { '/v': { expanded: ['/v/sub'], lastFile: '/v/a.md', folds: { '/v/a.md': ['k1'] }, baseGroups: { '/v/b.md::T': ['v:idea'] }, topicsExpanded: ['/v/Metrics.md'] } },
+      windows: [win('w1', { root: '/v', file: '/v/a.excalidraw', tabs: ['/v/a.excalidraw', '/v/b.excalidraw'], sidebarCollapsed: true, sidebarLens: 'files' })],
+      folders: { '/v': { expanded: ['/v/sub'], lastFile: '/v/a.excalidraw' } },
     }
     await seed(state)
-    expect(createStore(file).get()).toEqual({ ...state, folders: { '/v': { ...state.folders['/v'], expanded: [], topicsExpanded: [] } } })
+    expect(createStore(file).get()).toEqual({ ...state, folders: { '/v': { ...state.folders['/v'], expanded: [] } } })
   })
 
-  it('settings fall back field by field (partial shapes, junk types, width/colour ranges)', async () => {
-    await seed(valid({ settings: { lineSpacing: 1.15 } }))
-    expect(createStore(file).get().settings).toEqual({ ...DEFAULT_SETTINGS, lineSpacing: 1.15 })
-    await seed(valid({ settings: { lineSpacing: 'big', blockGap: 8, bulletThreading: 'off' } }))
-    expect(createStore(file).get().settings).toEqual({ ...DEFAULT_SETTINGS, blockGap: 8 })
-    await seed(valid({ settings: { threadWidth: 3, threadColor: '#ff0000' } }))
-    expect(createStore(file).get().settings).toEqual({ ...DEFAULT_SETTINGS, threadWidth: 3, threadColor: '#ff0000' })
-    await seed(valid({ settings: { threadWidth: 5, threadColor: 'red' } }))
-    expect(createStore(file).get().settings).toEqual(DEFAULT_SETTINGS)
-    await seed(valid({ settings: { threadWidth: 'thick', threadColor: null } }))
-    expect(createStore(file).get().settings).toEqual(DEFAULT_SETTINGS)
+  it('settings fall back field by field (partial shapes, junk types)', async () => {
+    await seed(valid({ settings: { confirmDelete: false } }))
+    expect(createStore(file).get().settings).toEqual({ ...DEFAULT_SETTINGS, confirmDelete: false })
+    await seed(valid({ settings: { theme: 'dark', confirmDelete: 'off' } }))
+    expect(createStore(file).get().settings).toEqual({ ...DEFAULT_SETTINGS, theme: 'dark' })
+    await seed(valid({ settings: { theme: 7, confirmDelete: false } }))
+    expect(createStore(file).get().settings).toEqual({ ...DEFAULT_SETTINGS, confirmDelete: false })
     await seed(valid({ settings: 'nope' }))
     expect(createStore(file).get().settings).toEqual(DEFAULT_SETTINGS)
   })
@@ -95,58 +91,12 @@ describe('createStore: loading', () => {
     expect(createStore(file).get().settings.theme).toBe('system')
   })
 
-  it('contentWidth: legacy state defaults to narrow; supported presets survive; junk falls back (YAZ-1176)', async () => {
-    const { contentWidth: _omitted, ...legacySettings } = DEFAULT_SETTINGS
-    await seed(valid({ settings: legacySettings }))
-    expect(createStore(file).get().settings).toMatchObject({ contentWidth: 'narrow' })
-
-    for (const contentWidth of ['narrow', 'medium', 'full']) {
-      await seed(valid({ settings: { ...DEFAULT_SETTINGS, contentWidth } }))
-      expect(createStore(file).get().settings).toMatchObject({ contentWidth })
-    }
-
-    await seed(valid({ settings: { ...DEFAULT_SETTINGS, contentWidth: 'wide' } }))
-    expect(createStore(file).get().settings).toMatchObject({ contentWidth: 'narrow' })
-  })
-
-  it('commentsOrder: a pre-1515 file without the key sanitizes to oldest; both orders survive; junk falls back (YAZ-1515)', async () => {
-    const { commentsOrder: _omitted, ...legacySettings } = DEFAULT_SETTINGS
-    await seed(valid({ settings: legacySettings }))
-    expect(createStore(file).get().settings).toMatchObject({ commentsOrder: 'oldest' })
-
-    for (const commentsOrder of ['oldest', 'newest']) {
-      await seed(valid({ settings: { ...DEFAULT_SETTINGS, commentsOrder } }))
-      expect(createStore(file).get().settings).toMatchObject({ commentsOrder })
-    }
-
-    await seed(valid({ settings: { ...DEFAULT_SETTINGS, commentsOrder: 'latest' } }))
-    expect(createStore(file).get().settings).toMatchObject({ commentsOrder: 'oldest' })
-    await seed(valid({ settings: { ...DEFAULT_SETTINGS, commentsOrder: 1 } }))
-    expect(createStore(file).get().settings).toMatchObject({ commentsOrder: 'oldest' })
-  })
-
-  it('newNoteLocation/newNoteFolder: a pre-C2 file without the keys sanitizes to the defaults (current + "", YAZ-1643); junk falls back (GRO-2240)', async () => {
-    // A pre-C2 yaseendraw.json: every field but the Files & Links pair — missing fields just gain their defaults.
-    const { newNoteLocation: _loc, newNoteFolder: _folder, ...preC2Settings } = DEFAULT_SETTINGS
-    await seed(valid({ settings: preC2Settings }))
-    expect(createStore(file).get().settings).toEqual(DEFAULT_SETTINGS)
-    await seed(valid({ settings: { ...DEFAULT_SETTINGS, newNoteLocation: 'folder', newNoteFolder: 'Notes/Inbox' } }))
-    expect(createStore(file).get().settings).toEqual({ ...DEFAULT_SETTINGS, newNoteLocation: 'folder', newNoteFolder: 'Notes/Inbox' })
-    // Junk location, absolute / dot-dot / trailing-slash folders: each field falls back alone.
-    await seed(valid({ settings: { ...DEFAULT_SETTINGS, newNoteLocation: 'desktop', newNoteFolder: 5 } }))
-    expect(createStore(file).get().settings).toEqual(DEFAULT_SETTINGS)
-    for (const bad of ['/abs', 'a/../b', 'a//b', 'Notes/']) {
-      await seed(valid({ settings: { ...DEFAULT_SETTINGS, newNoteFolder: bad } }))
-      expect(createStore(file).get().settings.newNoteFolder).toBe('')
-    }
-  })
-
   it('sidebarCollapsed migrates from the legacy global value into each window, while a per-window boolean wins', async () => {
     await seed(
       valid({
         sidebarCollapsed: true,
         windows: [
-          { id: 'legacy', root: '/v', file: '/v/a.md', tabs: ['/v/a.md'], bounds },
+          { id: 'legacy', root: '/v', file: '/v/a.excalidraw', tabs: ['/v/a.excalidraw'], bounds },
           { id: 'new', root: '/v', file: null, tabs: [], bounds, sidebarCollapsed: false },
         ],
       }),
@@ -190,8 +140,8 @@ describe('createStore: loading', () => {
       valid({
         sidebarLens: 'files',
         windows: [
-          { id: 'legacy', root: '/v', file: '/v/a.md', tabs: ['/v/a.md'], bounds },
-          { id: 'own', root: '/v', file: null, tabs: [], bounds, sidebarLens: 'topics' },
+          { id: 'legacy', root: '/v', file: '/v/a.excalidraw', tabs: ['/v/a.excalidraw'], bounds },
+          { id: 'own', root: '/v', file: null, tabs: [], bounds, sidebarLens: 'favorites' },
           { id: 'junk', root: null, file: null, tabs: [], bounds, sidebarLens: 'graph' },
         ],
       }),
@@ -199,23 +149,23 @@ describe('createStore: loading', () => {
     const store = createStore(file)
     const loaded = store.get() as unknown as { sidebarLens?: unknown; windows: Array<{ sidebarLens: string }> }
     expect(loaded).not.toHaveProperty('sidebarLens')
-    expect(loaded.windows.map((w) => w.sidebarLens)).toEqual(['files', 'topics', 'files'])
+    expect(loaded.windows.map((w) => w.sidebarLens)).toEqual(['files', 'favorites', 'files'])
 
     // The next write completes the migration (the YAZ-1280 shape): no shadow global lens survives on disk.
     store.setSidebarWidth(321)
     await store.flush()
     const persisted = JSON.parse(await readFile(file, 'utf8')) as { sidebarLens?: unknown; windows: Array<{ sidebarLens: string }> }
     expect(persisted).not.toHaveProperty('sidebarLens')
-    expect(persisted.windows.map((w) => w.sidebarLens)).toEqual(['files', 'topics', 'files'])
+    expect(persisted.windows.map((w) => w.sidebarLens)).toEqual(['files', 'favorites', 'files'])
   })
 
-  it('sidebarLens migration treats a junk or missing legacy value as Topics — a PRE-847 file has no key anywhere (YAZ-847, YAZ-1628)', async () => {
+  it('sidebarLens migration treats a junk or missing legacy value as Files — a PRE-847 file has no key anywhere (YAZ-847, YAZ-1628)', async () => {
     await seed(valid({ sidebarLens: 'graph', windows: [{ id: 'w', root: null, file: null, tabs: [], bounds }] }))
-    expect(createStore(file).get().windows[0].sidebarLens).toBe('topics')
+    expect(createStore(file).get().windows[0].sidebarLens).toBe('files')
     await seed(valid({ sidebarLens: 1, windows: [{ id: 'w', root: null, file: null, tabs: [], bounds, sidebarLens: 1 }] }))
-    expect(createStore(file).get().windows[0].sidebarLens).toBe('topics')
+    expect(createStore(file).get().windows[0].sidebarLens).toBe('files')
     await seed(valid({ windows: [{ id: 'w', root: null, file: null, tabs: [], bounds }] }))
-    expect(createStore(file).get().windows[0].sidebarLens).toBe('topics')
+    expect(createStore(file).get().windows[0].sidebarLens).toBe('files')
   })
 
   it('recents: a wrong shape reads as empty, a long list is capped', async () => {
@@ -250,148 +200,96 @@ describe('createStore: loading', () => {
   // `tabs` key and keeps using `file` (graceful downgrade); this build repairs the other way.
   it('tabs: a legacy entry without the key repairs from file ([file], or [] when file is null)', async () => {
     const legacy = (id: string, file: string | null) => ({ id, root: '/v', file, bounds })
-    await seed(valid({ windows: [legacy('w1', '/v/a.md'), legacy('w2', null)] }))
+    await seed(valid({ windows: [legacy('w1', '/v/a.excalidraw'), legacy('w2', null)] }))
     const windows = createStore(file).get().windows
-    expect(windows[0].tabs).toEqual(['/v/a.md'])
+    expect(windows[0].tabs).toEqual(['/v/a.excalidraw'])
     expect(windows[1].tabs).toEqual([])
   })
 
   it('tabs: junk elements (non-strings, relative paths) drop; duplicates de-dupe keeping the first; order survives', async () => {
-    await seed(valid({ windows: [win('w1', { root: '/v', file: '/v/a.md', tabs: ['/v/a.md', 5, 'rel.md', '/v/b.md', '/v/a.md', null, '/v/b.md'] as never })] }))
-    expect(createStore(file).get().windows[0].tabs).toEqual(['/v/a.md', '/v/b.md'])
+    await seed(valid({ windows: [win('w1', { root: '/v', file: '/v/a.excalidraw', tabs: ['/v/a.excalidraw', 5, 'rel.excalidraw', '/v/b.excalidraw', '/v/a.excalidraw', null, '/v/b.excalidraw'] as never })] }))
+    expect(createStore(file).get().windows[0].tabs).toEqual(['/v/a.excalidraw', '/v/b.excalidraw'])
   })
 
   it('tabs: a non-null file missing from tabs is prepended (file IS the active tab)', async () => {
-    await seed(valid({ windows: [win('w1', { root: '/v', file: '/v/a.md', tabs: ['/v/b.md', '/v/c.md'] })] }))
-    expect(createStore(file).get().windows[0].tabs).toEqual(['/v/a.md', '/v/b.md', '/v/c.md'])
+    await seed(valid({ windows: [win('w1', { root: '/v', file: '/v/a.excalidraw', tabs: ['/v/b.excalidraw', '/v/c.excalidraw'] })] }))
+    expect(createStore(file).get().windows[0].tabs).toEqual(['/v/a.excalidraw', '/v/b.excalidraw', '/v/c.excalidraw'])
   })
 
   it('tabs: a null file clears the list (tabs [] ⇔ file null) and a non-array reads as the repair path', async () => {
-    await seed(valid({ windows: [win('w1', { root: '/v', file: null, tabs: ['/v/orphan.md'] })] }))
+    await seed(valid({ windows: [win('w1', { root: '/v', file: null, tabs: ['/v/orphan.excalidraw'] })] }))
     expect(createStore(file).get().windows[0].tabs).toEqual([])
-    await seed(valid({ windows: [win('w1', { root: '/v', file: '/v/a.md', tabs: 'nope' as never })] }))
-    expect(createStore(file).get().windows[0].tabs).toEqual(['/v/a.md'])
+    await seed(valid({ windows: [win('w1', { root: '/v', file: '/v/a.excalidraw', tabs: 'nope' as never })] }))
+    expect(createStore(file).get().windows[0].tabs).toEqual(['/v/a.excalidraw'])
   })
 
-  it('rightPanel: a legacy entry gains the closed empty default without changing state version 1', async () => {
-    const legacy = { id: 'w1', root: '/v', file: '/v/a.md', tabs: ['/v/a.md'], bounds }
-    await seed(valid({ windows: [legacy] }))
-    expect(createStore(file).get().windows[0]).toMatchObject({
-      rightPanel: { open: false, width: 440, items: [], expanded: null },
-    })
-  })
-
-  it('rightPanel: normalizes geometry, absolute unique items, expanded membership, and exclusive ownership', async () => {
-    await seed(valid({
-      windows: [{
-        ...win('w1', { root: '/v', file: '/v/a.md', tabs: ['/v/a.md'] }),
-        rightPanel: {
-          open: true,
-          width: 9_999,
-          items: ['/v/a.md', '/v/b.md', 'relative.md', '/v/b.md'],
-          expanded: '/v/a.md',
-        },
-      }],
-    }))
-    expect(createStore(file).get().windows[0]).toMatchObject({
-      rightPanel: { open: true, width: 720, items: ['/v/b.md'], expanded: null },
-    })
-
-    await seed(valid({
-      windows: [{ ...win('w2'), rightPanel: { open: 'yes', width: Number.NaN, items: 'nope', expanded: 3 } }],
-    }))
-    expect(createStore(file).get().windows[0]).toMatchObject({
-      rightPanel: { open: false, width: 440, items: [], expanded: null },
-    })
-  })
-
-  it('folders: each folder entry falls back field by field; junk folds are dropped and capped', async () => {
+  it('folders: each folder entry falls back field by field; a non-record entry is dropped', async () => {
     await seed(
       valid({
         folders: {
-          '/a': { expanded: 'nope', lastFile: 5, folds: { '/a/x.md': ['k'], '/a/y.md': 'nope', '/a/z.md': [1, 2] } },
+          '/a': { expanded: 'nope', lastFile: 5 },
           '/b': 'nope',
-          '/c': { expanded: ['/c/sub'], lastFile: '/c/a.md', folds: { '/c/a.md': Array.from({ length: MAX_FOLD_KEYS_PER_FILE + 5 }, (_, i) => `k${i}`) } },
+          '/c': { expanded: ['/c/sub'], lastFile: '/c/a.excalidraw' },
           '/d': {},
         },
       }),
     )
     const { folders } = createStore(file).get()
-    expect(folders['/a']).toEqual({ expanded: [], lastFile: null, folds: { '/a/x.md': ['k'] }, baseGroups: {}, topicsExpanded: [] })
+    expect(folders['/a']).toEqual({ expanded: [], lastFile: null })
     expect(folders['/b']).toBeUndefined()
     expect(folders['/c'].expanded).toEqual([]) // a session list: the file's value is ignored (YAZ-1642)
-    expect(folders['/c'].lastFile).toBe('/c/a.md')
-    expect(folders['/c'].folds['/c/a.md']).toHaveLength(MAX_FOLD_KEYS_PER_FILE)
-    expect(folders['/d']).toEqual({ expanded: [], lastFile: null, folds: {}, baseGroups: {}, topicsExpanded: [] })
+    expect(folders['/c'].lastFile).toBe('/c/a.excalidraw')
+    expect(folders['/d']).toEqual({ expanded: [], lastFile: null })
     await seed(valid({ folders: [] }))
     expect(createStore(file).get().folders).toEqual({})
   })
 
-  it('folders: junk baseGroups are dropped and capped; an old file without the field reads as {}', async () => {
-    await seed(
-      valid({
-        folders: {
-          '/a': { expanded: [], lastFile: null, folds: {}, baseGroups: { '/a/x.md::T': ['v:idea'], '/a/y.md::T': 'nope', '/a/z.md::T': [1, 2] } },
-          '/b': { expanded: [], lastFile: null, folds: {} }, // pre-4C file: no baseGroups
-          '/c': { expanded: [], lastFile: null, folds: {}, baseGroups: { '/c/x.md::T': Array.from({ length: MAX_COLLAPSED_GROUP_KEYS + 5 }, (_, i) => `v:${i}`) } },
-        },
-      }),
-    )
-    const { folders } = createStore(file).get()
-    expect(folders['/a'].baseGroups).toEqual({ '/a/x.md::T': ['v:idea'] })
-    expect(folders['/b']).toEqual({ expanded: [], lastFile: null, folds: {}, baseGroups: {}, topicsExpanded: [] })
-    expect(folders['/c'].baseGroups['/c/x.md::T']).toHaveLength(MAX_COLLAPSED_GROUP_KEYS)
-  })
-
-  it('windows: focusDirs / focusTopics load with the tabs rule — relative elements drop, a missing or junk list is no focus (YAZ-1628)', async () => {
+  it('windows: focusDirs / focusFavorites load with the tabs rule — relative elements drop, a missing or junk list is no focus (YAZ-1628)', async () => {
     await seed(
       valid({
         windows: [
-          { id: 'a', root: '/v', file: null, tabs: [], bounds, focusDirs: ['/v/x', 'rel', '/v/y'], focusTopics: ['/v/T.md'], focusFavorites: [] },
+          { id: 'a', root: '/v', file: null, tabs: [], bounds, focusDirs: ['/v/x', 'rel', '/v/y'], focusFavorites: ['/v/f'] },
           { id: 'b', root: '/v', file: null, tabs: [], bounds }, // pre-1628 entry: no focus fields
-          { id: 'c', root: '/v', file: null, tabs: [], bounds, focusDirs: '/v/x', focusTopics: [1], focusFavorites: [] },
+          { id: 'c', root: '/v', file: null, tabs: [], bounds, focusDirs: '/v/x', focusFavorites: [1] },
         ],
       }),
     )
     const { windows } = createStore(file).get()
-    expect(windows[0]).toMatchObject({ focusDirs: ['/v/x', '/v/y'], focusTopics: ['/v/T.md'], focusFavorites: [] })
-    expect(windows[1]).toMatchObject({ focusDirs: [], focusTopics: [], focusFavorites: [] })
-    expect(windows[2]).toMatchObject({ focusDirs: [], focusTopics: [], focusFavorites: [] }) // junk voids the list, like `tabs`
+    expect(windows[0]).toMatchObject({ focusDirs: ['/v/x', '/v/y'], focusFavorites: ['/v/f'] })
+    expect(windows[1]).toMatchObject({ focusDirs: [], focusFavorites: [] })
+    expect(windows[2]).toMatchObject({ focusDirs: [], focusFavorites: [] }) // junk voids the list, like `tabs`
   })
 
-  it('a legacy per-vault focus (folders[root].focusDirs / focusTopics, pre-1628) is dropped on load and absent from the written file', async () => {
+  it('a legacy per-vault focus (folders[root].focusDirs, pre-1628) is dropped on load and absent from the written file', async () => {
     await seed(
       valid({
         windows: [{ id: 'w1', root: '/v', file: null, tabs: [], bounds }],
-        folders: { '/v': { expanded: [], lastFile: null, folds: {}, baseGroups: {}, topicsExpanded: [], favorites: [], focusDirs: ['/v/x'], focusTopics: ['/v/T.md'], focusFavorites: [] } },
+        folders: { '/v': { expanded: [], lastFile: null, favorites: [], focusDirs: ['/v/x'], focusFavorites: [] } },
       }),
     )
     const store = createStore(file)
     // No migration: the vault bucket could not say WHICH window was focused, so every window starts unfocused.
-    expect(store.get().folders['/v']).toEqual({ expanded: [], lastFile: null, folds: {}, baseGroups: {}, topicsExpanded: [] })
-    expect(store.get().windows[0]).toMatchObject({ focusDirs: [], focusTopics: [], focusFavorites: [] })
+    expect(store.get().folders['/v']).toEqual({ expanded: [], lastFile: null })
+    expect(store.get().windows[0]).toMatchObject({ focusDirs: [], focusFavorites: [] })
     store.setSidebarWidth(321)
     await store.flush()
     const persisted = JSON.parse(await readFile(file, 'utf8')) as { folders: Record<string, Record<string, unknown>> }
     expect(persisted.folders['/v']).not.toHaveProperty('focusDirs')
-    expect(persisted.folders['/v']).not.toHaveProperty('focusTopics')
+    expect(persisted.folders['/v']).not.toHaveProperty('focusFavorites')
   })
 
-  it('folders: expanded and topicsExpanded are session lists — present, junk or missing, a launch reads them as [] (YAZ-1642)', async () => {
+  it('folders: expanded is a session list — present, junk or missing, a launch reads it as [] (YAZ-1642)', async () => {
     await seed(
       valid({
         folders: {
-          '/a': { expanded: ['/a/sub'], lastFile: null, folds: {}, baseGroups: {}, topicsExpanded: ['/a/Metrics.md'] }, // a pre-1642 file still carrying both
-          '/b': { lastFile: null, folds: {}, baseGroups: {} }, // what this version writes: neither key
-          '/c': { expanded: 'nope', lastFile: null, folds: {}, baseGroups: {}, topicsExpanded: [1, 2] },
+          '/a': { expanded: ['/a/sub'], lastFile: null }, // a pre-1642 file still carrying it
+          '/b': { lastFile: null }, // what this version writes: no key
+          '/c': { expanded: 'nope', lastFile: null },
         },
       }),
     )
     const { folders } = createStore(file).get()
-    for (const root of ['/a', '/b', '/c']) {
-      expect(folders[root].expanded).toEqual([])
-      expect(folders[root].topicsExpanded).toEqual([])
-    }
+    for (const root of ['/a', '/b', '/c']) expect(folders[root].expanded).toEqual([])
   })
 
   it('unknown top-level keys are dropped', async () => {
@@ -420,11 +318,11 @@ describe('createStore: mutations', () => {
     const seen: AppState[] = []
     const off = store.onChange((s) => seen.push(s))
     const before = store.get()
-    store.setSettings({ ...DEFAULT_SETTINGS, blockGap: 12 })
+    store.setSettings({ ...DEFAULT_SETTINGS, confirmDelete: false })
     expect(seen).toHaveLength(1)
     expect(seen[0]).toBe(store.get())
-    expect(store.get().settings.blockGap).toBe(12)
-    expect(before.settings.blockGap).toBe(DEFAULT_SETTINGS.blockGap) // snapshots are immutable
+    expect(store.get().settings.confirmDelete).toBe(false)
+    expect(before.settings.confirmDelete).toBe(DEFAULT_SETTINGS.confirmDelete) // snapshots are immutable
     off()
     store.setSettings(DEFAULT_SETTINGS)
     expect(seen).toHaveLength(1)
@@ -463,77 +361,32 @@ describe('createStore: mutations', () => {
   it('setFolder creates the entry with defaults, merges the patch and ignores unknown keys', () => {
     const store = createStore(file)
     store.setFolder('/r1', { expanded: ['/r1/a'] })
-    expect(store.get().folders['/r1']).toEqual({ expanded: ['/r1/a'], lastFile: null, folds: {}, baseGroups: {}, topicsExpanded: [] })
-    store.setFolder('/r1', { lastFile: '/r1/a/x.md' })
-    expect(store.get().folders['/r1']).toEqual({ expanded: ['/r1/a'], lastFile: '/r1/a/x.md', folds: {}, baseGroups: {}, topicsExpanded: [] })
-    store.setFolder('/r1', { lastFile: null, folds: { '/r1/a.md': ['k'] } } as never)
-    expect(store.get().folders['/r1']).toEqual({ expanded: ['/r1/a'], lastFile: null, folds: {}, baseGroups: {}, topicsExpanded: [] })
+    expect(store.get().folders['/r1']).toEqual({ expanded: ['/r1/a'], lastFile: null })
+    store.setFolder('/r1', { lastFile: '/r1/a/x.excalidraw' })
+    expect(store.get().folders['/r1']).toEqual({ expanded: ['/r1/a'], lastFile: '/r1/a/x.excalidraw' })
+    store.setFolder('/r1', { lastFile: null, folds: { '/r1/a.excalidraw': ['k'] } } as never)
+    expect(store.get().folders['/r1']).toEqual({ expanded: ['/r1/a'], lastFile: null })
     store.setFolder('/r2', {})
-    expect(store.get().folders['/r2']).toEqual({ expanded: [], lastFile: null, folds: {}, baseGroups: {}, topicsExpanded: [] })
+    expect(store.get().folders['/r2']).toEqual({ expanded: [], lastFile: null })
   })
 
-  it('two windows on one root hold independent focusDirs / focusTopics — upsertWindow on one leaves the other untouched (YAZ-1628)', () => {
+  it('two windows on one root hold independent focusDirs / focusFavorites — upsertWindow on one leaves the other untouched (YAZ-1628)', () => {
     const store = createStore(file)
-    store.upsertWindow(win('w1', { root: '/v', focusDirs: ['/v/a', '/v/b'], focusTopics: ['/v/T.md'], focusFavorites: [] }))
+    store.upsertWindow(win('w1', { root: '/v', focusDirs: ['/v/a', '/v/b'], focusFavorites: ['/v/F'] }))
     store.upsertWindow(win('w2', { root: '/v', focusDirs: ['/v/c'] }))
-    expect(store.get().windows[0]).toMatchObject({ focusDirs: ['/v/a', '/v/b'], focusTopics: ['/v/T.md'], focusFavorites: [] })
-    expect(store.get().windows[1]).toMatchObject({ focusDirs: ['/v/c'], focusTopics: [], focusFavorites: [] })
+    expect(store.get().windows[0]).toMatchObject({ focusDirs: ['/v/a', '/v/b'], focusFavorites: ['/v/F'] })
+    expect(store.get().windows[1]).toMatchObject({ focusDirs: ['/v/c'], focusFavorites: [] })
     store.upsertWindow({ ...store.get().windows[0], focusDirs: [] }) // one window's exit leaves its other lens AND the other window alone
-    expect(store.get().windows[0]).toMatchObject({ focusDirs: [], focusTopics: ['/v/T.md'], focusFavorites: [] })
-    expect(store.get().windows[1]).toMatchObject({ focusDirs: ['/v/c'], focusTopics: [], focusFavorites: [] })
-  })
-
-  it('setFolder carries topicsExpanded too — per root, capped, replacing never merging (YAZ-848)', () => {
-    const store = createStore(file)
-    store.setFolder('/r1', { topicsExpanded: ['/r1/Metrics.md', '/r1/Home.md'] })
-    store.setFolder('/r2', { topicsExpanded: ['/r2/Other.md'] })
-    expect(store.get().folders['/r1'].topicsExpanded).toEqual(['/r1/Metrics.md', '/r1/Home.md'])
-    expect(store.get().folders['/r2'].topicsExpanded).toEqual(['/r2/Other.md'])
-    store.setFolder('/r1', { expanded: ['/r1/dir'] })
-    expect(store.get().folders['/r1'].topicsExpanded).toEqual(['/r1/Metrics.md', '/r1/Home.md']) // the other fields survive
-    store.setFolder('/r1', { topicsExpanded: [] })
-    expect(store.get().folders['/r1']).toEqual({ expanded: ['/r1/dir'], lastFile: null, folds: {}, baseGroups: {}, topicsExpanded: [] })
-    store.setFolder('/r2', { topicsExpanded: Array.from({ length: MAX_TOPICS_EXPANDED_PAGES + 50 }, (_, i) => `/r2/p${i}.md`) })
-    expect(store.get().folders['/r2'].topicsExpanded).toHaveLength(MAX_TOPICS_EXPANDED_PAGES)
-  })
-
-  it('setFolds is keyed by root then file, capped, and an empty list removes the file entry but keeps the folder', () => {
-    const store = createStore(file)
-    store.setFolds('/r1', '/r1/a.md', ['k1', 'k2'])
-    store.setFolds('/r1', '/r1/b.md', ['k3'])
-    store.setFolds('/r2', '/r2/a.md', ['k4'])
-    expect(store.get().folders['/r1']).toEqual({ expanded: [], lastFile: null, folds: { '/r1/a.md': ['k1', 'k2'], '/r1/b.md': ['k3'] }, baseGroups: {}, topicsExpanded: [] })
-    store.setFolds('/r1', '/r1/a.md', ['k2']) // the live set replaces, never merges
-    expect(store.get().folders['/r1'].folds['/r1/a.md']).toEqual(['k2'])
-    store.setFolder('/r1', { lastFile: '/r1/a.md' })
-    store.setFolds('/r1', '/r1/a.md', [])
-    store.setFolds('/r1', '/r1/b.md', [])
-    expect(store.get().folders['/r1']).toEqual({ expanded: [], lastFile: '/r1/a.md', folds: {}, baseGroups: {}, topicsExpanded: [] })
-    store.setFolds('/r2', '/r2/a.md', Array.from({ length: MAX_FOLD_KEYS_PER_FILE + 50 }, (_, i) => `k${i}`))
-    expect(store.get().folders['/r2'].folds['/r2/a.md']).toHaveLength(MAX_FOLD_KEYS_PER_FILE)
-  })
-
-  it('setBaseGroups is keyed by root then base::view, capped, and an empty list removes the entry but keeps the folder', () => {
-    const store = createStore(file)
-    store.setBaseGroups('/r1', '/r1/a.md::T', ['v:idea', 'v:done'])
-    store.setBaseGroups('/r1', '/r1/a.md::T 2', ['∅'])
-    store.setBaseGroups('/r2', '/r2/a.md::T', ['v:x'])
-    expect(store.get().folders['/r1']).toEqual({ expanded: [], lastFile: null, folds: {}, baseGroups: { '/r1/a.md::T': ['v:idea', 'v:done'], '/r1/a.md::T 2': ['∅'] }, topicsExpanded: [] })
-    store.setBaseGroups('/r1', '/r1/a.md::T', ['v:done']) // the live set replaces, never merges
-    expect(store.get().folders['/r1'].baseGroups['/r1/a.md::T']).toEqual(['v:done'])
-    store.setBaseGroups('/r1', '/r1/a.md::T', [])
-    store.setBaseGroups('/r1', '/r1/a.md::T 2', [])
-    expect(store.get().folders['/r1']).toEqual({ expanded: [], lastFile: null, folds: {}, baseGroups: {}, topicsExpanded: [] })
-    store.setBaseGroups('/r2', '/r2/a.md::T', Array.from({ length: MAX_COLLAPSED_GROUP_KEYS + 50 }, (_, i) => `v:${i}`))
-    expect(store.get().folders['/r2'].baseGroups['/r2/a.md::T']).toHaveLength(MAX_COLLAPSED_GROUP_KEYS)
+    expect(store.get().windows[0]).toMatchObject({ focusDirs: [], focusFavorites: ['/v/F'] })
+    expect(store.get().windows[1]).toMatchObject({ focusDirs: ['/v/c'], focusFavorites: [] })
   })
 
   it('upsertWindow replaces by id or appends; removeWindow drops by id', () => {
     const store = createStore(file)
     store.upsertWindow(win('w1'))
     store.upsertWindow(win('w2', { root: '/v' }))
-    store.upsertWindow(win('w1', { root: '/other', file: '/other/a.md' }))
-    expect(store.get().windows).toEqual([win('w1', { root: '/other', file: '/other/a.md', tabs: ['/other/a.md'] }), win('w2', { root: '/v' })])
+    store.upsertWindow(win('w1', { root: '/other', file: '/other/a.excalidraw' }))
+    expect(store.get().windows).toEqual([win('w1', { root: '/other', file: '/other/a.excalidraw', tabs: ['/other/a.excalidraw'] }), win('w2', { root: '/v' })])
     store.removeWindow('w1')
     expect(store.get().windows).toEqual([win('w2', { root: '/v' })])
     store.removeWindow('nope')
@@ -541,19 +394,19 @@ describe('createStore: mutations', () => {
   })
 
   describe('renamePath (Links E1, GRO-2194: the store repair after an in-app rename)', () => {
-    const OLD = '/v/B.md'
-    const NEW = '/v/C.md'
+    const OLD = '/v/B.excalidraw'
+    const NEW = '/v/C.excalidraw'
 
     it('remaps window file and tabs (through normalizeTabs) in every affected window', () => {
       const store = createStore(file)
-      store.upsertWindow(win('w1', { root: '/v', file: OLD, tabs: [OLD, '/v/x.md'] }))
-      store.upsertWindow(win('w2', { root: '/v', file: '/v/x.md', tabs: ['/v/x.md', OLD] }))
-      store.upsertWindow(win('w3', { root: '/other', file: '/other/a.md', tabs: ['/other/a.md'] }))
+      store.upsertWindow(win('w1', { root: '/v', file: OLD, tabs: [OLD, '/v/x.excalidraw'] }))
+      store.upsertWindow(win('w2', { root: '/v', file: '/v/x.excalidraw', tabs: ['/v/x.excalidraw', OLD] }))
+      store.upsertWindow(win('w3', { root: '/other', file: '/other/a.excalidraw', tabs: ['/other/a.excalidraw'] }))
       store.renamePath(OLD, NEW)
       expect(store.get().windows).toEqual([
-        win('w1', { root: '/v', file: NEW, tabs: [NEW, '/v/x.md'] }),
-        win('w2', { root: '/v', file: '/v/x.md', tabs: ['/v/x.md', NEW] }),
-        win('w3', { root: '/other', file: '/other/a.md', tabs: ['/other/a.md'] }),
+        win('w1', { root: '/v', file: NEW, tabs: [NEW, '/v/x.excalidraw'] }),
+        win('w2', { root: '/v', file: '/v/x.excalidraw', tabs: ['/v/x.excalidraw', NEW] }),
+        win('w3', { root: '/other', file: '/other/a.excalidraw', tabs: ['/other/a.excalidraw'] }),
       ])
     })
 
@@ -565,57 +418,37 @@ describe('createStore: mutations', () => {
       expect(store.get().windows[0].file).toBe(NEW)
     })
 
-    it('remaps right-panel items and expanded while preserving order', () => {
-      const store = createStore(file)
-      store.upsertWindow({
-        ...win('w1', { root: '/v', file: '/v/a.md', tabs: ['/v/a.md'] }),
-        rightPanel: { open: true, width: 440, items: [OLD, '/v/x.md'], expanded: OLD },
-      } as unknown as WindowEntry)
-      store.renamePath(OLD, NEW)
-      expect(store.get().windows[0]).toMatchObject({
-        rightPanel: { open: true, width: 440, items: [NEW, '/v/x.md'], expanded: NEW },
-      })
-    })
-
-    it('remaps folders: lastFile, topicsExpanded pages, fold keys and baseGroups keys (base rename)', () => {
+    it('remaps folders: the renamed lastFile follows, the others are untouched', () => {
       const store = createStore(file)
       store.setFolder('/v', { lastFile: OLD })
-      // A renamed PAGE the Topics tree had open keeps its expansion (🔒 D4, YAZ-848): the bucket
-      // is path-keyed, so it is repaired here or the row silently collapses after every rename.
-      store.setFolder('/v', { topicsExpanded: [OLD, '/v/Home.md'] })
-      store.setFolds('/v', OLD, ['k1'])
-      store.setFolds('/v', '/v/x.md', ['k2'])
-      store.setBaseGroups('/v', '/v/T.md::Table', ['g1'])
+      store.setFolder('/other', { lastFile: '/other/a.excalidraw' })
       store.renamePath(OLD, NEW)
       expect(store.get().folders['/v'].lastFile).toBe(NEW)
-      expect(store.get().folders['/v'].topicsExpanded).toEqual([NEW, '/v/Home.md'])
-      expect(store.get().folders['/v'].folds).toEqual({ [NEW]: ['k1'], '/v/x.md': ['k2'] })
-      store.renamePath('/v/T.md', '/v/U.md')
-      expect(store.get().folders['/v'].baseGroups).toEqual({ '/v/U.md::Table': ['g1'] })
+      expect(store.get().folders['/other'].lastFile).toBe('/other/a.excalidraw')
     })
 
     it('a rename nothing references changes (and notifies) nothing', () => {
       const store = createStore(file)
-      store.upsertWindow(win('w1', { root: '/v', file: '/v/x.md', tabs: ['/v/x.md'] }))
+      store.upsertWindow(win('w1', { root: '/v', file: '/v/x.excalidraw', tabs: ['/v/x.excalidraw'] }))
       const seen: AppState[] = []
       store.onChange((s) => seen.push(s))
-      store.renamePath('/v/unreferenced.md', '/v/other.md')
+      store.renamePath('/v/unreferenced.excalidraw', '/v/other.excalidraw')
       expect(seen).toHaveLength(0)
-      expect(store.get().windows).toEqual([win('w1', { root: '/v', file: '/v/x.md', tabs: ['/v/x.md'] })])
+      expect(store.get().windows).toEqual([win('w1', { root: '/v', file: '/v/x.excalidraw', tabs: ['/v/x.excalidraw'] })])
     })
   })
 
   describe('removePath (GRO-2272: the store repair after an in-app delete)', () => {
-    it('drops focusDirs / focusTopics entries at or under the deleted path in every window, like tabs (YAZ-1628)', () => {
+    it('drops focusDirs / focusFavorites entries at or under the deleted path in every window, like tabs (YAZ-1628)', () => {
       const store = createStore(file)
-      store.upsertWindow(win('w1', { root: '/v', focusDirs: ['/v/Sub', '/v/Sub/deep', '/v/other'], focusTopics: ['/v/Sub/T.md', '/v/Home.md'], focusFavorites: [] }))
-      store.upsertWindow(win('w2', { root: '/v', focusDirs: ['/v/Sub'], focusTopics: [], focusFavorites: [] }))
+      store.upsertWindow(win('w1', { root: '/v', focusDirs: ['/v/Sub', '/v/Sub/deep', '/v/other'], focusFavorites: ['/v/Sub/Fav', '/v/Home'] }))
+      store.upsertWindow(win('w2', { root: '/v', focusDirs: ['/v/Sub'], focusFavorites: [] }))
       store.removePath('/v/Sub')
-      expect(store.get().windows[0]).toMatchObject({ focusDirs: ['/v/other'], focusTopics: ['/v/Home.md'], focusFavorites: [] })
-      expect(store.get().windows[1]).toMatchObject({ focusDirs: [], focusTopics: [], focusFavorites: [] }) // the last one leaving ends the focus
+      expect(store.get().windows[0]).toMatchObject({ focusDirs: ['/v/other'], focusFavorites: ['/v/Home'] })
+      expect(store.get().windows[1]).toMatchObject({ focusDirs: [], focusFavorites: [] }) // the last one leaving ends the focus
     })
 
-    const GONE = '/v/B.md'
+    const GONE = '/v/B.excalidraw'
 
     it('deleting the ONLY tab leaves the window empty (file null, tabs [])', () => {
       const store = createStore(file)
@@ -627,51 +460,31 @@ describe('createStore: mutations', () => {
 
     it('deleting the ACTIVE tab promotes the right neighbour, else the left — never discards survivors', () => {
       const store = createStore(file)
-      store.upsertWindow(win('w1', { root: '/v', file: GONE, tabs: ['/v/left.md', GONE, '/v/right.md'] }))
+      store.upsertWindow(win('w1', { root: '/v', file: GONE, tabs: ['/v/left.excalidraw', GONE, '/v/right.excalidraw'] }))
       store.removePath(GONE)
-      expect(store.get().windows[0].file).toBe('/v/right.md')
-      expect(store.get().windows[0].tabs).toEqual(['/v/left.md', '/v/right.md'])
+      expect(store.get().windows[0].file).toBe('/v/right.excalidraw')
+      expect(store.get().windows[0].tabs).toEqual(['/v/left.excalidraw', '/v/right.excalidraw'])
       // No right neighbour: fall back to the nearest surviving tab on the left.
       const store2 = createStore(`${file}.2`)
-      store2.upsertWindow(win('w2', { root: '/v', file: GONE, tabs: ['/v/left.md', GONE] }))
+      store2.upsertWindow(win('w2', { root: '/v', file: GONE, tabs: ['/v/left.excalidraw', GONE] }))
       store2.removePath(GONE)
-      expect(store2.get().windows[0].file).toBe('/v/left.md')
+      expect(store2.get().windows[0].file).toBe('/v/left.excalidraw')
     })
 
     it('drops the deleted tab and keeps the window on a surviving active file', () => {
       const store = createStore(file)
-      store.upsertWindow(win('w1', { root: '/v', file: '/v/x.md', tabs: ['/v/x.md', GONE] }))
-      store.upsertWindow(win('w2', { root: '/other', file: '/other/a.md', tabs: ['/other/a.md'] }))
+      store.upsertWindow(win('w1', { root: '/v', file: '/v/x.excalidraw', tabs: ['/v/x.excalidraw', GONE] }))
+      store.upsertWindow(win('w2', { root: '/other', file: '/other/a.excalidraw', tabs: ['/other/a.excalidraw'] }))
       store.removePath(GONE)
       expect(store.get().windows).toEqual([
-        win('w1', { root: '/v', file: '/v/x.md', tabs: ['/v/x.md'] }),
-        win('w2', { root: '/other', file: '/other/a.md', tabs: ['/other/a.md'] }),
+        win('w1', { root: '/v', file: '/v/x.excalidraw', tabs: ['/v/x.excalidraw'] }),
+        win('w2', { root: '/other', file: '/other/a.excalidraw', tabs: ['/other/a.excalidraw'] }),
       ])
-    })
-
-    it('drops deleted right items and promotes the next item, then the previous, then null', () => {
-      const store = createStore(file)
-      store.upsertWindow({
-        ...win('w1', { root: '/v', file: '/v/main.md', tabs: ['/v/main.md'] }),
-        rightPanel: { open: true, width: 440, items: ['/v/left.md', GONE, '/v/right.md'], expanded: GONE },
-      } as unknown as WindowEntry)
-      store.removePath(GONE)
-      expect(store.get().windows[0].rightPanel).toEqual({
-        open: true,
-        width: 440,
-        items: ['/v/left.md', '/v/right.md'],
-        expanded: '/v/right.md',
-      })
-
-      store.removePath('/v/right.md')
-      expect(store.get().windows[0].rightPanel.expanded).toBe('/v/left.md')
-      store.removePath('/v/left.md')
-      expect(store.get().windows[0].rightPanel).toEqual({ open: true, width: 440, items: [], expanded: null })
     })
 
     it('leaves window ROOT alone — the renderer onRootMissing probe owns that repair', () => {
       const store = createStore(file)
-      store.upsertWindow(win('w1', { root: '/v/Sub', file: '/v/Sub/a.md', tabs: ['/v/Sub/a.md'] }))
+      store.upsertWindow(win('w1', { root: '/v/Sub', file: '/v/Sub/a.excalidraw', tabs: ['/v/Sub/a.excalidraw'] }))
       store.removePath('/v/Sub')
       expect(store.get().windows[0].root).toBe('/v/Sub') // untouched by design
       expect(store.get().windows[0].file).toBeNull() // the file under it still goes
@@ -680,17 +493,17 @@ describe('createStore: mutations', () => {
 
     it('a DIRECTORY removes by prefix: every file and tab under it goes, siblings stay', () => {
       const store = createStore(file)
-      store.upsertWindow(win('w1', { root: '/v', file: '/v/Old/a.md', tabs: ['/v/Old/a.md', '/v/x.md', '/v/Old/deep/b.md'] }))
+      store.upsertWindow(win('w1', { root: '/v', file: '/v/Old/a.excalidraw', tabs: ['/v/Old/a.excalidraw', '/v/x.excalidraw', '/v/Old/deep/b.excalidraw'] }))
       store.removePath('/v/Old')
-      expect(store.get().windows[0].file).toBe('/v/x.md')
-      expect(store.get().windows[0].tabs).toEqual(['/v/x.md'])
+      expect(store.get().windows[0].file).toBe('/v/x.excalidraw')
+      expect(store.get().windows[0].tabs).toEqual(['/v/x.excalidraw'])
     })
 
     it('a prefix must be a real path segment: /v/Older is not under /v/Old', () => {
       const store = createStore(file)
-      store.upsertWindow(win('w1', { root: '/v', file: '/v/Older.md', tabs: ['/v/Older.md'] }))
+      store.upsertWindow(win('w1', { root: '/v', file: '/v/Older.excalidraw', tabs: ['/v/Older.excalidraw'] }))
       store.removePath('/v/Old')
-      expect(store.get().windows[0].tabs).toEqual(['/v/Older.md'])
+      expect(store.get().windows[0].tabs).toEqual(['/v/Older.excalidraw'])
     })
 
     it('drops the recents entry for a deleted folder', () => {
@@ -701,49 +514,37 @@ describe('createStore: mutations', () => {
       expect(store.get().recents.map((r) => r.path)).toEqual(['/v/Keep'])
     })
 
-    it('drops folder state at or under the path: the key itself, expanded, topicsExpanded, lastFile, folds, baseGroups', () => {
+    it('drops folder state at or under the path: the key itself, expanded and lastFile', () => {
       const store = createStore(file)
       store.setFolder('/v', { lastFile: GONE, expanded: ['/v/Old', '/v/Keep'] })
-      // The Topics tree's open pages (YAZ-848): a deleted page's entry goes with the rest.
-      store.setFolder('/v', { topicsExpanded: [GONE, '/v/Keep.md'] })
-      store.setFolds('/v', GONE, ['k1'])
-      store.setFolds('/v', '/v/x.md', ['k2'])
-      store.setBaseGroups('/v', '/v/T.md::Table', ['g1'])
-      store.setBaseGroups('/v', '/v/K.md::Table', ['g2'])
       store.removePath(GONE)
       expect(store.get().folders['/v'].lastFile).toBeNull()
-      expect(store.get().folders['/v'].folds).toEqual({ '/v/x.md': ['k2'] })
-      expect(store.get().folders['/v'].topicsExpanded).toEqual(['/v/Keep.md'])
       store.removePath('/v/Old')
       expect(store.get().folders['/v'].expanded).toEqual(['/v/Keep'])
-      // A baseGroups key is `<basePath>::<view>` — the exact-file half needs its own test.
-      store.removePath('/v/T.md')
-      expect(store.get().folders['/v'].baseGroups).toEqual({ '/v/K.md::Table': ['g2'] })
     })
 
     it('drops the whole folder-state entry when the deleted folder was itself a stored root', () => {
       const store = createStore(file)
-      store.setFolder('/v/Sub', { lastFile: '/v/Sub/a.md' })
-      store.setFolder('/v/Keep', { lastFile: '/v/Keep/b.md' })
+      store.setFolder('/v/Sub', { lastFile: '/v/Sub/a.excalidraw' })
+      store.setFolder('/v/Keep', { lastFile: '/v/Keep/b.excalidraw' })
       store.removePath('/v/Sub')
       expect(Object.keys(store.get().folders)).toEqual(['/v/Keep'])
     })
 
     it('a delete nothing references changes (and notifies) nothing', () => {
       const store = createStore(file)
-      store.upsertWindow(win('w1', { root: '/v', file: '/v/x.md', tabs: ['/v/x.md'] }))
+      store.upsertWindow(win('w1', { root: '/v', file: '/v/x.excalidraw', tabs: ['/v/x.excalidraw'] }))
       const seen: AppState[] = []
       store.onChange((s) => seen.push(s))
-      store.removePath('/v/unreferenced.md')
+      store.removePath('/v/unreferenced.excalidraw')
       expect(seen).toHaveLength(0)
     })
 
     it('commits ONCE for a delete that touches several places at once', () => {
       const store = createStore(file)
       store.upsertWindow(win('w1', { root: '/v', file: GONE, tabs: [GONE] }))
-      store.upsertWindow(win('w2', { root: '/v', file: '/v/x.md', tabs: ['/v/x.md', GONE] }))
+      store.upsertWindow(win('w2', { root: '/v', file: '/v/x.excalidraw', tabs: ['/v/x.excalidraw', GONE] }))
       store.setFolder('/v', { lastFile: GONE })
-      store.setFolds('/v', GONE, ['k1'])
       const seen: AppState[] = []
       store.onChange((s) => seen.push(s))
       store.removePath(GONE)
@@ -757,53 +558,44 @@ describe('createStore: mutations', () => {
 
     it('remaps every window path at or under the dir — file, tabs, and a window ROOTED at (or under) it — in one commit', () => {
       const store = createStore(file)
-      store.upsertWindow(win('w1', { root: '/v', file: `${OLD}/a.md`, tabs: [`${OLD}/a.md`, '/v/x.md', `${OLD}/deep/b.md`] }))
-      store.upsertWindow(win('w2', { root: OLD, file: `${OLD}/a.md`, tabs: [`${OLD}/a.md`] })) // the subfolder opened as a vault
+      store.upsertWindow(win('w1', { root: '/v', file: `${OLD}/a.excalidraw`, tabs: [`${OLD}/a.excalidraw`, '/v/x.excalidraw', `${OLD}/deep/b.excalidraw`] }))
+      store.upsertWindow(win('w2', { root: OLD, file: `${OLD}/a.excalidraw`, tabs: [`${OLD}/a.excalidraw`] })) // the subfolder opened as a vault
       store.upsertWindow(win('w3', { root: `${OLD}/deep`, file: null, tabs: [] }))
-      store.upsertWindow(win('w4', { root: '/other', file: '/other/a.md', tabs: ['/other/a.md'] }))
+      store.upsertWindow(win('w4', { root: '/other', file: '/other/a.excalidraw', tabs: ['/other/a.excalidraw'] }))
       const seen: AppState[] = []
       store.onChange((s) => seen.push(s))
       store.renamePath(OLD, NEW)
       expect(seen).toHaveLength(1) // ONE commit, one notify, for the whole repair
       expect(store.get().windows).toEqual([
-        win('w1', { root: '/v', file: `${NEW}/a.md`, tabs: [`${NEW}/a.md`, '/v/x.md', `${NEW}/deep/b.md`] }),
-        win('w2', { root: NEW, file: `${NEW}/a.md`, tabs: [`${NEW}/a.md`] }),
+        win('w1', { root: '/v', file: `${NEW}/a.excalidraw`, tabs: [`${NEW}/a.excalidraw`, '/v/x.excalidraw', `${NEW}/deep/b.excalidraw`] }),
+        win('w2', { root: NEW, file: `${NEW}/a.excalidraw`, tabs: [`${NEW}/a.excalidraw`] }),
         win('w3', { root: `${NEW}/deep`, file: null, tabs: [] }),
-        win('w4', { root: '/other', file: '/other/a.md', tabs: ['/other/a.md'] }),
+        win('w4', { root: '/other', file: '/other/a.excalidraw', tabs: ['/other/a.excalidraw'] }),
       ])
     })
 
-    it('remaps focusDirs / focusTopics at or under the dir in every window rooted there — a focused dir / topic INSIDE the renamed folder follows it, one outside is untouched (YAZ-1628)', () => {
+    it('remaps focusDirs / focusFavorites at or under the dir in every window rooted there — a focused dir INSIDE the renamed folder follows it, one outside is untouched (YAZ-1628)', () => {
       const store = createStore(file)
-      store.upsertWindow(win('w1', { root: '/v', focusDirs: [`${OLD}/deep`, '/v/other'], focusTopics: [`${OLD}/Metrics.md`, '/v/Home.md'], focusFavorites: [] }))
-      store.upsertWindow(win('w2', { root: '/v', focusDirs: [OLD], focusTopics: [], focusFavorites: [] }))
-      store.upsertWindow(win('w3', { root: '/other', focusDirs: ['/other/x'], focusTopics: [], focusFavorites: [] }))
+      store.upsertWindow(win('w1', { root: '/v', focusDirs: [`${OLD}/deep`, '/v/other'], focusFavorites: [`${OLD}/Fav`, '/v/Home'] }))
+      store.upsertWindow(win('w2', { root: '/v', focusDirs: [OLD], focusFavorites: [] }))
+      store.upsertWindow(win('w3', { root: '/other', focusDirs: ['/other/x'], focusFavorites: [] }))
       store.renamePath(OLD, NEW)
-      expect(store.get().windows[0]).toMatchObject({ focusDirs: [`${NEW}/deep`, '/v/other'], focusTopics: [`${NEW}/Metrics.md`, '/v/Home.md'], focusFavorites: [] })
-      expect(store.get().windows[1]).toMatchObject({ focusDirs: [NEW], focusTopics: [], focusFavorites: [] })
-      expect(store.get().windows[2]).toMatchObject({ focusDirs: ['/other/x'], focusTopics: [], focusFavorites: [] })
+      expect(store.get().windows[0]).toMatchObject({ focusDirs: [`${NEW}/deep`, '/v/other'], focusFavorites: [`${NEW}/Fav`, '/v/Home'] })
+      expect(store.get().windows[1]).toMatchObject({ focusDirs: [NEW], focusFavorites: [] })
+      expect(store.get().windows[2]).toMatchObject({ focusDirs: ['/other/x'], focusFavorites: [] })
     })
 
-    it('remaps folder state under the dir: lastFile, expanded dirs, topicsExpanded pages, fold keys, baseGroups keys — and the folder-state KEY of a root at/under it', () => {
+    it('remaps folder state under the dir: lastFile and expanded dirs — and the folder-state KEY of a root at/under it', () => {
       const store = createStore(file)
-      store.setFolder('/v', { lastFile: `${OLD}/a.md`, expanded: [OLD, `${OLD}/deep`, '/v/other'] })
-      // The Topics tree's open pages (YAZ-848) ride the same prefix branch: a page INSIDE the
-      // renamed folder follows it, one outside is untouched.
-      store.setFolder('/v', { topicsExpanded: [`${OLD}/Metrics.md`, '/v/Home.md'] })
-      store.setFolds('/v', `${OLD}/a.md`, ['k1'])
-      store.setFolds('/v', '/v/x.md', ['k2'])
-      store.setBaseGroups('/v', `${OLD}/T.md::Table`, ['g1'])
-      store.setFolder(OLD, { lastFile: `${OLD}/a.md` }) // the subfolder's own folder-state entry (it was opened as a root)
+      store.setFolder('/v', { lastFile: `${OLD}/a.excalidraw`, expanded: [OLD, `${OLD}/deep`, '/v/other'] })
+      store.setFolder(OLD, { lastFile: `${OLD}/a.excalidraw` }) // the subfolder's own folder-state entry (it was opened as a root)
       store.renamePath(OLD, NEW)
       expect(store.get().folders['/v']).toEqual({
-        lastFile: `${NEW}/a.md`,
+        lastFile: `${NEW}/a.excalidraw`,
         expanded: [NEW, `${NEW}/deep`, '/v/other'],
-        topicsExpanded: [`${NEW}/Metrics.md`, '/v/Home.md'],
-        folds: { [`${NEW}/a.md`]: ['k1'], '/v/x.md': ['k2'] },
-        baseGroups: { [`${NEW}/T.md::Table`]: ['g1'] },
       })
       expect(store.get().folders[OLD]).toBeUndefined()
-      expect(store.get().folders[NEW]).toEqual({ lastFile: `${NEW}/a.md`, expanded: [], folds: {}, baseGroups: {}, topicsExpanded: [] })
+      expect(store.get().folders[NEW]).toEqual({ lastFile: `${NEW}/a.excalidraw`, expanded: [] })
     })
 
     it('remaps a recents entry at or under the dir (a subfolder that was opened as a vault)', () => {
@@ -816,10 +608,10 @@ describe('createStore: mutations', () => {
 
     it('a FILE rename never trips the prefix branch (nothing is stored under a file path)', () => {
       const store = createStore(file)
-      store.upsertWindow(win('w1', { root: '/v', file: '/v/B.md', tabs: ['/v/B.md', '/v/B.md.md'] }))
-      store.renamePath('/v/B.md', '/v/C.md')
-      // `/v/B.md.md` does NOT start with `/v/B.md/` — only the exact match moved.
-      expect(store.get().windows[0].tabs).toEqual(['/v/C.md', '/v/B.md.md'])
+      store.upsertWindow(win('w1', { root: '/v', file: '/v/B.excalidraw', tabs: ['/v/B.excalidraw', '/v/B.excalidraw.excalidraw'] }))
+      store.renamePath('/v/B.excalidraw', '/v/C.excalidraw')
+      // `/v/B.excalidraw.excalidraw` does NOT start with `/v/B.excalidraw/` — only the exact match moved.
+      expect(store.get().windows[0].tabs).toEqual(['/v/C.excalidraw', '/v/B.excalidraw.excalidraw'])
     })
   })
 })
@@ -841,23 +633,23 @@ describe('createStore: persistence', () => {
     const store = createStore(file)
     store.setSidebarWidth(321)
     store.pushRecent('/v', 1)
-    store.setFolds('/v', '/v/a.md', ['k1'])
+    store.setFolder('/v', { lastFile: '/v/a.excalidraw' })
     await vi.advanceTimersByTimeAsync(100)
     expect(existsSync(file)).toBe(false)
     await vi.advanceTimersByTimeAsync(60)
     await store.flush()
     expect(renames()).toHaveLength(1)
-    expect(await onDisk()).toEqual({ ...store.get(), folders: { '/v': { lastFile: null, folds: { '/v/a.md': ['k1'] }, baseGroups: {} } } })
+    expect(await onDisk()).toEqual({ ...store.get(), folders: { '/v': { lastFile: '/v/a.excalidraw' } } })
     expect((await readdir(dir)).filter((n) => n.includes('.tmp-'))).toEqual([])
   })
 
-  it('the two session lists live in get() for every window but never reach disk, so a relaunch starts collapsed (YAZ-1642)', async () => {
+  it('the session list lives in get() for every window but never reaches disk, so a relaunch starts collapsed (YAZ-1642)', async () => {
     const store = createStore(file)
-    store.setFolder('/v', { expanded: ['/v/sub'], topicsExpanded: ['/v/Metrics.md'] })
-    expect(store.get().folders['/v']).toEqual({ expanded: ['/v/sub'], lastFile: null, folds: {}, baseGroups: {}, topicsExpanded: ['/v/Metrics.md'] })
+    store.setFolder('/v', { expanded: ['/v/sub'] })
+    expect(store.get().folders['/v']).toEqual({ expanded: ['/v/sub'], lastFile: null })
     await store.flush()
-    expect((await onDisk()).folders['/v']).toEqual({ lastFile: null, folds: {}, baseGroups: {} })
-    expect(createStore(file).get().folders['/v']).toEqual({ expanded: [], lastFile: null, folds: {}, baseGroups: {}, topicsExpanded: [] })
+    expect((await onDisk()).folders['/v']).toEqual({ lastFile: null })
+    expect(createStore(file).get().folders['/v']).toEqual({ expanded: [], lastFile: null })
   })
 
   it('flush writes at once, cancels the pending timer, and is a no-op when nothing changed', async () => {
@@ -865,9 +657,9 @@ describe('createStore: persistence', () => {
     const store = createStore(file)
     await store.flush()
     expect(existsSync(file)).toBe(false)
-    store.setSettings({ ...DEFAULT_SETTINGS, lineSpacing: 2 })
+    store.setSettings({ ...DEFAULT_SETTINGS, confirmDelete: false })
     await store.flush()
-    expect((await onDisk()).settings.lineSpacing).toBe(2)
+    expect((await onDisk()).settings.confirmDelete).toBe(false)
     await vi.advanceTimersByTimeAsync(500)
     await store.flush()
     expect(renames()).toHaveLength(1)

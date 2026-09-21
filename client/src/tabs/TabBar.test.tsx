@@ -9,12 +9,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { TabBar, type TabBarProps } from './TabBar'
-import { WORKSPACE_PAGE_MIME } from '../workspace/pageDrag'
 
 // The OS-action items call the bridge (YAZ-963): stub the verbs, keep BridgeRequestError real.
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),
-  api: { reveal: vi.fn().mockResolvedValue({}), openVsCode: vi.fn().mockResolvedValue({}), agentPrompt: vi.fn().mockResolvedValue('handshake') },
+  api: { reveal: vi.fn().mockResolvedValue({}), openVsCode: vi.fn().mockResolvedValue({}) },
 }))
 import { api, BridgeRequestError } from '../api'
 const reveal = vi.mocked(api.reveal)
@@ -47,16 +46,16 @@ describe('TabBar', () => {
   const noop = { onActivate: vi.fn(), onClose: vi.fn(), onMove: vi.fn() }
 
   it('renders a labelled tablist: one role=tab per path, extension-stripped label, full path as tooltip', () => {
-    const el = mount({ tabs: ['/v/Note.md', '/v/sub/Plan.markdown'], active: '/v/Note.md', ...noop, ...noNav })
+    const el = mount({ tabs: ['/v/Note.excalidraw', '/v/sub/Plan.excalidraw'], active: '/v/Note.excalidraw', ...noop, ...noNav })
     expect(el.querySelector('.tabbar')?.getAttribute('role')).toBe('tablist')
     expect(el.querySelector('.tabbar')?.getAttribute('aria-label')).toBe('Open files')
     const tabsEls = [...el.querySelectorAll<HTMLButtonElement>('[role="tab"]')]
     expect(tabsEls.map((t) => t.textContent)).toEqual(['Note', 'Plan'])
-    expect(tabsEls.map((t) => t.title)).toEqual(['/v/Note.md', '/v/sub/Plan.markdown'])
+    expect(tabsEls.map((t) => t.title)).toEqual(['/v/Note.excalidraw', '/v/sub/Plan.excalidraw'])
   })
 
   it('marks only the active tab: aria-selected + the underline modifier', () => {
-    const el = mount({ tabs: ['/v/a.md', '/v/b.md'], active: '/v/b.md', ...noop, ...noNav })
+    const el = mount({ tabs: ['/v/a.excalidraw', '/v/b.excalidraw'], active: '/v/b.excalidraw', ...noop, ...noNav })
     expect([...el.querySelectorAll('[role="tab"]')].map((t) => t.getAttribute('aria-selected'))).toEqual(['false', 'true'])
     expect([...el.querySelectorAll('.tabbar__tab')].map((t) => t.classList.contains('tabbar__tab--active'))).toEqual([false, true])
   })
@@ -64,20 +63,20 @@ describe('TabBar', () => {
   it('clicking a tab activates it; the ✕ (labelled per file) closes it without activating', () => {
     const onActivate = vi.fn()
     const onClose = vi.fn()
-    const el = mount({ tabs: ['/v/a.md', '/v/b.md'], active: '/v/a.md', onActivate, onClose, onMove: vi.fn(), ...noNav })
+    const el = mount({ tabs: ['/v/a.excalidraw', '/v/b.excalidraw'], active: '/v/a.excalidraw', onActivate, onClose, onMove: vi.fn(), ...noNav })
     act(() => el.querySelectorAll<HTMLButtonElement>('[role="tab"]')[1]?.click())
-    expect(onActivate).toHaveBeenCalledWith('/v/b.md')
+    expect(onActivate).toHaveBeenCalledWith('/v/b.excalidraw')
     act(() => el.querySelector<HTMLButtonElement>('[aria-label="Close b"]')?.click())
-    expect(onClose).toHaveBeenCalledWith('/v/b.md')
+    expect(onClose).toHaveBeenCalledWith('/v/b.excalidraw')
     expect(onActivate).toHaveBeenCalledTimes(1)
   })
 
   it('middle-click closes a tab (the browser-tab convention); other aux buttons do nothing', () => {
     const onClose = vi.fn()
-    const el = mount({ tabs: ['/v/a.md'], active: '/v/a.md', onActivate: vi.fn(), onClose, onMove: vi.fn(), ...noNav })
+    const el = mount({ tabs: ['/v/a.excalidraw'], active: '/v/a.excalidraw', onActivate: vi.fn(), onClose, onMove: vi.fn(), ...noNav })
     const tab = el.querySelector<HTMLButtonElement>('[role="tab"]')
     act(() => void tab?.dispatchEvent(new MouseEvent('auxclick', { button: 1, bubbles: true })))
-    expect(onClose).toHaveBeenCalledWith('/v/a.md')
+    expect(onClose).toHaveBeenCalledWith('/v/a.excalidraw')
     act(() => void tab?.dispatchEvent(new MouseEvent('auxclick', { button: 2, bubbles: true })))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
@@ -90,7 +89,7 @@ describe('TabBar', () => {
 })
 
 describe('TabBar drag-to-reorder (I3, GRO-2235)', () => {
-  const TABS = ['/v/a.md', '/v/b.md', '/v/c.md']
+  const TABS = ['/v/a.excalidraw', '/v/b.excalidraw', '/v/c.excalidraw']
   const tabAt = (el: HTMLElement, i: number) => [...el.querySelectorAll<HTMLElement>('.tabbar__tab')][i]
   /**
    * Drag events bubble like the real thing; jsdom has no DragEvent, the handlers guard
@@ -102,7 +101,7 @@ describe('TabBar drag-to-reorder (I3, GRO-2235)', () => {
 
   it('dropping past a tab\'s midpoint calls onMove with the final index; grab and indicator classes mark the drag', () => {
     const onMove = vi.fn()
-    const el = mount({ tabs: TABS, active: '/v/a.md', onActivate: vi.fn(), onClose: vi.fn(), onMove, ...noNav })
+    const el = mount({ tabs: TABS, active: '/v/a.excalidraw', onActivate: vi.fn(), onClose: vi.fn(), onMove, ...noNav })
     fire(tabAt(el, 0), 'dragstart')
     expect(tabAt(el, 0).classList.contains('tabbar__tab--dragging')).toBe(true)
     fire(tabAt(el, 2), 'dragover', 5) // right half of c → the end slot: the last tab marks --insert-after
@@ -114,7 +113,7 @@ describe('TabBar drag-to-reorder (I3, GRO-2235)', () => {
 
   it('dropping on a tab\'s left half inserts BEFORE it (--insert-before on that tab)', () => {
     const onMove = vi.fn()
-    const el = mount({ tabs: TABS, active: '/v/a.md', onActivate: vi.fn(), onClose: vi.fn(), onMove, ...noNav })
+    const el = mount({ tabs: TABS, active: '/v/a.excalidraw', onActivate: vi.fn(), onClose: vi.fn(), onMove, ...noNav })
     fire(tabAt(el, 0), 'dragstart')
     fire(tabAt(el, 2), 'dragover', -5)
     expect(tabAt(el, 2).classList.contains('tabbar__tab--insert-before')).toBe(true)
@@ -124,64 +123,13 @@ describe('TabBar drag-to-reorder (I3, GRO-2235)', () => {
 
   it('dropping back on the grabbed slot is a no-op; dragend clears an abandoned drag', () => {
     const onMove = vi.fn()
-    const el = mount({ tabs: TABS, active: '/v/a.md', onActivate: vi.fn(), onClose: vi.fn(), onMove, ...noNav })
+    const el = mount({ tabs: TABS, active: '/v/a.excalidraw', onActivate: vi.fn(), onClose: vi.fn(), onMove, ...noNav })
     fire(tabAt(el, 1), 'dragstart')
     fire(tabAt(el, 1), 'drop', -5) // before itself = its own slot
     expect(onMove).not.toHaveBeenCalled()
     fire(tabAt(el, 1), 'dragstart')
     fire(tabAt(el, 1), 'dragend')
     expect(el.querySelector('.tabbar__tab--dragging')).toBeNull()
-  })
-
-  it('writes the private main-owner payload instead of exposing a text/plain path', () => {
-    const data = {
-      types: [] as string[],
-      effectAllowed: 'none',
-      setData: vi.fn(),
-      getData: vi.fn(() => ''),
-    } as unknown as DataTransfer
-    const el = mount({ tabs: TABS, active: '/v/a.md', onActivate: vi.fn(), onClose: vi.fn(), onMove: vi.fn(), ...noNav })
-    const event = new MouseEvent('dragstart', { bubbles: true, cancelable: true })
-    Object.defineProperty(event, 'dataTransfer', { value: data })
-    act(() => void tabAt(el, 0).dispatchEvent(event))
-    expect(data.setData).toHaveBeenCalledExactlyOnceWith(
-      WORKSPACE_PAGE_MIME,
-      JSON.stringify({ path: '/v/a.md', owner: 'main' }),
-    )
-    expect(data.effectAllowed).toBe('move')
-  })
-
-  it('accepts one validated right-owner drop at a before/end insertion slot and ignores foreign data', () => {
-    const onDropPage = vi.fn()
-    const el = mount({ tabs: TABS, active: '/v/a.md', onActivate: vi.fn(), onClose: vi.fn(), onMove: vi.fn(), onDropPage, ...noNav })
-    const fireData = (target: Element, type: string, data: DataTransfer, clientX = 0): MouseEvent => {
-      const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX })
-      Object.defineProperty(event, 'dataTransfer', { value: data })
-      act(() => void target.dispatchEvent(event))
-      return event
-    }
-    const data = {
-      types: [WORKSPACE_PAGE_MIME],
-      effectAllowed: 'move',
-      dropEffect: 'none',
-      getData: vi.fn(() => JSON.stringify({ path: '/v/right.md', owner: 'right' })),
-      setData: vi.fn(),
-    } as unknown as DataTransfer
-    expect(fireData(tabAt(el, 1), 'dragover', data, -5).defaultPrevented).toBe(true)
-    expect(tabAt(el, 1).classList.contains('tabbar__tab--insert-before')).toBe(true)
-    fireData(tabAt(el, 1), 'drop', data, -5)
-    expect(onDropPage).toHaveBeenCalledExactlyOnceWith({ path: '/v/right.md', owner: 'right' }, 1)
-
-    fireData(tabAt(el, 2), 'dragover', data, 5)
-    expect(tabAt(el, 2).classList.contains('tabbar__tab--insert-after')).toBe(true)
-    act(() => void window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
-    expect(el.querySelector('.tabbar__tab--insert-after')).toBeNull()
-    expect(onDropPage).toHaveBeenCalledTimes(1)
-
-    const foreign = { ...data, types: ['text/plain'] } as unknown as DataTransfer
-    expect(fireData(el.querySelector('.tabbar')!, 'dragover', foreign).defaultPrevented).toBe(false)
-    fireData(el.querySelector('.tabbar')!, 'drop', foreign)
-    expect(onDropPage).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -190,8 +138,8 @@ describe('TabBar keeps the active tab in view (I3 overflow polish)', () => {
     const spy = vi.fn()
     ;(HTMLElement.prototype as unknown as Record<string, unknown>).scrollIntoView = spy
     try {
-      mount({ tabs: ['/v/a.md', '/v/b.md'], active: '/v/a.md', onActivate: vi.fn(), onClose: vi.fn(), onMove: vi.fn(), ...noNav })
-      act(() => root?.render(<TabBar tabs={['/v/a.md', '/v/b.md']} active="/v/b.md" onActivate={vi.fn()} onClose={vi.fn()} onMove={vi.fn()} {...noNav} />))
+      mount({ tabs: ['/v/a.excalidraw', '/v/b.excalidraw'], active: '/v/a.excalidraw', onActivate: vi.fn(), onClose: vi.fn(), onMove: vi.fn(), ...noNav })
+      act(() => root?.render(<TabBar tabs={['/v/a.excalidraw', '/v/b.excalidraw']} active="/v/b.excalidraw" onActivate={vi.fn()} onClose={vi.fn()} onMove={vi.fn()} {...noNav} />))
       const activeTab = spy.mock.contexts.at(-1) as HTMLElement
       expect(activeTab.classList.contains('tabbar__tab--active')).toBe(true)
       expect(activeTab.querySelector('[role="tab"]')?.textContent).toBe('b')
@@ -202,8 +150,8 @@ describe('TabBar keeps the active tab in view (I3 overflow polish)', () => {
 })
 
 describe('TabBar right-click menu (YAZ-922)', () => {
-  const TABS = ['/vault/Note.md', '/vault/sub/Deep Note.md']
-  const props = { tabs: TABS, active: '/vault/Note.md', onActivate: vi.fn(), onClose: vi.fn(), onMove: vi.fn(), ...noNav }
+  const TABS = ['/vault/Note.excalidraw', '/vault/sub/Deep Note.excalidraw']
+  const props = { tabs: TABS, active: '/vault/Note.excalidraw', onActivate: vi.fn(), onClose: vi.fn(), onMove: vi.fn(), ...noNav }
 
   /** jsdom has no clipboard; the menu's only job is to hand the path to it, so spy on writeText. */
   let writeText: ReturnType<typeof vi.fn>
@@ -239,7 +187,7 @@ describe('TabBar right-click menu (YAZ-922)', () => {
     expect(menu?.getAttribute('role')).toBe('menu')
     expect(menu?.style.left).toBe('120px')
     expect(menu?.style.top).toBe('42px')
-    expect(items(el).map((b) => b.textContent)).toEqual(['Show in sidebar', 'Copy path', 'Copy for Agent', 'Reveal in Finder', 'Open in VS Code'])
+    expect(items(el).map((b) => b.textContent)).toEqual(['Show in sidebar', 'Copy path', 'Reveal in Finder', 'Open in VS Code'])
   })
 
   it('Show in sidebar targets the right-clicked inactive tab, closes the menu, and never activates it', () => {
@@ -248,18 +196,8 @@ describe('TabBar right-click menu (YAZ-922)', () => {
     const el = mount({ ...props, onActivate, onShowInSidebar })
     rightClick(tabAt(el, 1))
     act(() => items(el)[0]?.click())
-    expect(onShowInSidebar).toHaveBeenCalledExactlyOnceWith('/vault/sub/Deep Note.md')
+    expect(onShowInSidebar).toHaveBeenCalledExactlyOnceWith('/vault/sub/Deep Note.excalidraw')
     expect(onActivate).not.toHaveBeenCalled()
-    expect(menuOf(el)).toBeNull()
-  })
-
-  it('Move to right panel transfers the exact tab and closes the menu', () => {
-    const onMoveToRight = vi.fn()
-    const el = mount({ ...props, onMoveToRight })
-    rightClick(tabAt(el, 1))
-    const move = items(el).find((item) => item.textContent === 'Move to right panel')
-    act(() => move?.click())
-    expect(onMoveToRight).toHaveBeenCalledExactlyOnceWith('/vault/sub/Deep Note.md')
     expect(menuOf(el)).toBeNull()
   })
 
@@ -283,18 +221,7 @@ describe('TabBar right-click menu (YAZ-922)', () => {
     const el = mount(props)
     rightClick(tabAt(el, 1))
     act(() => items(el)[1]?.click())
-    expect(writeText).toHaveBeenCalledWith('/vault/sub/Deep Note.md')
-    expect(menuOf(el)).toBeNull()
-  })
-
-  it('Copy for Agent (YAZ-1617) asks main for the handshake for THAT tab, writes it, and closes the menu', async () => {
-    const el = mount(props)
-    rightClick(tabAt(el, 1))
-    await act(async () => {
-      items(el)[2]?.click()
-    })
-    expect(vi.mocked(api.agentPrompt)).toHaveBeenCalledExactlyOnceWith({ path: '/vault/sub/Deep Note.md' })
-    expect(writeText).toHaveBeenCalledWith('handshake')
+    expect(writeText).toHaveBeenCalledWith('/vault/sub/Deep Note.excalidraw')
     expect(menuOf(el)).toBeNull()
   })
 
@@ -304,7 +231,7 @@ describe('TabBar right-click menu (YAZ-922)', () => {
     rightClick(tabAt(el, 1))
     act(() => items(el)[1]?.click())
     expect(writeText).toHaveBeenCalledTimes(1)
-    expect(writeText).toHaveBeenCalledWith('/vault/sub/Deep Note.md')
+    expect(writeText).toHaveBeenCalledWith('/vault/sub/Deep Note.excalidraw')
   })
 
   it('Escape anywhere in the window dismisses the menu', () => {
@@ -330,7 +257,7 @@ describe('TabBar right-click menu (YAZ-922)', () => {
     expect(menuOf(el)).not.toBeNull()
     // …and the press that survived is followed by the click that actually copies.
     act(() => items(el)[1]?.click())
-    expect(writeText).toHaveBeenCalledWith('/vault/Note.md')
+    expect(writeText).toHaveBeenCalledWith('/vault/Note.excalidraw')
   })
 
   it('closing the menu unhooks its window listeners (no stray dismissals after the fact)', () => {
@@ -351,7 +278,7 @@ describe('TabBar right-click menu (YAZ-922)', () => {
 
 describe('TabBar history buttons (YAZ-721, LOCKED D2: buttons only — no shortcut, no menu item)', () => {
   const btn = (el: HTMLElement, label: string) => el.querySelector<HTMLButtonElement>(`.tabbar-nav__btn[aria-label="${label}"]`)
-  const tabs = { tabs: ['/v/a.md'], active: '/v/a.md', onActivate: vi.fn(), onClose: vi.fn(), onMove: vi.fn() }
+  const tabs = { tabs: ['/v/a.excalidraw'], active: '/v/a.excalidraw', onActivate: vi.fn(), onClose: vi.fn(), onMove: vi.fn() }
 
   it('renders ◀ ▶ left of the tablist, each labelled and tooltipped', () => {
     const el = mount({ ...tabs, ...noNav })
@@ -413,8 +340,8 @@ describe('tab menu OS actions (YAZ-963)', () => {
     document.body.appendChild(host)
     root2 = createRoot(host)
     const base: TabBarProps = {
-      tabs: ['/vault/A.md', '/vault/sub/Deep Note.md'],
-      active: '/vault/A.md',
+      tabs: ['/vault/A.excalidraw', '/vault/sub/Deep Note.excalidraw'],
+      active: '/vault/A.excalidraw',
       onActivate: vi.fn(),
       onClose: vi.fn(),
       onMove: vi.fn(),
@@ -438,7 +365,7 @@ describe('tab menu OS actions (YAZ-963)', () => {
     const el = mountWith()
     rightClick(tabAt(el, 1))
     act(() => itemNamed(el, 'Reveal in Finder')?.click())
-    expect(reveal).toHaveBeenCalledExactlyOnceWith({ path: '/vault/sub/Deep Note.md' })
+    expect(reveal).toHaveBeenCalledExactlyOnceWith({ path: '/vault/sub/Deep Note.excalidraw' })
     expect(menuOf(el)).toBeNull()
   })
 
@@ -446,7 +373,7 @@ describe('tab menu OS actions (YAZ-963)', () => {
     const el = mountWith()
     rightClick(tabAt(el, 0))
     act(() => itemNamed(el, 'Open in VS Code')?.click())
-    expect(openVsCode).toHaveBeenCalledExactlyOnceWith({ path: '/vault/A.md' })
+    expect(openVsCode).toHaveBeenCalledExactlyOnceWith({ path: '/vault/A.excalidraw' })
     expect(menuOf(el)).toBeNull()
   })
 

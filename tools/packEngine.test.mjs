@@ -42,7 +42,7 @@ describe('names', () => {
   })
 
   it('ignores tarballs that are not ours', () => {
-    expect(parseTarballName('milkdown-components-7.22.1-yaz1410.tgz')).toBeNull()
+    expect(parseTarballName('some-other-package-7.22.1-abc1234.tgz')).toBeNull()
     expect(parseTarballName('yaseendraw-utils-0.1.0-e72242f8.tgz')).toBeNull()
     expect(parseTarballName('README.md')).toBeNull()
   })
@@ -208,7 +208,7 @@ describe('findStaleTarballRefs', () => {
       `yaseendraw-math-0.18.0-${OLD}.tgz`,
       `yaseendraw-math-0.18.0-${OLD}.tgz`,
       `yaseendraw-common-0.18.0-${NEW}.tgz`,
-      'milkdown-components-7.22.1-yaz1410.tgz',
+      'some-other-package-7.22.1-abc1234.tgz',
     ].join(' ')
     expect(findStaleTarballRefs(text, NEW)).toEqual([`yaseendraw-math-0.18.0-${OLD}.tgz`])
   })
@@ -226,7 +226,7 @@ describe('selectPrebuilt', () => {
   const names = [
     `yaseendraw-common-0.18.0-${NEW}.tgz`,
     `yaseendraw-math-0.18.0-${OLD}.tgz`,
-    'milkdown-components-7.22.1-yaz1410.tgz',
+    'some-other-package-7.22.1-abc1234.tgz',
   ]
 
   it('takes the tarball whose name carries the commit', () => {

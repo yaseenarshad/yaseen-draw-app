@@ -4,11 +4,10 @@ import path from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { MAX_FILE_BYTES } from '@shared/types'
 import { readAsset, resolveAsset, writeAsset } from './assets'
-import { makeViewsFixture } from './viewsFixture'
 import { failure } from './testFixture'
 
 /**
- * `readAsset(root, ref)` (4E, GRO-2139 amended by Desktop D10): resolves a wikilink target or
+ * `readAsset(root, ref)` (4E, GRO-2139 amended by Desktop D10): resolves a bare name or
  * path to a local image under `root` — root-relative when the ref has a `/`, else Obsidian's
  * shortest-path rule (case-insensitive basename, first match in a breadth-first walk with each
  * directory's entries sorted, dot-dirs and node_modules skipped) — and answers base64 + mime.
@@ -22,10 +21,17 @@ const SCENE = '{"type":"excalidraw","version":2,"elements":[{"id":"a","x":1.5,"y
 let root: string
 let cleanup: () => Promise<void>
 beforeAll(async () => {
-  ;({ root, cleanup } = await makeViewsFixture())
-  // Extra assets for the resolution-order cases; the shared fixture itself stays untouched.
-  await Promise.all([mkdir(path.join(root, 'aa', 'deeper'), { recursive: true }), mkdir(path.join(root, 'bb'), { recursive: true })])
+  root = await mkdtemp(path.join(tmpdir(), 'mdapp-assets-'))
+  cleanup = () => rm(root, { recursive: true, force: true })
   await Promise.all([
+    mkdir(path.join(root, 'Content Pillars'), { recursive: true }),
+    mkdir(path.join(root, 'aa', 'deeper'), { recursive: true }),
+    mkdir(path.join(root, 'bb'), { recursive: true }),
+    mkdir(path.join(root, '.obsidian'), { recursive: true }), // a foreign app's dotfolder: invisible to the walk
+  ])
+  await Promise.all([
+    writeFile(path.join(root, 'Content Pillars', 'levels.png'), PNG),
+    writeFile(path.join(root, 'Content Pillars', 'Reading list.txt'), 'an existing file with no asset extension'),
     writeFile(path.join(root, 'aa', 'dup.png'), PNG),
     writeFile(path.join(root, 'bb', 'dup.png'), PNG),
     writeFile(path.join(root, 'aa', 'deeper', 'shallow.png'), PNG),
@@ -155,7 +161,7 @@ describe('readAsset failures', () => {
   })
 
   it('UNSUPPORTED_EXTENSION for refs that are neither image nor drawing, even existing files', async () => {
-    expect((await failure(readAsset(root, 'Content Pillars/List of Topics.md'))).code).toBe('UNSUPPORTED_EXTENSION')
+    expect((await failure(readAsset(root, 'Content Pillars/Reading list.txt'))).code).toBe('UNSUPPORTED_EXTENSION')
     expect((await failure(readAsset(root, 'levels'))).code).toBe('UNSUPPORTED_EXTENSION')
     expect((await failure(readAsset(root, 'sketch.excalidraw.bak'))).code).toBe('UNSUPPORTED_EXTENSION')
   })
@@ -249,7 +255,7 @@ describe('writeAsset', () => {
   })
 
   it('a STRING body is a drawing: UNSUPPORTED_EXTENSION on anything else, images included', async () => {
-    expect(await code(writeAsset({ root: vault, path: rel('note.md'), content: '# no' }))).toBe('UNSUPPORTED_EXTENSION')
+    expect(await code(writeAsset({ root: vault, path: rel('note.txt'), content: '# no' }))).toBe('UNSUPPORTED_EXTENSION')
     expect(await code(writeAsset({ root: vault, path: rel('pic.png'), content: 'x' }))).toBe('UNSUPPORTED_EXTENSION')
     expect(await code(writeAsset({ root: vault, path: rel('scene'), content: 'x' }))).toBe('UNSUPPORTED_EXTENSION')
   })
@@ -316,7 +322,7 @@ describe('writeAsset image bytes', () => {
 
   it('a BYTE body is an image: UNSUPPORTED_EXTENSION on a drawing or any other path', async () => {
     expect(await code(writeAsset({ root: vault, path: rel('scene.excalidraw'), content: new Uint8Array(PNG) }))).toBe('UNSUPPORTED_EXTENSION')
-    expect(await code(writeAsset({ root: vault, path: rel('note.md'), content: new Uint8Array(PNG) }))).toBe('UNSUPPORTED_EXTENSION')
+    expect(await code(writeAsset({ root: vault, path: rel('note.txt'), content: new Uint8Array(PNG) }))).toBe('UNSUPPORTED_EXTENSION')
     expect(await code(writeAsset({ root: vault, path: rel('pic'), content: new Uint8Array(PNG) }))).toBe('UNSUPPORTED_EXTENSION')
     expect(await stat(path.join(vault, 'assets', 'scene.excalidraw')).catch(() => null)).toBeNull()
   })

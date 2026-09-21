@@ -1,6 +1,6 @@
 /**
  * `useGithubSync` (YAZ-1081 3A): one `github.status(root)` fetch per root, live-replaced by
- * `github:status` broadcasts for that root — `useProperties`' shape, and tested the same way.
+ * `github:status` broadcasts for that root.
  * Public surface is exactly `{ status, syncNow, setEnabled }`. The bridge (`api.github`) is
  * mocked; the onStatus listeners are captured so tests can push broadcasts.
  *

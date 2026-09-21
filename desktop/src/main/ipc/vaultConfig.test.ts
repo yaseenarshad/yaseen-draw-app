@@ -77,11 +77,11 @@ describe('registerVaultConfigIpc', () => {
 
   it('subscribes one config watcher per open-vault root and drops it when the last window leaves', async () => {
     expect(activeConfigWatcherRoots()).toEqual([])
-    store.upsertWindow({ id: 'w1', root: vault, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds })
+    store.upsertWindow({ id: 'w1', root: vault, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds })
     expect(activeConfigWatcherRoots()).toEqual([vault])
-    store.upsertWindow({ id: 'w2', root: vault, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds })
+    store.upsertWindow({ id: 'w2', root: vault, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds })
     expect(activeConfigWatcherRoots()).toEqual([vault]) // shared, not doubled
-    store.upsertWindow({ id: 'w3', root: null, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds }) // Welcome window: no root, no watcher
+    store.upsertWindow({ id: 'w3', root: null, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds }) // Welcome window: no root, no watcher
     expect(activeConfigWatcherRoots()).toEqual([vault])
     store.removeWindow('w1')
     expect(activeConfigWatcherRoots()).toEqual([vault])
@@ -93,7 +93,7 @@ describe('registerVaultConfigIpc', () => {
     const a = fakeWindow()
     const b = fakeWindow()
     vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([a, b] as unknown as BrowserWindow[])
-    store.upsertWindow({ id: 'w1', root: vault, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds })
+    store.upsertWindow({ id: 'w1', root: vault, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds })
     a.webContents.send.mockClear()
     b.webContents.send.mockClear()
 

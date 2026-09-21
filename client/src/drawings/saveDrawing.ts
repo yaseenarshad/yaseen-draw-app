@@ -1,10 +1,10 @@
 /**
- * Writing a drawing back (YAZ-879). `writeProperty.ts`'s CONFLICT dance, with the one difference
+ * Writing a drawing back (YAZ-879). The app's standard CONFLICT dance, with the one difference
  * a drawing forces:
  *
- * THE CANVAS WINS. A note's frontmatter write re-reads the file so the concurrent edit AROUND the
- * changed key survives; a scene has no such "around" — two scenes cannot be merged, and the user
- * is looking at theirs. So the re-read here fetches NOTHING but a fresh `expectedMtime`: the guard
+ * THE CANVAS WINS. A partial-key write re-reads the file so a concurrent edit AROUND the changed
+ * key survives; a scene has no such "around" — two scenes cannot be merged, and the user is
+ * looking at theirs. So the re-read here fetches NOTHING but a fresh `expectedMtime`: the guard
  * is refreshed, the bytes are the ones on the canvas, and the write goes through once. A second
  * CONFLICT throws (two writers racing us is not something a retry loop fixes) and becomes the
  * modal's inline error.

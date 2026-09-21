@@ -26,7 +26,7 @@
  * editor ⌘, was pressed in — gets it back on close.
  */
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { SearchIcon } from '../views/view/icons'
+import { SearchIcon } from '../components/icons'
 import { availableSections, resolveHint, resolveWide, type SettingDef, type SettingsCtx, type SettingsGroup, type SettingsSection, type SettingsSectionId } from './registry'
 import { searchSettings, settingCandidates } from './searchSettings'
 import { SettingRow } from './SettingRow'

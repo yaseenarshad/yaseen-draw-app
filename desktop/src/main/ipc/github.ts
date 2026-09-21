@@ -18,7 +18,7 @@ import { handle } from './envelope'
  * chokidar, the status broadcast, and the pass itself.
  *
  * Which roots exist is `AppState.windows` (null = Welcome), exactly the per-open-root idiom
- * `ipc/vaultConfig.ts` and `ipc/properties.ts` already use — the manager subscribes, times and
+ * `ipc/vaultConfig.ts` already uses — the manager subscribes, times and
  * drops per root off that one list, so a closed vault goes completely silent.
  */
 

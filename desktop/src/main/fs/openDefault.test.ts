@@ -30,8 +30,8 @@ describe('openInDefaultApp (YAZ-1577 D2)', () => {
     expect(open).toHaveBeenCalledExactlyOnceWith(p)
   })
 
-  it('has no extension gate: a Markdown file, a folder and the vault root open the same way', async () => {
-    for (const p of [path.join(root, 'b.md'), path.join(root, 'Zeta'), root]) {
+  it('has no extension gate: a drawing file, a folder and the vault root open the same way', async () => {
+    for (const p of [path.join(root, 'b.excalidraw'), path.join(root, 'Zeta'), root]) {
       expect(await openInDefaultApp({ path: p })).toEqual({ path: p })
     }
     expect(open).toHaveBeenCalledTimes(3)

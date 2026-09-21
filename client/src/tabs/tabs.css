@@ -90,10 +90,6 @@
   box-shadow: inset -2px 0 0 var(--accent);
 }
 
-.tabbar--drop-empty {
-  box-shadow: inset 2px 0 0 var(--accent);
-}
-
 .tabbar__btn {
   display: inline-flex;
   align-items: center;

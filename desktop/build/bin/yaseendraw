@@ -1,6 +1,0 @@
-#!/bin/sh
-# The `yaseendraw` command (YAZ-1617): the app's own Electron run as plain Node — VS Code's `code` pattern.
-# Lives at Contents/Resources/bin/yaseendraw; a symlink from anywhere resolves back here.
-SELF="$(readlink -f "$0")"
-CONTENTS="$(dirname "$(dirname "$(dirname "$SELF")")")"
-ELECTRON_RUN_AS_NODE=1 exec "$CONTENTS/MacOS/Yaseen Draw" "$CONTENTS/Resources/app.asar/out/main/cli.js" "$@"

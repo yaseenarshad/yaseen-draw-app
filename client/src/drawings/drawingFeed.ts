@@ -1,15 +1,12 @@
 /**
  * The drawing refresh feed (YAZ-878, third build unit of the Excalidraw embed YAZ-852).
  *
- * The `WikilinkResolveSource` subscribe/poke idiom (`editor/wikilink/wikilinkPlugin.ts`) cut down
- * to its smallest honest shape: a holder App owns, carrying no state at all — only the poke. A
- * preview plugin subscribes once and, on a poke naming its target, drops that target's cached
- * scene and re-reads it. Nothing else moves: no remount, no document change, no transaction the
- * autosave can see.
+ * A subscribe/poke holder carrying no state at all — only the poke. A subscriber, on a poke
+ * naming its target, drops that target's cached scene and re-reads it. Nothing else moves: no
+ * remount, no document change, no transaction the autosave can see.
  *
- * ONE per editor mount, made by `CrepeHost` and given to BOTH the preview plugin and the modal
- * (YAZ-879, the first and only poker: a save redraws every preview of that target in place).
- * Absent from `createCrepe`, previews still render; they just never live-refresh.
+ * ONE per mount, given to the modal (YAZ-879, the first and only poker: a save redraws every
+ * view of that target in place).
  */
 
 /** How a poke reaches the previews; see `createDrawingFeed`. */

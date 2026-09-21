@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { BrowserWindow, ipcMain } from 'electron'
-import { defaultAppState, defaultRightPanelIdentity, VAULT_CONFIG_DIR, type AppState, type GithubSyncStatus, type WindowEntry } from '@shared/types'
+import { defaultAppState, VAULT_CONFIG_DIR, type AppState, type GithubSyncStatus, type WindowEntry } from '@shared/types'
 import { CH, type Envelope } from '../../channels'
 import { createStore, type Store } from '../store'
 import { activeConfigWatcherRoots } from '../vaultConfig'
@@ -48,7 +48,7 @@ const bounds = { x: 0, y: 0, width: 800, height: 600 }
 const sender = { id: 1 }
 
 const stateWith = (windows: WindowEntry[]): AppState => ({ ...defaultAppState(), windows })
-const win = (id: string, root: string | null): WindowEntry => ({ id, root, file: null, tabs: [], rightPanel: defaultRightPanelIdentity(), sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds })
+const win = (id: string, root: string | null): WindowEntry => ({ id, root, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds })
 
 let dir: string
 let vault: string

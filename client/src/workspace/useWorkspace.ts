@@ -1,7 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { defaultRightPanelIdentity, type RightPanelIdentity } from '@shared/types'
 import { storage } from '../lib/storage'
-import { carryEditorAcrossPane } from '../lib/renameContinuity'
 import { hashFilePath } from '../lib/urlHash'
 
 /**
@@ -35,32 +33,11 @@ export interface TabsState {
   history: Record<string, TabHistory>
 }
 
-/** One tab's back/forward stack (YAZ-721 D1): `entries[index]` is the page the tab shows. */
+/** One tab's back/forward stack (YAZ-721 D1): `entries[index]` is the file the tab shows. */
 export interface TabHistory {
   entries: string[]
   index: number
 }
-
-export interface WorkspaceState extends TabsState {
-  rightPanel: RightPanelIdentity
-  /** Right editors visited in this session, retained until their header closes. */
-  rightMounted: string[]
-  /** Session-only Back/Forward stacks, independent from main-tab history. */
-  rightHistory: Record<string, TabHistory>
-}
-
-export type WorkspaceAction =
-  | TabsAction
-  | { type: 'open-right' | 'open-right-background'; path: string; at?: number }
-  | { type: 'navigate-right'; from: string; to: string }
-  | { type: 'toggle-right'; path: string }
-  | { type: 'close-right'; path: string }
-  | { type: 'move-right'; from: number; to: number }
-  | { type: 'transfer-main-to-right'; path: string; at: number }
-  | { type: 'transfer-right-to-main'; path: string; at: number }
-  | { type: 'right-back' | 'right-forward' }
-  | { type: 'set-right-open'; open: boolean }
-  | { type: 'set-right-width'; width: number }
 
 export type TabsAction =
   | { type: 'open-current'; path: string } // sidebar click & friends: replace the active tab (activate instead when already open)
@@ -275,213 +252,6 @@ export function tabsReducer(s: TabsState, a: TabsAction): TabsState {
   }
 }
 
-const rightDefault = (): Pick<WorkspaceState, 'rightPanel' | 'rightMounted' | 'rightHistory'> => ({
-  rightPanel: defaultRightPanelIdentity(),
-  rightMounted: [],
-  rightHistory: {},
-})
-
-const withMain = (s: WorkspaceState, main: TabsState): WorkspaceState => ({ ...s, ...main })
-
-function closeRight(s: WorkspaceState, path: string): WorkspaceState {
-  const i = s.rightPanel.items.indexOf(path)
-  if (i === -1) return s
-  const items = s.rightPanel.items.filter((item) => item !== path)
-  const expanded = s.rightPanel.expanded === path
-    ? (s.rightPanel.items[i + 1] ?? s.rightPanel.items[i - 1] ?? null)
-    : s.rightPanel.expanded
-  const rightHistory = { ...s.rightHistory }
-  delete rightHistory[path]
-  return {
-    ...s,
-    rightPanel: { ...s.rightPanel, items, expanded },
-    rightMounted: s.rightMounted.filter((item) => item !== path),
-    rightHistory,
-  }
-}
-
-function insertAt(items: readonly string[], path: string, at = items.length): string[] {
-  const next = items.filter((item) => item !== path)
-  next.splice(Math.max(0, Math.min(at, next.length)), 0, path)
-  return next
-}
-
-function openRight(s: WorkspaceState, path: string, foreground: boolean, at?: number): WorkspaceState {
-  const main = s.tabs.includes(path) ? tabsReducer(s, { type: 'close', path }) : s
-  const alreadyRight = s.rightPanel.items.includes(path)
-  const items = alreadyRight && at === undefined ? s.rightPanel.items : insertAt(s.rightPanel.items, path, at)
-  const expanded = foreground ? path : s.rightPanel.expanded
-  const rightMounted = foreground && !s.rightMounted.includes(path) ? [...s.rightMounted, path] : s.rightMounted
-  if (main === s && alreadyRight && s.rightPanel.open && expanded === s.rightPanel.expanded && items === s.rightPanel.items && rightMounted === s.rightMounted) return s
-  return {
-    ...s,
-    ...main,
-    rightPanel: { ...s.rightPanel, open: true, items, expanded },
-    rightMounted,
-  }
-}
-
-function navigateRight(s: WorkspaceState, from: string, to: string, historyIndex?: number): WorkspaceState {
-  const fromIndex = s.rightPanel.items.indexOf(from)
-  if (fromIndex === -1 || from === to) return s
-  if (s.rightPanel.items.includes(to)) {
-    return { ...s, rightPanel: { ...s.rightPanel, expanded: to } }
-  }
-  const main = s.tabs.includes(to) ? tabsReducer(s, { type: 'close', path: to }) : s
-  const items = [...s.rightPanel.items]
-  items[fromIndex] = to
-  const prior = s.rightHistory[from] ?? { entries: [from], index: 0 }
-  const record = historyIndex === undefined
-    ? { entries: [...prior.entries.slice(0, prior.index + 1), to], index: prior.index + 1 }
-    : { entries: prior.entries, index: historyIndex }
-  const rightHistory = { ...s.rightHistory }
-  delete rightHistory[from]
-  rightHistory[to] = record
-  return {
-    ...s,
-    ...main,
-    rightPanel: { ...s.rightPanel, items, expanded: to },
-    rightMounted: [...s.rightMounted.filter((item) => item !== from), to],
-    rightHistory,
-  }
-}
-
-function repairRightPaths(
-  s: WorkspaceState,
-  main: TabsState,
-  map: (path: string) => string | null,
-): WorkspaceState {
-  const mainPaths = new Set(main.tabs)
-  const seen = new Set<string>()
-  const items: string[] = []
-  for (const item of s.rightPanel.items) {
-    const next = map(item)
-    if (next === null || mainPaths.has(next) || seen.has(next)) continue
-    seen.add(next)
-    items.push(next)
-  }
-  const mappedExpanded = s.rightPanel.expanded === null ? null : map(s.rightPanel.expanded)
-  let expanded = mappedExpanded !== null && items.includes(mappedExpanded) ? mappedExpanded : null
-  if (expanded === null && s.rightPanel.expanded !== null) {
-    const i = s.rightPanel.items.indexOf(s.rightPanel.expanded)
-    const heirCandidates = [...s.rightPanel.items.slice(i + 1), ...s.rightPanel.items.slice(0, i).reverse()]
-    expanded = heirCandidates.map(map).find((path): path is string => path !== null && items.includes(path)) ?? null
-  }
-  const rightMounted = [...new Set(s.rightMounted.map(map).filter((path): path is string => path !== null && items.includes(path)))]
-  const repairedHistory = rekey(s.rightHistory, map)
-  const rightHistory = Object.fromEntries(Object.entries(repairedHistory).filter(([key]) => items.includes(key)))
-  return { ...s, ...main, rightPanel: { ...s.rightPanel, items, expanded }, rightMounted, rightHistory }
-}
-
-/** One pure owner for main tabs, right headers, both histories, and all lifecycle repair. */
-export function workspaceReducer(s: WorkspaceState, a: WorkspaceAction): WorkspaceState {
-  switch (a.type) {
-    case 'open-right':
-      return openRight(s, a.path, true, a.at)
-    case 'open-right-background':
-      return openRight(s, a.path, false, a.at)
-    case 'transfer-main-to-right':
-      return s.tabs.includes(a.path) ? openRight(s, a.path, true, a.at) : s
-    case 'transfer-right-to-main': {
-      if (!s.rightPanel.items.includes(a.path)) return s
-      const without = closeRight(s, a.path)
-      const tabs = insertAt(without.tabs, a.path, a.at)
-      return {
-        ...without,
-        tabs,
-        active: a.path,
-        mounted: without.mounted.includes(a.path) ? without.mounted : [...without.mounted, a.path],
-      }
-    }
-    case 'navigate-right':
-      return navigateRight(s, a.from, a.to)
-    case 'toggle-right': {
-      if (!s.rightPanel.items.includes(a.path)) return s
-      const expanded = s.rightPanel.expanded === a.path ? null : a.path
-      return {
-        ...s,
-        rightPanel: { ...s.rightPanel, expanded },
-        rightMounted: expanded !== null && !s.rightMounted.includes(expanded) ? [...s.rightMounted, expanded] : s.rightMounted,
-      }
-    }
-    case 'close-right':
-      return closeRight(s, a.path)
-    case 'move-right': {
-      const to = Math.max(0, Math.min(a.to, s.rightPanel.items.length - 1))
-      if (a.from < 0 || a.from >= s.rightPanel.items.length || a.from === to) return s
-      const items = [...s.rightPanel.items]
-      const [moved] = items.splice(a.from, 1)
-      items.splice(to, 0, moved)
-      return { ...s, rightPanel: { ...s.rightPanel, items } }
-    }
-    case 'right-back':
-    case 'right-forward': {
-      const current = s.rightPanel.expanded
-      if (current === null) return s
-      const history = s.rightHistory[current]
-      if (history === undefined) return s
-      const index = history.index + (a.type === 'right-back' ? -1 : 1)
-      if (index < 0 || index >= history.entries.length) return s
-      const target = history.entries[index]
-      if (s.rightPanel.items.includes(target)) return { ...s, rightPanel: { ...s.rightPanel, expanded: target } }
-      return navigateRight(s, current, target, index)
-    }
-    case 'set-right-open':
-      return a.open === s.rightPanel.open ? s : { ...s, rightPanel: { ...s.rightPanel, open: a.open } }
-    case 'set-right-width':
-      return a.width === s.rightPanel.width ? s : { ...s, rightPanel: { ...s.rightPanel, width: a.width } }
-    case 'reset': {
-      const main = tabsReducer(s, a)
-      if (main === s && s.rightPanel.items.length === 0 && !s.rightPanel.open) return s
-      return { ...s, ...main, ...rightDefault() }
-    }
-    case 'rename': {
-      if (a.oldPath === a.newPath) return s
-      const map = (path: string) => path === a.oldPath ? a.newPath : path
-      const main = tabsReducer(s, a)
-      const rightReferenced = s.rightPanel.items.includes(a.oldPath)
-        || s.rightMounted.includes(a.oldPath)
-        || Object.values(s.rightHistory).some((history) => history.entries.includes(a.oldPath))
-      return main === s && !rightReferenced ? s : repairRightPaths(s, main, map)
-    }
-    case 'rename-dir': {
-      if (a.oldPath === a.newPath) return s
-      const prefix = `${a.oldPath}/`
-      const map = (path: string) => path.startsWith(prefix) ? a.newPath + path.slice(a.oldPath.length) : path
-      const main = tabsReducer(s, a)
-      const rightReferenced = s.rightPanel.items.some((path) => path.startsWith(prefix))
-        || Object.values(s.rightHistory).some((history) => history.entries.some((path) => path.startsWith(prefix)))
-      return main === s && !rightReferenced ? s : repairRightPaths(s, main, map)
-    }
-    case 'delete': {
-      const map = (path: string) => path === a.path ? null : path
-      const main = tabsReducer(s, a)
-      const rightReferenced = s.rightPanel.items.includes(a.path)
-        || Object.values(s.rightHistory).some((history) => history.entries.includes(a.path))
-      return main === s && !rightReferenced ? s : repairRightPaths(s, main, map)
-    }
-    case 'delete-dir': {
-      const prefix = `${a.path}/`
-      const map = (path: string) => path.startsWith(prefix) ? null : path
-      const main = tabsReducer(s, a)
-      const rightReferenced = s.rightPanel.items.some((path) => path.startsWith(prefix))
-        || Object.values(s.rightHistory).some((history) => history.entries.some((path) => path.startsWith(prefix)))
-      return main === s && !rightReferenced ? s : repairRightPaths(s, main, map)
-    }
-    case 'open-current':
-    case 'open-new':
-    case 'open-background': {
-      const withoutRight = s.rightPanel.items.includes(a.path) ? closeRight(s, a.path) : s
-      const main = tabsReducer(withoutRight, a)
-      return main === withoutRight ? withoutRight : withMain(withoutRight, main)
-    }
-    default: {
-      const main = tabsReducer(s, a)
-      return main === s ? s : withMain(s, main)
-    }
-  }
-}
-
 /**
  * The boot state (rule 15): `storage`'s identity is valid AT BOOT only (`storage.init()`
  * resolves before the first render). Active-file precedence (GRO-2069/2160): a pasted
@@ -495,22 +265,7 @@ export function bootTabs(root: string | null): TabsState {
   return tabsReducer(EMPTY, { type: 'reset', tabs: storage.getTabs(), active })
 }
 
-export function bootWorkspace(root: string | null): WorkspaceState {
-  const main = bootTabs(root)
-  if (root === null) return { ...main, ...rightDefault() }
-  const stored = storage.getRightPanel()
-  const mainPaths = new Set(main.tabs)
-  const items = stored.items.filter((path) => !mainPaths.has(path))
-  const expanded = stored.expanded !== null && items.includes(stored.expanded) ? stored.expanded : null
-  return {
-    ...main,
-    rightPanel: { ...stored, items, expanded },
-    rightMounted: expanded === null ? [] : [expanded],
-    rightHistory: {},
-  }
-}
-
-export interface UseWorkspace extends WorkspaceState {
+export interface UseWorkspace extends TabsState {
   /** Rule 11: sidebar single-click, inline-create, Bases row links, base embeds, deep links. */
   openCurrent: (path: string) => void
   /** Rule 5: append at the end + activate. No shipped gesture yet — I3's ⌘-click ruling landed on openBackground. */
@@ -546,44 +301,24 @@ export interface UseWorkspace extends WorkspaceState {
   deletePath: (path: string) => void
   /** A FOLDER delete landed (`file:deleted` kind `dir`): drop every tab under the prefix. */
   deleteDirPath: (path: string) => void
-  openRight: (path: string, at?: number) => void
-  openRightBackground: (path: string, at?: number) => void
-  navigateRight: (from: string, to: string) => void
-  toggleRight: (path: string) => void
-  closeRight: (path: string) => void
-  moveRight: (from: number, to: number) => void
-  transferMainToRight: (path: string, at: number) => void
-  transferRightToMain: (path: string, at: number) => void
-  rightBack: () => void
-  rightForward: () => void
-  canRightBack: boolean
-  canRightForward: boolean
-  setRightOpen: (open: boolean) => void
-  setRightWidth: (width: number) => void
 }
 
 export function useWorkspace(root: string | null): UseWorkspace {
-  const [state, setState] = useState<WorkspaceState>(() => bootWorkspace(root))
+  const [state, setState] = useState<TabsState>(() => bootTabs(root))
   // Dispatch reads/writes the ref so consecutive dispatches in one event see each other; the
   // mirror side effect stays OUT of the setState updater (StrictMode double-invokes updaters).
   const stateRef = useRef(state)
   const rootRef = useRef(root)
   rootRef.current = root
 
-  const dispatch = useCallback((action: WorkspaceAction, opts?: { root?: string | null; mirror?: boolean }): void => {
+  const dispatch = useCallback((action: TabsAction, opts?: { root?: string | null; mirror?: boolean }): void => {
     const prevState = stateRef.current
-    const nextState = workspaceReducer(prevState, action)
+    const nextState = tabsReducer(prevState, action)
     if (nextState === prevState) return
-    for (const path of prevState.tabs) {
-      if (nextState.rightPanel.items.includes(path)) carryEditorAcrossPane(path)
-    }
-    for (const path of prevState.rightPanel.items) {
-      if (nextState.tabs.includes(path)) carryEditorAcrossPane(path)
-    }
     stateRef.current = nextState
     setState(nextState)
-    // ONE explicit write per durable change carries both owners and the active main file.
-    if (opts?.mirror !== false) storage.setWorkspace(opts?.root !== undefined ? opts.root : rootRef.current, nextState.tabs, nextState.active, nextState.rightPanel)
+    // ONE explicit write per durable change carries the tab list and the active file.
+    if (opts?.mirror !== false) storage.setWorkspace(opts?.root !== undefined ? opts.root : rootRef.current, nextState.tabs, nextState.active)
   }, [])
 
   const openCurrent = useCallback((path: string) => dispatch({ type: 'open-current', path }), [dispatch])
@@ -619,39 +354,12 @@ export function useWorkspace(root: string | null): UseWorkspace {
 
   const deletePath = useCallback((path: string) => dispatch({ type: 'delete', path }), [dispatch])
   const deleteDirPath = useCallback((path: string) => dispatch({ type: 'delete-dir', path }), [dispatch])
-  const openRightCallback = useCallback((path: string, at?: number) => dispatch({ type: 'open-right', path, at }), [dispatch])
-  const openRightBackground = useCallback((path: string, at?: number) => dispatch({ type: 'open-right-background', path, at }), [dispatch])
-  const navigateRightCallback = useCallback((from: string, to: string) => dispatch({ type: 'navigate-right', from, to }), [dispatch])
-  const toggleRight = useCallback((path: string) => dispatch({ type: 'toggle-right', path }), [dispatch])
-  const closeRightCallback = useCallback((path: string) => dispatch({ type: 'close-right', path }), [dispatch])
-  const moveRight = useCallback((from: number, to: number) => dispatch({ type: 'move-right', from, to }), [dispatch])
-  const transferMainToRight = useCallback((path: string, at: number) => dispatch({ type: 'transfer-main-to-right', path, at }), [dispatch])
-  const transferRightToMain = useCallback((path: string, at: number) => dispatch({ type: 'transfer-right-to-main', path, at }), [dispatch])
-  const rightBack = useCallback(() => dispatch({ type: 'right-back' }), [dispatch])
-  const rightForward = useCallback(() => dispatch({ type: 'right-forward' }), [dispatch])
-  const setRightOpen = useCallback((open: boolean) => dispatch({ type: 'set-right-open', open }), [dispatch])
-  const setRightWidth = useCallback((width: number) => dispatch({ type: 'set-right-width', width }), [dispatch])
 
   const h: TabHistory | undefined = state.history[state.active ?? '']
-  const rightH: TabHistory | undefined = state.rightHistory[state.rightPanel.expanded ?? '']
   return {
     ...state,
     openCurrent, openNew, openBackground, activate, close, move, closeActive, next, prev, back, forward, reset, renamePath, renameDirPath, deletePath, deleteDirPath,
-    openRight: openRightCallback,
-    openRightBackground,
-    navigateRight: navigateRightCallback,
-    toggleRight,
-    closeRight: closeRightCallback,
-    moveRight,
-    transferMainToRight,
-    transferRightToMain,
-    rightBack,
-    rightForward,
-    setRightOpen,
-    setRightWidth,
     canBack: h !== undefined && h.index > 0,
     canForward: h !== undefined && h.index < h.entries.length - 1,
-    canRightBack: rightH !== undefined && rightH.index > 0,
-    canRightForward: rightH !== undefined && rightH.index < rightH.entries.length - 1,
   }
 }

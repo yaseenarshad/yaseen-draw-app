@@ -1,11 +1,11 @@
 import { mkdir, stat, writeFile } from 'node:fs/promises'
 import type { CreateDirResponse, CreateFileRequest, CreateFileResponse } from '@shared/types'
-import { isMarkdown } from '@shared/fileKind'
+import { isDrawing } from '@shared/fileKind'
 import { BridgeFailure, fsCall, requireAbsPath } from './fsUtils'
 
 /**
- * Creation calls for the sidebar's "New folder" / "New note" (GRO-2022).
- * Markdown files are created empty. The object form's `content` (Bible B, GRO-2202) rides the
+ * Creation calls for the sidebar's "New folder" / "New drawing" (GRO-2022).
+ * Drawing files are created empty. The object form's `content` (Bible B, GRO-2202) rides the
  * same `wx` write — content-at-create, no create-then-write race. Existence races resolve at
  * the fs layer: mkdir and `wx` writes throw EEXIST, which `toBridgeFailure` maps to
  * ALREADY_EXISTS — nothing is ever overwritten.
@@ -21,7 +21,7 @@ export async function createFile(req: string | CreateFileRequest): Promise<Creat
   const raw: unknown = req
   const isReq = typeof raw === 'object' && raw !== null
   const p = requireAbsPath(isReq ? (raw as Record<string, unknown>).path : raw, 'path')
-  if (!isMarkdown(p)) throw new BridgeFailure('UNSUPPORTED_EXTENSION', 'only .md/.markdown files can be created', { path: p })
+  if (!isDrawing(p)) throw new BridgeFailure('UNSUPPORTED_EXTENSION', 'only .excalidraw files can be created', { path: p })
   const content = isReq ? (raw as Record<string, unknown>).content : undefined
   if (content !== undefined && typeof content !== 'string') throw new BridgeFailure('BAD_REQUEST', "'content' must be a string", { path: p })
   return fsCall(p, async () => {

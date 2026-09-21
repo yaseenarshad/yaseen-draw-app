@@ -51,7 +51,7 @@ describe('registerStateIpc', () => {
   it('registers every state channel the preload invokes (and nothing else)', () => {
     const channels = vi.mocked(ipcMain.handle).mock.calls.map(([ch]) => ch).sort()
     expect(channels).toEqual(
-      [CH.stateGet, CH.stateSetSettings, CH.stateSetSidebarWidth, CH.statePushRecent, CH.stateRemoveRecent, CH.stateSetFolder, CH.stateSetFolds, CH.stateSetBaseGroups].sort(),
+      [CH.stateGet, CH.stateSetSettings, CH.stateSetSidebarWidth, CH.statePushRecent, CH.stateRemoveRecent, CH.stateSetFolder].sort(),
     )
   })
 
@@ -60,12 +60,12 @@ describe('registerStateIpc', () => {
   })
 
   it('state:set-settings takes a complete valid SettingsState and rejects anything else as BAD_REQUEST', async () => {
-    const next = { ...DEFAULT_SETTINGS, lineSpacing: 2, threadColor: '#00aaff', contentWidth: 'full' }
+    const next = { ...DEFAULT_SETTINGS, theme: 'dark' as const, confirmDelete: false }
     expect(await registered(CH.stateSetSettings)({ sender }, next)).toEqual(ok(undefined))
     expect(store.get().settings).toEqual(next)
-    expect(await registered(CH.stateSetSettings)({ sender }, { ...DEFAULT_SETTINGS, lineSpacing: 'big' })).toEqual(bad('BAD_REQUEST'))
-    expect(await registered(CH.stateSetSettings)({ sender }, { ...DEFAULT_SETTINGS, contentWidth: 'wide' })).toEqual(bad('BAD_REQUEST'))
-    expect(await registered(CH.stateSetSettings)({ sender }, { lineSpacing: 1 })).toEqual(bad('BAD_REQUEST'))
+    expect(await registered(CH.stateSetSettings)({ sender }, { ...DEFAULT_SETTINGS, theme: 'blue' })).toEqual(bad('BAD_REQUEST'))
+    expect(await registered(CH.stateSetSettings)({ sender }, { ...DEFAULT_SETTINGS, confirmDelete: 'yes' })).toEqual(bad('BAD_REQUEST'))
+    expect(await registered(CH.stateSetSettings)({ sender }, { theme: 'dark' })).toEqual(bad('BAD_REQUEST'))
     expect(await registered(CH.stateSetSettings)({ sender }, 'nope')).toEqual(bad('BAD_REQUEST'))
     expect(store.get().settings).toEqual(next)
   })
@@ -97,8 +97,8 @@ describe('registerStateIpc', () => {
   })
 
   it('state:set-folder checks the root and the patch shape', async () => {
-    expect(await registered(CH.stateSetFolder)({ sender }, '/v', { expanded: ['/v/sub'], lastFile: '/v/a.md' })).toEqual(ok(undefined))
-    expect(store.get().folders['/v']).toEqual({ expanded: ['/v/sub'], lastFile: '/v/a.md', folds: {}, baseGroups: {}, topicsExpanded: [] })
+    expect(await registered(CH.stateSetFolder)({ sender }, '/v', { expanded: ['/v/sub'], lastFile: '/v/a.excalidraw' })).toEqual(ok(undefined))
+    expect(store.get().folders['/v']).toEqual({ expanded: ['/v/sub'], lastFile: '/v/a.excalidraw' })
     expect(await registered(CH.stateSetFolder)({ sender }, '/v', { lastFile: null })).toEqual(ok(undefined))
     expect(store.get().folders['/v'].lastFile).toBeNull()
     expect(await registered(CH.stateSetFolder)({ sender }, 'v', {})).toEqual(bad('NOT_ABSOLUTE'))
@@ -106,38 +106,10 @@ describe('registerStateIpc', () => {
     expect(await registered(CH.stateSetFolder)({ sender }, '/v', { expanded: 'nope' })).toEqual(bad('BAD_REQUEST'))
     expect(await registered(CH.stateSetFolder)({ sender }, '/v', { expanded: [1] })).toEqual(bad('BAD_REQUEST'))
     expect(await registered(CH.stateSetFolder)({ sender }, '/v', { lastFile: 5 })).toEqual(bad('BAD_REQUEST'))
-    expect(store.get().folders['/v']).toEqual({ expanded: ['/v/sub'], lastFile: null, folds: {}, baseGroups: {}, topicsExpanded: [] })
-    // The Topics tree's open pages ride the same patch (YAZ-848), checked like `expanded`.
-    expect(await registered(CH.stateSetFolder)({ sender }, '/v', { topicsExpanded: ['/v/Metrics.md'] })).toEqual(ok(undefined))
-    expect(store.get().folders['/v'].topicsExpanded).toEqual(['/v/Metrics.md'])
-    expect(await registered(CH.stateSetFolder)({ sender }, '/v', { topicsExpanded: 'nope' })).toEqual(bad('BAD_REQUEST'))
-    expect(await registered(CH.stateSetFolder)({ sender }, '/v', { topicsExpanded: [1] })).toEqual(bad('BAD_REQUEST'))
-    expect(store.get().folders['/v'].topicsExpanded).toEqual(['/v/Metrics.md'])
+    expect(store.get().folders['/v']).toEqual({ expanded: ['/v/sub'], lastFile: null })
     // Focus Mode's lists are window identity since YAZ-1628 (`window.setIdentity`): here they are unknown keys, ignored like any other.
     expect(await registered(CH.stateSetFolder)({ sender }, '/v', { focusDirs: ['/v/sub'] })).toEqual(ok(undefined))
-    expect(store.get().folders['/v']).toEqual({ expanded: ['/v/sub'], lastFile: null, folds: {}, baseGroups: {}, topicsExpanded: ['/v/Metrics.md'] })
-  })
-
-  it('state:set-folds checks root, file and keys', async () => {
-    expect(await registered(CH.stateSetFolds)({ sender }, '/v', '/v/a.md', ['k1'])).toEqual(ok(undefined))
-    expect(store.get().folders['/v'].folds).toEqual({ '/v/a.md': ['k1'] })
-    expect(await registered(CH.stateSetFolds)({ sender }, '/v', 'a.md', ['k1'])).toEqual(bad('NOT_ABSOLUTE'))
-    expect(await registered(CH.stateSetFolds)({ sender }, '/v', '/v/a.md', 'k1')).toEqual(bad('BAD_REQUEST'))
-    expect(await registered(CH.stateSetFolds)({ sender }, '/v', '/v/a.md', [1])).toEqual(bad('BAD_REQUEST'))
-    expect(await registered(CH.stateSetFolds)({ sender }, '/v', '/v/a.md', [])).toEqual(ok(undefined))
-    expect(store.get().folders['/v'].folds).toEqual({})
-  })
-
-  it('state:set-base-groups checks root, key and collapsed', async () => {
-    expect(await registered(CH.stateSetBaseGroups)({ sender }, '/v', '/v/a.md::T', ['v:idea'])).toEqual(ok(undefined))
-    expect(store.get().folders['/v'].baseGroups).toEqual({ '/v/a.md::T': ['v:idea'] })
-    expect(await registered(CH.stateSetBaseGroups)({ sender }, 'v', '/v/a.md::T', ['v:idea'])).toEqual(bad('NOT_ABSOLUTE'))
-    expect(await registered(CH.stateSetBaseGroups)({ sender }, '/v', 5, ['v:idea'])).toEqual(bad('BAD_REQUEST'))
-    expect(await registered(CH.stateSetBaseGroups)({ sender }, '/v', '', ['v:idea'])).toEqual(bad('BAD_REQUEST'))
-    expect(await registered(CH.stateSetBaseGroups)({ sender }, '/v', '/v/a.md::T', 'v:idea')).toEqual(bad('BAD_REQUEST'))
-    expect(await registered(CH.stateSetBaseGroups)({ sender }, '/v', '/v/a.md::T', [1])).toEqual(bad('BAD_REQUEST'))
-    expect(await registered(CH.stateSetBaseGroups)({ sender }, '/v', '/v/a.md::T', [])).toEqual(ok(undefined))
-    expect(store.get().folders['/v'].baseGroups).toEqual({})
+    expect(store.get().folders['/v']).toEqual({ expanded: ['/v/sub'], lastFile: null })
   })
 
   it('broadcasts state:changed with the new state to every live window, skipping destroyed ones', async () => {

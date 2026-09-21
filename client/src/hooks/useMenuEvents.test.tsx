@@ -20,7 +20,6 @@ function installBridge() {
   const closeTabListeners = new Set<() => void>()
   const nextTabListeners = new Set<() => void>()
   const prevTabListeners = new Set<() => void>()
-  const zoomListeners = new Set<(step: -1 | 0 | 1) => void>()
   const sub = <T,>(set: Set<T>) =>
     vi.fn((l: T) => {
       set.add(l)
@@ -37,7 +36,6 @@ function installBridge() {
       onCloseTab: sub(closeTabListeners),
       onNextTab: sub(nextTabListeners),
       onPrevTab: sub(prevTabListeners),
-      onZoom: sub(zoomListeners),
     },
   }
   Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
@@ -51,8 +49,7 @@ function installBridge() {
     emitCloseTab: () => closeTabListeners.forEach((l) => l()),
     emitNextTab: () => nextTabListeners.forEach((l) => l()),
     emitPrevTab: () => prevTabListeners.forEach((l) => l()),
-    emitZoom: (step: -1 | 0 | 1) => zoomListeners.forEach((l) => l(step)),
-    count: () => openFolderListeners.size + openRootListeners.size + searchListeners.size + switchVaultListeners.size + settingsListeners.size + toggleSidebarListeners.size + closeTabListeners.size + nextTabListeners.size + prevTabListeners.size + zoomListeners.size,
+    count: () => openFolderListeners.size + openRootListeners.size + searchListeners.size + switchVaultListeners.size + settingsListeners.size + toggleSidebarListeners.size + closeTabListeners.size + nextTabListeners.size + prevTabListeners.size,
   }
 }
 
@@ -66,7 +63,6 @@ interface ProbeProps {
   onCloseTab: () => void
   onNextTab: () => void
   onPrevTab: () => void
-  onZoom: (step: -1 | 0 | 1) => void
 }
 
 function Probe(props: ProbeProps) {
@@ -84,7 +80,7 @@ afterEach(() => {
 describe('useMenuEvents', () => {
   it('routes menu gestures to the callbacks and unsubscribes on unmount', () => {
     const b = installBridge()
-    const handlers = { onOpenFolder: vi.fn(), onOpenRoot: vi.fn(), onSearch: vi.fn(), onSwitchVault: vi.fn(), onSettings: vi.fn(), onToggleSidebar: vi.fn(), onCloseTab: vi.fn(), onNextTab: vi.fn(), onPrevTab: vi.fn(), onZoom: vi.fn() }
+    const handlers = { onOpenFolder: vi.fn(), onOpenRoot: vi.fn(), onSearch: vi.fn(), onSwitchVault: vi.fn(), onSettings: vi.fn(), onToggleSidebar: vi.fn(), onCloseTab: vi.fn(), onNextTab: vi.fn(), onPrevTab: vi.fn() }
     root = createRoot(document.createElement('div'))
     act(() => root?.render(<Probe {...handlers} />))
 
@@ -106,8 +102,6 @@ describe('useMenuEvents', () => {
     expect(handlers.onNextTab).toHaveBeenCalledTimes(1)
     act(() => b.emitPrevTab())
     expect(handlers.onPrevTab).toHaveBeenCalledTimes(1)
-    act(() => b.emitZoom(-1))
-    expect(handlers.onZoom).toHaveBeenCalledExactlyOnceWith(-1)
 
     act(() => root?.unmount())
     root = null

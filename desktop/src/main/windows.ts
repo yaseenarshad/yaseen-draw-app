@@ -8,7 +8,7 @@
 import { randomUUID } from 'node:crypto'
 import { posix } from 'node:path'
 import { fileKind } from '@shared/fileKind'
-import { defaultRightPanelIdentity, type OpenWindowOptions, type RecentRoots, type WindowBounds, type WindowEntry } from '@shared/types'
+import type { OpenWindowOptions, RecentRoots, WindowBounds, WindowEntry } from '@shared/types'
 import { CH } from '../channels'
 import type { Store } from './store'
 
@@ -305,7 +305,7 @@ export function createWindowManager(store: Store, host: WindowHost): WindowManag
   }
 
   const openWindow = (opts: OpenWindowOptions): void => {
-    open({ id: randomUUID(), root: opts.root, file: opts.file, tabs: opts.file === null ? [] : [opts.file], rightPanel: defaultRightPanelIdentity(), sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: clampBounds({ ...DEFAULT_BOUNDS }, host.workAreas()) })
+    open({ id: randomUUID(), root: opts.root, file: opts.file, tabs: opts.file === null ? [] : [opts.file], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: clampBounds({ ...DEFAULT_BOUNDS }, host.workAreas()) })
   }
 
   const focusWindow = (win: ManagedWindow): void => {
@@ -328,7 +328,7 @@ export function createWindowManager(store: Store, host: WindowHost): WindowManag
       let entries = store.get().windows
       if (entries.length === 0) {
         // First launch: one window on the Welcome screen (root null; the screen itself is C2).
-        const first: WindowEntry = { id: randomUUID(), root: null, file: null, tabs: [], rightPanel: defaultRightPanelIdentity(), sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { ...DEFAULT_BOUNDS } }
+        const first: WindowEntry = { id: randomUUID(), root: null, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: { ...DEFAULT_BOUNDS } }
         store.upsertWindow(first)
         entries = [first]
       }
@@ -352,11 +352,9 @@ export function createWindowManager(store: Store, host: WindowHost): WindowManag
           root: from.root,
           file: from.file,
           tabs: [...from.tabs],
-          rightPanel: { ...from.rightPanel, items: [...from.rightPanel.items] },
           sidebarCollapsed: from.sidebarCollapsed,
           sidebarLens: from.sidebarLens,
           focusDirs: [...from.focusDirs],
-          focusTopics: [...from.focusTopics],
           focusFavorites: [...from.focusFavorites],
           bounds: clampBounds(cascaded, host.workAreas()),
         })
@@ -399,7 +397,7 @@ export function createWindowManager(store: Store, host: WindowHost): WindowManag
 
     routeToFile(path, rootOverride) {
       // Validate first (E1): a supported file kind and a live regular file. Anything off →
-      // notice, never a dialog; renderer dispatch decides Markdown editor vs read-only viewer.
+      // notice, never a dialog; the renderer's kind dispatch decides what mounts.
       if (fileKind(path) === null) {
         linkNotice(`Can't open ${path}: unsupported file type`)
         return
