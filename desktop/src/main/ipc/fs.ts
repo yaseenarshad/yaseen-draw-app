@@ -41,10 +41,10 @@ export function registerFsIpc(store: Store, windows: WindowLookup): void {
   // eviction drops the entry); the index cache's honest-miss semantics ride through untouched —
   // consumers gate on cacheStatus === 'hit'.
   handle(CH.fsReadAsset, readAsset)
-  // The asset write (YAZ-876 drawings, YAZ-1661 image bytes): no store repair and no broadcast
-  // — repair and the pushes exist for paths that MOVE or GO, and a write does neither. A
-  // `.excalidraw` is not a vault file, so nothing points at it; a pasted image is a NEW file
-  // the tree learns of from the watcher, like any add made outside the app.
+  // The image write (YAZ-1661): no store repair and no broadcast — repair and the pushes exist
+  // for paths that MOVE or GO, and a write does neither. A pasted image is a NEW file the tree
+  // learns of from the watcher, like any add made outside the app. (A DRAWING is written through
+  // `drawing:save`, 🔒 YAZ-1810 — never here.)
   handle(CH.fsWriteAsset, writeAsset)
   // Reveal in Finder (GRO-2274): read-only, so no store repair and no broadcast — but still
   // enveloped like every other handler so a stale row's NOT_FOUND reaches the renderer as a

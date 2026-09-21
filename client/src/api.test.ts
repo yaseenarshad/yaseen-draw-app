@@ -12,6 +12,7 @@ function installBridge(): { [K in keyof YaseenDrawApi]: ReturnType<typeof vi.fn>
     createFile: vi.fn(),
     readAsset: vi.fn(),
     writeAsset: vi.fn(),
+    drawing: vi.fn(),
     pickFolder: vi.fn(),
     watch: vi.fn(),
     state: vi.fn(),
@@ -53,11 +54,29 @@ describe('api', () => {
     bridge.readAsset.mockResolvedValue({ path: '/v/pic.png', mime: 'image/png', data: 'aGk=', size: 2 })
     await expect(api.readAsset('/v', 'pic.png')).resolves.toEqual({ path: '/v/pic.png', mime: 'image/png', data: 'aGk=', size: 2 })
     expect(bridge.readAsset).toHaveBeenCalledWith('/v', 'pic.png')
-    // The drawing write half (YAZ-876): the request goes through untouched, the receipt comes back.
-    const draw = { root: '/v', path: 'assets/drawings/a.excalidraw', content: '{}' }
-    bridge.writeAsset.mockResolvedValue({ path: '/v/assets/drawings/a.excalidraw', mtime: 7, size: 2 })
-    await expect(api.writeAsset(draw)).resolves.toEqual({ path: '/v/assets/drawings/a.excalidraw', mtime: 7, size: 2 })
-    expect(bridge.writeAsset).toHaveBeenCalledWith(draw)
+    // The image write half (YAZ-1661): the request goes through untouched, the receipt comes back.
+    const image = { root: '/v', path: 'assets/a.png', content: Uint8Array.from([1, 2]) }
+    bridge.writeAsset.mockResolvedValue({ path: '/v/assets/a.png', mtime: 7, size: 2 })
+    await expect(api.writeAsset(image)).resolves.toEqual({ path: '/v/assets/a.png', mtime: 7, size: 2 })
+    expect(bridge.writeAsset).toHaveBeenCalledWith(image)
+  })
+
+  it('the drawing document doors pass their request through and answer the receipt (🔒 YAZ-1810)', async () => {
+    const drawing = { load: vi.fn(), save: vi.fn() }
+    Object.defineProperty(window.yaseenDraw, 'drawing', { value: drawing, configurable: true })
+    const loaded = { path: '/v/b.excalidraw', json: '{"elements":[]}', mtime: 1, size: 15, files: {}, stored: [] }
+    drawing.load.mockResolvedValue(loaded)
+    await expect(api.drawing.load({ root: '/v', path: 'b.excalidraw' })).resolves.toEqual(loaded)
+    expect(drawing.load).toHaveBeenCalledWith({ root: '/v', path: 'b.excalidraw' })
+    const req = { root: '/v', path: 'b.excalidraw', json: '{"elements":[]}', expectedMtime: 1, newFiles: [] }
+    drawing.save.mockResolvedValue({ path: '/v/b.excalidraw', mtime: 2, size: 15, persisted: [] })
+    await expect(api.drawing.save(req)).resolves.toEqual({ path: '/v/b.excalidraw', mtime: 2, size: 15, persisted: [] })
+    expect(drawing.save).toHaveBeenCalledWith(req)
+    // A CONFLICT rejection arrives as plain data and comes back as the class, mtime included.
+    drawing.save.mockRejectedValue({ code: 'CONFLICT', message: 'drawing changed on disk since last read', path: '/v/b.excalidraw', mtime: 9 })
+    const err = (await api.drawing.save(req).catch((e: unknown) => e)) as BridgeRequestError
+    expect(err).toBeInstanceOf(BridgeRequestError)
+    expect([err.code, err.mtime]).toEqual(['CONFLICT', 9])
   })
 
   it('rename delegates to file.rename and wraps ALREADY_EXISTS like every other code (Links E1, GRO-2194)', async () => {

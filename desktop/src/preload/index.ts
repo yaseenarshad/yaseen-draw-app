@@ -36,6 +36,11 @@ const api: YaseenDrawApi = {
   createFile: (req) => call(CH.fsCreateFile, req),
   readAsset: (root, ref) => call(CH.fsReadAsset, root, ref),
   writeAsset: (req) => call(CH.fsWriteAsset, req),
+  // The drawing DOCUMENT's two doors (🔒 YAZ-1810): the only way a `.excalidraw` tab reads and writes.
+  drawing: {
+    load: (req) => call(CH.drawingLoad, req),
+    save: (req) => call(CH.drawingSave, req),
+  },
   pickFolder: () => call(CH.dialogPickFolder),
   watch: (root, listener) => {
     const id = crypto.randomUUID()

@@ -18,7 +18,7 @@ marks an amendment to an earlier locked decision; the amendment wins.
 | Path | What it is |
 |---|---|
 | `client/` | the renderer: React 19, Vite. Talks to nothing but `window.yaseenDraw`. |
-| `client/src/drawings/` | the engine seam — `<Excalidraw>` mount, scene read/write, assets |
+| `client/src/drawings/` | the drawing document: the engine seam (`ExcalidrawSurface`, the ONE importer of the package), its host, and what a scene is |
 | `client/src/sidebar/` | the file tree, its context menu, rename/move/trash, favorites, vault switcher |
 | `client/src/tabs/` | the tab strip |
 | `client/src/workspace/` | the tab model (`tabsReducer`) and its per-tab history |
@@ -63,10 +63,14 @@ One kind, one extension.
 - `.excalidraw` hides its extension wherever a name is shown — tree rows, tab labels, the window
   title, the rename field (⚡ D8 amended on YAZ-1775). Every other file shows its full name.
 - Image bytes do NOT live in the scene JSON: they are content-addressed under `<vault>/assets/`
-  (🔒 D3 on YAZ-1775), served through the asset pipe (`fs:read-asset` / `fs:write-asset`).
-- At the close of YAZ-1808 the document pane is a dispatcher with nothing to dispatch to:
-  `client/src/Editor.tsx` renders "Select a file from the sidebar." with no file, "Unsupported
-  file type." for a `null` kind, and an empty pane for a drawing. YAZ-1809 (2D) mounts the canvas.
+  (🔒 D3 on YAZ-1775) and travel with the scene through `drawing:load` / `drawing:save`.
+- A `.excalidraw` has ONE door per direction (🔒 YAZ-1810): `drawing:load` and `drawing:save`.
+  Not `fs:read` / `fs:write` (a text buffer capped at 10 MiB), and not the image pipe — which
+  stopped accepting drawings in YAZ-1810, because a second writer with different rules about the
+  scene's images is a race with no upside. `fs:create-file` is the one exception and only for
+  BIRTH: "New drawing" writes the empty scene with the file, under `wx`.
+- `client/src/Editor.tsx` dispatches on the kind: "Select a file from the sidebar." with no file,
+  "Unsupported file type." for a `null` kind, and `DrawingEditor` for a drawing.
 
 ## Bridge API
 
@@ -85,8 +89,10 @@ Electron flattens a thrown Error to its message, which is why failure travels as
 | `writeFile(req)` | `fs:write` | atomic write (tmp + rename); `expectedMtime` rejects `CONFLICT` |
 | `createDir(path)` | `fs:create-dir` | never overwrites (`ALREADY_EXISTS`) |
 | `createFile(req)` | `fs:create-file` | `.excalidraw` only; content-at-create, `wx` flag |
-| `readAsset(root, ref)` | `fs:read-asset` | an image or scene under the vault, base64 + mime |
-| `writeAsset(req)` | `fs:write-asset` | atomic asset write with the same mtime guard |
+| `readAsset(root, ref)` | `fs:read-asset` | an IMAGE under the vault, base64 + mime (a drawing is `drawing.load`'s) |
+| `writeAsset(req)` | `fs:write-asset` | atomic image-bytes write with the same mtime guard |
+| `drawing.load(req)` | `drawing:load` | one `.excalidraw` AS A DOCUMENT: its bytes, its mtime, and the images it names |
+| `drawing.save(req)` | `drawing:save` | images first, then the scene, atomically; `expectedMtime` → `CONFLICT` with NOTHING written |
 | `pickFolder()` | `dialog:pick-folder` | the native open-directory dialog |
 | `watch(root, cb)` | `watch:*` | chokidar under the root; `ready` / `change` / `add` / `unlink` / `error` |
 | `file.rename(req)` | `fs:rename` | same-parent rename or a move; never overwrites |
@@ -113,6 +119,12 @@ Rules that hold across the whole surface:
 - **Atomic writes.** Every write is tmp-file + rename, so a crash cannot truncate a drawing.
 - **Echo suppression by mtime.** A write's own watcher event is recognised by the mtime the write
   returned and ignored; a genuine external change while the buffer is dirty raises the conflict bar.
+- **One door per direction, per kind.** Where a kind has a dedicated pair (`drawing:load` /
+  `drawing:save`), nothing else may read or write those bytes. A save is an ORDER as well as a
+  write: the images the scene names land before the scene that names them.
+- **Read ceilings are per door.** `MAX_FILE_BYTES` (10 MiB) bounds the text reads;
+  `MAX_DRAWING_BYTES` (200 MiB) bounds `drawing:load`, which has to open legacy scenes that still
+  embed their images as base64.
 - **No path jail** (out of scope, below): anything under the user's account is reachable.
 
 ## App state schema

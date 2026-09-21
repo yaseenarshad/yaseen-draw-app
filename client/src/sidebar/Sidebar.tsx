@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { SIDEBAR_LENSES, type FileClipState, type SettingsState, type SidebarLens, type TreeNode, type TreeResponse } from '@shared/types'
 import { api, BridgeRequestError } from '../api'
+import { EMPTY_SCENE_JSON } from '../drawings/drawingScene'
 import { ChevronsIcon, EyeIcon, HeartIcon, SearchIcon, SidebarPanelIcon } from '../components/icons'
 import type { WatchSource } from '../hooks/useWatch'
 import { basename } from '../lib/paths'
@@ -838,7 +839,9 @@ export function Sidebar({
       if (creating === null) return
       const p = entryPath(creating.parentDir, name, creating.kind)
       if (creating.kind === 'dir') await api.createDir(p)
-      else await api.createFile(p)
+      // Content-at-create (🔒 YAZ-1810): a new drawing is an EMPTY SCENE, not an empty file — a
+      // zero-byte `.excalidraw` is exactly the corrupt case the editor's error pane exists for.
+      else await api.createFile({ path: p, content: EMPTY_SCENE_JSON })
       setCreating(null)
       refresh()
       if (creating.kind !== 'dir') onOpenFile(p)

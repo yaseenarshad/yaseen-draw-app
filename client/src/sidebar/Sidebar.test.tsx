@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { StrictMode, act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { DEFAULT_SETTINGS, defaultAppState, type AppState, type FileClipRequest, type FileClipState, type PasteResponse, type TreeNode, type WatchEvent, type WindowIdentity } from '@shared/types'
+import { EMPTY_SCENE_JSON } from '../drawings/drawingScene'
 import { EMPTY_SELECTION } from '../lib/selection'
 // Focus Mode's persistence is the REAL storage module (no mock in this file): a spy on its read is
 // how a test hands the Sidebar a focus restored from an earlier session (YAZ-1605).
@@ -27,7 +28,7 @@ const TREE: TreeNode[] = [
 function installBridge() {
   const bridge = {
     tree: vi.fn(async (root: string) => ({ root, tree: TREE, generatedAt: 1 })),
-    // The inline-create flow (GRO-2022): "New drawing" hands `createFile` the bare path.
+    // The inline-create flow (GRO-2022): "New drawing" hands `createFile` the path AND the empty-scene bytes (🔒 YAZ-1810).
     createFile: vi.fn(async (req: string | { path: string; content?: string }) => ({ path: typeof req === 'string' ? req : req.path, mtime: 2, size: 0 })),
     createDir: vi.fn(async (path: string) => ({ path })),
     state: { get: vi.fn(async () => defaultAppState()), setFolder: vi.fn(async () => undefined), onChange: vi.fn((_listener: (state: AppState) => void) => () => undefined) },
@@ -259,6 +260,21 @@ describe('Sidebar file-row open gestures (D2 GRO-2168, I3 GRO-2235)', () => {
     expect(bridge.window.open).toHaveBeenCalledWith({ root: '/v', file: '/v/a.excalidraw' })
     expect(props.onOpenFile).not.toHaveBeenCalled()
     expect(el.querySelector('.ctx-menu')).toBeNull()
+  })
+
+  it('"New drawing" creates the file with an EMPTY SCENE, not an empty file (🔒 YAZ-1810), and opens it', async () => {
+    const { el, props, bridge } = await mount()
+    act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
+    act(() => itemByLabel(el, 'New drawing')?.click())
+    const input = el.querySelector<HTMLInputElement>('.create-inline__input')
+    act(() => {
+      input!.value = 'Board'
+      input!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+    await act(async () => undefined)
+    expect(bridge.createFile).toHaveBeenCalledExactlyOnceWith({ path: '/v/Board.excalidraw', content: EMPTY_SCENE_JSON })
+    expect(JSON.parse(EMPTY_SCENE_JSON)).toMatchObject({ type: 'excalidraw', elements: [] })
+    expect(props.onOpenFile).toHaveBeenCalledWith('/v/Board.excalidraw')
   })
 
   it('folder rows and blank space get no "Open in new window" item', async () => {

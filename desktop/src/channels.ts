@@ -9,6 +9,11 @@ export const CH = {
   fsCreateFile: 'fs:create-file',
   fsReadAsset: 'fs:read-asset',
   fsWriteAsset: 'fs:write-asset',
+  // The drawing DOCUMENT's two doors (🔒 YAZ-1810) — one per direction, because a scene and the
+  // bytes it names are ONE thing: a load is "the scene, then its images", a save is "the images,
+  // then the scene", and splitting either would let a renderer land half of it.
+  drawingLoad: 'drawing:load',
+  drawingSave: 'drawing:save',
   fsRename: 'fs:rename',
   fsDelete: 'fs:delete',
   fsClip: 'fs:clip',
