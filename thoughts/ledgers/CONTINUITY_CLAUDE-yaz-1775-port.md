@@ -42,9 +42,9 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
   - [x] 2E — Image store: `assets/`, hydrate, extract, orphan sweep (YAZ-1811)
   - [x] 2F — Canvas chrome: rail, panel shell, menus, full toolbar, parity checklist (YAZ-1812)
   - [x] 2G — Settings: canvas preferences, Library folder, trims (YAZ-1813)
-- Now: [→] 2H — ⌘K search over the drawing catalog (YAZ-1814)
+  - [x] 2H — ⌘K search over the drawing catalog (YAZ-1814)
+- Now: [→] 2I — New drawing, naming, extension display, file association (YAZ-1815)
 - Remaining:
-  - [ ] 2I — New drawing, naming, extension display, file association (YAZ-1815)
   - [ ] 3A — Library folder and secrets plumbing (YAZ-1817)
   - [ ] 3B — Images tab: Image Studio with main-process providers (YAZ-1818)
   - [ ] 3C — Components tab: Saved Components as library files (YAZ-1819)
@@ -64,7 +64,15 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 - RESOLVED (🔒 "Dead asset pipe deleted" on YAZ-1775): the image half of the asset pipe is gone — module, tests, channels, preload methods, types and CONTRACTS rows — in 2F's first commit.
 - UNCONFIRMED (posted on YAZ-1812, awaiting Yasin): `focusOpenDocument`. A tab that becomes visible LATER still gets no focus — `autoFocus` only fires at mount. Whether the canvas should claim focus when its layer becomes visible is a product call, so 2F left it alone.
 
-## Learnings (2D / 2E / 2F / 2G)
+## Learnings (2D / 2E / 2F / 2G / 2H)
+
+- **⌘K is derived, never indexed.** The vault index died with markdown; the catalog is one walk of
+  the tree the Sidebar already holds, which the structural watcher already refreshes. Nothing new
+  subscribes, nothing new reads the disk, and a drawing created a second ago is findable.
+- **Lazy, but latched.** A vault is opened far more often than it is searched, so the catalog is
+  not built until the first non-empty query — and once built it stays, or the second query would
+  pay for the walk again. The latch is written during render on purpose: an effect would show one
+  empty frame of results on the very first keystroke.
 
 - **The toolbar-mode names read backwards.** The fully built-out `ContextualPropertiesToolbar` is the engine's `full` desktop mode; `compact` is upstream's vertical strip. `YASEEN_FULL_TOOLBAR_MODE` exists so no one ever writes the bare string and inverts it again (rounds 3–4 did).
 - **`getFormFactor` is the other half of that gate.** Without it a canvas pane narrowed by the shell sidebar falls into the engine's ≤ 1180 px tablet band and is forced to `compact` before the localStorage key is ever consulted.
