@@ -138,7 +138,7 @@ async function initStorage(state: AppState = defaultAppState()): Promise<void> {
     state: { get: vi.fn(async () => state), setFolder: bridgeSetFolder, onChange: vi.fn(() => () => undefined) },
     window: { identity: vi.fn(async (): Promise<WindowIdentity> => ({ id: 'w1', root: ROOT, file: null, tabs: [], rightPanel: defaultRightPanelIdentity(), sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [] })) },
   }
-  Object.defineProperty(window, 'yaseenDocs', { value: bridge, configurable: true, writable: true })
+  Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
   await storage.init()
 }
 
@@ -309,7 +309,7 @@ afterEach(() => {
   // The commit gesture (YAZ-921) reaches for the editor by DOM query, so its stand-in lives in
   // the document beside the mount — and must not survive into the next case.
   document.querySelectorAll('.editor-instance').forEach((node) => node.remove())
-  delete (window as unknown as Record<string, unknown>).yaseenDocs
+  delete (window as unknown as Record<string, unknown>).yaseenDraw
   vi.restoreAllMocks()
 })
 

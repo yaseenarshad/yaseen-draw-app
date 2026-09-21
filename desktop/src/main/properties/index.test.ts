@@ -32,7 +32,7 @@ async function seed(root: string, content: unknown): Promise<void> {
 const onDisk = async (root: string): Promise<unknown> => JSON.parse(await readFile(file(root), 'utf8'))
 
 describe('getProperties', () => {
-  it('absent file → no declarations, no error, and NEVER creates .yaseendocs (lazy, LOCKED)', async () => {
+  it('absent file → no declarations, no error, and NEVER creates .yaseendraw (lazy, LOCKED)', async () => {
     const root = await makeRoot()
     expect(await getProperties(root)).toEqual({ root, version: 1, properties: {} })
     expect(await readdir(root)).toEqual([])
@@ -104,7 +104,7 @@ describe('getProperties', () => {
 })
 
 describe('setProperty', () => {
-  it('the first mutation lazily creates .yaseendocs/properties.json with a version-1 skeleton', async () => {
+  it('the first mutation lazily creates .yaseendraw/properties.json with a version-1 skeleton', async () => {
     const root = await makeRoot()
     await setProperty(root, 'related', { kind: 'multi-link' })
     expect(await onDisk(root)).toEqual({ version: 1, properties: { related: { kind: 'multi-link' } } })

@@ -228,7 +228,7 @@ views:
 
   it('a page_type filter no longer scaffolds or redirects: the plain filter-derived seed, in the view folder', async () => {
     // No bridge is installed at all: a surviving scaffold path would read a template (or create
-    // the type folder) through `window.yaseenDocs` and blow up instead of creating the note.
+    // the type folder) through `window.yaseenDraw` and blow up instead of creating the note.
     const { el, onOpenFile } = mount(KPI_TABLE, { properties: DECLS })
 
     click(byLabel(el, 'New note'))

@@ -25,7 +25,7 @@ beforeEach(() => vi.clearAllMocks())
 describe('createDrawing', () => {
   it('writes a valid empty Excalidraw scene', () => {
     const scene = JSON.parse(EMPTY_SCENE_JSON) as typeof EMPTY_SCENE
-    expect(scene).toEqual({ type: 'excalidraw', version: 2, source: 'yaseen-docs', elements: [], appState: {}, files: {} })
+    expect(scene).toEqual({ type: 'excalidraw', version: 2, source: 'yaseen-draw', elements: [], appState: {}, files: {} })
     expect(EMPTY_SCENE_JSON.endsWith('\n')).toBe(true)
   })
 

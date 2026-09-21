@@ -47,7 +47,7 @@ let store: Store
 beforeAll(async () => {
   ;({ root, cleanup } = await makeFixture())
   storeDir = await mkdtemp(path.join(tmpdir(), 'yd-fs-ipc-'))
-  store = createStore(path.join(storeDir, 'yaseendocs.json'))
+  store = createStore(path.join(storeDir, 'yaseendraw.json'))
 })
 afterAll(async () => {
   _evictAll()

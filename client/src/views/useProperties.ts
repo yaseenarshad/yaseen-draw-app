@@ -10,9 +10,9 @@ import { api } from '../api'
  */
 
 /**
- * The bridge, wrapped: the real `.yaseendocs/properties.json` surface
- * (`window.yaseenDocs.properties`, `BridgeRequestError`-wrapped via `api`). Tests fake it by
- * installing `propertiesStub` as `window.yaseenDocs.properties` — the stub implements this same
+ * The bridge, wrapped: the real `.yaseendraw/properties.json` surface
+ * (`window.yaseenDraw.properties`, `BridgeRequestError`-wrapped via `api`). Tests fake it by
+ * installing `propertiesStub` as `window.yaseenDraw.properties` — the stub implements this same
  * interface.
  */
 export const properties: PropertiesApi = api.properties

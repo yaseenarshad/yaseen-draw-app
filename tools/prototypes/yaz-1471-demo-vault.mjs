@@ -7,7 +7,7 @@
  *
  *   node tools/prototypes/yaz-1471-demo-vault.mjs            # writes /tmp/yaz-1471-demo/{vault,profile}
  *   cd .claude/worktrees/<branch>   # or the main checkout
- *   YASEEN_DOCS_USER_DATA_DIR=/tmp/yaz-1471-demo/profile npm run dev -w desktop
+ *   YASEEN_DRAW_USER_DATA_DIR=/tmp/yaz-1471-demo/profile npm run dev -w desktop
  *
  * The profile is separate from the installed app's, so both run side by side (the single-instance
  * lock is per profile). Delete /tmp/yaz-1471-demo when done.
@@ -210,6 +210,6 @@ const state = {
   windows: [{ id: 'w1', root: V, file, tabs: [...pages, ...first8], rightPanel: { open: false, width: 440, items: [], expanded: null }, sidebarCollapsed: false, bounds: { x: 80, y: 60, width: 1200, height: 800 } }],
   folders: { [V]: { expanded: [], lastFile: file, folds: {}, baseGroups: {}, topicsExpanded: [] } },
 }
-fs.writeFileSync(path.join(P, 'yaseendocs.json'), JSON.stringify(state, null, 2))
+fs.writeFileSync(path.join(P, 'yaseendraw.json'), JSON.stringify(state, null, 2))
 console.log(`vault: ${V} (${fs.readdirSync(V).length} root entries, ${n} members) · profile: ${P}`)
-console.log(`launch: YASEEN_DOCS_USER_DATA_DIR=${P} npm run dev -w desktop`)
+console.log(`launch: YASEEN_DRAW_USER_DATA_DIR=${P} npm run dev -w desktop`)

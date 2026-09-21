@@ -7,7 +7,7 @@ import path from 'node:path'
  * test: 8 markdown notes (one with invalid frontmatter, two with none), png stubs, a `.trash`
  * note, and the two dotfolders that must stay invisible to tree/index/watcher — `.obsidian`
  * (a foreign app's, now EMPTY: ⚡ YAZ-815 deleted the `types.json` it used to carry along with
- * every read of it) and `.yaseendocs` (ours). Caller removes it via `cleanup`.
+ * every read of it) and `.yaseendraw` (ours). Caller removes it via `cleanup`.
  *
  * Named `basesFixture` / `makeBasesFixture` until YAZ-861 renamed it for the surface it actually
  * feeds — the folder-page views and the vault index — rather than the retired `.base` format.
@@ -20,7 +20,7 @@ export async function makeViewsFixture(): Promise<{ root: string; cleanup: () =>
   const trust = path.join(pillars, '3. Trust Economy & Paid Ads')
   const tech = path.join(pillars, '4. Tech & Silicon Valley')
   await Promise.all(
-    [agentic, creator, trust, tech, path.join(root, '.obsidian'), path.join(root, '.yaseendocs'), path.join(root, '.trash')].map((d) =>
+    [agentic, creator, trust, tech, path.join(root, '.obsidian'), path.join(root, '.yaseendraw'), path.join(root, '.trash')].map((d) =>
       mkdir(d, { recursive: true }),
     ),
   )

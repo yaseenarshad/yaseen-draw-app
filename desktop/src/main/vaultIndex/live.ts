@@ -72,7 +72,7 @@ function onEvent(root: string, entry: Entry, ev: WatchEvent): void {
 
 // TOMBSTONE (⚡ YAZ-815, ruled by Yasin): `readTypes(root)` stood here — a per-`getIndex` read of
 // `.obsidian/types.json`, whose assignments rode `IndexResponse.types` to a typing rung nothing
-// ever fed. A foreign app's file is not our schema: `.yaseendocs/properties.json` is the vault's
+// ever fed. A foreign app's file is not our schema: `.yaseendraw/properties.json` is the vault's
 // own, and this index no longer reads anything out of `.obsidian` at all. (It was never cached
 // either — the payload is `{version, root, records}` — so there is nothing to invalidate and no
 // CACHE_VERSION bump here.)

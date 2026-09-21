@@ -70,7 +70,7 @@ const TEXT_BASE = {
 }
 
 const scene = (elements: unknown[]) =>
-  `${JSON.stringify({ type: 'excalidraw', version: 2, source: 'yaseen-docs', elements, appState: {}, files: {} }, null, 2)}\n`
+  `${JSON.stringify({ type: 'excalidraw', version: 2, source: 'yaseen-draw', elements, appState: {}, files: {} }, null, 2)}\n`
 
 /** The fork's per-line metadata, exactly as its editor persists it (YAZ-868 scope findings). */
 const styledScene = () =>

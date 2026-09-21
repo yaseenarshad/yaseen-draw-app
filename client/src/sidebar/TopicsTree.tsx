@@ -56,7 +56,7 @@
  * would otherwise flash "0" over a vault it has not seen yet.
  *
  * THE OFFER (6C-, YAZ-849): the one thing this lens shows that is not the vault — a small card
- * above the tree, and ONLY when the folder has not been adopted (no `.yaseendocs/`, a fact App
+ * above the tree, and ONLY when the folder has not been adopted (no `.yaseendraw/`, a fact App
  * establishes once per vault) AND nothing answers `[[Home]]`. An adopted vault never sees it: its
  * Home was created for it on open. The condition's live half is asked HERE, on this surface's own
  * feed, so the card retires the moment a Home appears — including an ordinary, unflagged page
@@ -162,7 +162,7 @@ export interface TopicsTreeProps {
    */
   selection: TreeSelection
   /**
-   * This folder has no `.yaseendocs/` (6C-, YAZ-849), so nothing was written into it and the
+   * This folder has no `.yaseendraw/` (6C-, YAZ-849), so nothing was written into it and the
    * offer card is on the table. App establishes it once per vault (`useEnsureHome`) — it is a
    * fact about the FOLDER, not about Home, and stays true after the card has made one.
    */

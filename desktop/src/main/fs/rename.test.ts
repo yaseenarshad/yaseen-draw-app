@@ -174,10 +174,10 @@ describe('renameFile (Links E1b, GRO-2241: cross-directory file move + folder re
   })
 
   it('BAD_REQUEST for dot-directories (source or target — invisible infrastructure) and for moving a folder inside itself', async () => {
-    expect(await code(renameFile({ oldPath: path.join(root, '.yaseendocs'), newPath: path.join(root, 'visible') }))).toBe('BAD_REQUEST')
+    expect(await code(renameFile({ oldPath: path.join(root, '.yaseendraw'), newPath: path.join(root, 'visible') }))).toBe('BAD_REQUEST')
     expect(await code(renameFile({ oldPath: path.join(root, 'moved'), newPath: path.join(root, '.hidden-dir') }))).toBe('BAD_REQUEST')
     expect(await code(renameFile({ oldPath: path.join(root, 'moved'), newPath: path.join(root, 'moved', 'inner') }))).toBe('BAD_REQUEST')
-    await expect(stat(path.join(root, '.yaseendocs'))).resolves.toBeDefined() // nothing moved
+    await expect(stat(path.join(root, '.yaseendraw'))).resolves.toBeDefined() // nothing moved
   })
 })
 
@@ -285,7 +285,7 @@ describe('repairRename (Links E1c, GRO-2242: validate a rename that ALREADY happ
   })
 
   it("mirrors renameFile's dot-dir refusal for directories", async () => {
-    expect(await code(repairRename({ oldPath: path.join(root, 'WasVisible'), newPath: path.join(root, '.yaseendocs') }))).toBe('BAD_REQUEST')
+    expect(await code(repairRename({ oldPath: path.join(root, 'WasVisible'), newPath: path.join(root, '.yaseendraw') }))).toBe('BAD_REQUEST')
   })
 
   it('an md ↔ markdown repair stays within the markdown kind (parity with renameFile)', async () => {

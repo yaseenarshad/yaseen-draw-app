@@ -44,7 +44,7 @@ beforeEach(async () => {
   vi.mocked(ipcMain.handle).mockClear()
   vi.mocked(ipcMain.on).mockClear()
   dir = await mkdtemp(path.join(tmpdir(), 'yd-window-ipc-'))
-  store = createStore(path.join(dir, 'yaseendocs.json'))
+  store = createStore(path.join(dir, 'yaseendraw.json'))
   store.upsertWindow(entry)
   unregister = windows.register({ webContents: sender }, 'w1')
   manager = { idFor: windows.idFor, openWindow: vi.fn(), duplicateWindow: vi.fn(), openRecentBeside: vi.fn(() => true), closeWindow: vi.fn(), handleFlushed: vi.fn() }

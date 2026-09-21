@@ -25,7 +25,7 @@ function syncSubscriptions(state: AppState): void {
   }
 }
 
-/** The `vaultConfig.*` half of `window.yaseenDocs` (Desktop J, GRO-2188). */
+/** The `vaultConfig.*` half of `window.yaseenDraw` (Desktop J, GRO-2188). */
 export function registerVaultConfigIpc(store: Store): void {
   handle(CH.vaultConfigRead, readConfig)
   handle(CH.vaultConfigWrite, writeConfig)

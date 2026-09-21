@@ -2,7 +2,7 @@
  * External edits apply as diffs (YAZ-1347): the REAL built app, one pointed proof of the case
  * YAZ-1342 declared its boundary. Collapse a numbered bullet → an "agent" renumbers every line,
  * REWORDS the collapsed line itself and appends a bullet → the silent reload shows the new content,
- * the fold is still collapsed, and yaseendocs.json carries the key of the NEW label. Serial like
+ * the fold is still collapsed, and yaseendraw.json carries the key of the NEW label. Serial like
  * foldExternalEdit.spec.ts; screenshots are the evidence.
  */
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test'

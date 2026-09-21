@@ -49,7 +49,7 @@ beforeEach(async () => {
   dir = await mkdtemp(path.join(tmpdir(), 'yd-vaultcfg-ipc-'))
   vault = path.join(dir, 'vault')
   await mkdir(vault) // the root exists (an open vault always does); its dotfolder does not
-  store = createStore(path.join(dir, 'yaseendocs.json'))
+  store = createStore(path.join(dir, 'yaseendraw.json'))
   registerVaultConfigIpc(store)
 })
 afterEach(async () => {

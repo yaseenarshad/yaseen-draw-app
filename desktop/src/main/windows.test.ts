@@ -131,7 +131,7 @@ let dir: string
 let store: Store
 beforeEach(async () => {
   dir = await mkdtemp(path.join(tmpdir(), 'yd-windows-'))
-  store = createStore(path.join(dir, 'yaseendocs.json'))
+  store = createStore(path.join(dir, 'yaseendraw.json'))
   vi.useFakeTimers()
 })
 afterEach(async () => {

@@ -126,7 +126,7 @@ export function VaultSwitcher({ root, onPickFolder, pickDisabled, openRequest }:
   }, [matches, query, root])
 
   const choose = (path: string): void => {
-    void window.yaseenDocs.window
+    void window.yaseenDraw.window
       .openRecent(path)
       .catch((err: unknown) => {
         console.error('[vault-switcher] openRecent failed:', err)

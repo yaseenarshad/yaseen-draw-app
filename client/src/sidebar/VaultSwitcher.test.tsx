@@ -3,7 +3,7 @@
  * D3 the current vault is a row (`aria-current`), D4 "Open folder…" last, D5 dead folders stay in
  * an open panel, D6 the one-line trigger, D7 the filter/keyboard model (ranking, default
  * highlight skipping the current vault, clamp, Enter, Esc, focus never leaving the input), D8 the
- * ⌘O request. Every open goes through the mocked `window.yaseenDocs.window.openRecent` — the one
+ * ⌘O request. Every open goes through the mocked `window.yaseenDraw.window.openRecent` — the one
  * back-end door (D1); nothing here ever opens in place.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -33,7 +33,7 @@ let container: HTMLElement | null = null
 beforeEach(() => {
   vi.useFakeTimers({ now: NOW, toFake: ['Date'] })
   openRecent = vi.fn(async () => true)
-  Object.defineProperty(window, 'yaseenDocs', { value: { window: { openRecent } }, configurable: true, writable: true })
+  Object.defineProperty(window, 'yaseenDraw', { value: { window: { openRecent } }, configurable: true, writable: true })
   recentsSpy = vi.spyOn(storage, 'getRecentRoots').mockReturnValue(RECENTS)
 })
 
@@ -43,7 +43,7 @@ afterEach(() => {
   container?.remove()
   container = null
   recentsSpy.mockRestore()
-  delete (window as unknown as Record<string, unknown>).yaseenDocs
+  delete (window as unknown as Record<string, unknown>).yaseenDraw
   vi.useRealTimers()
 })
 

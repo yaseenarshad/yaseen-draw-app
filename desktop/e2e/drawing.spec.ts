@@ -74,7 +74,7 @@ const DRAWN_SCENE = `${JSON.stringify(
   {
     type: 'excalidraw',
     version: 2,
-    source: 'yaseen-docs',
+    source: 'yaseen-draw',
     elements: [
       { ...ELEMENT_BASE, id: 'box', type: 'rectangle', x: 0, y: 0, width: 240, height: 140 },
       {
@@ -179,7 +179,7 @@ test('step 1 — "/" offers Drawing; each pick writes its own empty scene and le
   expect(first).toMatch(DRAWING_NAME)
   // On disk it is a valid EMPTY Excalidraw scene, not a placeholder.
   const scene = JSON.parse(await readFile(path.join(vault, DRAWINGS_DIR, first), 'utf8')) as Record<string, unknown>
-  expect(scene).toEqual({ type: 'excalidraw', version: 2, source: 'yaseen-docs', elements: [], appState: {}, files: {} })
+  expect(scene).toEqual({ type: 'excalidraw', version: 2, source: 'yaseen-draw', elements: [], appState: {}, files: {} })
   // The note gained ONE line — the plain-markdown embed — and nothing else moved.
   await expect.poll(readNote).toBe(`${NOTE_BODY}\n![[${first}]]\n`)
   await expect(editorOf(win)).toContainText(`![[${first}]]`)
@@ -328,7 +328,7 @@ test('step 5 — a preview opens the modal; a rectangle DRAWN there is saved bac
   const saved = await readScene(second)
   expect(saved.elements[0].type).toBe('rectangle')
   expect(saved.type).toBe('excalidraw')
-  expect(saved.source).toBe('yaseen-docs')
+  expect(saved.source).toBe('yaseen-draw')
   expect(saved.files).toEqual({})
   const raw = await readSidecar(second)
   expect(raw.endsWith('\n')).toBe(true)

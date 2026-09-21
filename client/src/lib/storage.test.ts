@@ -3,7 +3,7 @@ import { DEFAULT_SETTINGS, MAX_COLLAPSED_GROUP_KEYS, MAX_FOLD_KEYS_PER_FILE, MAX
 import { storage } from './storage'
 import { hashFilePath } from './urlHash'
 
-/** A fake `window.yaseenDocs` with just the state / window halves the storage module talks to. */
+/** A fake `window.yaseenDraw` with just the state / window halves the storage module talks to. */
 type IdentityFixture = Omit<WindowIdentity, 'rightPanel' | 'sidebarCollapsed' | 'sidebarLens' | 'focusDirs' | 'focusTopics' | 'focusFavorites'> & Partial<Pick<WindowIdentity, 'rightPanel' | 'sidebarCollapsed' | 'sidebarLens' | 'focusDirs' | 'focusTopics' | 'focusFavorites'>>
 
 function installBridge(state: AppState, identity: IdentityFixture) {
@@ -40,7 +40,7 @@ function installBridge(state: AppState, identity: IdentityFixture) {
       duplicate: vi.fn(),
     },
   }
-  Object.defineProperty(window, 'yaseenDocs', { value: bridge, configurable: true, writable: true })
+  Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
   return { bridge, emit: (s: AppState) => listener?.(s), hasListener: () => listener !== null }
 }
 
@@ -52,7 +52,7 @@ beforeEach(async () => {
   await storage.init()
 })
 afterEach(() => {
-  delete (window as unknown as Record<string, unknown>).yaseenDocs
+  delete (window as unknown as Record<string, unknown>).yaseenDraw
   vi.restoreAllMocks()
 })
 
@@ -102,7 +102,7 @@ describe('storage.init', () => {
 
   it('reads fall back to defaults before init / when the bridge is unavailable', async () => {
     vi.resetModules()
-    delete (window as unknown as Record<string, unknown>).yaseenDocs
+    delete (window as unknown as Record<string, unknown>).yaseenDraw
     const fresh = (await import('./storage')).storage
     expect(fresh.getRoot()).toBeNull()
     expect(fresh.getTabs()).toEqual([])

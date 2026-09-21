@@ -5,10 +5,10 @@ import { CH } from '../../channels'
 import { BridgeFailure, fsCall, requireAbsPath, requireMarkdownFile } from '../fs/fsUtils'
 import { handle } from './envelope'
 
-/** What main knows and the renderer does not: where the `yaseendocs` command lives on this machine. */
+/** What main knows and the renderer does not: where the `yaseendraw` command lives on this machine. */
 export interface AgentHost {
   packaged: boolean
-  /** `process.resourcesPath` — the bundle's `Contents/Resources`, where `bin/yaseendocs` is (YAZ-1621). */
+  /** `process.resourcesPath` — the bundle's `Contents/Resources`, where `bin/yaseendraw` is (YAZ-1621). */
   resourcesPath: string
   /** The main bundle's directory (`out/main`), where `cli.js` sits in dev. */
   mainDir: string
@@ -16,7 +16,7 @@ export interface AgentHost {
 
 /** The command as an agent must type it: the shim in the bundle, or `node` on the built entry in dev. */
 export function agentCommand({ packaged, resourcesPath, mainDir }: AgentHost): string {
-  return packaged ? `"${join(resourcesPath, 'bin', 'yaseendocs')}"` : `node "${join(mainDir, 'cli.js')}"`
+  return packaged ? `"${join(resourcesPath, 'bin', 'yaseendraw')}"` : `node "${join(mainDir, 'cli.js')}"`
 }
 
 /**

@@ -1,6 +1,6 @@
 /**
  * useMenuEvents (GRO-2161, tabs GRO-2232): the renderer's half of the File › Open Folder… /
- * Open Recent / Search Vault / Close Tab, Yaseen Docs › Settings… (YAZ-1679) and Window › Next/Previous Tab menu gestures — subscribed on
+ * Open Recent / Search Vault / Close Tab, Yaseen Draw › Settings… (YAZ-1679) and Window › Next/Previous Tab menu gestures — subscribed on
  * mount, unsubscribed on unmount, latest callbacks win.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -40,7 +40,7 @@ function installBridge() {
       onZoom: sub(zoomListeners),
     },
   }
-  Object.defineProperty(window, 'yaseenDocs', { value: bridge, configurable: true, writable: true })
+  Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
   return {
     emitOpenFolder: () => openFolderListeners.forEach((l) => l()),
     emitOpenRoot: (path: string) => openRootListeners.forEach((l) => l(path)),
@@ -78,7 +78,7 @@ let root: Root | null = null
 afterEach(() => {
   act(() => root?.unmount())
   root = null
-  delete (window as unknown as Record<string, unknown>).yaseenDocs
+  delete (window as unknown as Record<string, unknown>).yaseenDraw
 })
 
 describe('useMenuEvents', () => {

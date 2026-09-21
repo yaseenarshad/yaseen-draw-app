@@ -18,7 +18,7 @@ let file: string
 beforeEach(async () => {
   vi.mocked(rename).mockClear()
   dir = await mkdtemp(path.join(tmpdir(), 'yd-store-'))
-  file = path.join(dir, 'yaseendocs.json')
+  file = path.join(dir, 'yaseendraw.json')
 })
 afterEach(async () => {
   vi.useRealTimers()
@@ -83,7 +83,7 @@ describe('createStore: loading', () => {
   })
 
   it('theme: an old settings object without the key sanitizes to system; junk falls back too (GRO-2218)', async () => {
-    // A pre-K yaseendocs.json: every field but `theme` — the missing field must default, not corrupt the file.
+    // A pre-K yaseendraw.json: every field but `theme` — the missing field must default, not corrupt the file.
     const { theme: _omitted, ...preThemeSettings } = DEFAULT_SETTINGS
     await seed(valid({ settings: preThemeSettings }))
     expect(createStore(file).get().settings.theme).toBe('system')
@@ -126,7 +126,7 @@ describe('createStore: loading', () => {
   })
 
   it('newNoteLocation/newNoteFolder: a pre-C2 file without the keys sanitizes to the defaults (current + "", YAZ-1643); junk falls back (GRO-2240)', async () => {
-    // A pre-C2 yaseendocs.json: every field but the Files & Links pair — missing fields just gain their defaults.
+    // A pre-C2 yaseendraw.json: every field but the Files & Links pair — missing fields just gain their defaults.
     const { newNoteLocation: _loc, newNoteFolder: _folder, ...preC2Settings } = DEFAULT_SETTINGS
     await seed(valid({ settings: preC2Settings }))
     expect(createStore(file).get().settings).toEqual(DEFAULT_SETTINGS)
@@ -403,12 +403,12 @@ describe('createStore: loading', () => {
     ['unparsable JSON', '{broken'],
     ['not an object', '[]'],
     ['wrong version', JSON.stringify(valid({ version: 2 }))],
-  ])('a corrupt file (%s) is moved to yaseendocs.json.corrupt-<epoch> and the defaults are used', async (_name, raw) => {
+  ])('a corrupt file (%s) is moved to yaseendraw.json.corrupt-<epoch> and the defaults are used', async (_name, raw) => {
     await seed(raw)
     const store = createStore(file)
     expect(store.get()).toEqual(defaultAppState())
     expect(existsSync(file)).toBe(false)
-    const backups = (await readdir(dir)).filter((n) => /^yaseendocs\.json\.corrupt-\d+$/.test(n))
+    const backups = (await readdir(dir)).filter((n) => /^yaseendraw\.json\.corrupt-\d+$/.test(n))
     expect(backups).toHaveLength(1)
     expect(await readFile(path.join(dir, backups[0]), 'utf8')).toBe(raw)
   })
@@ -874,7 +874,7 @@ describe('createStore: persistence', () => {
   })
 
   it('the file on disk is the pretty-printed state and the parent directory is created on demand', async () => {
-    const nested = path.join(dir, 'deeper', 'yaseendocs.json')
+    const nested = path.join(dir, 'deeper', 'yaseendraw.json')
     const store = createStore(nested)
     store.upsertWindow(win('w1', { root: '/v' }))
     await store.flush()
@@ -889,7 +889,7 @@ describe('createStore: persistence', () => {
 /**
  * Favorites' per-window focus list (YAZ-1766 D5): `WindowEntry.focusFavorites` rides `focusDirs`'
  * rules — path-keyed, so `renamePath` / `removePath` repair it exactly as they repair `focusDirs`.
- * (The favorites LIST itself left this store for `.yaseendocs/favorites.json` in 6A/D15 — see `favorites.test.ts`.)
+ * (The favorites LIST itself left this store for `.yaseendraw/favorites.json` in 6A/D15 — see `favorites.test.ts`.)
  */
 describe('focusFavorites (YAZ-1766 D5)', () => {
   it('windows: focusFavorites loads with the tabs rule, upserts and duplicates by value', async () => {

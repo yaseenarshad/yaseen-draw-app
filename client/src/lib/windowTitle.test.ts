@@ -12,7 +12,7 @@ describe('windowTitle', () => {
   })
 
   it('is the app name on the Welcome screen (no folder), whatever the file says', () => {
-    expect(APP_NAME).toBe('Yaseen Docs')
+    expect(APP_NAME).toBe('Yaseen Draw')
     expect(windowTitle(null, null)).toBe(APP_NAME)
     expect(windowTitle(null, '/stray.md')).toBe(APP_NAME)
   })

@@ -4,7 +4,7 @@
  * generator for index benchmarks. Deterministic — a given --notes/--seed pair always produces the
  * same vault. Shapes mirror `viewsFixture.ts` / `helpers.buildFixtureVault`: realistic frontmatter
  * (status/priority/pillar/tags/aliases on a subset), bodies with `[[wiki links]]` between notes,
- * inline #tags, code fences, `![[embeds]]`, folder depth 0-4, png stubs, `.yaseendocs/` config
+ * inline #tags, code fences, `![[embeds]]`, folder depth 0-4, png stubs, `.yaseendraw/` config
  * and a `.trash` note.
  *
  * THE FOLDER-PAGE SHAPE (7C-, YAZ-855): the vault this emits speaks the model the app actually
@@ -101,7 +101,7 @@ async function main() {
     folders.push(parent === '' ? name : `${parent}/${name}`)
   }
   await Promise.all(
-    [...folders.filter((f) => f !== ''), '.yaseendocs', '.trash'].map((f) => mkdir(path.join(root, ...f.split('/')), { recursive: true })),
+    [...folders.filter((f) => f !== ''), '.yaseendraw', '.trash'].map((f) => mkdir(path.join(root, ...f.split('/')), { recursive: true })),
   )
 
   // The folder pages: a fixed handful, scaled gently with the vault and capped by the pool, so a
@@ -229,7 +229,7 @@ async function main() {
   await Promise.all([
     ...Array.from({ length: 4 }, (_, i) => writeFile(path.join(root, `chart-${i}.png`), png)),
     writeFile(
-      path.join(root, '.yaseendocs', 'properties.json'),
+      path.join(root, '.yaseendraw', 'properties.json'),
       '{"version":1,"properties":{"status":{"kind":"text"},"priority":{"kind":"number"}}}',
     ),
     writeFile(path.join(root, '.trash', 'Untitled.md'), 'trash'),

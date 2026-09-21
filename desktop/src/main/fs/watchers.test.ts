@@ -105,11 +105,11 @@ describe('shared watchers', () => {
     expect(await a.next()).toEqual({ type: 'addDir', path: path.join(root, 'newdir') })
   })
 
-  it('a change inside .yaseendocs/ emits NOTHING on the shared watcher (GRO-2188)', async () => {
+  it('a change inside .yaseendraw/ emits NOTHING on the shared watcher (GRO-2188)', async () => {
     const a = openWatch(root)
     await a.next()
-    await writeFile(path.join(root, '.yaseendocs', 'types.json'), '{"b":2}')
-    await writeFile(path.join(root, '.yaseendocs', 'note.md'), 'even markdown in there is invisible')
+    await writeFile(path.join(root, '.yaseendraw', 'types.json'), '{"b":2}')
+    await writeFile(path.join(root, '.yaseendraw', 'note.md'), 'even markdown in there is invisible')
     // A control event proves the silence: the next thing the subscriber sees is the unrelated mkdir.
     await mkdir(path.join(root, 'control-dir'))
     expect(await a.next()).toEqual({ type: 'addDir', path: path.join(root, 'control-dir') })

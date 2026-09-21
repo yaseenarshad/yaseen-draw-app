@@ -29,7 +29,7 @@
  * SHAPE ON DISK: `serializeAsJSON(…, 'local')` is the library's OWN writer — the same one its
  * "Save to disk" uses — so element cleanup and the `files` filter (an image paste survives, a
  * deleted one does not) are its rules, not ours. Two things are ours: `source` stays
- * `yaseen-docs` (pinned as a global before the import, `renderScene.ts`) and a trailing newline,
+ * `yaseen-draw` (pinned as a global before the import, `renderScene.ts`) and a trailing newline,
  * so a file YAZ-877 created and this saved back differ only in what was drawn.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'

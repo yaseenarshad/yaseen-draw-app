@@ -82,7 +82,7 @@ import { App } from './App'
 
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
-/** The full `window.yaseenDocs` surface the App tree touches, all observable. `files` backs readFile/writeFile (the E1c rewrite path). */
+/** The full `window.yaseenDraw` surface the App tree touches, all observable. `files` backs readFile/writeFile (the E1c rewrite path). */
 type IdentityFixture = Omit<WindowIdentity, 'rightPanel' | 'sidebarCollapsed' | 'sidebarLens' | 'focusDirs' | 'focusTopics' | 'focusFavorites'> & Partial<Pick<WindowIdentity, 'rightPanel' | 'sidebarCollapsed' | 'sidebarLens' | 'focusDirs' | 'focusTopics' | 'focusFavorites'>>
 
 function installBridge(state: AppState, identity: IdentityFixture, files: Record<string, { content: string; mtime: number }> = {}) {
@@ -216,7 +216,7 @@ function installBridge(state: AppState, identity: IdentityFixture, files: Record
       onStatus: vi.fn(() => () => undefined),
     },
   }
-  Object.defineProperty(window, 'yaseenDocs', { value: bridge, configurable: true, writable: true })
+  Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
   return {
     bridge,
     emitStateChanged: (next: AppState) => stateChanged.forEach((listener) => listener(next)),
@@ -242,7 +242,7 @@ async function mount(
   state: AppState,
   identity: IdentityFixture,
   files: Record<string, { content: string; mtime: number }> = {},
-  /** Runs BEFORE the first render, for stubs the mount itself consumes (the index, the `.yaseendocs` probe). */
+  /** Runs BEFORE the first render, for stubs the mount itself consumes (the index, the `.yaseendraw` probe). */
   tweak?: (b: ReturnType<typeof installBridge>) => void,
 ) {
   const b = installBridge(state, identity, files)
@@ -274,7 +274,7 @@ afterEach(() => {
   history.replaceState(null, '', '/')
   delete document.documentElement.dataset.theme
   document.getElementById(CREPE_THEME_STYLE_ID)?.remove()
-  delete (window as unknown as Record<string, unknown>).yaseenDocs
+  delete (window as unknown as Record<string, unknown>).yaseenDraw
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 })
   vi.restoreAllMocks()
 })
@@ -470,7 +470,7 @@ describe('App notice icon (D10 amended, YAZ-1674)', () => {
 describe('App on a null root (C2, GRO-2164)', () => {
   it('boots to the Welcome screen with the recents and never auto-opens the folder dialog', async () => {
     const { bridge, el } = await mount({ ...defaultAppState(), recents: [recent('/vaults/notes')] }, { id: 'w1', root: null, file: null, tabs: [] })
-    expect(el.querySelector('.welcome__title')?.textContent).toBe('Yaseen Docs')
+    expect(el.querySelector('.welcome__title')?.textContent).toBe('Yaseen Draw')
     expect([...el.querySelectorAll('.welcome__recent-path')].map((s) => s.textContent)).toEqual(['/vaults/notes'])
     expect(bridge.pickFolder).not.toHaveBeenCalled()
     expect(el.querySelector('[data-editor]')).toBeNull()
@@ -549,7 +549,7 @@ describe('App window title (C3, GRO-2165)', () => {
   it('is "<file> — <folder>" with a file open, the folder alone without one, the app name on Welcome', async () => {
     const state = withFolder(defaultAppState(), '/vaults/w', '/vaults/w/Note.md')
     const { emitOpenRoot } = await mount(state, { id: 'w1', root: null, file: null, tabs: [] })
-    expect(document.title).toBe('Yaseen Docs')
+    expect(document.title).toBe('Yaseen Draw')
     await act(async () => emitOpenRoot('/vaults/w'))
     expect(document.title).toBe('Note — w')
     await act(async () => emitOpenRoot('/vaults/empty'))
@@ -781,7 +781,7 @@ describe('App Show in sidebar request ownership (YAZ-1023)', () => {
 })
 
 describe('App settings dialog (YAZ-1679)', () => {
-  it('Yaseen Docs › Settings… (⌘,) mounts the ONE dialog, and its × unmounts it', async () => {
+  it('Yaseen Draw › Settings… (⌘,) mounts the ONE dialog, and its × unmounts it', async () => {
     const { el, emitSettings } = await mount(defaultAppState(), { id: 'w1', root: '/v', file: null, tabs: [] })
     expect(el.querySelector('.settings-dialog')).toBeNull()
     act(() => emitSettings())
@@ -1519,7 +1519,7 @@ describe('App root-missing (C2, GRO-2164)', () => {
     expect(el.querySelector('[data-sidebar]')?.getAttribute('data-root')).toBe('/v')
     expect(el.querySelector('.welcome')).toBeNull()
     act(() => captured.sidebar?.onRootMissing())
-    expect(el.querySelector('.welcome__title')?.textContent).toBe('Yaseen Docs')
+    expect(el.querySelector('.welcome__title')?.textContent).toBe('Yaseen Draw')
     expect(el.querySelector('[data-sidebar]')).toBeNull()
     expect(el.querySelector('[data-editor]')).toBeNull()
     expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({ root: null, file: null, tabs: [], rightPanel: defaultRightPanelIdentity(), focusDirs: [], focusTopics: [], focusFavorites: [] })
@@ -1603,11 +1603,11 @@ describe('in-app delete (GRO-2272)', () => {
  * Files lens, or with the Topics tree never rendered, it must still happen exactly once.
  *
  * Adoption is read through the ONE existing bridge call that can tell a missing directory from
- * an existing one: `fs:tree` of `<root>/.yaseendocs`. Nothing here creates that folder.
+ * an existing one: `fs:tree` of `<root>/.yaseendraw`. Nothing here creates that folder.
  */
 describe('Home is born on vault open (6C-, YAZ-849)', () => {
   const HOME = '/v/Home.md'
-  const DOTFOLDER = '/v/.yaseendocs'
+  const DOTFOLDER = '/v/.yaseendraw'
   const identity = (): IdentityFixture => ({ id: 'w1', root: '/v', file: null, tabs: [] })
 
   const homeRecord = (): IndexRecord => ({
@@ -1626,7 +1626,7 @@ describe('Home is born on vault open (6C-, YAZ-849)', () => {
     embeds: [],
   })
 
-  /** No `.yaseendocs/`: the probe rejects NOT_FOUND exactly as `requireDir` does; the root itself still answers. */
+  /** No `.yaseendraw/`: the probe rejects NOT_FOUND exactly as `requireDir` does; the root itself still answers. */
   const unadopt = (b: ReturnType<typeof installBridge>) =>
     b.bridge.tree.mockImplementation(async (r: string) =>
       r === DOTFOLDER ? Promise.reject({ code: 'NOT_FOUND', message: 'path does not exist', path: r }) : { root: r, tree: [], generatedAt: 1 },

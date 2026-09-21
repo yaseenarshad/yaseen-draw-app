@@ -1,5 +1,5 @@
 /**
- * Shared renderer/main contracts for Yaseen Docs (locked in GRO-1961, bridge in GRO-2153) —
+ * Shared renderer/main contracts for Yaseen Draw (locked in GRO-1961, bridge in GRO-2153) —
  * see docs/CONTRACTS.md for the prose version.
  *
  * All paths are ABSOLUTE, POSIX-style (`/Users/...`). The main process imposes no
@@ -20,7 +20,7 @@ export type BridgeErrorCode =
   | 'TOO_LARGE' // file exceeds MAX_FILE_BYTES
   | 'IO_ERROR' // any other fs error
   | 'PICKER_FAILED' // native folder dialog could not be run
-  | 'INVALID_CONFIG' // a vault config file (e.g. .yaseendocs/properties.json) is unusable; the mutation is refused, the file never touched
+  | 'INVALID_CONFIG' // a vault config file (e.g. .yaseendraw/properties.json) is unusable; the mutation is refused, the file never touched
 
 export const MARKDOWN_EXTENSIONS = ['.md', '.markdown'] as const
 export const TEXT_VIEW_EXTENSIONS = [
@@ -441,7 +441,7 @@ export type WatchEvent =
   | { type: 'unlinkDir'; path: string }
   | { type: 'error'; message: string }
 
-// ---------- App state (main-owned `yaseendocs.json`, D9 — GRO-2159) ----------
+// ---------- App state (main-owned `yaseendraw.json`, D9 — GRO-2159) ----------
 
 /** `AppState.recents` — most-recent first, max MAX_RECENT_ROOTS, de-duplicated. */
 export type RecentRoots = Array<{ path: string; lastOpened: number }>
@@ -461,7 +461,7 @@ export const MAX_COLLAPSED_GROUP_KEYS = 200
 /** Expanded Topics-tree pages per vault (🔒 D4, YAZ-848) are capped at this many — `folds`' cap, for a bucket of the same kind: one entry per page the user opened. */
 export const MAX_TOPICS_EXPANDED_PAGES = 500
 
-/** Entries in a vault's `.yaseendocs/favorites.json` (YAZ-1766 D2, in the vault since 6A/D11) are capped at this many on read and write — `topicsExpanded`'s cap, for a list of the same kind. */
+/** Entries in a vault's `.yaseendraw/favorites.json` (YAZ-1766 D2, in the vault since 6A/D11) are capped at this many on read and write — `topicsExpanded`'s cap, for a list of the same kind. */
 export const MAX_FAVORITES = 500
 
 /**
@@ -535,7 +535,7 @@ export interface SettingsState {
    * Defaults TRUE and should stay that way: the sheet is the ONLY guard on delete, because
    * `shell.trashItem` has no programmatic undo, so there is no in-app restore to fall back
    * on. Cleared from the sheet's own "Don't ask me again" and re-enabled from the settings
-   * cog — a one-way switch would leave hand-editing `yaseendocs.json` as the only way back.
+   * cog — a one-way switch would leave hand-editing `yaseendraw.json` as the only way back.
    */
   confirmDelete: boolean
   /** Comment stream order (YAZ-1515): how you READ, global, never part of a note. */
@@ -663,7 +663,7 @@ export interface FolderState {
 
 /**
  * The whole persisted app state — one user-global JSON file, owned by the main process
- * (`~/Library/Application Support/Yaseen Docs/yaseendocs.json`). Settings are global so
+ * (`~/Library/Application Support/Yaseen Draw/yaseendraw.json`). Settings are global so
  * they apply to every folder and travel to another machine by copying this one file.
  */
 export interface AppState {
@@ -686,7 +686,7 @@ export function defaultFolderState(): FolderState {
   return { expanded: [], lastFile: null, folds: {}, baseGroups: {}, topicsExpanded: [] }
 }
 
-// ---------- Vault-local config (`<root>/.yaseendocs/`, Desktop J — GRO-2188) ----------
+// ---------- Vault-local config (`<root>/.yaseendraw/`, Desktop J — GRO-2188) ----------
 
 /**
  * The `.obsidian/`-style dotfolder that travels with a vault, and THE one definition of its name
@@ -694,37 +694,37 @@ export function defaultFolderState(): FolderState {
  * own copy of the literal). Both sides read it from here: main joins paths under it, and the
  * client probes it because its existence IS adoption (6C-, YAZ-849).
  */
-export const VAULT_CONFIG_DIR = '.yaseendocs'
+export const VAULT_CONFIG_DIR = '.yaseendraw'
 
 /**
- * Pushed to every window after a config file under `<root>/.yaseendocs/` changes — an own
+ * Pushed to every window after a config file under `<root>/.yaseendraw/` changes — an own
  * `vaultConfig.write` or an external edit (sync tools). Renderers filter by their own root,
  * the same posture as `state:changed`, and re-read the named file.
  */
 export interface VaultConfigChange {
   root: string
-  /** Config file name inside `.yaseendocs/`, e.g. `properties.json`. */
+  /** Config file name inside `.yaseendraw/`, e.g. `properties.json`. */
   name: string
 }
 
 /**
- * Per-vault config in `<root>/.yaseendocs/` — the Obsidian-`.obsidian/` analogue: travels with
+ * Per-vault config in `<root>/.yaseendraw/` — the Obsidian-`.obsidian/` analogue: travels with
  * the folder. Created lazily on first write; reading never creates it. The folder is invisible
  * everywhere (tree/sidebar, vault index, shared watcher).
  */
 export interface VaultConfigApi {
-  /** Parsed `<root>/.yaseendocs/<name>`, or null when the folder/file is missing or the JSON is malformed. */
+  /** Parsed `<root>/.yaseendraw/<name>`, or null when the folder/file is missing or the JSON is malformed. */
   read(root: string, name: string): Promise<unknown>
-  /** Creates `.yaseendocs/` on first write; atomic tmp+rename; pretty-printed JSON. `name` must be a plain `<stem>.json`. */
+  /** Creates `.yaseendraw/` on first write; atomic tmp+rename; pretty-printed JSON. `name` must be a plain `<stem>.json`. */
   write(root: string, name: string, value: unknown): Promise<void>
   /** Fired in every window after any vault's config change; returns an unsubscribe. */
   onChange(listener: (change: VaultConfigChange) => void): () => void
 }
 
-// ---------- GitHub sync (`<root>/.yaseendocs/github.json` — YAZ-1081) ----------
+// ---------- GitHub sync (`<root>/.yaseendraw/github.json` — YAZ-1081) ----------
 
 /**
- * The per-vault sync switch (YAZ-1081 D4), stored as `<root>/.yaseendocs/github.json` so it
+ * The per-vault sync switch (YAZ-1081 D4), stored as `<root>/.yaseendraw/github.json` so it
  * travels with the folder like every other vault-local setting. OFF by default and off for any
  * shape that isn't exactly `{ enabled: true }` — a vault someone copies onto a second machine
  * therefore syncs there too, and a corrupt or hand-edited file fails closed rather than starting
@@ -784,7 +784,7 @@ export interface GithubApi {
   /** Run a pass NOW (the manual "sync" button). A pass already running is joined, never raced; `off` roots answer `off`. */
   syncNow(root: string): Promise<GithubSyncStatus>
   /**
-   * The per-vault switch (D4), written to `<root>/.yaseendocs/github.json`. Turning it ON waits
+   * The per-vault switch (D4), written to `<root>/.yaseendraw/github.json`. Turning it ON waits
    * for the first pass and answers with its real outcome — "synced", or what needs fixing —
    * rather than an optimistic `syncing`; turning it OFF is immediate and total (no watcher, no
    * timers, no passes).
@@ -794,7 +794,7 @@ export interface GithubApi {
   onStatus(listener: (status: GithubSyncStatus) => void): () => void
 }
 
-// ---------- Vault-wide property declarations (`<root>/.yaseendocs/properties.json` — YAZ-835) ----------
+// ---------- Vault-wide property declarations (`<root>/.yaseendraw/properties.json` — YAZ-835) ----------
 
 /**
  * The editor set that exists (5B's `EditorKind`) plus the link/multi-link split. An unknown
@@ -842,7 +842,7 @@ export interface PropertiesResponse {
 }
 
 /**
- * The vault-wide property declarations delivered as `window.yaseenDocs.properties` (YAZ-835).
+ * The vault-wide property declarations delivered as `window.yaseenDraw.properties` (YAZ-835).
  * Targeted mutators, never a whole-file PUT — the `StateApi` anti-clobber principle. Every
  * mutation is a serialised read-modify-write that preserves unknown fields at every level.
  * Property names must match `^[a-z][a-z0-9_]*$` (→ `BAD_REQUEST`). A corrupt or newer-versioned
@@ -850,7 +850,7 @@ export interface PropertiesResponse {
  * moved aside.
  */
 export interface PropertiesApi {
-  /** Empty declarations (no error) when .yaseendocs/properties.json does not exist; never creates anything. */
+  /** Empty declarations (no error) when .yaseendraw/properties.json does not exist; never creates anything. */
   get(root: string): Promise<PropertiesResponse>
   /** Upsert one vault-wide declaration. Creates the dotfolder and the file on demand. */
   setProperty(root: string, name: string, def: PropertyDecl): Promise<void>
@@ -859,7 +859,7 @@ export interface PropertiesApi {
   onChange(listener: (properties: PropertiesResponse) => void): () => void
 }
 
-// ---------- Favorites (`<root>/.yaseendocs/favorites.json` — YAZ-1766 6A, D11) ----------
+// ---------- Favorites (`<root>/.yaseendraw/favorites.json` — YAZ-1766 6A, D11) ----------
 
 /** The file on disk: VAULT-RELATIVE POSIX paths in the user's order (`MAX_FAVORITES` at most). */
 export interface FavoritesConfig {
@@ -868,8 +868,8 @@ export interface FavoritesConfig {
 }
 
 /**
- * The Favorites tab's list as `window.yaseenDocs.favorites` (YAZ-1766 6A): ABSOLUTE paths over
- * `.yaseendocs/favorites.json`, so the list travels with the vault (D11). A malformed file reads
+ * The Favorites tab's list as `window.yaseenDraw.favorites` (YAZ-1766 6A): ABSOLUTE paths over
+ * `.yaseendraw/favorites.json`, so the list travels with the vault (D11). A malformed file reads
  * as `[]` and rejects every `set` with `INVALID_CONFIG`, never overwritten (D12); `set` drops
  * entries whose path is gone from disk (D14); in-app rename/delete repair the file in main (D13).
  */
@@ -882,7 +882,7 @@ export interface FavoritesApi {
   onChanged(listener: (change: { root: string }) => void): () => void
 }
 
-// ---------- Bridge: `window.yaseenDocs` (locked in GRO-2153, Desktop A1) ----------
+// ---------- Bridge: `window.yaseenDraw` (locked in GRO-2153, Desktop A1) ----------
 
 /**
  * Every bridge promise rejects with a plain object satisfying `BridgeError` (the preload
@@ -1033,7 +1033,7 @@ export interface MenuApi {
   onSearch(listener: () => void): () => void
   /** File › Switch Vault… (⌘O) targeted this window: open the sidebar header's vault switcher, un-collapsing the sidebar first (YAZ-1767 D8). Returns an unsubscribe. */
   onSwitchVault(listener: () => void): () => void
-  /** Yaseen Docs › Settings… (⌘,) targeted this window: open the settings dialog (YAZ-1679). Returns an unsubscribe. */
+  /** Yaseen Draw › Settings… (⌘,) targeted this window: open the settings dialog (YAZ-1679). Returns an unsubscribe. */
   onSettings(listener: () => void): () => void
   /** View › Toggle Sidebar targeted this window (YAZ-1280). Returns an unsubscribe. */
   onToggleSidebar(listener: () => void): () => void
@@ -1149,7 +1149,7 @@ export interface ShellApi {
   openLink(req: OpenLinkRequest): Promise<void>
   /**
    * Copy for Agent (YAZ-1617): the handshake text for `path` — the page, one sentence, and the
-   * `yaseendocs` command with `--help` — which the renderer writes to the clipboard itself, the
+   * `yaseendraw` command with `--help` — which the renderer writes to the clipboard itself, the
    * way Copy path does. Main composes it because only main knows where the command lives.
    * Read-only, `reveal`'s posture: a page that no longer exists rejects `NOT_FOUND`; a
    * non-Markdown file is not a page and rejects `UNSUPPORTED_EXTENSION`.
@@ -1158,7 +1158,7 @@ export interface ShellApi {
 }
 
 /**
- * Deep links (E1, GRO-2171): main parses a `yaseendocs://` URL (`shared/links.ts`) and routes
+ * Deep links (E1, GRO-2171): main parses a `yaseendraw://` URL (`shared/links.ts`) and routes
  * it to the best window; these are the pushes the routed-to renderer receives.
  */
 export interface LinkApi {
@@ -1170,11 +1170,11 @@ export interface LinkApi {
 
 /**
  * The single typed surface the renderer uses for everything outside the DOM, installed by
- * the preload as `window.yaseenDocs` (`contextBridge`, `ipcMain.handle` on the main side).
+ * the preload as `window.yaseenDraw` (`contextBridge`, `ipcMain.handle` on the main side).
  * Request/response shapes are the ones above. Bases (GRO-2097) adds its methods here
  * (e.g. `index(root)`) — additive only.
  */
-export interface YaseenDocsApi {
+export interface YaseenDrawApi {
   tree(root: string): Promise<TreeResponse>
   readFile(path: string): Promise<FileResponse>
   readPdf(path: string): Promise<PdfResponse>
@@ -1214,11 +1214,11 @@ export interface YaseenDocsApi {
   file: FileApi
   /** OS-level actions: Reveal in Finder (GRO-2274) and Open in VS Code (YAZ-963). */
   shell: ShellApi
-  /** Vault-local config in `<root>/.yaseendocs/` (Desktop J, GRO-2188). */
+  /** Vault-local config in `<root>/.yaseendraw/` (Desktop J, GRO-2188). */
   vaultConfig: VaultConfigApi
-  /** Vault-wide property declarations over `.yaseendocs/properties.json` (YAZ-835). */
+  /** Vault-wide property declarations over `.yaseendraw/properties.json` (YAZ-835). */
   properties: PropertiesApi
-  /** The Favorites list over `.yaseendocs/favorites.json` (YAZ-1766 6A) — absolute paths in, relative on disk. */
+  /** The Favorites list over `.yaseendraw/favorites.json` (YAZ-1766 6A) — absolute paths in, relative on disk. */
   favorites: FavoritesApi
   /** Per-vault GitHub sync, off by default (YAZ-1081). */
   github: GithubApi

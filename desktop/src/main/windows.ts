@@ -99,7 +99,7 @@ export interface WindowManager extends WindowLookup {
    * No live window for `id` (mid-close race) is a no-op.
    */
   closeWindow(id: string): void
-  /** A `yaseendocs://` link resolved to `path` (E1, GRO-2171): validate, then `resolveLinkTarget` routes it. */
+  /** A `yaseendraw://` link resolved to `path` (E1, GRO-2171): validate, then `resolveLinkTarget` routes it. */
   routeToFile(path: string, rootOverride?: string | null): void
   /** The unobtrusive can't-open surface (E1): restore + focus a live window, send `link:notice`. Never a dialog. */
   linkNotice(message: string): void
@@ -170,7 +170,7 @@ const rootContains = (root: string, path: string): boolean => {
 }
 
 /**
- * Where a `yaseendocs://` link to `path` should land: (1) the open window whose root contains
+ * Where a `yaseendraw://` link to `path` should land: (1) the open window whose root contains
  * it — most specific root wins, ties keep the first in `windows[]`, Welcome windows never match;
  * (2) a new window on the most recent `recents` folder containing it (the list is already
  * most-recent-first); (3) a new window on the file's parent folder. A containing `rootOverride`

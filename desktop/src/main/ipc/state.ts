@@ -26,7 +26,7 @@ function requireFolderPatch(raw: unknown): Partial<Pick<FolderState, 'expanded' 
   return patch
 }
 
-/** The `state.*` half of `window.yaseenDocs` over the main-owned store (GRO-2159). */
+/** The `state.*` half of `window.yaseenDraw` over the main-owned store (GRO-2159). */
 export function registerStateIpc(store: Store): void {
   handle(CH.stateGet, async () => store.get())
   handle(CH.stateSetSettings, async (settings: unknown) => {

@@ -193,7 +193,7 @@ export function addComment(content: string, body: string, entry: { id: string; a
   const list = writable(content)
   const text = body.trimEnd()
   const title = titleKey(entry.title)
-  // `by` is the writer's declaration (🔒 D3): the UI passes none, the `yaseendocs` command passes its caller's (YAZ-1617).
+  // `by` is the writer's declaration (🔒 D3): the UI passes none, the `yaseendraw` command passes its caller's (YAZ-1617).
   const by = entry.by === undefined ? {} : { by: entry.by }
   if (entry.replyTo === undefined) return write(content, [...list, { id: entry.id, n: nextNumber(list, undefined), at: entry.at, ...by, ...title, body: text }])
   const index = threading(typed(list))

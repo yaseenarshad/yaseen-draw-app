@@ -76,7 +76,7 @@ describe('removeEntry (GRO-2272 A1)', () => {
 
   it('refuses everything the tree hides — dot-entries AND node_modules — never deletable from a UI that never showed them', async () => {
     trashResolves()
-    for (const p of [path.join(root, '.obsidian'), path.join(root, '.yaseendocs'), path.join(root, '.hidden.md'), path.join(root, 'node_modules')]) {
+    for (const p of [path.join(root, '.obsidian'), path.join(root, '.yaseendraw'), path.join(root, '.hidden.md'), path.join(root, 'node_modules')]) {
       const err = await failure(removeEntry({ path: p }))
       expect(err.code).toBe('BAD_REQUEST')
       expect(await exists(p)).toBe(true)

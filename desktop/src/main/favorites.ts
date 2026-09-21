@@ -6,7 +6,7 @@ import { isRecord, isStringArray } from './store'
 import { readConfigDetailed, subscribeConfig, writeConfig } from './vaultConfig'
 
 /**
- * The Favorites list in the vault (YAZ-1766 6A, D11): `<root>/.yaseendocs/favorites.json` =
+ * The Favorites list in the vault (YAZ-1766 6A, D11): `<root>/.yaseendraw/favorites.json` =
  * `{ version: 1, favorites: string[] }` of VAULT-RELATIVE POSIX paths in the user's order, so
  * GitHub sync carries it between machines. Electron-free, over the vaultConfig plumbing like
  * `properties/`. The API speaks ABSOLUTE paths; the file never does.

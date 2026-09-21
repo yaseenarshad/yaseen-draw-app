@@ -73,8 +73,8 @@ describe('getIndex: cold scan', () => {
     expect(res.records.map((r) => r.path)).toEqual([...res.records.map((r) => r.path)].sort())
     expect(res.records.every((r) => r.ext === 'md')).toBe(true)
     expect(res.records.some((r) => r.name.endsWith('.png'))).toBe(false)
-    // `.yaseendocs/` (vault-local config, GRO-2188) never becomes an index record (GRO-2117 note).
-    expect(res.records.some((r) => r.path.includes('/.trash/') || r.path.includes('/.obsidian/') || r.path.includes('/.yaseendocs/'))).toBe(false)
+    // `.yaseendraw/` (vault-local config, GRO-2188) never becomes an index record (GRO-2117 note).
+    expect(res.records.some((r) => r.path.includes('/.trash/') || r.path.includes('/.obsidian/') || r.path.includes('/.yaseendraw/'))).toBe(false)
   })
 
   it('matches the fixture spec facts', async () => {

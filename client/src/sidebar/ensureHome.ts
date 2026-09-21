@@ -12,7 +12,7 @@
  * asked by a different surface.)
  *
  * 🔒 D2 + ⚡ (the amendment on YAZ-797): what happens when nothing answers depends on whether the
- * vault has been ADOPTED — whether `<root>/.yaseendocs/` exists:
+ * vault has been ADOPTED — whether `<root>/.yaseendraw/` exists:
  *   ADOPTED    → `<root>/Home.md` is created automatically, on vault open, carrying exactly
  *                `folder_page: true` and nothing else.
  *   UN-ADOPTED → NOTHING is written. The Topics lens offers a card instead, and one click runs
@@ -31,7 +31,7 @@
  * `fs:tree` is the one existing call that distinguishes a missing directory (NOT_FOUND, from
  * `requireDir`) from an existing one. `vaultConfig.read` cannot: it collapses "no dotfolder" and
  * "no such config file" into the same absent. So the probe is a READ-ONLY `api.tree` of
- * `<root>/.yaseendocs` — no new IPC, nothing created, and the answer honest. Anything other than
+ * `<root>/.yaseendraw` — no new IPC, nothing created, and the answer honest. Anything other than
  * a clean success (missing, unreadable, not a directory) counts as UN-ADOPTED: the safe side is
  * always the card, which writes nothing until the user clicks.
  */
@@ -101,7 +101,7 @@ export async function ensureHome(root: string, resolve: ResolveLink): Promise<En
 
 export interface HomeState {
   /**
-   * This folder has no `.yaseendocs/`, so nothing was written and the Topics lens should OFFER.
+   * This folder has no `.yaseendraw/`, so nothing was written and the Topics lens should OFFER.
    * A durable fact about the FOLDER, not about Home: it stays true after the card's button has
    * made Home (the folder is still un-adopted) — the card stops rendering because `[[Home]]`
    * resolves now, which is the live half of the condition and the tree's own to see.

@@ -11,7 +11,7 @@ let dir: string
 let file: string
 beforeEach(async () => {
   dir = await mkdtemp(path.join(tmpdir(), 'yd-theme-'))
-  file = path.join(dir, 'yaseendocs.json')
+  file = path.join(dir, 'yaseendraw.json')
 })
 afterEach(async () => {
   await rm(dir, { recursive: true, force: true })

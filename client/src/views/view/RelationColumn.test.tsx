@@ -122,7 +122,7 @@ beforeEach(() => {
   write.mockReset()
   write.mockResolvedValue({ mtime: 1 })
   // `useProperties` reads the real bridge; the stub plays it in tests.
-  Object.defineProperty(window, 'yaseenDocs', { value: { properties: propertiesStub }, configurable: true, writable: true })
+  Object.defineProperty(window, 'yaseenDraw', { value: { properties: propertiesStub }, configurable: true, writable: true })
 })
 
 afterEach(() => {
@@ -131,7 +131,7 @@ afterEach(() => {
   container?.remove()
   container = null
   resetPropertiesStub()
-  delete (window as unknown as Record<string, unknown>).yaseenDocs
+  delete (window as unknown as Record<string, unknown>).yaseenDraw
 })
 
 // ---------- DOM helpers (EditableCell.test.tsx style) ----------

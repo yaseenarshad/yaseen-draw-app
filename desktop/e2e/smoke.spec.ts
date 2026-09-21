@@ -55,10 +55,10 @@ test.afterAll(async () => {
 test('step 1 — fresh state boots one Welcome window', async () => {
   app = await launchApp({ userData })
   win = await app.firstWindow()
-  await expect(win.locator('.welcome__title')).toHaveText('Yaseen Docs')
+  await expect(win.locator('.welcome__title')).toHaveText('Yaseen Draw')
   await expect(win.locator('.welcome__empty')).toBeVisible() // brand-new state: no recents yet
   expect(await windowCount(app)).toBe(1)
-  await expect.poll(() => win.title()).toBe('Yaseen Docs')
+  await expect.poll(() => win.title()).toBe('Yaseen Draw')
   await shoot(win, '01-fresh-welcome')
   await quitApp(app) // the real quit path, so step 2's seed overwrites a settled state file
 })
@@ -103,7 +103,7 @@ test('step 4 — folding a bullet hides its children and persists to app state',
   await win.locator('.outline-toggle').first().click()
   await expect(win.locator('[data-outline-folded="true"]').first()).toBeAttached()
   await expect(win.locator('.ProseMirror').getByText(CHILD_BULLET)).toBeHidden()
-  // The fold key reaches yaseendocs.json (store debounces writes by 150 ms).
+  // The fold key reaches yaseendraw.json (store debounces writes by 150 ms).
   await expect
     .poll(async () => ((await readState(userData)).folders[vault]?.folds[notePath] ?? []).length, { timeout: 10_000 })
     .toBeGreaterThan(0)

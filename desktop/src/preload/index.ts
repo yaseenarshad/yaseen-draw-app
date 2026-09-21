@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AppState, ClipboardPasteRequest, FileClipState, FileDeletedEvent, FileRenamedEvent, GithubSyncStatus, PropertiesResponse, VaultConfigChange, WatchEvent, YaseenDocsApi, ZoomStep } from '@shared/types'
+import type { AppState, ClipboardPasteRequest, FileClipState, FileDeletedEvent, FileRenamedEvent, GithubSyncStatus, PropertiesResponse, VaultConfigChange, WatchEvent, YaseenDrawApi, ZoomStep } from '@shared/types'
 import { CH, type Envelope } from '../channels'
 
 /** invoke + unwrap: resolves the value or rejects with the plain `BridgeError` object. */
@@ -66,7 +66,7 @@ ipcRenderer.on(CH.menuCopyAs, (_event, mode: unknown) => {
   if (text !== '') void call<void>(CH.menuCopyText, text).catch((error: unknown) => console.error('Copy failed', error))
 })
 
-const api: YaseenDocsApi = {
+const api: YaseenDrawApi = {
   tree: (root) => call(CH.fsTree, root),
   readFile: (path) => call(CH.fsRead, path),
   readPdf: (path) => call(CH.fsReadPdf, path),
@@ -140,7 +140,7 @@ const api: YaseenDocsApi = {
     onNextTab: on<void>(CH.menuNextTab),
     onPrevTab: on<void>(CH.menuPrevTab),
   },
-  // Deep links (E1, GRO-2171): main routes a yaseendocs:// URL to the best window.
+  // Deep links (E1, GRO-2171): main routes a yaseendraw:// URL to the best window.
   link: {
     onOpenFile: on<string>(CH.linkOpenFile),
     onNotice: on<string>(CH.linkNotice),
@@ -169,7 +169,7 @@ const api: YaseenDocsApi = {
     agentPrompt: (req) => call(CH.shellAgentPrompt, req),
     openLink: (req) => call(CH.shellOpenLink, req),
   },
-  // Vault-wide property declarations over `.yaseendocs/properties.json` (YAZ-835).
+  // Vault-wide property declarations over `.yaseendraw/properties.json` (YAZ-835).
   properties: {
     get: (root) => call(CH.propertiesGet, root),
     setProperty: (root, name, def) => call(CH.propertiesSetProperty, root, name, def),
@@ -180,19 +180,19 @@ const api: YaseenDocsApi = {
       return () => ipcRenderer.removeListener(CH.propertiesChanged, on)
     },
   },
-  // The Favorites list over `.yaseendocs/favorites.json` (YAZ-1766 6A).
+  // The Favorites list over `.yaseendraw/favorites.json` (YAZ-1766 6A).
   favorites: {
     get: (root) => call(CH.favoritesGet, root),
     set: (root, paths) => call(CH.favoritesSet, root, paths),
     onChanged: on<{ root: string }>(CH.favoritesChanged),
   },
-  // Vault-local config in `<root>/.yaseendocs/` (Desktop J, GRO-2188).
+  // Vault-local config in `<root>/.yaseendraw/` (Desktop J, GRO-2188).
   vaultConfig: {
     read: (root, name) => call(CH.vaultConfigRead, root, name),
     write: (root, name, value) => call(CH.vaultConfigWrite, root, name, value),
     onChange: on<VaultConfigChange>(CH.vaultConfigChanged),
   },
-  // Per-vault GitHub sync over `.yaseendocs/github.json` (YAZ-1081); every window gets every status.
+  // Per-vault GitHub sync over `.yaseendraw/github.json` (YAZ-1081); every window gets every status.
   github: {
     status: (root) => call(CH.githubStatus, root),
     syncNow: (root) => call(CH.githubSyncNow, root),
@@ -201,7 +201,7 @@ const api: YaseenDocsApi = {
   },
 }
 
-contextBridge.exposeInMainWorld('yaseenDocs', api)
+contextBridge.exposeInMainWorld('yaseenDraw', api)
 
 /** Exported for the completeness test only (the preload is otherwise side-effect driven). */
 export { api as bridge }

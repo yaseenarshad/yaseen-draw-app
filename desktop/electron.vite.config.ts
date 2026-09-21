@@ -59,7 +59,7 @@ export default defineConfig({
     // No externalizeDepsPlugin: chokidar 4 is pure JS and gets bundled, so the packaged app
     // needs no node_modules at all (spike decision, see GRO-2151 findings).
     resolve: { alias: { '@shared': shared } },
-    // Two entries (YAZ-1617): the app, and the `yaseendocs` command the packaged shim runs as plain Node.
+    // Two entries (YAZ-1617): the app, and the `yaseendraw` command the packaged shim runs as plain Node.
     build: { rollupOptions: { input: { index: resolve(here, 'src/main/index.ts'), cli: resolve(here, 'src/cli/index.ts') } } },
   },
   preload: {

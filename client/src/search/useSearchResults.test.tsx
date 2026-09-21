@@ -34,7 +34,7 @@ const rec = (basename: string, folder = ''): IndexRecord => ({
 
 function installBridge(records: IndexRecord[]) {
   const bridge = { index: vi.fn(async (root: string) => ({ root, records, generatedAt: 1 })) }
-  Object.defineProperty(window, 'yaseenDocs', { value: bridge, configurable: true, writable: true })
+  Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
   return bridge
 }
 
@@ -75,7 +75,7 @@ afterEach(() => {
   reactRoot = null
   container?.remove()
   container = null
-  delete (window as unknown as Record<string, unknown>).yaseenDocs
+  delete (window as unknown as Record<string, unknown>).yaseenDraw
   vi.restoreAllMocks()
 })
 

@@ -64,7 +64,7 @@ function installBridge() {
       clipState: vi.fn(async (): Promise<FileClipState> => null),
       onClipChanged: vi.fn((_listener: (state: FileClipState) => void) => () => undefined),
     },
-    // The Favorites list (YAZ-1766 6A): `.yaseendocs/favorites.json` behind main; absolute paths both ways.
+    // The Favorites list (YAZ-1766 6A): `.yaseendraw/favorites.json` behind main; absolute paths both ways.
     // Empty by default; the favorites block seeds `get` and captures the `onChanged` listener.
     favorites: {
       get: vi.fn(async (_root: string): Promise<string[]> => []),
@@ -78,7 +78,7 @@ function installBridge() {
       openDefault: vi.fn(async ({ path }: { path: string }) => ({ path })),
     },
   }
-  Object.defineProperty(window, 'yaseenDocs', { value: bridge, configurable: true, writable: true })
+  Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
   return bridge
 }
 
@@ -188,7 +188,7 @@ afterEach(() => {
   root = null
   container?.remove()
   container = null
-  delete (window as unknown as Record<string, unknown>).yaseenDocs
+  delete (window as unknown as Record<string, unknown>).yaseenDraw
   vi.restoreAllMocks()
 })
 
@@ -1691,7 +1691,7 @@ describe('focus mode (YAZ-1605)', () => {
  * The Favorites tab (YAZ-1766): a third lens listing the files and folders the user pinned from any
  * row's menu, in insertion order, each a full tree row — a pinned folder unfolds in place through
  * the Files tree's own expansion (D7), a pinned file inside a pinned folder shows twice (root and
- * nested), the toast names the kind, the list persists in the vault's `.yaseendocs/favorites.json`
+ * nested), the toast names the kind, the list persists in the vault's `.yaseendraw/favorites.json`
  * through `favorites.get/set` (D2, in the vault since 6A/D11), root rows drag to reorder (D4), and
  * Focus keeps its own per-window list here (D5). One fresh vault and window per mount, as the Focus
  * block above does it.
@@ -2569,7 +2569,7 @@ describe('the Topics context menu (8G-, YAZ-865)', () => {
   it("…and the folder page's TEMPLATE rides along, without ever displacing the birth key", async () => {
     const { el, bridge } = await topicsWithMetrics({}, (b) => {
       b.readFile = vi.fn(async (path: string) => {
-        if (path !== '/v/.yaseendocs/templates/Metrics.md') throw { code: 'NOT_FOUND', message: path }
+        if (path !== '/v/.yaseendraw/templates/Metrics.md') throw { code: 'NOT_FOUND', message: path }
         return { path, content: '---\nowner: Yasin\nstage: draft\nfolder_pages: ["[[Elsewhere]]"]\n---\n\n## Notes\n', mtime: 1, size: 1 }
       })
     })

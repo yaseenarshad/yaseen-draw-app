@@ -1,5 +1,5 @@
 /**
- * `yaseendocs` (YAZ-1617 🔒 D1, D4, D5): the door an agent uses to work with a page's comments from
+ * `yaseendraw` (YAZ-1617 🔒 D1, D4, D5): the door an agent uses to work with a page's comments from
  * the shell. Plain Node — this module and its entry never import `electron`; the packaged shim
  * runs it under `ELECTRON_RUN_AS_NODE=1` with the app's own binary (VS Code's `code` pattern).
  *
@@ -33,13 +33,13 @@ export interface Io {
 }
 
 export const USAGE = `usage:
-  yaseendocs comment  <page.md> --body <text | -> [--title <one line>] [--reply-to <comment>] [--by <name>]
-  yaseendocs comments <page.md> [--json]
-  yaseendocs edit     <page.md> <comment> --body <text | -> [--title <one line>]
-  yaseendocs delete   <page.md> <comment>
-  yaseendocs --help`
+  yaseendraw comment  <page.md> --body <text | -> [--title <one line>] [--reply-to <comment>] [--by <name>]
+  yaseendraw comments <page.md> [--json]
+  yaseendraw edit     <page.md> <comment> --body <text | -> [--title <one line>]
+  yaseendraw delete   <page.md> <comment>
+  yaseendraw --help`
 
-export const HELP = `yaseendocs — comments on a Yaseen Docs page, from the shell.
+export const HELP = `yaseendraw — comments on a Yaseen Draw page, from the shell.
 
 ${USAGE}
 
@@ -56,7 +56,7 @@ a person's comment is edited or deleted in the app. Deleting a comment deletes i
 Exit codes: 0 done · 1 refused or failed (the reason is on stderr) · 2 usage.
 
 Example:
-  yaseendocs comment "/vault/Weekly review.md" --title "Numbers check" --body "The Q3 figure is off by one row."
+  yaseendraw comment "/vault/Weekly review.md" --title "Numbers check" --body "The Q3 figure is off by one row."
   → #3 added to /vault/Weekly review.md
 `
 
