@@ -2,9 +2,6 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { App } from './App'
 import { storage } from './lib/storage'
-import '@milkdown/crepe/theme/common/style.css'
-// The frame theme vars are NOT imported statically: App injects frame / frame-dark per the
-// Appearance setting (editor/crepeTheme.ts, Desktop K — GRO-2218).
 import './app.css'
 
 // First-paint theming (K, GRO-2218): the app state arrives async over the bridge, but main set

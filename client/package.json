@@ -9,25 +9,13 @@
     "@excalidraw/excalidraw": "file:vendor/yaseendraw-excalidraw-0.18.0-e72242f8.tgz",
     "@excalidraw/fractional-indexing": "file:vendor/yaseendraw-fractional-indexing-3.3.0-e72242f8.tgz",
     "@excalidraw/math": "file:vendor/yaseendraw-math-0.18.0-e72242f8.tgz",
-    "@milkdown/crepe": "^7.22.1",
-    "@milkdown/kit": "^7.22.1",
-    "dompurify": "^3.4.14",
-    "marked": "^16.4.2",
-    "mdast-util-to-markdown": "^2.1.2",
-    "micromark-util-chunked": "^2.0.1",
-    "micromark-util-classify-character": "^2.0.1",
-    "micromark-util-resolve-all": "^2.0.1",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "unist-util-visit": "^5.1.0",
-    "yaml": "^2.9.0"
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^5.2.0",
-    "mdast-util-from-markdown": "^2.0.3",
-    "micromark-util-types": "^2.0.1",
     "vite": "^7.3.6"
   }
 }

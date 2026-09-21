@@ -17,7 +17,6 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
-    "@milkdown/components": "file:client/vendor/milkdown-components-7.22.1-yaz1410.tgz",
     "jsdom": "^30.0.1",
     "typescript": "^5.9.3",
     "vitest": "^3.2.7"
@@ -27,8 +26,5 @@
   },
   "allowScripts": {
     "esbuild@0.28.2": true
-  },
-  "overrides": {
-    "@milkdown/components": "$@milkdown/components"
   }
 }
