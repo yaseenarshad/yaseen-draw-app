@@ -11,7 +11,7 @@
  * differs, and the transport is the one part of this that is not ours. A spec that needed a token
  * would be a spec nobody could run.
  *
- * `<vault>/.yaseendocs/github.json` is written `{ "enabled": true }` BEFORE launch and committed
+ * `<vault>/.yaseendraw/github.json` is written `{ "enabled": true }` BEFORE launch and committed
  * with the seed, and the app is never told to turn sync on. That is the SECOND-MACHINE path (D4):
  * the switch travels with the folder, and opening the vault is what adopts it (D3, adoption pulls).
  *
@@ -116,7 +116,7 @@ test.beforeAll(async () => {
   notePath = path.join(vault, SEED_FILE)
   configPath = path.join(vault, VAULT_CONFIG_DIR, 'github.json')
 
-  // A Home the vault already has. An ADOPTED vault (one with `.yaseendocs/`) whose `[[Home]]`
+  // A Home the vault already has. An ADOPTED vault (one with `.yaseendraw/`) whose `[[Home]]`
   // resolves to nothing gets one written on open (YAZ-849) — a byte the sync engine would rightly
   // report as `pending` a beat after adoption, and a race this spec has no business running.
   await writeFile(path.join(vault, 'Home.md'), '# Home\n\nsynthetic-home-body\n')
@@ -129,8 +129,8 @@ test.beforeAll(async () => {
   await git(['init', '-b', BRANCH, vault])
   // Identity and signing are per-repo on purpose: the runner's own global git config must not be
   // able to decide whether this spec can commit.
-  await git(['-C', vault, 'config', 'user.name', 'Yaseen Docs E2E'])
-  await git(['-C', vault, 'config', 'user.email', 'e2e@yaseendocs.test'])
+  await git(['-C', vault, 'config', 'user.name', 'Yaseen Draw E2E'])
+  await git(['-C', vault, 'config', 'user.email', 'e2e@yaseendraw.test'])
   await git(['-C', vault, 'config', 'commit.gpgsign', 'false'])
   await git(['init', '--bare', '-b', BRANCH, bare])
   await git(['-C', vault, 'remote', 'add', 'origin', bare])

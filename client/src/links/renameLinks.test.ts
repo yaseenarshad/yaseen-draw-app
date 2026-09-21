@@ -190,12 +190,12 @@ function installBridge(files: Record<string, { content: string; mtime: number }>
     files[path] = { content, mtime: (f?.mtime ?? 0) + 1 }
     return { path, mtime: files[path].mtime, size: content.length }
   })
-  Object.defineProperty(window, 'yaseenDocs', { value: { readFile, writeFile }, configurable: true, writable: true })
+  Object.defineProperty(window, 'yaseenDraw', { value: { readFile, writeFile }, configurable: true, writable: true })
   return { readFile, writeFile }
 }
 
 afterEach(() => {
-  delete (window as unknown as Record<string, unknown>).yaseenDocs
+  delete (window as unknown as Record<string, unknown>).yaseenDraw
 })
 
 describe('updateLinksAfterRename', () => {

@@ -77,7 +77,7 @@ const WITH_NEW_KPI = ['CAC', 'Gross Margin', NEW_KPI, 'MQL Volume', 'Sales Cycle
 /** The only two pages in the migrated fixture that belong nowhere: `inbox/`, deliberately unfiled. */
 const ORPHANS = ['Pipeline Review Notes', 'Positioning Draft']
 /** 6C (YAZ-849): the dotfolder whose existence IS adoption. */
-const VAULT_CONFIG_DIR = '.yaseendocs'
+const VAULT_CONFIG_DIR = '.yaseendraw'
 /**
  * 4B's birth, as a newborn Home carries it: the flag AND — since YAZ-1513 — the default `status`
  * Select every folder page is born with, spelled from the app's ONE `DEFAULT_COLUMNS`; no body.
@@ -205,7 +205,7 @@ test('step 1 — the migrated shape: Home a pinned LEAF, the five topics promote
   await expect(rowFor(win, 'inbox')).toHaveCount(0)
   await expect(win.locator('.sidebar__body .tree__row--file')).toHaveCount(0)
   // A vault that already answers `[[Home]]` is never offered one, adopted or not (the fixture has
-  // no `.yaseendocs/`, so this is the offer's LIVE half deciding, not the adoption half).
+  // no `.yaseendraw/`, so this is the offer's LIVE half deciding, not the adoption half).
   await expect(offerCard(win)).toHaveCount(0)
   await shoot(win, 'topics-01-roots')
 })
@@ -515,7 +515,7 @@ test('step 6 — an UN-ADOPTED folder is OFFERED a Home, never given one; one cl
 // ------------------------------------------------------- 🔒 D2: an ADOPTED vault creates its own
 
 test('step 7 — an ADOPTED vault grows its own Home on open: once, unasked, never overwritten', async () => {
-  // The same encyclopedia minus its Home, adopted: `.yaseendocs/` exists, so it has said yes already.
+  // The same encyclopedia minus its Home, adopted: `.yaseendraw/` exists, so it has said yes already.
   const adopted = await homelessVault()
   await mkdir(path.join(adopted, VAULT_CONFIG_DIR), { recursive: true })
   expect(await onDisk(adopted, HOME)).toBeNull()

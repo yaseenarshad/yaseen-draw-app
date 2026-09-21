@@ -17,7 +17,7 @@ import {
 
 /**
  * The renderer's view of the app state (D9, GRO-2159): an in-memory cache of the main-owned
- * `yaseendocs.json` plus this window's identity. `init()` loads both over the bridge and
+ * `yaseendraw.json` plus this window's identity. `init()` loads both over the bridge and
  * subscribes to `state.onChange`, so a change made in any window replaces the cache here and
  * wakes `subscribe` listeners. Reads are synchronous off the cache; writes update the cache at
  * once (optimistic) and send the targeted mutator over the bridge, fire-and-forget.
@@ -49,7 +49,7 @@ function patchFolder(root: string, patch: Partial<FolderState>): void {
 export const storage = {
   /** Load the state + identity and start following changes; call once before the first render. */
   async init(): Promise<void> {
-    const bridge = window.yaseenDocs
+    const bridge = window.yaseenDraw
     const [s, id] = await Promise.all([bridge.state.get(), bridge.window.identity()])
     state = s
     identity = id
@@ -78,27 +78,27 @@ export const storage = {
       ? { root }
       : { root, file: null, tabs: [] as string[], rightPanel: defaultRightPanelIdentity(), focusDirs: [] as string[], focusTopics: [] as string[], focusFavorites: [] as string[] }
     identity = { ...identity, ...patch }
-    send('window.setIdentity', () => window.yaseenDocs.window.setIdentity(patch))
+    send('window.setIdentity', () => window.yaseenDraw.window.setIdentity(patch))
   },
 
   getRecentRoots: (): RecentRoots => state.recents,
   pushRecentRoot(path: string, now = Date.now()): RecentRoots {
     const next = addRecentRoot(state.recents, path, now)
     state = { ...state, recents: next }
-    send('state.pushRecent', () => window.yaseenDocs.state.pushRecent(path))
+    send('state.pushRecent', () => window.yaseenDraw.state.pushRecent(path))
     return next
   },
 
   /** Drop a dead folder from the MRU (its directory vanished on disk, C2 — GRO-2164). */
   removeRecentRoot(path: string): void {
     state = { ...state, recents: state.recents.filter((r) => r.path !== path) }
-    send('state.removeRecent', () => window.yaseenDocs.state.removeRecent(path))
+    send('state.removeRecent', () => window.yaseenDraw.state.removeRecent(path))
   },
 
   getExpanded: (root: string): string[] => folderOf(root).expanded,
   setExpanded(root: string, dirs: string[]): void {
     patchFolder(root, { expanded: dirs })
-    send('state.setFolder', () => window.yaseenDocs.state.setFolder(root, { expanded: dirs }))
+    send('state.setFolder', () => window.yaseenDraw.state.setFolder(root, { expanded: dirs }))
   },
 
   /**
@@ -111,7 +111,7 @@ export const storage = {
   setTopicsExpanded(root: string, pages: readonly string[]): void {
     const topicsExpanded = pages.slice(0, MAX_TOPICS_EXPANDED_PAGES)
     patchFolder(root, { topicsExpanded })
-    send('state.setFolder', () => window.yaseenDocs.state.setFolder(root, { topicsExpanded }))
+    send('state.setFolder', () => window.yaseenDraw.state.setFolder(root, { topicsExpanded }))
   },
 
   /**
@@ -123,20 +123,20 @@ export const storage = {
   setFocusDirs(dirs: readonly string[]): void {
     const focusDirs = [...dirs]
     identity = { ...identity, focusDirs }
-    send('window.setIdentity', () => window.yaseenDocs.window.setIdentity({ focusDirs }))
+    send('window.setIdentity', () => window.yaseenDraw.window.setIdentity({ focusDirs }))
   },
   getFocusTopics: (): string[] => identity.focusTopics,
   setFocusTopics(pages: readonly string[]): void {
     const focusTopics = [...pages]
     identity = { ...identity, focusTopics }
-    send('window.setIdentity', () => window.yaseenDocs.window.setIdentity({ focusTopics }))
+    send('window.setIdentity', () => window.yaseenDraw.window.setIdentity({ focusTopics }))
   },
   /** The Favorites tab's own focus list (YAZ-1766 D5): the favorited dirs it is narrowed to. */
   getFocusFavorites: (): string[] => identity.focusFavorites,
   setFocusFavorites(dirs: readonly string[]): void {
     const focusFavorites = [...dirs]
     identity = { ...identity, focusFavorites }
-    send('window.setIdentity', () => window.yaseenDocs.window.setIdentity({ focusFavorites }))
+    send('window.setIdentity', () => window.yaseenDraw.window.setIdentity({ focusFavorites }))
   },
 
   /** The window identity records what is open now: THIS window's restored file, not the folder's shared lastFile (GRO-2160). */
@@ -157,9 +157,9 @@ export const storage = {
     identity = { ...identity, file, tabs: [...tabs], rightPanel: nextRight }
     if (root !== null && fileChanged) {
       patchFolder(root, { lastFile: file })
-      send('state.setFolder', () => window.yaseenDocs.state.setFolder(root, { lastFile: file }))
+      send('state.setFolder', () => window.yaseenDraw.state.setFolder(root, { lastFile: file }))
     }
-    send('window.setIdentity', () => window.yaseenDocs.window.setIdentity({
+    send('window.setIdentity', () => window.yaseenDraw.window.setIdentity({
       tabs: [...tabs],
       file,
       rightPanel: { ...nextRight, items: [...nextRight.items] },
@@ -170,21 +170,21 @@ export const storage = {
   getSettings: (): SettingsState => state.settings,
   setSettings(settings: SettingsState): void {
     state = { ...state, settings }
-    send('state.setSettings', () => window.yaseenDocs.state.setSettings(settings))
+    send('state.setSettings', () => window.yaseenDraw.state.setSettings(settings))
   },
 
   /** Sidebar visibility is window identity; global state broadcasts cannot change another window. */
   getSidebarCollapsed: (): boolean => identity.sidebarCollapsed,
   setSidebarCollapsed(collapsed: boolean): void {
     identity = { ...identity, sidebarCollapsed: collapsed }
-    send('window.setIdentity', () => window.yaseenDocs.window.setIdentity({ sidebarCollapsed: collapsed }))
+    send('window.setIdentity', () => window.yaseenDraw.window.setIdentity({ sidebarCollapsed: collapsed }))
   },
 
   /** Already clamped to [SIDEBAR_MIN_W, SIDEBAR_MAX_W] by the main process on load and on write. */
   getSidebarWidth: (): number => state.sidebarWidth,
   setSidebarWidth(width: number): void {
     state = { ...state, sidebarWidth: width }
-    send('state.setSidebarWidth', () => window.yaseenDocs.state.setSidebarWidth(width))
+    send('state.setSidebarWidth', () => window.yaseenDraw.state.setSidebarWidth(width))
   },
 
   /**
@@ -196,7 +196,7 @@ export const storage = {
   getSidebarLens: (): SidebarLens => identity.sidebarLens,
   setSidebarLens(lens: SidebarLens): void {
     identity = { ...identity, sidebarLens: lens }
-    send('window.setIdentity', () => window.yaseenDocs.window.setIdentity({ sidebarLens: lens }))
+    send('window.setIdentity', () => window.yaseenDraw.window.setIdentity({ sidebarLens: lens }))
   },
 
   getFolds: (root: string, file: string): string[] => folderOf(root).folds[file] ?? [],
@@ -206,7 +206,7 @@ export const storage = {
     if (keys.length === 0) delete folds[file]
     else folds[file] = keys.slice(0, MAX_FOLD_KEYS_PER_FILE)
     patchFolder(root, { folds })
-    send('state.setFolds', () => window.yaseenDocs.state.setFolds(root, file, keys))
+    send('state.setFolds', () => window.yaseenDraw.state.setFolds(root, file, keys))
   },
 
   /**
@@ -226,6 +226,6 @@ export const storage = {
     if (collapsed.length === 0) delete baseGroups[key]
     else baseGroups[key] = collapsed.slice(0, MAX_COLLAPSED_GROUP_KEYS)
     patchFolder(root, { baseGroups })
-    send('state.setBaseGroups', () => window.yaseenDocs.state.setBaseGroups(root, key, collapsed))
+    send('state.setBaseGroups', () => window.yaseenDraw.state.setBaseGroups(root, key, collapsed))
   },
 }

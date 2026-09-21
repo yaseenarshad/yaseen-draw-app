@@ -101,7 +101,7 @@ export const clipboardPaste = $prose((ctx) => {
   return new Plugin({
     key: new PluginKey('mdapp-clipboard-paste'),
     view: (view) => {
-      const unsubscribe = window.yaseenDocs?.menu?.onPasteAs?.(({ mode, text }) => {
+      const unsubscribe = window.yaseenDraw?.menu?.onPasteAs?.(({ mode, text }) => {
         // CodeMirror and ordinary inputs keep native text insertion at their own caret.
         if (!view.hasFocus()) return false
         if (!view.editable || !text) return true

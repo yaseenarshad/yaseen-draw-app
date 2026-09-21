@@ -246,7 +246,7 @@ describe('tabsReducer', () => {
   })
 })
 
-/** A fake `window.yaseenDocs` with just the surface storage touches (the storage.test.ts pattern). */
+/** A fake `window.yaseenDraw` with just the surface storage touches (the storage.test.ts pattern). */
 type IdentityFixture = Omit<WindowIdentity, 'rightPanel' | 'sidebarCollapsed' | 'sidebarLens' | 'focusDirs' | 'focusTopics' | 'focusFavorites'> & Partial<Pick<WindowIdentity, 'rightPanel' | 'sidebarCollapsed' | 'sidebarLens' | 'focusDirs' | 'focusTopics' | 'focusFavorites'>>
 
 function installBridge(app: AppState, identity: IdentityFixture) {
@@ -269,14 +269,14 @@ function installBridge(app: AppState, identity: IdentityFixture) {
       setIdentity: vi.fn(async () => undefined),
     },
   }
-  Object.defineProperty(window, 'yaseenDocs', { value: bridge, configurable: true, writable: true })
+  Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
   return bridge
 }
 
 afterEach(() => {
   _resetRenameContinuity()
   history.replaceState(null, '', '/')
-  delete (window as unknown as Record<string, unknown>).yaseenDocs
+  delete (window as unknown as Record<string, unknown>).yaseenDraw
   vi.restoreAllMocks()
 })
 

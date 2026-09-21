@@ -226,7 +226,7 @@ test('scenario 5 — deep link to a recents-only vault opens a new window on tha
 
 test('scenario 7 (bonus) — Finder "Open With" (open-file) rides the same link pipeline', async () => {
   const roadmapA = path.join(vaultA, 'Projects', 'Roadmap.md')
-  await emitOpenFile(app, roadmapA) // main encodes it as a yaseendocs:// link and routes it
+  await emitOpenFile(app, roadmapA) // main encodes it as a yaseendraw:// link and routes it
 
   // Routed into the existing vault-A window (its root contains the file) — no new window.
   await expect.poll(() => winA.title()).toBe(titleOf(vaultA, roadmapA))

@@ -3,7 +3,7 @@
  *
  * The permanent home of the idioms proven in the `node_modules/.verify/*.mjs` throwaways:
  * launch the REAL app (`desktop/out/main/index.js`, run `npm run build` first — `npm run e2e`
- * does) against a temp `--user-data-dir`, seed `<userData>/yaseendocs.json` with a `windows[]`
+ * does) against a temp `--user-data-dir`, seed `<userData>/yaseendraw.json` with a `windows[]`
  * entry to skip the native folder dialog (the locked no-dialog-in-tests rule), and always work
  * on a COPY of a generated fixture vault — the real vault and real app state are never touched.
  */
@@ -21,15 +21,15 @@ export const ARTIFACTS_DIR = path.join(__dirname, 'artifacts')
 // ---------- app lifecycle ----------
 
 export interface LaunchOptions {
-  /** The temp dir passed as `--user-data-dir` (state file lives at `<userData>/yaseendocs.json`). */
+  /** The temp dir passed as `--user-data-dir` (state file lives at `<userData>/yaseendraw.json`). */
   userData: string
-  /** Written to `<userData>/yaseendocs.json` before launch — a `windows[]` entry skips the native dialog. */
+  /** Written to `<userData>/yaseendraw.json` before launch — a `windows[]` entry skips the native dialog. */
   seedState?: AppState
 }
 
 export async function launchApp({ userData, seedState }: LaunchOptions): Promise<ElectronApplication> {
   if (seedState !== undefined) {
-    await writeFile(path.join(userData, 'yaseendocs.json'), JSON.stringify(seedState, null, 2))
+    await writeFile(path.join(userData, 'yaseendraw.json'), JSON.stringify(seedState, null, 2))
   }
   return _electron.launch({ args: [MAIN_ENTRY, `--user-data-dir=${userData}`] })
 }
@@ -146,7 +146,7 @@ export async function expandDirs(win: Page, dirs: string[]): Promise<void> {
 }
 
 export async function readState(userData: string): Promise<AppState> {
-  return JSON.parse(await readFile(path.join(userData, 'yaseendocs.json'), 'utf8')) as AppState
+  return JSON.parse(await readFile(path.join(userData, 'yaseendraw.json'), 'utf8')) as AppState
 }
 
 // ---------- multi-window seeds & gestures (G3, GRO-2180) ----------
@@ -248,7 +248,7 @@ export async function clickMenuItem(app: ElectronApplication, itemId: string, fo
   )
 }
 
-/** Replays macOS's `open-url` (a clicked `yaseendocs://` link) on the running app — the E1 entry point. */
+/** Replays macOS's `open-url` (a clicked `yaseendraw://` link) on the running app — the E1 entry point. */
 export async function emitOpenUrl(app: ElectronApplication, url: string): Promise<void> {
   await app.evaluate(({ app: electronApp }, u) => {
     electronApp.emit('open-url', { preventDefault: () => undefined }, u)

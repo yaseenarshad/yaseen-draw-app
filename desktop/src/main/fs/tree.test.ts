@@ -38,8 +38,8 @@ describe('tree', () => {
     expect(all).toContain(path.join(root, 'notes.txt'))
     expect(all.some((p) => p.includes('.obsidian') || p.includes('.git') || p.includes('node_modules'))).toBe(false)
     expect(all).not.toContain(path.join(root, '.hidden.md'))
-    // `.yaseendocs/` (vault-local config, GRO-2188) never reaches the tree — the sidebar renders the tree as-is.
-    expect(all.some((p) => p.includes('.yaseendocs'))).toBe(false)
+    // `.yaseendraw/` (vault-local config, GRO-2188) never reaches the tree — the sidebar renders the tree as-is.
+    expect(all.some((p) => p.includes('.yaseendraw'))).toBe(false)
   })
 
   it('classifies text, PDF and raster images by kind, and lists SVG and arbitrary binaries with kind null (YAZ-1577 D1)', async () => {

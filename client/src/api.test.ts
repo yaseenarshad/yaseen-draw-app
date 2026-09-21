@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { YaseenDocsApi } from '@shared/types'
+import type { YaseenDrawApi } from '@shared/types'
 import { api, BridgeRequestError } from './api'
 
-/** A minimal `window.yaseenDocs` stub: only the methods the client `api` delegates to. */
-function installBridge(): { [K in keyof YaseenDocsApi]: ReturnType<typeof vi.fn> } {
+/** A minimal `window.yaseenDraw` stub: only the methods the client `api` delegates to. */
+function installBridge(): { [K in keyof YaseenDrawApi]: ReturnType<typeof vi.fn> } {
   const bridge = {
     tree: vi.fn(),
     readFile: vi.fn(),
@@ -29,18 +29,18 @@ function installBridge(): { [K in keyof YaseenDocsApi]: ReturnType<typeof vi.fn>
     favorites: vi.fn(),
     github: vi.fn(),
   }
-  Object.defineProperty(window, 'yaseenDocs', { value: bridge, configurable: true, writable: true })
+  Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
   return bridge
 }
 
 let bridge: ReturnType<typeof installBridge>
 beforeEach(() => (bridge = installBridge()))
 afterEach(() => {
-  delete (window as unknown as Record<string, unknown>).yaseenDocs
+  delete (window as unknown as Record<string, unknown>).yaseenDraw
 })
 
 describe('api', () => {
-  it('delegates to window.yaseenDocs with the same arguments and resolves its value', async () => {
+  it('delegates to window.yaseenDraw with the same arguments and resolves its value', async () => {
     bridge.tree.mockResolvedValue({ root: '/v', tree: [], generatedAt: 1 })
     bridge.writeFile.mockResolvedValue({ path: '/v/a.md', mtime: 2, size: 3 })
     bridge.pickFolder.mockResolvedValue({ cancelled: true })
@@ -78,7 +78,7 @@ describe('api', () => {
 
   it('rename delegates to file.rename and wraps ALREADY_EXISTS like every other code (Links E1, GRO-2194)', async () => {
     const file = { rename: vi.fn(), onRenamed: vi.fn() }
-    Object.defineProperty(window.yaseenDocs, 'file', { value: file, configurable: true })
+    Object.defineProperty(window.yaseenDraw, 'file', { value: file, configurable: true })
     file.rename.mockResolvedValue({ oldPath: '/v/a.md', newPath: '/v/b.md' })
     await expect(api.rename({ oldPath: '/v/a.md', newPath: '/v/b.md' })).resolves.toEqual({ oldPath: '/v/a.md', newPath: '/v/b.md' })
     expect(file.rename).toHaveBeenCalledWith({ oldPath: '/v/a.md', newPath: '/v/b.md' })
@@ -91,7 +91,7 @@ describe('api', () => {
 
   it('repairRename delegates to file.repairRename and coldDiff to the top-level bridge method (Links E1c, GRO-2242)', async () => {
     const file = { rename: vi.fn(), repairRename: vi.fn(), onRenamed: vi.fn() }
-    Object.defineProperty(window.yaseenDocs, 'file', { value: file, configurable: true })
+    Object.defineProperty(window.yaseenDraw, 'file', { value: file, configurable: true })
     file.repairRename.mockResolvedValue({ oldPath: '/v/a.md', newPath: '/v/b.md', kind: 'file' })
     await expect(api.repairRename({ oldPath: '/v/a.md', newPath: '/v/b.md' })).resolves.toEqual({ oldPath: '/v/a.md', newPath: '/v/b.md', kind: 'file' })
     expect(file.repairRename).toHaveBeenCalledWith({ oldPath: '/v/a.md', newPath: '/v/b.md' })
@@ -133,7 +133,7 @@ describe('api', () => {
 
   it('properties calls delegate and wrap INVALID_CONFIG like every other code (YAZ-835)', async () => {
     const properties = { get: vi.fn(), setProperty: vi.fn(), removeProperty: vi.fn(), onChange: vi.fn() }
-    Object.defineProperty(window.yaseenDocs, 'properties', { value: properties, configurable: true })
+    Object.defineProperty(window.yaseenDraw, 'properties', { value: properties, configurable: true })
     properties.get.mockResolvedValue({ root: '/v', version: 1, properties: {} })
     await expect(api.properties.get('/v')).resolves.toEqual({ root: '/v', version: 1, properties: {} })
     expect(properties.get).toHaveBeenCalledWith('/v')
@@ -147,7 +147,7 @@ describe('api', () => {
 
   it('github calls delegate and pass the status through, onStatus included (YAZ-1081)', async () => {
     const github = { status: vi.fn(), syncNow: vi.fn(), setEnabled: vi.fn(), onStatus: vi.fn() }
-    Object.defineProperty(window.yaseenDocs, 'github', { value: github, configurable: true })
+    Object.defineProperty(window.yaseenDraw, 'github', { value: github, configurable: true })
     github.status.mockResolvedValue({ root: '/v', state: 'off' })
     await expect(api.github.status('/v')).resolves.toEqual({ root: '/v', state: 'off' })
     expect(github.status).toHaveBeenCalledWith('/v')

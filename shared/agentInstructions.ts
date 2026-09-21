@@ -6,7 +6,7 @@
  * in dev — 🔒 D3: no PATH install, the path travels with the text).
  */
 export function agentPrompt(command: string, page: string): string {
-  return `This file is a page in Yaseen Docs: ${page}
+  return `This file is a page in Yaseen Draw: ${page}
 The app has a command line for working with its pages. Run it first to see what it can do:
 ${command} --help`
 }

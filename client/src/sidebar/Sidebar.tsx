@@ -127,7 +127,7 @@ interface SidebarProps {
   onSearchFocusHandled: () => void
   /**
    * 6C's offer (YAZ-849), threaded straight through to the Topics lens: this folder has no
-   * `.yaseendocs/`, so Home was NOT created for it and the lens offers to make one. App owns
+   * `.yaseendraw/`, so Home was NOT created for it and the lens offers to make one. App owns
    * both — the fact is established once per vault ON OPEN (`useEnsureHome`), which the sidebar
    * cannot do: it is unmounted while collapsed and would let a whole session pass without a Home.
    */
@@ -398,7 +398,7 @@ export function Sidebar({
   const [focusTopics, setFocusTopics] = useState<readonly string[]>(storage.getFocusTopics)
   const [focusFavorites, setFocusFavorites] = useState<readonly string[]>(storage.getFocusFavorites)
   // Favorites (YAZ-1766 D2, in the vault since 6A/D11): the vault's pinned files and folders in the
-  // user's order, read from `.yaseendocs/favorites.json` through main (absolute paths). Another
+  // user's order, read from `.yaseendraw/favorites.json` through main (absolute paths). Another
   // window's — or another machine's, via sync — write lands here through `favorites:changed` (below).
   const [favorites, setFavorites] = useState<readonly string[]>([])
   const favoritesRef = useRef(favorites)
@@ -977,7 +977,7 @@ export function Sidebar({
   /** Context menu "Open in new window" (D2, GRO-2168): a fresh window on {root, file}; this one untouched. (⌘-click opens a background tab instead since I3.) */
   const openFileNewWindow = useCallback(
     (path: string) => {
-      window.yaseenDocs.window.open({ root, file: path }).catch((err: unknown) => console.error('[sidebar] window.open failed:', err))
+      window.yaseenDraw.window.open({ root, file: path }).catch((err: unknown) => console.error('[sidebar] window.open failed:', err))
     },
     [root],
   )

@@ -2,7 +2,7 @@ import { remarkCtx, schemaCtx } from '@milkdown/kit/core'
 import type { Ctx } from '@milkdown/kit/ctx'
 import { ParserState, type Node as MdNode } from '@milkdown/kit/transformer'
 
-export const APP_CLIPBOARD = 'data-yaseendocs-clipboard'
+export const APP_CLIPBOARD = 'data-yaseendraw-clipboard'
 
 type PasteNode = MdNode & { [key: string]: unknown; children?: PasteNode[]; ordered?: boolean; start?: number; checked?: boolean }
 

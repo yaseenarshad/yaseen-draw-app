@@ -1,7 +1,7 @@
 /**
  * In-memory `PropertiesApi` stub (YAZ-835): `get` on an untouched root resolves empty — never an
  * error — and never creates state; mutations are targeted and fire every `onChange` listener with
- * a fresh snapshot. `version` is the constant 1, matching the real `.yaseendocs/properties.json`
+ * a fresh snapshot. `version` is the constant 1, matching the real `.yaseendraw/properties.json`
  * bridge this stub stands in for (GRO-2204 alignment).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'

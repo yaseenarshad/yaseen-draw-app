@@ -26,7 +26,7 @@ function syncSubscriptions(state: AppState): void {
   }
 }
 
-/** The `favorites.*` half of `window.yaseenDocs` (YAZ-1766 6A). */
+/** The `favorites.*` half of `window.yaseenDraw` (YAZ-1766 6A). */
 export function registerFavoritesIpc(store: Store): void {
   handle(CH.favoritesGet, async (root: unknown) => getFavorites(requireAbsPath(root, 'root')))
   handle(CH.favoritesSet, async (root: unknown, paths: unknown) => {

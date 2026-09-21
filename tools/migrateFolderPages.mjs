@@ -16,7 +16,7 @@
  *    deleted; `channels:` / `functions:` link arrays MERGE into `folder_pages` (order preserved,
  *    de-duplicated like a click) and those keys are deleted; the `function:` TEXT field is deleted
  *    only where a `functions:` links field also existed. Every other relation is untouched.
- *  · FOLDER PAGES (🔒 D4) — one per distinct `page_type`, named from `.yaseendocs/types.json`
+ *  · FOLDER PAGES (🔒 D4) — one per distinct `page_type`, named from `.yaseendraw/types.json`
  *    (`pluralName` → `displayName` → an irregulars map → a regular pluralizer), carrying the flag,
  *    `folder_pages: ["[[Home]]"]` and the type's registry properties as `folder_page_settings`
  *    columns. Home is created with an outline `order` over them. Templates follow the new names,
@@ -61,7 +61,7 @@ const FUNCTION_TEXT_KEY = 'function'
 const ALIASES_KEY = 'aliases'
 
 const REPORT_FILE = 'migration-report.md'
-const CONFIG_DIR = '.yaseendocs'
+const CONFIG_DIR = '.yaseendraw'
 const TYPES_FILE = 'types.json'
 const PROPERTIES_FILE = 'properties.json'
 const TEMPLATES_DIR = 'templates'
@@ -330,7 +330,7 @@ function scanVault(root) {
   return { root, pages, baseFiles, scripts, templates, registry: readRegistry(root) }
 }
 
-/** `.yaseendocs/types.json`, read best-effort: a file we cannot parse blocks the run rather than losing it. */
+/** `.yaseendraw/types.json`, read best-effort: a file we cannot parse blocks the run rather than losing it. */
 function readRegistry(root) {
   const file = path.join(root, CONFIG_DIR, TYPES_FILE)
   if (!fs.existsSync(file)) return { file, present: false, types: {}, properties: {}, error: undefined }
@@ -786,7 +786,7 @@ function orderedFolderPages(folderPages, registry) {
 }
 
 /**
- * The registry's VAULT-WIDE declarations become `.yaseendocs/properties.json` (the Properties
+ * The registry's VAULT-WIDE declarations become `.yaseendraw/properties.json` (the Properties
  * contract). Zero of them is the common case and writes nothing at all; a properties.json that
  * already exists is only ever ADDED to, never replaced.
  */

@@ -99,7 +99,7 @@ const FIXTURE = {
   // Not a folder page (a string flag is not the flag): never touched.
   'Member.md': '---\nfolder_pages:\n  - "[[Bare]]"\nfolder_page: "true"\n---\n\n# Member\n',
   // A dotfolder is invisible to the scan.
-  '.yaseendocs/Hidden.md': '---\nfolder_page: true\n---\n',
+  '.yaseendraw/Hidden.md': '---\nfolder_page: true\n---\n',
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +174,7 @@ describe('the transform', () => {
     // untouched pages are byte-identical
     expect(read(root, 'Done.md')).toBe(FIXTURE['Done.md'])
     expect(read(root, 'Member.md')).toBe(FIXTURE['Member.md'])
-    expect(read(root, '.yaseendocs/Hidden.md')).toBe(FIXTURE['.yaseendocs/Hidden.md'])
+    expect(read(root, '.yaseendraw/Hidden.md')).toBe(FIXTURE['.yaseendraw/Hidden.md'])
     expect(gitStatus(root).trimEnd().split('\n').sort()).toEqual([' M Bare.md', ' M Rich.md'])
   })
 

@@ -1,7 +1,7 @@
 /**
  * Folder-page scaffolding (YAZ-832; 🔒 Q5/Q6 of YAZ-815): a new member is the folder page's
  * declared columns, empty, plus ONE `folder_pages` wikilink back to it, forced LAST — a template
- * at `.yaseendocs/templates/<folder page>.md` overrides key-by-key and may not displace the
+ * at `.yaseendraw/templates/<folder page>.md` overrides key-by-key and may not displace the
  * birth. The declarations/`page_type` half this file used to cover died with the type system
  * (YAZ-836). `api` mocked like newNote.test.ts.
  */
@@ -73,9 +73,9 @@ describe('scaffoldFromFolderPage (🔒 Q5)', () => {
 })
 
 describe('folderPageTemplatePath / newPageFromFolderPage (🔒 Q6)', () => {
-  it('the template lives in `.yaseendocs/templates`; existence = has-template', () => {
-    expect(folderPageTemplatePath('/v', 'Metrics')).toBe('/v/.yaseendocs/templates/Metrics.md')
-    expect(folderPageTemplatePath('/v', 'Meta Ads')).toBe('/v/.yaseendocs/templates/Meta Ads.md')
+  it('the template lives in `.yaseendraw/templates`; existence = has-template', () => {
+    expect(folderPageTemplatePath('/v', 'Metrics')).toBe('/v/.yaseendraw/templates/Metrics.md')
+    expect(folderPageTemplatePath('/v', 'Meta Ads')).toBe('/v/.yaseendraw/templates/Meta Ads.md')
   })
 
   it('no template → scaffold + seed, folder_pages still last (a new seed key never displaces it), body \'\'', async () => {
@@ -83,7 +83,7 @@ describe('folderPageTemplatePath / newPageFromFolderPage (🔒 Q6)', () => {
 
     const parts = await newPageFromFolderPage('/v', 'Metrics', METRICS, { unit: 'days', spend: 12 })
 
-    expect(readFile).toHaveBeenCalledWith('/v/.yaseendocs/templates/Metrics.md')
+    expect(readFile).toHaveBeenCalledWith('/v/.yaseendraw/templates/Metrics.md')
     expect(parts).toEqual({
       properties: { ...EMPTY_COLUMNS, unit: 'days', spend: 12, folder_pages: ['[[Metrics]]'] },
       body: '',
@@ -93,7 +93,7 @@ describe('folderPageTemplatePath / newPageFromFolderPage (🔒 Q6)', () => {
 
   it('merge order: scaffold ← template ← seed; extra template keys survive; folder_pages forced back and last; body verbatim', async () => {
     readFile.mockResolvedValue({
-      path: '/v/.yaseendocs/templates/Metrics.md',
+      path: '/v/.yaseendraw/templates/Metrics.md',
       content: '---\nunit: "%"\nscore: 1\nextra: kept\nfolder_pages: ["[[Wrong]]"]\n---\n# Scaffolded\n\nNotes.\n',
       mtime: 1,
       size: 1,

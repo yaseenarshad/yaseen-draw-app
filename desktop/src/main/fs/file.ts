@@ -27,7 +27,7 @@ export async function readFile(path: string): Promise<FileResponse> {
 }
 
 /**
- * `window.yaseenDocs.writeFile(req)`. Atomic (tmp + rename),
+ * `window.yaseenDraw.writeFile(req)`. Atomic (tmp + rename),
  * parent dir must exist. With `expectedMtime`, a newer file on disk rejects `CONFLICT` carrying
  * the current mtime and nothing is written. The request crosses IPC from a sandboxed renderer,
  * so its shape is checked like a request body, not trusted from the type.

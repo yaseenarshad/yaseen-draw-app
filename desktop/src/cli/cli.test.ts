@@ -1,5 +1,5 @@
 /**
- * `yaseendocs` (YAZ-1617): the program runs in-process against real temp files — `main(argv, io)`
+ * `yaseendraw` (YAZ-1617): the program runs in-process against real temp files — `main(argv, io)`
  * with captured stdio — so every receipt, refusal and exit code is pinned without spawning.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'

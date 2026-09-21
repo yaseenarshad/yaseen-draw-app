@@ -11,7 +11,7 @@ export async function makeFixture(): Promise<{ root: string; cleanup: () => Prom
   await mkdir(path.join(root, 'Empty'), { recursive: true })
   await mkdir(path.join(root, 'assets-only'), { recursive: true })
   await mkdir(path.join(root, '.obsidian'), { recursive: true })
-  await mkdir(path.join(root, '.yaseendocs'), { recursive: true })
+  await mkdir(path.join(root, '.yaseendraw'), { recursive: true })
   await mkdir(path.join(root, '.git'), { recursive: true })
   await mkdir(path.join(root, 'node_modules', 'pkg'), { recursive: true })
   await Promise.all([
@@ -25,7 +25,7 @@ export async function makeFixture(): Promise<{ root: string; cleanup: () => Prom
     writeFile(path.join(root, 'alpha', 'a.md'), 'a'),
     writeFile(path.join(root, 'assets-only', 'img.png'), 'png'),
     writeFile(path.join(root, '.obsidian', 'workspace.md'), 'ws'),
-    writeFile(path.join(root, '.yaseendocs', 'foo.json'), '{"a":1}'),
+    writeFile(path.join(root, '.yaseendraw', 'foo.json'), '{"a":1}'),
     writeFile(path.join(root, 'node_modules', 'pkg', 'README.md'), 'readme'),
   ])
   return { root, cleanup: () => rm(root, { recursive: true, force: true }) }

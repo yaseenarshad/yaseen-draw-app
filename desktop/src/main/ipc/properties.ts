@@ -30,7 +30,7 @@ function syncSubscriptions(state: AppState): void {
   }
 }
 
-/** The `properties.*` half of `window.yaseenDocs` (YAZ-835). */
+/** The `properties.*` half of `window.yaseenDraw` (YAZ-835). */
 export function registerPropertiesIpc(store: Store): void {
   handle(CH.propertiesGet, getProperties)
   handle(CH.propertiesSetProperty, setProperty)

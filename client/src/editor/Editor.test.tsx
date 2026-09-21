@@ -171,7 +171,7 @@ beforeEach(() => {
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:editor-pdf') })
   Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
   writeFile.mockImplementation(async (body) => ({ path: body.path, mtime: 99, size: body.content.length }))
-  Object.defineProperty(window, 'yaseenDocs', {
+  Object.defineProperty(window, 'yaseenDraw', {
     value: {
       window: {
         onFlush: (l: () => Promise<void> | void) => {
@@ -197,7 +197,7 @@ afterEach(() => {
   delete (URL as unknown as Record<string, unknown>).createObjectURL
   delete (URL as unknown as Record<string, unknown>).revokeObjectURL
   delete (globalThis as unknown as Record<string, unknown>).createImageBitmap
-  delete (window as unknown as Record<string, unknown>).yaseenDocs
+  delete (window as unknown as Record<string, unknown>).yaseenDraw
   // reset (not clear): a failing test must not leak queued mockResolvedValueOnce reads into the next mount.
   vi.resetAllMocks()
   vi.useRealTimers()

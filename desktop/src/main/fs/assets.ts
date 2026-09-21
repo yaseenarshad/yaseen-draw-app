@@ -6,7 +6,7 @@ import { linkTarget } from '../vaultIndex/scan'
 import { atomicWrite, BridgeFailure, byNameCi, fsCall, isSkipped, requireAbsPath, requireDir } from './fsUtils'
 
 /**
- * `window.yaseenDocs.readAsset(root, ref)` / `.writeAsset(req)` (Bases 4E, GRO-2139 — Desktop
+ * `window.yaseenDraw.readAsset(root, ref)` / `.writeAsset(req)` (Bases 4E, GRO-2139 — Desktop
  * D10: bridge methods, never routes): the vault's ASSET pipe. Reads resolve a wikilink target or
  * path to a local image or drawing under `root` and answer its bytes base64-encoded with a mime
  * derived from the extension; writes take drawing JSON (YAZ-876) or image bytes (YAZ-1661).
@@ -125,7 +125,7 @@ function resolveUnderRoot(dir: string, rel: string): string {
 }
 
 /**
- * `window.yaseenDocs.writeAsset(req)` — the write half of the asset pipe (YAZ-876, first build
+ * `window.yaseenDraw.writeAsset(req)` — the write half of the asset pipe (YAZ-876, first build
  * unit of the Excalidraw embed YAZ-852; widened to image bytes by YAZ-1661, images-as-first-
  * class-citizens YAZ-1656 D5). THE BODY'S TYPE PICKS THE FILE KIND: a string is scene JSON and
  * may only land on a `DRAWING_EXTENSIONS` path; bytes are an image and may only land on an

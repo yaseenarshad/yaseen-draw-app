@@ -2,7 +2,7 @@
  * Folds survive an external/AI edit (YAZ-1342): the REAL built app, one pointed proof.
  * Collapse a bullet and a heading → an "agent" rewrites the file on disk (collapsed lines
  * untouched) → the clean-doc silent reload shows the new content, keeps BOTH folds, and
- * yaseendocs.json keeps both keys (the old bug also erased them from disk). Serial like
+ * yaseendraw.json keeps both keys (the old bug also erased them from disk). Serial like
  * headingFold.spec.ts; screenshots are the evidence.
  */
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test'

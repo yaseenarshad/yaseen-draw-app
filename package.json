@@ -1,8 +1,8 @@
 {
-  "name": "yaseen-milkdown",
+  "name": "yaseen-draw",
   "private": true,
-  "version": "0.9.25",
-  "description": "Yaseen Docs: local markdown editor as an Electron desktop app (React + Milkdown Crepe renderer, main-process file layer)",
+  "version": "0.1.0",
+  "description": "Yaseen Draw: local Excalidraw whiteboard as an Electron desktop app (React + vendored yaseendraw engine, main-process file layer)",
   "workspaces": [
     "client",
     "desktop"

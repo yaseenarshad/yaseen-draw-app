@@ -22,15 +22,15 @@ import { createWindowManager } from './windows'
 import { createWindowOpenHandler } from './windowOpenPolicy'
 
 // Before anything reads app.getPath('userData'): the workspace is named "desktop", the app is not.
-app.setName('Yaseen Docs')
-applyUserDataOverride(app, process.env.YASEEN_DOCS_USER_DATA_DIR)
+app.setName('Yaseen Draw')
+applyUserDataOverride(app, process.env.YASEEN_DRAW_USER_DATA_DIR)
 
 /** One running instance (GRO-2160): a second launch focuses the first; a link in its argv routes (E1). */
 const isPrimaryInstance = app.requestSingleInstanceLock()
 if (!isPrimaryInstance) app.quit()
 app.on('second-instance', (_event, argv) => {
-  // Windows/Linux deliver a clicked yaseendocs:// link as an argv entry of the second launch.
-  const urls = argv.filter((arg) => arg.startsWith('yaseendocs://'))
+  // Windows/Linux deliver a clicked yaseendraw:// link as an argv entry of the second launch.
+  const urls = argv.filter((arg) => arg.startsWith('yaseendraw://'))
   if (urls.length > 0) {
     for (const url of urls) links.push(url)
     return // routing focuses (or opens) the right window itself
@@ -42,7 +42,7 @@ app.on('second-instance', (_event, argv) => {
 })
 
 // Deep links (E1, GRO-2171): the packaged bundle's `protocols` Info.plist entry is F1's job.
-app.setAsDefaultProtocolClient('yaseendocs')
+app.setAsDefaultProtocolClient('yaseendraw')
 
 /** A parsed link routes to the best window; a bad one gets the unobtrusive notice, never a dialog. */
 function handleLink(url: string): void {
@@ -62,7 +62,7 @@ app.on('open-url', (event, url) => {
 })
 
 // Finder "Open With" (E2, GRO-2172) hands a plain absolute path — also before `ready` on cold
-// start. Encoding it as a yaseendocs:// link reuses the whole E1 pipeline (queue, parse, routing,
+// start. Encoding it as a yaseendraw:// link reuses the whole E1 pipeline (queue, parse, routing,
 // markdown/exists guards); fileLink ↔ parseFileLink is lossless (links.test.ts round trips). The
 // packaged bundle's `fileAssociations` (role Alternate) declaration is F1's job.
 app.on('open-file', (event, path) => {
@@ -76,8 +76,8 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: t
 
 const RENDERER_DIR = join(__dirname, '../renderer')
 
-/** One user-global state file (D9, GRO-2159): `~/Library/Application Support/Yaseen Docs/yaseendocs.json`. */
-const store = createStore(join(app.getPath('userData'), 'yaseendocs.json'))
+/** One user-global state file (D9, GRO-2159): `~/Library/Application Support/Yaseen Draw/yaseendraw.json`. */
+const store = createStore(join(app.getPath('userData'), 'yaseendraw.json'))
 
 /** Persistent vault-index cache (GRO-2223 D1): one JSON per vault under userData, never in the vault. */
 initIndexCache(join(app.getPath('userData'), 'index-cache'))
@@ -177,7 +177,7 @@ app.whenReady().then(() => {
     writeText: (text) => clipboard.writeText(text),
     rendererUrl: process.env.ELECTRON_RENDERER_URL ?? 'app://yaseen/index.html',
   })
-  // Copy for Agent (YAZ-1617): main knows where the `yaseendocs` command lives; the renderer only asks.
+  // Copy for Agent (YAZ-1617): main knows where the `yaseendraw` command lives; the renderer only asks.
   registerAgentIpc({ packaged: app.isPackaged, resourcesPath: process.resourcesPath, mainDir: __dirname })
   const handlers = createMenuHandlers(store, manager, {
     focusedWebContents: menuTarget,

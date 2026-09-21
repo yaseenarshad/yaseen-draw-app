@@ -52,7 +52,7 @@ beforeEach(async () => {
   vault = path.join(dir, 'vault')
   await mkdir(vault) // the root exists (an open vault always does); its dotfolder does not
   await writeFile(path.join(vault, 'a.md'), '# a\n')
-  store = createStore(path.join(dir, 'yaseendocs.json'))
+  store = createStore(path.join(dir, 'yaseendraw.json'))
   registerFavoritesIpc(store)
 })
 afterEach(async () => {

@@ -5,7 +5,7 @@ import { BridgeFailure, requireAbsPath, requireDir } from '../fs/fsUtils'
 import { readConfigDetailed, subscribeConfig, writeConfig } from '../vaultConfig'
 
 /**
- * Vault-wide property declarations (YAZ-835): `<root>/.yaseendocs/properties.json` read and
+ * Vault-wide property declarations (YAZ-835): `<root>/.yaseendraw/properties.json` read and
  * written through the vaultConfig plumbing (GRO-2188). Electron-free, like the vault index.
  *
  * Lazy (LOCKED): `getProperties` never creates anything; the first successful mutation creates

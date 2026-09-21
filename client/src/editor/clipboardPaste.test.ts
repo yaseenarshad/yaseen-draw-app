@@ -20,17 +20,17 @@ const writeAsset = vi.mocked(api.writeAsset)
 
 const mounted: Array<{ crepe: Crepe; root: HTMLElement }> = []
 const listeners = new Set<(request: ClipboardPasteRequest) => boolean>()
-let originalApi: typeof window.yaseenDocs
+let originalApi: typeof window.yaseenDraw
 beforeEach(() => {
-  originalApi = window.yaseenDocs
-  window.yaseenDocs = { ...originalApi, menu: { ...originalApi?.menu, onPasteAs: (listener) => {
+  originalApi = window.yaseenDraw
+  window.yaseenDraw = { ...originalApi, menu: { ...originalApi?.menu, onPasteAs: (listener) => {
     listeners.add(listener)
     return () => { listeners.delete(listener) }
   } } }
 })
 afterEach(async () => {
   for (const { crepe, root } of mounted.splice(0)) { await crepe.destroy(); root.remove() }
-  window.yaseenDocs = originalApi
+  window.yaseenDraw = originalApi
   listeners.clear()
 })
 async function mount(markdown = '', outline = false, nativeCode = false, image?: ImageOptions) {

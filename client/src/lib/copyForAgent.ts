@@ -3,7 +3,7 @@ import { basename } from './paths'
 
 /**
  * Copy for Agent (YAZ-1617 🔒 D2): main composes the handshake for `path` (it knows where the
- * `yaseendocs` command lives), the renderer writes the clipboard exactly as Copy path does, and
+ * `yaseendraw` command lives), the renderer writes the clipboard exactly as Copy path does, and
  * the panel's passive notice reports either way. One helper, so the sidebar row and the tab
  * cannot spell the gesture two ways.
  */

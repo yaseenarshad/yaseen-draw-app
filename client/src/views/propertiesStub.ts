@@ -1,8 +1,8 @@
 import type { PropertiesApi, PropertiesResponse } from '@shared/types'
 
 /**
- * In-memory `PropertiesApi`: the tests' stand-in for `window.yaseenDocs.properties` (same
- * interface, same semantics as the real `.yaseendocs/properties.json` bridge). `get` on an
+ * In-memory `PropertiesApi`: the tests' stand-in for `window.yaseenDraw.properties` (same
+ * interface, same semantics as the real `.yaseendraw/properties.json` bridge). `get` on an
  * untouched root resolves `{ properties: {} }` — empty, never an error, and never creates state
  * (lazy-creation is the bridge's rule too); the first mutation creates the per-root store and
  * fires every `onChange` listener with a fresh snapshot. `version` is the constant 1, exactly

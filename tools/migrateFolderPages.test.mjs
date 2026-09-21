@@ -130,9 +130,9 @@ const TYPES_JSON = JSON.stringify(
 /** The mini-vault every "happy path" case starts from. */
 function fixture(extra = {}) {
   return {
-    '.yaseendocs/types.json': TYPES_JSON,
-    '.yaseendocs/templates/problem.md': '---\npage_type: problem\nsku_tag:\nchannels: []\n---\n\n# Problem template\n',
-    '.yaseendocs/templates/metric.md': '---\n---\n\n# Metric template\n',
+    '.yaseendraw/types.json': TYPES_JSON,
+    '.yaseendraw/templates/problem.md': '---\npage_type: problem\nsku_tag:\nchannels: []\n---\n\n# Problem template\n',
+    '.yaseendraw/templates/metric.md': '---\n---\n\n# Metric template\n',
 
     // A deep function tree: the problem goes out to problems/, the function page comes up flat.
     'functions/1. Sales/CRM Hygiene.md':
@@ -265,7 +265,7 @@ describe('the transform (🔒 D3/D4/D5)', () => {
     for (const [rel, content] of before) expect(read(root, rel)).toBe(content)
     expect(exists(root, 'Home.md')).toBe(false)
     expect(exists(root, 'KPIs.md')).toBe(false)
-    expect(exists(root, '.yaseendocs/types.json')).toBe(true)
+    expect(exists(root, '.yaseendraw/types.json')).toBe(true)
     expect(exists(root, 'functions/Problems by function.base')).toBe(true)
     expect(pendingChanges(result.stdout)).toBeGreaterThan(0)
   })
@@ -369,28 +369,28 @@ describe('the transform (🔒 D3/D4/D5)', () => {
   it('renames the templates onto the folder page names (🔒 D4)', () => {
     const root = makeVault(fixture())
     run(root, '--apply')
-    expect(exists(root, '.yaseendocs/templates/problem.md')).toBe(false)
-    expect(exists(root, '.yaseendocs/templates/Problems.md')).toBe(true)
-    const template = read(root, '.yaseendocs/templates/Problems.md')
+    expect(exists(root, '.yaseendraw/templates/problem.md')).toBe(false)
+    expect(exists(root, '.yaseendraw/templates/Problems.md')).toBe(true)
+    const template = read(root, '.yaseendraw/templates/Problems.md')
     expect(template).toContain('# Problem template')
     // The 7D rule: a renamed template's CONTENT migrates too — dead keys scrubbed, the rest kept.
     expect(template).not.toContain('page_type')
     expect(template).not.toContain('channels: []')
     expect(template).toContain('sku_tag:')
-    expect(exists(root, '.yaseendocs/templates/Metrics.md')).toBe(true)
+    expect(exists(root, '.yaseendraw/templates/Metrics.md')).toBe(true)
   })
 
   it('deletes types.json once it has been extracted, writing no properties.json when it declares none', () => {
     const root = makeVault(fixture())
     run(root, '--apply')
-    expect(exists(root, '.yaseendocs/types.json')).toBe(false)
-    expect(exists(root, '.yaseendocs/properties.json')).toBe(false)
+    expect(exists(root, '.yaseendraw/types.json')).toBe(false)
+    expect(exists(root, '.yaseendraw/properties.json')).toBe(false)
   })
 
   it('writes properties.json when types.json DOES carry vault-wide declarations', () => {
     const root = makeVault(
       fixture({
-        '.yaseendocs/types.json': JSON.stringify({
+        '.yaseendraw/types.json': JSON.stringify({
           version: 1,
           types: { problem: { displayName: 'Problem', folder: 'problems', properties: {} } },
           properties: { owner: { kind: 'text' }, sold_to: { kind: 'multi-link', target: 'problem' } },
@@ -398,11 +398,11 @@ describe('the transform (🔒 D3/D4/D5)', () => {
       }),
     )
     const result = run(root, '--apply')
-    const declared = JSON.parse(read(root, '.yaseendocs/properties.json'))
+    const declared = JSON.parse(read(root, '.yaseendraw/properties.json'))
     expect(declared.version).toBe(1)
     expect(declared.properties.owner).toEqual({ kind: 'text' })
     expect(declared.properties.sold_to).toEqual({ kind: 'multi-link', target: '[[Problems]]' })
-    expect(result.stdout).toMatch(/## `\.yaseendocs\/properties\.json`/)
+    expect(result.stdout).toMatch(/## `\.yaseendraw\/properties\.json`/)
   })
 
   it('flattens the functions tree and dissolves the channels bins (🔒 D5)', () => {

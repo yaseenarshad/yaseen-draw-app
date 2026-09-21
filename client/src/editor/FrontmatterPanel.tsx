@@ -31,7 +31,7 @@ import '../views/views.css'
 export interface FrontmatterPanelProps {
   /** The open note as the Editor loaded it — the panel's disk truth until its own write moves it. */
   file: Pick<FileResponse, 'path' | 'content' | 'mtime'>
-  /** The vault root: the scope of `.yaseendocs/properties.json`. Absent → rows carry no type affordance. */
+  /** The vault root: the scope of `.yaseendraw/properties.json`. Absent → rows carry no type affordance. */
   root?: string | null
   /** Legacy vault declarations are a fallback beneath the selected folder page's definition. */
   properties?: PropertiesResponse | null

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { FavoritesApi, FileApi, FileClipState, GithubApi, GithubSyncStatus, LinkApi, MenuApi, PropertiesApi, ShellApi, StateApi, VaultConfigApi, WatchEvent, WindowApi, YaseenDocsApi } from '@shared/types'
+import type { FavoritesApi, FileApi, FileClipState, GithubApi, GithubSyncStatus, LinkApi, MenuApi, PropertiesApi, ShellApi, StateApi, VaultConfigApi, WatchEvent, WindowApi, YaseenDrawApi } from '@shared/types'
 import { CH } from '../channels'
 
 const exposed: Record<string, unknown> = {}
@@ -13,7 +13,7 @@ vi.mock('electron', () => ({
  * typecheck. `as const satisfies` keeps each tuple's literal type (a plain `readonly (keyof T)[]`
  * annotation would widen it and make `Exhaustive<>` vacuous) while still rejecting typos.
  */
-const TOP = ['tree', 'readFile', 'readPdf', 'readImage', 'writeFile', 'createDir', 'createFile', 'index', 'coldDiff', 'readAsset', 'writeAsset', 'pickFolder', 'watch', 'state', 'window', 'menu', 'link', 'file', 'shell', 'vaultConfig', 'properties', 'favorites', 'github'] as const satisfies readonly (keyof YaseenDocsApi)[]
+const TOP = ['tree', 'readFile', 'readPdf', 'readImage', 'writeFile', 'createDir', 'createFile', 'index', 'coldDiff', 'readAsset', 'writeAsset', 'pickFolder', 'watch', 'state', 'window', 'menu', 'link', 'file', 'shell', 'vaultConfig', 'properties', 'favorites', 'github'] as const satisfies readonly (keyof YaseenDrawApi)[]
 const STATE = ['get', 'setSettings', 'setSidebarWidth', 'pushRecent', 'removeRecent', 'setFolder', 'setFolds', 'setBaseGroups', 'onChange'] as const satisfies readonly (keyof StateApi)[]
 const WINDOW = ['identity', 'setIdentity', 'open', 'duplicate', 'openRecent', 'closeSelf', 'zoom', 'onFlush'] as const satisfies readonly (keyof WindowApi)[]
 const MENU = ['onCopyAs', 'onPasteAs', 'onOpenFolder', 'onOpenRoot', 'onSearch', 'onSwitchVault', 'onSettings', 'onToggleSidebar', 'onCloseTab', 'onNextTab', 'onPrevTab', 'onZoom'] as const satisfies readonly (keyof MenuApi)[]
@@ -25,7 +25,7 @@ const PROPERTIES = ['get', 'setProperty', 'removeProperty', 'onChange'] as const
 const FAVORITES = ['get', 'set', 'onChanged'] as const satisfies readonly (keyof FavoritesApi)[]
 const GITHUB = ['status', 'syncNow', 'setEnabled', 'onStatus'] as const satisfies readonly (keyof GithubApi)[]
 type Exhaustive<T, K extends readonly (keyof T)[]> = Exclude<keyof T, K[number]> extends never ? true : never
-const _top: Exhaustive<YaseenDocsApi, typeof TOP> = true
+const _top: Exhaustive<YaseenDrawApi, typeof TOP> = true
 const _state: Exhaustive<StateApi, typeof STATE> = true
 const _window: Exhaustive<WindowApi, typeof WINDOW> = true
 const _menu: Exhaustive<MenuApi, typeof MENU> = true
@@ -39,9 +39,9 @@ const _github: Exhaustive<GithubApi, typeof GITHUB> = true
 void [_top, _state, _window, _menu, _link, _file, _shell, _vaultConfig, _properties, _favorites, _github]
 
 describe('preload bridge', () => {
-  it('installs window.yaseenDocs with every contract method', async () => {
+  it('installs window.yaseenDraw with every contract method', async () => {
     await import('./index')
-    const api = exposed.yaseenDocs as YaseenDocsApi
+    const api = exposed.yaseenDraw as YaseenDrawApi
     expect(api).toBeDefined()
     for (const k of TOP) expect(api[k], k).toBeDefined()
     for (const k of STATE) expect(typeof api.state[k], `state.${k}`).toBe('function')

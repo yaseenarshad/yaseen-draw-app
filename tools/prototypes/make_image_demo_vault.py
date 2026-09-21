@@ -18,7 +18,7 @@ PRISTINE = DEMO / "pristine"
 OUTSIDE = DEMO / "outside.png"
 
 REAL_SRC = Path(
-    "/Users/yasin/Documents/GitHub/yaseen-docs-vault/Working-Log/"
+    "/Users/yasin/Documents/GitHub/yaseen-draw-vault/Working-Log/"
     "09_18- LN-Agent-Smeet-Handoff/aws-guide-images"
 )
 

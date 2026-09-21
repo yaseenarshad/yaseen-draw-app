@@ -36,5 +36,5 @@ const people = [['Alex Morgan',0,'Upwork',8],['Sam Rivera',0,'Fiverr',7],['Jorda
 for (const [name,stage,platform,score] of people) {
  await writeFile(path.join(vault,'Candidates',`${name}.md`), note({folder_pages:['[[AI CANDIDATES]]'],Name:name,Status:stages[stage],platform,'AI Fit Score':score,'Next Action':'Review portfolio',proposal_received:true,skills:['TypeScript','Agents'],discovery_keywords:['automation'],related:'[[Interview Strategy]]',collaborators:[],Notes:'Synthetic candidate for UI review.'},`# ${name}\n\nSample content. You can safely edit this note.`))
 }
-await writeFile(path.join(userdata,'yaseendocs.json'), JSON.stringify({version:1,sidebarLens:'topics',recents:[{path:vault,lastOpened:Date.now()}],windows:[{id:'yaz-1417-review',root:vault,file,tabs:[file],bounds:{x:100,y:80,width:1450,height:900}}],folders:{[vault]:{expanded:[],topicsExpanded:[],lastFile:file,folds:{},baseGroups:{}}}},null,2))
+await writeFile(path.join(userdata,'yaseendraw.json'), JSON.stringify({version:1,sidebarLens:'topics',recents:[{path:vault,lastOpened:Date.now()}],windows:[{id:'yaz-1417-review',root:vault,file,tabs:[file],bounds:{x:100,y:80,width:1450,height:900}}],folders:{[vault]:{expanded:[],topicsExpanded:[],lastFile:file,folds:{},baseGroups:{}}}},null,2))
 console.log(`Review vault: ${vault}\nUser data: ${userdata}`)

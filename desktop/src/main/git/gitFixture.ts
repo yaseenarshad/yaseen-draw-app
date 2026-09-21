@@ -46,7 +46,7 @@ export async function makeGitRepo(): Promise<GitRepo> {
   const root = await mkdtemp(path.join(tmpdir(), 'mdapp-git-'))
   const run = (args: string[]) => runIn(bin, root, args)
   await run(['init', '-b', 'main', '.'])
-  await run(['config', 'user.name', 'Yaseen Docs Test'])
+  await run(['config', 'user.name', 'Yaseen Draw Test'])
   await run(['config', 'user.email', 'test@example.invalid'])
   // A developer with `commit.gpgsign = true` globally would otherwise fail every commit here.
   await run(['config', 'commit.gpgsign', 'false'])

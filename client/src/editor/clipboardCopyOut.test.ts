@@ -16,10 +16,10 @@ import { EditorSelection, EditorState, StateEffect } from '@codemirror/state'
 
 const mounted: Array<{ crepe: Crepe; root: HTMLElement }> = []
 const copyListeners = new Set<(mode: 'plain' | 'markdown') => string | undefined>()
-let originalApi: typeof window.yaseenDocs
+let originalApi: typeof window.yaseenDraw
 beforeEach(() => {
-  originalApi = window.yaseenDocs
-  window.yaseenDocs = { ...originalApi, menu: { ...originalApi?.menu, onCopyAs: listener => {
+  originalApi = window.yaseenDraw
+  window.yaseenDraw = { ...originalApi, menu: { ...originalApi?.menu, onCopyAs: listener => {
     copyListeners.add(listener)
     return () => { copyListeners.delete(listener) }
   } } }
@@ -50,7 +50,7 @@ afterEach(async () => {
     await m.crepe.destroy()
     m.root.remove()
   }
-  window.yaseenDocs = originalApi
+  window.yaseenDraw = originalApi
   copyListeners.clear()
 })
 

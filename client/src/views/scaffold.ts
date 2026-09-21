@@ -48,7 +48,7 @@ export function scaffoldFromFolderPage(name: string, settings: FolderPageSetting
  * dotfolder is invisible to tree/index/watcher, not to direct reads).
  */
 export function folderPageTemplatePath(root: string, folderPageName: string): string {
-  return `${root}/.yaseendocs/templates/${folderPageName}.md`
+  return `${root}/.yaseendraw/templates/${folderPageName}.md`
 }
 
 /**

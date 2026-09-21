@@ -9,7 +9,7 @@
  * name, so a test or spec that knows the field knows the row.
  *
  * GitHub sync (YAZ-1081 3B) is the ONE setting not in `SettingsState`: the switch lives per-vault
- * in `.yaseendocs/github.json`, read and written through the engine, so its section is
+ * in `.yaseendraw/github.json`, read and written through the engine, so its section is
  * `available` only when App hands the engine's status + setter over.
  */
 import type { ReactNode } from 'react'
@@ -219,7 +219,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     id: 'sync',
     title: 'Sync',
     available: (ctx) => ctx.sync !== undefined,
-    note: "These settings are saved in this vault's .yaseendocs folder, not app-wide.",
+    note: "These settings are saved in this vault's .yaseendraw folder, not app-wide.",
     groups: [
       {
         items: [

@@ -49,7 +49,7 @@ function installBridge() {
       repairRename: vi.fn(async ({ oldPath, newPath }: { oldPath: string; newPath: string }) => ({ oldPath, newPath, kind: 'file' as const })),
     },
   }
-  Object.defineProperty(window, 'yaseenDocs', { value: bridge, configurable: true, writable: true })
+  Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
   return { bridge, files }
 }
 
@@ -88,7 +88,7 @@ afterEach(() => {
   container = null
   captured.ext = null
   notices.length = 0
-  delete (window as unknown as Record<string, unknown>).yaseenDocs
+  delete (window as unknown as Record<string, unknown>).yaseenDraw
   vi.restoreAllMocks()
 })
 

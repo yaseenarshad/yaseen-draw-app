@@ -30,7 +30,7 @@ export const DRAWINGS_DIR = 'assets/drawings'
 export const EMPTY_SCENE = {
   type: 'excalidraw',
   version: 2,
-  source: 'yaseen-docs',
+  source: 'yaseen-draw',
   elements: [],
   appState: {},
   files: {},

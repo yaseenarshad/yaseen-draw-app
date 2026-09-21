@@ -7,7 +7,7 @@
  *    and an ORDINARY (unflagged) page called Home counts too — it IS Home, the user simply has
  *    not flagged it, so nothing is written over it (the TOPICS TREE separately shows no Home row
  *    for it, 6B's rule, which is not this module's business);
- *  - an ADOPTED vault (`.yaseendocs/` exists) with no Home writes `<root>/Home.md` carrying
+ *  - an ADOPTED vault (`.yaseendraw/` exists) with no Home writes `<root>/Home.md` carrying
  *    exactly the flag bytes — through 4B's own birth call, never a local literal;
  *  - it is IDEMPOTENT: a second call finds the page through the resolver and returns 'exists',
  *    and the double-open RACE resolves at the fs layer — `createFile`'s `wx` write rejects
@@ -41,7 +41,7 @@ const fail = (code: 'NOT_FOUND' | 'ALREADY_EXISTS' | 'FORBIDDEN' | 'IO_ERROR') =
 
 /** The vault HAS been adopted: the dotfolder answers. */
 const adopted = () => tree.mockResolvedValue({ root: DOTFOLDER, tree: [], generatedAt: 1 })
-/** No `.yaseendocs/` anywhere: the probe rejects NOT_FOUND, exactly as `requireDir` does. */
+/** No `.yaseendraw/` anywhere: the probe rejects NOT_FOUND, exactly as `requireDir` does. */
 const unadopted = () => tree.mockRejectedValue(fail('NOT_FOUND'))
 
 /** A resolver over a basename/alias map, keyed the way `makeResolver` keys: lowered, brackets off. */
@@ -147,7 +147,7 @@ describe('an UN-ADOPTED folder is never written into', () => {
   })
 
   it('any OTHER probe failure also refuses to write: unreadable is not permission to adopt', async () => {
-    // FORBIDDEN, IO_ERROR, a `.yaseendocs` FILE — none of them prove adoption, and the safe
+    // FORBIDDEN, IO_ERROR, a `.yaseendraw` FILE — none of them prove adoption, and the safe
     // answer is always the offer card, which writes nothing until the user clicks.
     for (const code of ['FORBIDDEN', 'IO_ERROR'] as const) {
       tree.mockRejectedValueOnce(fail(code))

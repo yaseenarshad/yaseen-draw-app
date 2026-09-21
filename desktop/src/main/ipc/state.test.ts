@@ -39,7 +39,7 @@ beforeEach(async () => {
   vi.mocked(ipcMain.handle).mockClear()
   vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([])
   dir = await mkdtemp(path.join(tmpdir(), 'yd-state-ipc-'))
-  store = createStore(path.join(dir, 'yaseendocs.json'))
+  store = createStore(path.join(dir, 'yaseendraw.json'))
   registerStateIpc(store)
 })
 afterEach(async () => {

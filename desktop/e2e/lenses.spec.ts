@@ -12,7 +12,7 @@
  * The seed here is deliberately NOT `seededState`'s: that helper pre-selects Files for the rest
  * of the suite (every other spec is about the tree), so this one seeds a PRE-847 state file —
  * every key of a valid state except `sidebarLens` — which is also the honest upgrade case: an
- * existing user's `yaseendocs.json` gains the lens and lands on Topics.
+ * existing user's `yaseendraw.json` gains the lens and lands on Topics.
  *
  * The ⌘K accelerator itself is not driven here (Playwright cannot fire a native menu
  * accelerator — search.spec.ts's note; `desktop/src/main/menu.test.ts` pins the binding). What
@@ -54,7 +54,7 @@ async function expectLens(w: Page, lens: 'Topics' | 'Files'): Promise<void> {
 }
 
 /**
- * A PRE-847 `yaseendocs.json`: `seededState`'s window/folder seed with the window's lens key
+ * A PRE-847 `yaseendraw.json`: `seededState`'s window/folder seed with the window's lens key
  * removed (and no retired global one either), so the store's sanitize pass is what supplies the
  * default. `JSON.stringify` drops `undefined`, so the key never reaches disk.
  */

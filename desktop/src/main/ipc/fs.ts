@@ -32,7 +32,7 @@ const openRoots = (store: Store): string[] => store.get().windows.map((w) => w.r
  */
 const repairFavorites = (p: Promise<void>): Promise<void> => p.catch((err: unknown) => console.warn(`[favorites] repair failed: ${String(err)}`))
 
-/** The fs half of `window.yaseenDocs` (`dialog:pick-folder` lives in `./dialog`). */
+/** The fs half of `window.yaseenDraw` (`dialog:pick-folder` lives in `./dialog`). */
 export function registerFsIpc(store: Store, windows: WindowLookup): void {
   handle(CH.fsTree, tree)
   handle(CH.fsRead, readFile)

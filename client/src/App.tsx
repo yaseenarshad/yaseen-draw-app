@@ -296,7 +296,7 @@ export function App() {
   // ⌘W ladder (Tabs rule 7): close the active tab; with zero tabs open (incl. Welcome) close
   // the WINDOW through the real close path so the close/flush handshake runs.
   const closeTabOrWindow = useCallback(() => {
-    if (!closeActive()) void window.yaseenDocs.window.closeSelf()
+    if (!closeActive()) void window.yaseenDraw.window.closeSelf()
   }, [closeActive])
 
   // ⌘K (D4, YAZ-804): un-collapse this window through the one persisted toggle path, then ask
@@ -421,7 +421,7 @@ export function App() {
 
   // HOME (6C-, YAZ-849): every ADOPTED vault gets one the first time its index lands — one
   // `Home.md` carrying `folder_page: true`, created automatically, never twice, never over
-  // anything. An UN-ADOPTED folder (no `.yaseendocs/`) is not written into at all: `unadopted`
+  // anything. An UN-ADOPTED folder (no `.yaseendraw/`) is not written into at all: `unadopted`
   // rides down to the Topics lens, which offers a card whose button runs the same create. It
   // belongs HERE, beside the window's one index feed, because Home is born on VAULT OPEN — the
   // sidebar is unmounted while collapsed, and the Topics tree only exists on its own lens.
@@ -448,7 +448,7 @@ export function App() {
   // no identity write that could clobber the repaired file/tabs).
   useEffect(
     () =>
-      window.yaseenDocs.file.onRenamed(({ oldPath, newPath, kind }) => {
+      window.yaseenDraw.file.onRenamed(({ oldPath, newPath, kind }) => {
         // E1c: an in-app rename's watcher echo (unlink+add with preserved stats) must never
         // be re-offered as an "external rename" hypothesis.
         suppressRenameHypothesis(oldPath, newPath, kind)
@@ -606,7 +606,7 @@ export function App() {
    */
   useEffect(
     () =>
-      window.yaseenDocs.file.onDeleted(({ path, kind }) => {
+      window.yaseenDraw.file.onDeleted(({ path, kind }) => {
         if (kind === 'dir') {
           retireDeletedDir(path)
           deleteWorkspaceDir(path)

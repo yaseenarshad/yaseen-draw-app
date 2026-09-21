@@ -143,7 +143,7 @@ This vault exists only to stress-test the new **Settings dialog** (YAZ-1679). No
 ## Open it three ways
 1. Click the cog at the bottom-left of the sidebar.
 2. Press **⌘,** anywhere.
-3. Menu bar → **Yaseen Docs › Settings…**
+3. Menu bar → **Yaseen Draw › Settings…**
 4. Collapse the sidebar (View › Toggle Sidebar), then **⌘,** — it must still open.
 
 ## Shell

@@ -14,7 +14,7 @@ import type { Node as PMNode } from '@milkdown/kit/prose/model'
 import type { Crepe } from '@milkdown/crepe'
 import { createCrepe, getMarkdownForSave } from './createCrepe'
 
-/** One row of yaseen-docs `fa72c8c:Thinking Clearly - Nick.md`, exactly as the agent wrote it. */
+/** One row of yaseen-draw `fa72c8c:Thinking Clearly - Nick.md`, exactly as the agent wrote it. */
 const AGENT_ROW =
   '| The collection of mental processes that lets a person notice information, hold it in mind, reason about it, and act is called {{cognition}}. | **Cognition** is {{the collection of processes involved in thinking and knowing}}. <br><br>The course organizes it into {{attention}}, {{working memory}}, and {{executive function}}. <br><br>**Used in a sentence:** After a sleepless night, Maya’s cognition {{slowed enough that planning and remembering instructions became difficult}}. |'
 const AGENT_TABLE = `| Front | Back |\n| --- | --- |\n${AGENT_ROW}`

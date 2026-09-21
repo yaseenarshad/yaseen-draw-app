@@ -17,7 +17,7 @@ map requires).
 cd ~/Documents/GitHub/yaseen-excalidraw && git pull
 yarn install
 HASH=$(git rev-parse --short HEAD)
-V=~/Documents/GitHub/yaseen-milkdown/client/vendor
+V=~/Documents/GitHub/yaseen-draw-app/client/vendor
 for p in excalidraw common element math fractional-indexing; do
   yarn --cwd ./packages/$p build:esm
   (cd packages/$p && npm pack --pack-destination /tmp)

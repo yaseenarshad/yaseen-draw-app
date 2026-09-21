@@ -48,7 +48,7 @@ export const clipboardCopyOut = $prose((ctx) => {
   return new Plugin({
     key: new PluginKey('mdapp-clipboard-copy-out'),
     view: view => {
-      const unsubscribe = window.yaseenDocs?.menu?.onCopyAs?.(mode => {
+      const unsubscribe = window.yaseenDraw?.menu?.onCopyAs?.(mode => {
         const active = document.activeElement
         if (active instanceof HTMLElement && view.dom.contains(active)) {
           const code = CodeMirrorView.findFromDOM(active)

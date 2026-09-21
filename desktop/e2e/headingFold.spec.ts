@@ -1,6 +1,6 @@
 /**
  * Heading folding end-to-end (YAZ-1140, issue 4): the REAL built app, a heading-based note.
- * Chevron click → section hidden → `h:` key reaches yaseendocs.json → quit → relaunch → fold
+ * Chevron click → section hidden → `h:` key reaches yaseendraw.json → quit → relaunch → fold
  * restored — with a bullet fold coexisting in the same file's bucket the whole way (decision D3:
  * one `folds` bucket, two key spaces). Serial like smoke.spec.ts; screenshots are the evidence.
  */
@@ -72,7 +72,7 @@ test('step 2 — collapsing Section A hides exactly its body and lands an h: key
   await win.locator('.outline-toggle').first().click()
   await expect(win.locator('.ProseMirror').getByText(CHILD)).toBeHidden()
 
-  // Both keys reach yaseendocs.json (store debounces 150 ms); the file on disk never changes.
+  // Both keys reach yaseendraw.json (store debounces 150 ms); the file on disk never changes.
   await expect
     .poll(async () => {
       const folds = (await readState(userData)).folders[vault]?.folds[notePath] ?? []

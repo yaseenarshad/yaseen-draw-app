@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ZOOM_EVENT, requestZoom } from './zoomRequest'
 
 const zoom = vi.fn(async () => undefined)
-Object.defineProperty(window, 'yaseenDocs', { value: { window: { zoom } }, configurable: true, writable: true })
+Object.defineProperty(window, 'yaseenDraw', { value: { window: { zoom } }, configurable: true, writable: true })
 
 afterEach(() => {
   zoom.mockClear()

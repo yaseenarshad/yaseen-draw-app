@@ -17,7 +17,7 @@ let dir: string
 beforeEach(async () => {
   vi.mocked(ipcMain.handle).mockClear()
   dir = await mkdtemp(path.join(tmpdir(), 'yaz-1617-agent-'))
-  registerAgentIpc({ packaged: true, resourcesPath: '/Applications/Yaseen Docs.app/Contents/Resources', mainDir: '/unused' })
+  registerAgentIpc({ packaged: true, resourcesPath: '/Applications/Yaseen Draw.app/Contents/Resources', mainDir: '/unused' })
 })
 afterEach(async () => {
   await rm(dir, { recursive: true, force: true })
@@ -25,8 +25,8 @@ afterEach(async () => {
 
 describe('agentCommand', () => {
   it('packaged: the bundled shim, quoted; dev: node on the built entry beside main', () => {
-    expect(agentCommand({ packaged: true, resourcesPath: '/Applications/Yaseen Docs.app/Contents/Resources', mainDir: '/x' })).toBe(
-      '"/Applications/Yaseen Docs.app/Contents/Resources/bin/yaseendocs"',
+    expect(agentCommand({ packaged: true, resourcesPath: '/Applications/Yaseen Draw.app/Contents/Resources', mainDir: '/x' })).toBe(
+      '"/Applications/Yaseen Draw.app/Contents/Resources/bin/yaseendraw"',
     )
     expect(agentCommand({ packaged: false, resourcesPath: '/x', mainDir: '/repo/desktop/out/main' })).toBe('node "/repo/desktop/out/main/cli.js"')
   })
@@ -39,7 +39,7 @@ describe('shell:agent-prompt', () => {
     const env = await invoke({ path: page })
     expect(env).toEqual({
       ok: true,
-      value: `This file is a page in Yaseen Docs: ${page}\nThe app has a command line for working with its pages. Run it first to see what it can do:\n"/Applications/Yaseen Docs.app/Contents/Resources/bin/yaseendocs" --help`,
+      value: `This file is a page in Yaseen Draw: ${page}\nThe app has a command line for working with its pages. Run it first to see what it can do:\n"/Applications/Yaseen Draw.app/Contents/Resources/bin/yaseendraw" --help`,
     })
     for (const verb of ['comment', 'edit', 'delete']) expect((env as { value: string }).value).not.toContain(verb)
   })
