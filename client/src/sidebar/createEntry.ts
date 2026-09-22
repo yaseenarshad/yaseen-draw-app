@@ -41,12 +41,11 @@ export function untitledDrawingName(taken: readonly string[]): string {
   const used = new Set(taken.map((n) => n.toLowerCase()))
   const free = (name: string): boolean => !used.has(`${name}${DRAWING_VIEW_EXTENSIONS[0]}`.toLowerCase())
   if (free(UNTITLED_DRAWING)) return UNTITLED_DRAWING
-  // At most one more than the names in the way can be taken, so this always terminates.
-  for (let n = 2; n <= used.size + 2; n++) {
+  // Terminates: `used` is finite, so one of the first `used.size + 1` numbered candidates is free.
+  for (let n = 2; ; n++) {
     const candidate = `${UNTITLED_DRAWING} ${n}`
     if (free(candidate)) return candidate
   }
-  return `${UNTITLED_DRAWING} ${used.size + 2}`
 }
 
 /** Seed for "New dated folder" (YAZ-1604): `09_14- ` — today's MM_DD, then `- ` so the title lands one space after the dash. */
@@ -79,11 +78,18 @@ export function renameInputName(fileName: string): string {
   return name.slice(0, name.lastIndexOf('.'))
 }
 
+/** The suffix of a FILENAME, `.excalidraw` or otherwise; empty for a name with no dot (`README`). */
+function extensionOf(fileName: string): string {
+  const dot = fileName.lastIndexOf('.')
+  return dot > 0 ? fileName.slice(dot) : ''
+}
+
 /**
  * Absolute path for the sidebar's inline rename (Links E1, GRO-2194; folders E1b, GRO-2241):
  * same parent directory. A drawing keeps only an explicit `.excalidraw` suffix; any other visible
  * name inherits the old one. An unsupported file keeps its exact suffix, since nothing else
- * vouches for what its bytes are. Directories have no extension logic.
+ * vouches for what its bytes are — and an extensionless one (`README`, `LICENSE`) has none to
+ * inherit. Directories have no extension logic.
  */
 export function renamedPath(oldPath: string, newName: string, kind: 'file' | 'dir' = 'file'): string {
   const dir = oldPath.slice(0, oldPath.lastIndexOf('/'))
@@ -91,8 +97,8 @@ export function renamedPath(oldPath: string, newName: string, kind: 'file' | 'di
   if (kind === 'dir') return `${dir}/${final}`
   const oldName = oldPath.slice(oldPath.lastIndexOf('/') + 1)
   if (final === renameInputName(oldName)) return oldPath
-  const oldKind = fileKind(oldPath)
+  const oldKind = fileKind(oldName)
   const newKind = fileKind(final)
-  if (oldKind === 'drawing' ? newKind !== 'drawing' : newKind === null) final += oldPath.slice(oldPath.lastIndexOf('.'))
+  if (oldKind === 'drawing' ? newKind !== 'drawing' : newKind === null) final += extensionOf(oldName)
   return `${dir}/${final}`
 }
