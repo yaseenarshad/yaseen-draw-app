@@ -1,4 +1,4 @@
-import type { DrawingLoadRequest, DrawingLoadResponse, DrawingSaveRequest, DrawingSaveResponse, BridgeError, BridgeErrorCode, CreateDirResponse, CreateFileRequest, CreateFileResponse, DeleteRequest, DeleteResponse, FileClipRequest, FileClipState, FileResponse, FileWriteRequest, FileWriteResponse, GithubSyncStatus, OpenLinkRequest, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, RevealRequest, RevealResponse, TreeResponse } from '@shared/types'
+import type { DrawingLoadRequest, DrawingLoadResponse, DrawingSaveRequest, DrawingSaveResponse, BridgeError, BridgeErrorCode, CreateDirResponse, CreateFileRequest, CreateFileResponse, DeleteRequest, DeleteResponse, FileClipRequest, FileClipState, FileResponse, FileWriteRequest, FileWriteResponse, GithubSyncStatus, MediaFavoritesRequest, MediaRecentRequest, OpenLinkRequest, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, RevealRequest, RevealResponse, SecretHasRequest, SecretSetRequest, StoredMediaItem, TreeResponse } from '@shared/types'
 
 /** Typed failure from the main process (see docs/CONTRACTS.md "Bridge API"). */
 export class BridgeRequestError extends Error {
@@ -74,6 +74,18 @@ export const api = {
     get: (root: string) => call<string[]>(() => window.yaseenDraw.favorites.get(root)),
     set: (root: string, paths: readonly string[]) => call<void>(() => window.yaseenDraw.favorites.set(root, paths)),
     onChanged: (listener: (change: { root: string }) => void) => window.yaseenDraw.favorites.onChanged(listener),
+  },
+  /** The cross-vault media library over `<library>/media.json` (🔒 D4 / D5, YAZ-1817): pointers only; every verb answers the list it produced. */
+  media: {
+    favorites: (req: MediaFavoritesRequest) => call<StoredMediaItem[]>(() => window.yaseenDraw.media.favorites(req)),
+    recent: (req: MediaRecentRequest) => call<StoredMediaItem[]>(() => window.yaseenDraw.media.recent(req)),
+    /** Fired in EVERY window when `media.json` changes — this app's write, another vault's window, or a synced edit. */
+    onChanged: (listener: () => void) => window.yaseenDraw.media.onChanged(listener),
+  },
+  /** The secrets door (🔒 D4): write and ask, never read. `set` rejects ENCRYPTION_UNAVAILABLE without an OS keychain. */
+  secrets: {
+    set: (req: SecretSetRequest) => call<void>(() => window.yaseenDraw.secrets.set(req)),
+    has: (req: SecretHasRequest) => call<boolean>(() => window.yaseenDraw.secrets.has(req)),
   },
   /** Per-vault GitHub sync (YAZ-1081): off by default, toggled through `.yaseendraw/github.json`; every call answers the same status the push carries. */
   github: {

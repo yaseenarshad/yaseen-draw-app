@@ -19,7 +19,7 @@ import { shell, type WebContents } from 'electron'
 import { CH } from '../../channels'
 import { sweepOrphanAssets } from '../drawings/orphanSweep'
 import { loadDrawing, saveDrawing } from '../fs/drawing'
-import { resolveLibraryFolder } from '../library'
+import { resolveLibraryFolder } from '../library/folder'
 import type { Store } from '../store'
 import { handle } from './envelope'
 

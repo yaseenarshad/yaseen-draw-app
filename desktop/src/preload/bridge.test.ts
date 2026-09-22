@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { DrawingApi, FavoritesApi, FileApi, FileClipState, GithubApi, GithubSyncStatus, LinkApi, MenuApi, ShellApi, StateApi, VaultConfigApi, WatchEvent, WindowApi, YaseenDrawApi } from '@shared/types'
+import type { DrawingApi, FavoritesApi, FileApi, FileClipState, GithubApi, GithubSyncStatus, LinkApi, MediaApi, MenuApi, SecretsApi, ShellApi, StateApi, VaultConfigApi, WatchEvent, WindowApi, YaseenDrawApi } from '@shared/types'
 import { CH } from '../channels'
 
 const exposed: Record<string, unknown> = {}
@@ -13,7 +13,7 @@ vi.mock('electron', () => ({
  * typecheck. `as const satisfies` keeps each tuple's literal type (a plain `readonly (keyof T)[]`
  * annotation would widen it and make `Exhaustive<>` vacuous) while still rejecting typos.
  */
-const TOP = ['tree', 'readFile', 'writeFile', 'createDir', 'createFile', 'drawing', 'pickFolder', 'watch', 'state', 'window', 'menu', 'link', 'file', 'shell', 'vaultConfig', 'favorites', 'github'] as const satisfies readonly (keyof YaseenDrawApi)[]
+const TOP = ['tree', 'readFile', 'writeFile', 'createDir', 'createFile', 'drawing', 'pickFolder', 'watch', 'state', 'window', 'menu', 'link', 'file', 'shell', 'vaultConfig', 'favorites', 'media', 'secrets', 'github'] as const satisfies readonly (keyof YaseenDrawApi)[]
 const STATE = ['get', 'setSettings', 'setSidebarWidth', 'pushRecent', 'removeRecent', 'setFolder', 'onChange'] as const satisfies readonly (keyof StateApi)[]
 const WINDOW = ['identity', 'setIdentity', 'open', 'duplicate', 'openRecent', 'closeSelf', 'zoom', 'onFlush'] as const satisfies readonly (keyof WindowApi)[]
 const MENU = ['onOpenFolder', 'onOpenRoot', 'onSearch', 'onSwitchVault', 'onSettings', 'onToggleSidebar', 'onCloseTab', 'onNextTab', 'onPrevTab', 'onExportImage', 'onCanvasBackground'] as const satisfies readonly (keyof MenuApi)[]
@@ -24,6 +24,8 @@ const VAULT_CONFIG = ['read', 'write', 'onChange'] as const satisfies readonly (
 const FAVORITES = ['get', 'set', 'onChanged'] as const satisfies readonly (keyof FavoritesApi)[]
 const DRAWING = ['load', 'save', 'libraryFolder'] as const satisfies readonly (keyof DrawingApi)[]
 const GITHUB = ['status', 'syncNow', 'setEnabled', 'onStatus'] as const satisfies readonly (keyof GithubApi)[]
+const MEDIA = ['favorites', 'recent', 'onChanged'] as const satisfies readonly (keyof MediaApi)[]
+const SECRETS = ['set', 'has'] as const satisfies readonly (keyof SecretsApi)[]
 type Exhaustive<T, K extends readonly (keyof T)[]> = Exclude<keyof T, K[number]> extends never ? true : never
 const _top: Exhaustive<YaseenDrawApi, typeof TOP> = true
 const _state: Exhaustive<StateApi, typeof STATE> = true
@@ -36,7 +38,9 @@ const _vaultConfig: Exhaustive<VaultConfigApi, typeof VAULT_CONFIG> = true
 const _favorites: Exhaustive<FavoritesApi, typeof FAVORITES> = true
 const _drawing: Exhaustive<DrawingApi, typeof DRAWING> = true
 const _github: Exhaustive<GithubApi, typeof GITHUB> = true
-void [_top, _state, _window, _menu, _link, _file, _shell, _vaultConfig, _favorites, _drawing, _github]
+const _media: Exhaustive<MediaApi, typeof MEDIA> = true
+const _secrets: Exhaustive<SecretsApi, typeof SECRETS> = true
+void [_top, _state, _window, _menu, _link, _file, _shell, _vaultConfig, _favorites, _drawing, _github, _media, _secrets]
 
 describe('preload bridge', () => {
   it('installs window.yaseenDraw with every contract method', async () => {
@@ -53,6 +57,39 @@ describe('preload bridge', () => {
     for (const k of VAULT_CONFIG) expect(typeof api.vaultConfig[k], `vaultConfig.${k}`).toBe('function')
     for (const k of FAVORITES) expect(typeof api.favorites[k], `favorites.${k}`).toBe('function')
     for (const k of GITHUB) expect(typeof api.github[k], `github.${k}`).toBe('function')
+    for (const k of MEDIA) expect(typeof api.media[k], `media.${k}`).toBe('function')
+    for (const k of SECRETS) expect(typeof api.secrets[k], `secrets.${k}`).toBe('function')
+  })
+
+  it('media.favorites / media.recent invoke their channels with the request; media:changed reaches the listener (🔒 D5)', async () => {
+    const { ipcRenderer } = await import('electron')
+    const { bridge } = await import('./index')
+    vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: [] })
+    await expect(bridge.media.favorites({ op: 'list' })).resolves.toEqual([])
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith(CH.mediaFavorites, { op: 'list' })
+    vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: [] })
+    await expect(bridge.media.recent({ op: 'list' })).resolves.toEqual([])
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith(CH.mediaRecent, { op: 'list' })
+    const listener = vi.fn()
+    const off = bridge.media.onChanged(listener)
+    const calls = vi.mocked(ipcRenderer.on).mock.calls.filter(([ch]) => ch === CH.mediaChanged)
+    const emit = calls[calls.length - 1]?.[1] as unknown as (e: unknown) => void
+    emit(undefined)
+    expect(listener).toHaveBeenCalledTimes(1)
+    off()
+    expect(vi.mocked(ipcRenderer.removeListener).mock.calls.some(([ch, l]) => ch === CH.mediaChanged && l === emit)).toBe(true)
+  })
+
+  it('secrets.set / secrets.has invoke secrets:set and secrets:has — and there is no secrets.get (🔒 D4)', async () => {
+    const { ipcRenderer } = await import('electron')
+    const { bridge } = await import('./index')
+    vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: undefined })
+    await expect(bridge.secrets.set({ name: 'pixabayApiKey', value: 'k' })).resolves.toBeUndefined()
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith(CH.secretsSet, { name: 'pixabayApiKey', value: 'k' })
+    vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: true })
+    await expect(bridge.secrets.has({ name: 'pixabayApiKey' })).resolves.toBe(true)
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith(CH.secretsHas, { name: 'pixabayApiKey' })
+    expect(Object.keys(bridge.secrets).sort()).toEqual(['has', 'set'])
   })
 
   it('github.setEnabled invokes github:set-enabled with the root and the flag (YAZ-1081)', async () => {

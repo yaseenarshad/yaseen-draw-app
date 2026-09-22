@@ -21,6 +21,8 @@ function installBridge(): { [K in keyof YaseenDrawApi]: ReturnType<typeof vi.fn>
     shell: vi.fn(),
     vaultConfig: vi.fn(),
     favorites: vi.fn(),
+    media: vi.fn(),
+    secrets: vi.fn(),
     github: vi.fn(),
   }
   Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
@@ -115,6 +117,36 @@ describe('api', () => {
     const listener = vi.fn()
     expect(api.github.onStatus(listener)).toBe(off)
     expect(github.onStatus).toHaveBeenCalledWith(listener)
+  })
+
+  it('media calls pass the request through and answer the list; onChanged is a pass-through (🔒 D5)', async () => {
+    const media = { favorites: vi.fn(), recent: vi.fn(), onChanged: vi.fn() }
+    Object.defineProperty(window.yaseenDraw, 'media', { value: media, configurable: true })
+    const row = { itemKey: 'pixabay:1', provider: 'pixabay', providerId: '1', kind: 'photo', title: 'A tree', updatedAt: 1 }
+    media.favorites.mockResolvedValue([row])
+    await expect(api.media.favorites({ op: 'list' })).resolves.toEqual([row])
+    expect(media.favorites).toHaveBeenCalledWith({ op: 'list' })
+    media.recent.mockResolvedValue([])
+    await expect(api.media.recent({ op: 'remove' } as never)).resolves.toEqual([])
+    const off = () => {}
+    media.onChanged.mockReturnValue(off)
+    const listener = vi.fn()
+    expect(api.media.onChanged(listener)).toBe(off)
+    expect(media.onChanged).toHaveBeenCalledWith(listener)
+  })
+
+  it('secrets: set and has delegate, and ENCRYPTION_UNAVAILABLE arrives as a typed BridgeRequestError (🔒 D4)', async () => {
+    const secrets = { set: vi.fn(), has: vi.fn() }
+    Object.defineProperty(window.yaseenDraw, 'secrets', { value: secrets, configurable: true })
+    secrets.set.mockResolvedValue(undefined)
+    await expect(api.secrets.set({ name: 'pixabayApiKey', value: 'k' })).resolves.toBeUndefined()
+    expect(secrets.set).toHaveBeenCalledWith({ name: 'pixabayApiKey', value: 'k' })
+    secrets.has.mockResolvedValue(true)
+    await expect(api.secrets.has({ name: 'pixabayApiKey' })).resolves.toBe(true)
+    secrets.set.mockRejectedValue({ code: 'ENCRYPTION_UNAVAILABLE', message: 'no keychain' })
+    const err = (await api.secrets.set({ name: 'pixabayApiKey', value: 'k' }).catch((e: unknown) => e)) as BridgeRequestError
+    expect(err).toBeInstanceOf(BridgeRequestError)
+    expect(err.code).toBe('ENCRYPTION_UNAVAILABLE')
   })
 
   it('a BridgeError without path / mtime leaves those fields undefined', async () => {

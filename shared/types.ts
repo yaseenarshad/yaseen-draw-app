@@ -21,6 +21,7 @@ export type BridgeErrorCode =
   | 'IO_ERROR' // any other fs error
   | 'PICKER_FAILED' // native folder dialog could not be run
   | 'INVALID_CONFIG' // a vault config file (e.g. .yaseendraw/github.json) is unusable; the mutation is refused, the file never touched
+  | 'ENCRYPTION_UNAVAILABLE' // 🔒 D4: the OS keychain cannot encrypt on this machine, so no secret can be stored
 
 /** The one document extension the app opens, edits and creates (🔒 D1). */
 export const DRAWING_VIEW_EXTENSIONS = ['.excalidraw'] as const
@@ -711,6 +712,130 @@ export interface FavoritesApi {
   onChanged(listener: (change: { root: string }) => void): () => void
 }
 
+// ---------- Media library (`<library>/media.json` — 🔒 D4 / D5, YAZ-1817) ----------
+
+/**
+ * Where the media a board can reach comes from (the web app's `ImageStudioProvider`, ported
+ * verbatim): Pixabay photos and illustrations, Iconify icons and logos, and the app's own shapes.
+ * `shape` needs no network and no key at all.
+ */
+export type MediaProvider = 'pixabay' | 'iconify' | 'shape'
+export const MEDIA_PROVIDERS: readonly MediaProvider[] = ['pixabay', 'iconify', 'shape']
+export const isMediaProvider = (v: unknown): v is MediaProvider => MEDIA_PROVIDERS.includes(v as MediaProvider)
+
+/** What the item IS, independent of who served it (the web app's `ImageStudioItemKind`). */
+export type MediaItemKind = 'photo' | 'illustration' | 'icon' | 'logo' | 'shape'
+export const MEDIA_ITEM_KINDS: readonly MediaItemKind[] = ['photo', 'illustration', 'icon', 'logo', 'shape']
+export const isMediaItemKind = (v: unknown): v is MediaItemKind => MEDIA_ITEM_KINDS.includes(v as MediaItemKind)
+
+/**
+ * A POINTER to something a provider can serve — never the bytes. Field for field the web app's
+ * `mediaItemValidator` (`convex/mediaTypes.ts`) so a library written by either app reads in the
+ * other: `itemKey` is the identity (de-dupe and removal both key on it), the rest is attribution
+ * and layout metadata the studio shows.
+ *
+ * `previewUrl` is stored but NEVER TRUSTED: a provider's CDN URL expires, and a stale one in a
+ * file that syncs between machines would render a broken tile. 3B re-derives every preview it
+ * shows from `provider` + `providerId` and treats this field as a hint at best.
+ */
+export interface MediaItem {
+  itemKey: string
+  provider: MediaProvider
+  providerId: string
+  kind: MediaItemKind
+  title: string
+  previewUrl?: string
+  creator?: string
+  creatorUrl?: string
+  collectionName?: string
+  sourceUrl?: string
+  licenseName?: string
+  licenseUrl?: string
+  attribution?: string
+  width?: number
+  height?: number
+  trademarkNotice?: boolean
+}
+
+/**
+ * A `MediaItem` as the library FILE holds it — the web app's `storedItemValidator`: the pointer
+ * plus the moment it was last favorited or used. `updatedAt` is stamped by the main process on
+ * every write and is what both lists are ordered by (newest first); a renderer never supplies it.
+ */
+export type StoredMediaItem = MediaItem & { updatedAt: number }
+
+/**
+ * `<library>/media.json` (🔒 D5): the cross-vault media library, ONE file for the whole account.
+ * Both lists are newest-first and de-duplicated by `itemKey`; `favorites` is the user's pinned
+ * set, `recent` is an MRU of what they actually placed on a board.
+ */
+export interface MediaLibraryFile {
+  version: 1
+  favorites: StoredMediaItem[]
+  recent: StoredMediaItem[]
+}
+
+/** The library file's name inside the library folder. */
+export const MEDIA_LIBRARY_FILE = 'media.json'
+/**
+ * `<library>/components/` (🔒 D5): where 3C writes a saved component's `.excalidraw` + `.png`.
+ * Named here so nothing else claims it; 3A creates NOTHING — the folder appears on 3C's first write.
+ */
+export const LIBRARY_COMPONENTS_DIR = 'components'
+/** Favorites are capped at the web app's `listFavorites` ceiling; the oldest fall off the end. */
+export const MAX_MEDIA_FAVORITES = 500
+/** The MRU's length, the web app's `RECENT_LIMIT` exactly. */
+export const RECENT_LIMIT = 60
+
+/** `media:favorites` — one channel, three verbs; every verb answers the resulting list. */
+export type MediaFavoritesRequest = { op: 'list' } | { op: 'add'; item: MediaItem } | { op: 'remove'; itemKey: string }
+/** `media:recent` — the same shape: read the MRU, or push an item to its head. */
+export type MediaRecentRequest = { op: 'list' } | { op: 'record'; item: MediaItem }
+
+/**
+ * The media library as `window.yaseenDraw.media` (🔒 D4 / D5, YAZ-1817). Pointers only: the
+ * BYTES never travel through here (3B's `media:import` writes them into the vault's `assets/`).
+ * Every mutation answers the list it produced, so a caller that just wrote does not have to read
+ * back — and `onChanged` still fires in every window, so the OTHER vaults' windows follow too.
+ */
+export interface MediaApi {
+  /** List / add / remove favorites; `add` on an itemKey already there changes nothing. */
+  favorites(req: MediaFavoritesRequest): Promise<StoredMediaItem[]>
+  /** List the MRU, or record a use — which moves the item to the head and stamps it. */
+  recent(req: MediaRecentRequest): Promise<StoredMediaItem[]>
+  /** Fired in EVERY window whenever `media.json` changes, this app's write or an external one. Returns an unsubscribe. */
+  onChanged(listener: () => void): () => void
+}
+
+// ---------- Secrets (`userData/secrets.json` — 🔒 D4) ----------
+
+/** `secrets:set` — a value to store, or null to clear the name entirely. */
+export interface SecretSetRequest {
+  name: string
+  value: string | null
+}
+
+/** `secrets:has` — the ONLY question a renderer may ask about a secret. */
+export interface SecretHasRequest {
+  name: string
+}
+
+/** The name the Pixabay API key is stored under (🔒 D4); 3B reads it in main, never here. */
+export const PIXABAY_SECRET = 'pixabayApiKey'
+
+/**
+ * The secrets door (🔒 D4). THE RULE, and it has no exceptions: **the renderer never receives a
+ * value.** It may write one and it may ask whether one is there; reading is main's alone
+ * (`readSecret` in `desktop/src/main/secrets.ts`), so a key cannot leak through `state:get`, a
+ * devtools console or a crash dump of the renderer.
+ */
+export interface SecretsApi {
+  /** Store `value` encrypted, or clear the name with null. Rejects `ENCRYPTION_UNAVAILABLE` when the OS keychain is not there. */
+  set(req: SecretSetRequest): Promise<void>
+  /** Whether a value is stored AND still decryptable on this machine. False whenever encryption is unavailable. */
+  has(req: SecretHasRequest): Promise<boolean>
+}
+
 // ---------- Bridge: `window.yaseenDraw` (locked in GRO-2153, Desktop A1) ----------
 
 /**
@@ -1005,6 +1130,10 @@ export interface YaseenDrawApi {
   vaultConfig: VaultConfigApi
   /** The Favorites list over `.yaseendraw/favorites.json` (YAZ-1766 6A) — absolute paths in, relative on disk. */
   favorites: FavoritesApi
+  /** The cross-vault media library over `<library>/media.json` (🔒 D4 / D5, YAZ-1817). */
+  media: MediaApi
+  /** Encrypted secrets in `userData/secrets.json` (🔒 D4) — write and ask, never read. */
+  secrets: SecretsApi
   /** Per-vault GitHub sync, off by default (YAZ-1081). */
   github: GithubApi
 }

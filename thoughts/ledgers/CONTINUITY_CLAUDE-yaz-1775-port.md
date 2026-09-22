@@ -44,9 +44,9 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
   - [x] 2G — Settings: canvas preferences, Library folder, trims (YAZ-1813)
   - [x] 2H — ⌘K search over the drawing catalog (YAZ-1814)
   - [x] 2I — New drawing, naming, extension display, file association (YAZ-1815)
-- Now: [→] 3A — Library folder and secrets plumbing (YAZ-1817)
+  - [x] 3A — Library folder and secrets plumbing (YAZ-1817)
+- Now: [→] 3B — Images tab: Image Studio with main-process providers (YAZ-1818)
 - Remaining:
-  - [ ] 3B — Images tab: Image Studio with main-process providers (YAZ-1818)
   - [ ] 3C — Components tab: Saved Components as library files (YAZ-1819)
   - [ ] 3D — Present tab: presentation sidebar and player (YAZ-1820)
   - [ ] 3E — Export menu: PNG, SVG, standalone `.excalidraw` (YAZ-1821)
@@ -65,7 +65,30 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 - UNCONFIRMED (posted on YAZ-1815, awaiting Yasin): where a drawing outside EVERY open vault should open. 2I kept the shipped E1 rule — a NEW window rooted at the file's parent folder — rather than repointing the focused window's vault, which would discard its tabs and would need a main→renderer "switch vault and open this" message that does not exist. Documented in CONTRACTS as built.
 - RESOLVED (🔒 on YAZ-1775, with the phase-2 merge): the rename CONFIRM sheet is **deleted** — with wikilinks gone it warned about nothing, and "New drawing" landing on the inline rename field made every new `Untitled` board trip it. `ConfirmRename.tsx`/`.test.tsx` and App's `requestRename` detour are gone; rename commits on Enter. Delete and move keep their confirms. First commit of phase 3.
 
-## Learnings (2D / 2E / 2F / 2G / 2H / 2I)
+## Learnings (2D / 2E / 2F / 2G / 2H / 2I / 3A)
+
+- **The library store is `vaultConfig.ts` with one file.** Same shape end to end: lazy read, tmp +
+  rename write, one chokidar, own-write echo dropped by mtime, external edit debounced. The one
+  new idea is that `media:changed` has NO payload — every window re-lists whichever vault it is
+  on, because the library is one file for all of them (🔒 D5's whole point).
+- **Watch the folder, not the file, at depth 0.** Tests run chokidar in polling mode, which loses a
+  path that appears during its initialisation; the folder exists from startup (`ensureLibraryFolder`)
+  where `media.json` does not. Depth 0 keeps 3C's `components/` and the tmp files out of it; the
+  `anchored` re-add covers the folder that was unplugged at launch.
+- **Strict item, lenient file.** The web app's validator rejects an item whole (a wrong-typed
+  optional is a broken tile, not a field to drop), but the FILE drops the bad row and keeps the
+  other 499 — and the caps are enforced on read too, so a hand edit cannot grow the lists.
+- **A secret is not a setting.** `SettingsState` is broadcast to every window; a key in it would be
+  a key in every devtools console. So the Pixabay row has no `SettingsState` field, `onChange` is
+  never called, and the row's entire read-back is `secrets:has`. `has` means "stored AND
+  decryptable HERE" — a `secrets.json` copied between Macs is a file of blobs the new keychain
+  cannot open.
+- **The cipher comes in as an argument.** `createSecrets(file, safeStorage)` — the module is
+  Electron-free and its tests use a reversible scramble that is visibly not the plaintext, which is
+  how the "never on disk in clear" claim is actually asserted.
+- **`main/library.ts` became `main/library/folder.ts`** so `library/mediaStore.ts` could sit where
+  the contract names it; TypeScript would have resolved `./library` to the file over the folder,
+  which is a trap for the next reader.
 
 - **⌘K is derived, never indexed.** The vault index died with markdown; the catalog is one walk of
   the tree the Sidebar already holds, which the structural watcher already refreshes. Nothing new
@@ -108,7 +131,7 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 ## Working Set
 
 - **Repo:** `/Users/yasin/Documents/GitHub/yaseen-draw-app` (remote `origin` = `https://github.com/yaseenarshad/yaseen-draw-app.git`).
-- **Branch:** `yaz-1775-port` (off `main`).
+- **Branch:** `yaz-1775-phase-3` (off `main`, after the phase-2 merge).
 - **Worktree:** `/Users/yasin/Documents/GitHub/yaseen-draw-app-port` — do all work here.
 - **Test vault:** `~/Desktop/Port to Electron App - Local Version/` (plus `(origin).git` beside it for sync proofs).
 - **Read-only references:** `yaseen-docs-app` @ `66c9806` (shell source), `yaseen-excalidraw` @ `e72242f8` (engine + `public/favicon.svg` + `docs/yaseen-whiteboard-icons.md`), prototype worktree `~/Documents/GitHub/yaseen-docs-app-draw-demo` on `demo/yaz-1775-draw-prototype` (uncommitted; lift patterns, do not copy; delete after phase 2).

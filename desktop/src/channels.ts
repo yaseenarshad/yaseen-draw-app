@@ -65,6 +65,14 @@ export const CH = {
   favoritesGet: 'favorites:get',
   favoritesSet: 'favorites:set',
   favoritesChanged: 'favorites:changed',
+  // The cross-vault media library in `<library>/media.json` (🔒 D5): one channel per list, a verb
+  // inside the request, and one push every window gets — so favoriting in vault A shows in vault B.
+  mediaFavorites: 'media:favorites',
+  mediaRecent: 'media:recent',
+  mediaChanged: 'media:changed',
+  // The secrets door (🔒 D4): write and ask, never read — no channel answers a value.
+  secretsSet: 'secrets:set',
+  secretsHas: 'secrets:has',
   githubStatus: 'github:status',
   githubSyncNow: 'github:sync-now',
   githubSetEnabled: 'github:set-enabled',

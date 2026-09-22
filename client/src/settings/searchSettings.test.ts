@@ -40,6 +40,7 @@ describe('settingCandidates', () => {
       'canvas.defaultTextAlign',
       'confirmDelete',
       'libraryFolder',
+      'pixabayApiKey',
       'hotkeys-window',
       'hotkeys-canvas',
       'hotkeys-mouse',
@@ -86,6 +87,7 @@ describe('searchSettings', () => {
   it('matches on a keyword the label does not contain', () => {
     expect(ids(searchSettings(settingCandidates(ctx()), 'dark'))).toEqual(['theme'])
     expect(ids(searchSettings(settingCandidates(ctx()), 'trash'))).toEqual(['confirmDelete'])
+    expect(ids(searchSettings(settingCandidates(ctx()), 'iconify'))).toEqual(['pixabayApiKey'])
   })
 
   it('matches on the section title, returning every row of that section', () => {
