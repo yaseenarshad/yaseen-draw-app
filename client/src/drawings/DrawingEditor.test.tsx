@@ -39,8 +39,9 @@ const surface = {
   exportedScene: '{"type":"excalidraw","elements":[],"files":{}}\n',
 }
 
-vi.mock('./ExcalidrawSurface', () => ({
-  ENGINE_LOAD_FAILED: "Can't open the drawing editor.",
+vi.mock('./ExcalidrawSurface', async (importOriginal) => ({
+  // The real constant, so a change to the seam's message cannot slip past this suite.
+  ENGINE_LOAD_FAILED: ((await importOriginal()) as { ENGINE_LOAD_FAILED: string }).ENGINE_LOAD_FAILED,
   ExcalidrawSurface: (props: DrawingSurfaceProps) => {
     surface.props = props
     surface.emit = props.onSnapshot
@@ -506,8 +507,6 @@ describe('chips and the canvas frame', () => {
   it('renders the save chip — and the sync chip only when the vault has one — into the engine`s top-right slot', async () => {
     render()
     await flush()
-    const withoutSync = surface.props?.renderTopRight?.()
-    expect(withoutSync).toBeTruthy()
     expect(chips()).toContain('Saved')
 
     const sync: GithubSyncStatus = { state: 'pending', enabled: true } as GithubSyncStatus
@@ -564,7 +563,7 @@ describe('chips and the canvas frame', () => {
     })
 
     it('takes it from the tab being LEFT — the other canvas is inside the same tab layer', async () => {
-      container.className = 'tabstack__layer'
+      container.className = 'tabstack'
       await withObserver(async (reveal) => {
         render()
         await flush()

@@ -7,8 +7,8 @@
  * until the user clicks the canvas. The reveal effect that re-measures the canvas is exactly the
  * moment to hand focus over — GATED, because the same moment can arrive while the ⌘K search bar,
  * the vault switcher or a dialog has the keyboard, and stealing it there would break the very
- * gesture the user is in the middle of. This is the guard the old `focusOpenDocument` used, which
- * 2B deleted with the markdown layer.
+ * gesture the user is in the middle of. The rule: focus moves only when nothing outside the tab
+ * layer holds it.
  */
 
 /**

@@ -103,7 +103,7 @@ import { appStateToPrefs, changedPrefKeys, prefsEqual, prefsToAppState, type Eng
 import { DEFAULT_CANVAS_PANEL, DEFAULT_CANVAS_PREFS, type CanvasPanelState, type CanvasPanelTab, type CanvasPrefs } from '@shared/types'
 import { CANVAS_SIDEBAR, CanvasSidebar, openCanvasTab } from './CanvasSidebar'
 import type { DrawingScene } from './drawingScene'
-import { applyToolbarMode, loadExcalidraw, YASEEN_FULL_TOOLBAR_MODE, type ExcalidrawModule } from './engine'
+import { applyToolbarMode, loadExcalidraw, type ExcalidrawModule } from './engine'
 import { yaseenFormFactor } from './formFactor'
 import { applyFramesVisibility } from './framesVisibility'
 import { createLauncherStore, LauncherRail } from './LauncherRail'
@@ -421,7 +421,7 @@ export function ExcalidrawSurface({
     void import('@excalidraw/excalidraw/index.css')
     // ⚡ R4/R5: the engine reads its styles-panel mode out of localStorage at mount, so the one
     // mode this app ships lands there before every mount — the guard against a stray stored value.
-    applyToolbarMode(YASEEN_FULL_TOOLBAR_MODE)
+    applyToolbarMode()
     loadExcalidraw().then(
       (mod) => {
         if (!live) return

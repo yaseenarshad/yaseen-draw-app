@@ -67,17 +67,16 @@ export const DESKTOP_UI_MODE_STORAGE_KEY = 'excalidraw.desktopUIMode'
 export const YASEEN_FULL_TOOLBAR_MODE = 'full' as const
 
 /**
- * Writes the toolbar mode where the engine reads it; true when it landed. A storage that throws
- * or is absent is NOT an error — the engine then measures its own way, and `getFormFactor` still
- * keeps it out of `compact`.
+ * Writes the toolbar mode where the engine reads it, overwriting a stray stored value. A storage
+ * that throws or is absent is silently skipped — the engine then measures its own way, and
+ * `getFormFactor` still keeps it out of `compact`.
  */
-export function applyToolbarMode(mode: string = YASEEN_FULL_TOOLBAR_MODE, storage: Pick<Storage, 'getItem' | 'setItem'> | null = safeLocalStorage()): boolean {
+export function applyToolbarMode(storage: Pick<Storage, 'getItem' | 'setItem'> | null = safeLocalStorage()): void {
   try {
-    if (storage === null) return false
-    if (storage.getItem(DESKTOP_UI_MODE_STORAGE_KEY) !== mode) storage.setItem(DESKTOP_UI_MODE_STORAGE_KEY, mode)
-    return true
+    if (storage === null) return
+    if (storage.getItem(DESKTOP_UI_MODE_STORAGE_KEY) !== YASEEN_FULL_TOOLBAR_MODE) storage.setItem(DESKTOP_UI_MODE_STORAGE_KEY, YASEEN_FULL_TOOLBAR_MODE)
   } catch {
-    return false
+    // The engine measures its own way; `getFormFactor` is the other half of the guarantee.
   }
 }
 

@@ -70,12 +70,13 @@ import { ExcalidrawSurface, type DrawingSnapshot, type DrawingSurfaceApi } from 
 import { SaveIndicator } from './SaveIndicator'
 import { SyncIndicator } from './SyncIndicator'
 import './drawingEditor.css'
+import './statusChips.css'
 
 /** What a document that will not open says — one message for its three causes (missing, corrupt, empty). */
 export const BROKEN_DRAWING_DOCUMENT = "This drawing can't be opened: its file is missing or is not a scene."
 
 /** What File › Export Drawing… says when the save sheet or the write refused (🔒 D3, YAZ-1821). */
-export const EXPORT_FAILED = "The drawing couldn't be exported."
+const EXPORT_FAILED = "The drawing couldn't be exported."
 
 export interface DrawingEditorProps {
   root: string
@@ -343,7 +344,7 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasPrefs, 
     const observer = new IntersectionObserver((entries) => {
       if (!entries.some((e) => e.isIntersecting)) return
       surface.current?.refresh()
-      const layer = host.closest('.tabstack') ?? host.closest('.tabstack__layer')
+      const layer = host.closest('.tabstack')
       if (mayTakeFocus(document.activeElement, layer)) surface.current?.focus()
     })
     observer.observe(host)

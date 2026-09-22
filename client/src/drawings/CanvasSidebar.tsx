@@ -29,7 +29,8 @@ import { SavedComponents } from '../components-library/SavedComponents'
 import { ImageStudio } from '../media/ImageStudio'
 import type { ExcalidrawImperativeApi, ExcalidrawModule } from './engine'
 import { PresentationSidebar } from './presentation/PresentationSidebar'
-import { hamburgerIcon, imageIcon, libraryIcon, presentationIcon } from './launcherIcons'
+import { componentsIcon, hamburgerIcon, imageIcon } from './launcherIcons'
+import { presentationIcon } from './presentation/presentationIcons'
 
 /** The engine sidebar name the web app used for its workspace panel. */
 export const CANVAS_SIDEBAR = 'default'
@@ -37,7 +38,7 @@ export const CANVAS_SIDEBAR = 'default'
 /** The three tabs, left→right, with the web app's own labels. */
 export const CANVAS_SIDEBAR_TABS: ReadonlyArray<{ tab: CanvasPanelTab; label: string; shortLabel: string; icon: ReactNode }> = [
   { tab: 'image-studio', label: 'Image Studio', shortLabel: 'Images', icon: imageIcon },
-  { tab: 'components', label: 'Components', shortLabel: 'Components', icon: libraryIcon },
+  { tab: 'components', label: 'Components', shortLabel: 'Components', icon: componentsIcon },
   { tab: 'presentation', label: 'Presentation', shortLabel: 'Present', icon: presentationIcon },
 ]
 

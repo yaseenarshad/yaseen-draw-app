@@ -185,6 +185,14 @@ describe('the keyboard', () => {
     expect(canvas.setActiveTool).toHaveBeenLastCalledWith({ type: 'hand' })
   })
 
+  it('leaves ⌘ / ⌃ combinations to the app — ⌘→ is a window chord, not a slide step', async () => {
+    const { canvas } = await mount()
+    canvas.setViewport.mockClear()
+    await key('ArrowRight', { metaKey: true })
+    await key('ArrowRight', { ctrlKey: true })
+    expect(canvas.setViewport).not.toHaveBeenCalled()
+  })
+
   it('stands down inside a text field, so the engine’s own editing keeps the keys', async () => {
     const { canvas } = await mount()
     const input = document.createElement('input')
