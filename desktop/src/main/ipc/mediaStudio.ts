@@ -41,14 +41,8 @@ function requireBytesRequest(v: unknown): MediaBytesRequest {
   return { provider: v.provider, id: v.id }
 }
 
-/** Exposed for the tests, which drive the handlers against a stub `fetch` and a temp cache folder. */
-export interface MediaStudioIpc {
-  providers: MediaProviders
-  cache: MediaCache
-  folder: string
-}
-
-export function registerMediaStudioIpc(userData: string, secrets: Secrets, fetchImpl: typeof globalThis.fetch = globalThis.fetch): MediaStudioIpc {
+/** The cache folder this registration owns — the one fact a test needs back from it. */
+export function registerMediaStudioIpc(userData: string, secrets: Secrets, fetchImpl: typeof globalThis.fetch = globalThis.fetch): string {
   const folder = join(userData, MEDIA_CACHE_DIR)
   const cache = createMediaCache(folder)
   const providers = createMediaProviders({ fetch: fetchImpl, readPixabayKey: () => secrets.read(PIXABAY_SECRET), cache })
@@ -68,5 +62,5 @@ export function registerMediaStudioIpc(userData: string, secrets: Secrets, fetch
   handle(CH.mediaPreview, async (req: unknown) => providers.preview(requireBytesRequest(req)))
   handle(CH.mediaImport, async (req: unknown) => providers.import(requireBytesRequest(req)))
 
-  return { providers, cache, folder }
+  return folder
 }

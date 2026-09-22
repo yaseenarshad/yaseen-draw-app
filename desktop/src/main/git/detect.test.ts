@@ -32,7 +32,7 @@ async function committedRepo(): Promise<GitRepo> {
 
 describe('detectRepo', () => {
   it('reports a plain directory as not a repo', async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), 'mdapp-norepo-'))
+    const dir = await mkdtemp(path.join(tmpdir(), 'yaseendraw-norepo-'))
     cleanups.push(() => rm(dir, { recursive: true, force: true }))
     expect(await detectRepo(bin, dir)).toEqual({ isRepo: false, remoteUrl: null, branch: null, dirty: false, dirtyFiles: [] })
   })

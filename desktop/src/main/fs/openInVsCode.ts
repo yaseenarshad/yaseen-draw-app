@@ -14,8 +14,8 @@ import { BridgeFailure, fsCall, requireAbsPath } from './fsUtils'
  * VS Code is installed at all is never asserted — an unhandled scheme is the OS' business,
  * exactly as it is for the `yaseendraw://` links this app itself registers.
  *
- * Every path SEGMENT is percent-encoded, separators left literal: `My Note.md` makes an invalid
- * URL raw, and encoding the whole path in one go would eat the `/` along with the spaces.
+ * Every path SEGMENT is percent-encoded, separators left literal: `My Board.excalidraw` makes an
+ * invalid URL raw, and encoding the whole path in one go would eat the `/` along with the spaces.
  *
  * The stat is the same load-bearing check `reveal.ts` explains: a dead `vscode://` URL opens an
  * empty editor rather than reporting anything, so a stale row (deleted or moved externally) must

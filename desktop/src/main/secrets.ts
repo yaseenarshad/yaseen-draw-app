@@ -19,9 +19,11 @@
  * moved aside as `secrets.json.corrupt-<epoch>` (the `store.ts` posture). Writes are atomic and
  * chained.
  */
-import { readFile, rename } from 'node:fs/promises'
+
 import { atomicWrite, BridgeFailure, fsCall } from './fs/fsUtils'
 import { isRecord } from '@shared/guards'
+import { createChain, readOrQuarantine } from './watchedFolder'
+import { stat } from 'node:fs/promises'
 
 export const SECRETS_FILE = 'secrets.json'
 
@@ -45,31 +47,26 @@ type Values = Record<string, string>
 
 export function createSecrets(file: string, cipher: SecretCipher): Secrets {
   /** Writes chain so two read-modify-writes never interleave. */
-  let chain: Promise<unknown> = Promise.resolve()
+  const chain = createChain()
+  /**
+   * The parsed file, kept while its mtime says nothing has changed. `providers.ts` asks for the key
+   * on every search, every preview and every import, and re-reading plus re-parsing the file each
+   * time is the cost this saves; the mtime check keeps an outside edit honest for one `stat`.
+   */
+  let cached: { mtimeMs: number; values: Values } | null = null
+
+  const parse = (raw: unknown): Values | null =>
+    isRecord(raw) && raw.version === 1 && isRecord(raw.values)
+      ? Object.fromEntries(Object.entries(raw.values).filter((e): e is [string, string] => typeof e[1] === 'string'))
+      : null
 
   async function load(): Promise<Values> {
-    let raw: string
-    try {
-      raw = await readFile(file, 'utf8')
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return {}
-      throw err
-    }
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(raw)
-    } catch {
-      parsed = null
-    }
-    if (isRecord(parsed) && parsed.version === 1 && isRecord(parsed.values)) {
-      return Object.fromEntries(Object.entries(parsed.values).filter((e): e is [string, string] => typeof e[1] === 'string'))
-    }
-    const backup = `${file}.corrupt-${Date.now()}`
-    await rename(file, backup).then(
-      () => console.error(`[secrets] ${file} is not a valid secrets file; moved to ${backup}`),
-      (err: unknown) => console.error(`[secrets] ${file} is not a valid secrets file and could not be moved aside: ${String(err)}`),
-    )
-    return {}
+    const mtimeMs = await stat(file).then((st) => st.mtimeMs, () => null)
+    if (mtimeMs === null) return {}
+    if (cached !== null && cached.mtimeMs === mtimeMs) return cached.values
+    const values = (await readOrQuarantine(file, parse, 'secrets', 'a valid secrets file')) ?? {}
+    cached = { mtimeMs, values }
+    return values
   }
 
   const decrypt = (blob: string): string | null => {
@@ -89,14 +86,13 @@ export function createSecrets(file: string, cipher: SecretCipher): Secrets {
   return {
     set(name, value) {
       if (!cipher.isEncryptionAvailable()) return Promise.reject(new BridgeFailure('ENCRYPTION_UNAVAILABLE', 'this machine cannot encrypt secrets'))
-      const run = chain.then(async () => {
-        const values = await load()
+      return chain.run(async () => {
+        const values = { ...(await load()) }
         if (value === null) delete values[name]
         else values[name] = cipher.encryptString(value).toString('base64')
-        await fsCall(file, () => atomicWrite(file, `${JSON.stringify({ version: 1, values }, null, 2)}\n`))
+        const { mtime } = await fsCall(file, () => atomicWrite(file, `${JSON.stringify({ version: 1, values }, null, 2)}\n`))
+        cached = { mtimeMs: mtime, values }
       })
-      chain = run.catch(() => undefined)
-      return run
     },
     has: (name) => read(name).then((v) => v !== null),
     read,

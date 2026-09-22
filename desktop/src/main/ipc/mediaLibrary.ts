@@ -53,7 +53,7 @@ function requireRecentRequest(v: unknown): MediaRecentRequest {
 }
 
 /** Returns the store so a test can close its watcher; `main/index.ts` lets the process end take it. */
-export function registerMediaIpc(store: Store, userData: string): MediaStore {
+export function registerMediaLibraryIpc(store: Store, userData: string): MediaStore {
   const folderFor = (state: AppState): string => resolveLibraryFolder(state.settings.libraryFolder, userData)
   let folder = folderFor(store.get())
   const media = createMediaStore(folder)

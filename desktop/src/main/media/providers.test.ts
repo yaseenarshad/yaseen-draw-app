@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MediaSearchResponse, StudioItem } from '@shared/types'
 import { BridgeFailure } from '../fs/fsUtils'
 import type { MediaCache } from './cache'
+import { decodeCursor } from './curation'
 import { createMediaProviders, type MediaProviders } from './providers'
 
 /** The disk cache's contract, in a Map — `cache.test.ts` owns the disk half. */
@@ -109,7 +110,11 @@ describe('search over both providers', () => {
     const response = await build(fetchMock as unknown as typeof globalThis.fetch, null).search({ q: 'rocket', source: 'iconify' })
     expect(response.items.every(({ provider }) => provider === 'iconify')).toBe(true)
     expect(response.nextCursor).not.toBeNull()
-    expect(response.nextCursor).not.toBe('2')
+    // Opaque, but it must really carry the next window: it decodes for THIS query and source,
+    // and has advanced past the icon this page returned. (`not.toBe('2')` could never fail.)
+    const decoded = decodeCursor(response.nextCursor, 'rocket', 'iconify')
+    expect(decoded.query).toBe('rocket')
+    expect(decoded.iconify.colorStart).toBeGreaterThan(0)
   })
 
   it('exhausts both providers independently without skipping or repeating a result', async () => {

@@ -77,10 +77,7 @@ export async function sweepOrphanAssets(root: string, deps: SweepDeps): Promise<
   const referenced = await referencedAssetIds(root)
   const listing: AssetListingEntry[] = []
   for (const e of dirents) {
-    if (e.isDirectory()) {
-      listing.push({ name: e.name, mtime: 0, isDir: true })
-      continue
-    }
+    // Only regular files are assets; a directory or a symlink under `assets/` is not ours to sweep.
     if (!e.isFile()) continue
     const st = await stat(path.join(store, e.name)).catch(() => null)
     if (st !== null) listing.push({ name: e.name, mtime: st.mtimeMs })

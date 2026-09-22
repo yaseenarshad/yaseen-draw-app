@@ -1,15 +1,10 @@
 /**
- * THE LIBRARY FOLDER (🔒 D5): the one folder every vault shares, where Yaseen Draw's media
- * favorites and saved components will live.
+ * THE LIBRARY FOLDER (🔒 YAZ-1775 D5): the one folder every vault shares, holding `media.json`
+ * (`mediaStore.ts`) and `components/` (`componentStore.ts`).
  *
- * `SettingsState.libraryFolder` is the user's absolute path, or null for `<userData>/library`.
- * Only the main process knows where userData is, so only main can resolve it — which is why the
- * Settings row asks through `drawing:library-folder` rather than working it out itself. Main also
- * makes the folder at startup, so the row's hint always names a directory that exists.
- *
- * Electron-free on purpose (userData comes in as an argument), so this unit-tests against a temp
- * dir. The CONTENTS are the siblings' business: `mediaStore.ts` owns `<library>/media.json` (3A),
- * `<library>/components/` is 3C's.
+ * Only the main process knows where userData is, so only main can resolve
+ * `SettingsState.libraryFolder` — which is why the Settings row asks through
+ * `drawing:library-folder`. Electron-free on purpose (userData comes in as an argument).
  */
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'

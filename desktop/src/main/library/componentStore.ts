@@ -20,19 +20,18 @@
  * read-modify-writes and interleaving them would lose one), and a mutation that changes nothing
  * does not write.
  *
- * Watching: one chokidar on the library FOLDER at depth 1 — `components.json` beside
- * `components/`, and everything inside it — pushed to every window as `components:changed`. An own
- * write notifies this process's subscribers synchronously and its watcher echo is dropped by path
- * + mtime (`ownWrites`), which is `mediaStore`'s single-file echo suppression with one entry per
- * file, because one save touches three. `setFolder` re-points everything when
- * `settings.libraryFolder` changes.
+ * Watching is `watchedFolder.ts`'s, at depth 1 — `components.json` beside `components/`, and
+ * everything inside it — pushed to every window as `components:changed`. An own write notifies
+ * this process's subscribers synchronously and its watcher echo is dropped by path + mtime.
+ *
+ * THE FOLDER SCAN IS CACHED ON ITS OWN mtime. Reconciling costs a `readdir` plus a `stat` per
+ * fragment, and `components:changed` makes every window re-list; a folder whose mtime has not
+ * moved since the last scan cannot have gained or lost a file, so that scan is reused.
  *
  * TRASH, NEVER `rm` (the app's rule for every delete): `shell.trashItem` comes in as an argument,
  * so this module stays Electron-free and its tests run on a temp folder with a spy.
  */
-import { watch, type FSWatcher } from 'chokidar'
-import { existsSync, type Stats } from 'node:fs'
-import { mkdir, readdir, readFile, rename, stat } from 'node:fs/promises'
+import { mkdir, readdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 import {
   COMPONENTS_INDEX_FILE,
@@ -63,8 +62,7 @@ import {
 } from '@shared/savedComponents'
 import { parseDataUrl } from '@shared/drawingAssets'
 import { BridgeFailure, atomicWrite, fsCall } from '../fs/fsUtils'
-
-const NOTIFY_DEBOUNCE_MS = 50
+import { createChain, createWatchedFolder, readOrQuarantine } from '../watchedFolder'
 
 /** The one preview format (🔒 D5): the renderer exports PNG, and nothing else is stored. */
 const PREVIEW_MIME = 'image/png'
@@ -93,15 +91,10 @@ export function createComponentStore(initialFolder: string, deps: { now?: () => 
   const now = deps.now ?? Date.now
   const trash = deps.trash
   const listeners = new Set<() => void>()
+  const chain = createChain()
   let folder = initialFolder
-  let watcher: FSWatcher
-  /** Path → the mtime this process last wrote it with (null = an unlink it caused), so the echo drops. */
-  let ownWrites = new Map<string, number | null>()
-  /** True once the folder existed when the watcher anchored to it (polling loses a path that appears mid-init). */
-  let anchored = false
-  let timer: ReturnType<typeof setTimeout> | null = null
-  /** Mutations chain so two read-modify-writes never interleave. */
-  let chain: Promise<unknown> = Promise.resolve()
+  /** The last folder scan, kept while `components/`'s own mtime says nothing was added or removed. */
+  let scanCache: { dir: string; mtimeMs: number; disk: ComponentOnDisk[] } | null = null
 
   const indexFile = (): string => path.join(folder, COMPONENTS_INDEX_FILE)
   const componentsDir = (): string => path.join(folder, LIBRARY_COMPONENTS_DIR)
@@ -110,33 +103,20 @@ export function createComponentStore(initialFolder: string, deps: { now?: () => 
   const notify = (): void => listeners.forEach((l) => l())
 
   /** The index file alone, with a file that is not one moved aside. Never creates anything. */
-  async function readIndexFile(): Promise<ComponentsIndexFile> {
-    const p = indexFile()
-    let raw: string
-    try {
-      raw = await readFile(p, 'utf8')
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return EMPTY_COMPONENTS_INDEX
-      throw err
-    }
-    let index: ComponentsIndexFile | null = null
-    try {
-      index = sanitizeComponentsIndex(JSON.parse(raw))
-    } catch {
-      index = null
-    }
-    if (index !== null) return index
-    const backup = `${p}.corrupt-${Date.now()}`
-    await rename(p, backup).then(
-      () => console.error(`[components] ${p} is not a valid components index; moved to ${backup} and rebuilding from the folder`),
-      (err: unknown) => console.error(`[components] ${p} is not a valid components index and could not be moved aside: ${String(err)}`),
-    )
-    return EMPTY_COMPONENTS_INDEX
-  }
+  const readIndexFile = async (): Promise<ComponentsIndexFile> =>
+    (await readOrQuarantine(indexFile(), sanitizeComponentsIndex, 'components', 'a valid components index')) ?? EMPTY_COMPONENTS_INDEX
 
-  /** What the folder holds: one entry per readable `<slug>.excalidraw`, counted only when it is new. */
+  /**
+   * What the folder holds: one entry per readable `<slug>.excalidraw`, counted only when it is new.
+   * Reused while `components/`'s own mtime is unchanged — a directory mtime moves on every add and
+   * every remove, which is exactly what this scan is looking for, and every window re-lists on
+   * every `components:changed`.
+   */
   async function scanFolder(known: ComponentsIndexFile): Promise<ComponentOnDisk[]> {
     const dir = componentsDir()
+    const dirStat = await stat(dir).catch(() => null)
+    if (dirStat === null) return []
+    if (scanCache !== null && scanCache.dir === dir && scanCache.mtimeMs === dirStat.mtimeMs) return scanCache.disk
     let names: string[]
     try {
       names = await readdir(dir)
@@ -170,6 +150,7 @@ export function createComponentStore(initialFolder: string, deps: { now?: () => 
       const birth = Number.isFinite(st.birthtimeMs) && st.birthtimeMs > 0 ? st.birthtimeMs : st.mtimeMs
       seen.push({ slug, elementCount: count, createdAt: birth, updatedAt: st.mtimeMs })
     }
+    scanCache = { dir, mtimeMs: dirStat.mtimeMs, disk: seen }
     return seen
   }
 
@@ -184,12 +165,8 @@ export function createComponentStore(initialFolder: string, deps: { now?: () => 
       await mkdir(path.dirname(p), { recursive: true })
       return atomicWrite(p, content)
     })
-    ownWrites.set(p, mtime)
-    if (!anchored) {
-      // The watcher attached while the folder was missing; this write made it. Re-anchor once.
-      watcher.add(folder)
-      anchored = true
-    }
+    watched.noteOwnWrite(p, mtime)
+    scanCache = null // this process just changed the folder; the next read scans it again
   }
 
   async function writeIndex(index: ComponentsIndexFile): Promise<void> {
@@ -197,8 +174,8 @@ export function createComponentStore(initialFolder: string, deps: { now?: () => 
   }
 
   /** One read-modify-write on the chain; `fn` does the file work and answers the index to store. */
-  function mutate<T>(fn: (index: ComponentsIndexFile) => Promise<{ index: ComponentsIndexFile; value: T }>): Promise<T> {
-    const run = chain.then(async () => {
+  const mutate = <T,>(fn: (index: ComponentsIndexFile) => Promise<{ index: ComponentsIndexFile; value: T }>): Promise<T> =>
+    chain.run(async () => {
       const before = await readIndex()
       const { index, value } = await fn(before)
       if (index !== before) {
@@ -207,66 +184,44 @@ export function createComponentStore(initialFolder: string, deps: { now?: () => 
       }
       return value
     })
-    chain = run.catch(() => undefined)
-    return run
-  }
 
   function requireSlug(slug: string): string {
     if (!isValidComponentSlug(slug)) throw new BridgeFailure('BAD_REQUEST', "'slug' is not a component slug")
     return slug
   }
 
-  function startWatching(): FSWatcher {
-    const dir = folder
-    anchored = existsSync(dir)
-    ownWrites = new Map()
+  const componentsOf = (dir: string): string => path.join(dir, LIBRARY_COMPONENTS_DIR)
+
+  const watched = createWatchedFolder({
+    dir: initialFolder,
     // Depth 1: `components.json` sits beside `components/`, and what is INSIDE that folder is the
     // library itself — a synced fragment arrives there without the index ever being touched.
-    const w = watch(dir, { depth: 1, ignoreInitial: true, alwaysStat: true, awaitWriteFinish: { stabilityThreshold: 200, pollInterval: 50 } })
-    const components = path.join(dir, LIBRARY_COMPONENTS_DIR)
+    depth: 1,
+    tag: 'components',
     /**
      * The index, and the two files a component IS. Anything else under `components/` — an
      * `atomicWrite` tmp file above all, which is added and unlinked on every single save — is
      * silence, the way `mediaStore`'s depth-0 filter names `media.json` and nothing else.
      */
-    const relevant = (p: string): boolean => {
+    relevant: (p, dir) => {
       if (p === path.join(dir, COMPONENTS_INDEX_FILE)) return true
-      if (path.dirname(p) !== components) return false
+      if (path.dirname(p) !== componentsOf(dir)) return false
       const name = path.basename(p)
       return slugOfComponentFile(name) !== null || slugOfComponentPreview(name) !== null
-    }
-    const schedule = (p: string, stats?: Stats) => {
-      if (!relevant(p)) return
-      const own = ownWrites.get(p)
-      if (own !== undefined && (stats === undefined ? own === null : own === stats.mtimeMs)) {
-        ownWrites.delete(p)
-        return // echo of this process's own write or trash
-      }
-      if (timer !== null) clearTimeout(timer)
-      timer = setTimeout(() => {
-        timer = null
-        notify()
-      }, NOTIFY_DEBOUNCE_MS)
-    }
-    w.on('add', schedule)
-      .on('change', schedule)
-      .on('unlink', (p) => schedule(p))
-      .on('error', (err) => console.warn(`[components] watcher error under ${dir}: ${String(err)}`))
-      // `components/` may have come into existence DURING chokidar's own initialisation, which
-      // polling loses (the `mediaStore` note, one level down). Re-adding it once at `ready` is the
-      // recovery; on a path that still does not exist it does nothing, and the parent watch picks
-      // that folder up when it is finally made.
-      .on('ready', () => void w.add(components))
-    return w
-  }
-
-  watcher = startWatching()
+    },
+    // `components/` may have come into existence DURING chokidar's own initialisation, which
+    // polling loses. Re-adding it once at `ready` is the recovery; on a path that still does not
+    // exist it does nothing, and the parent watch picks that folder up when it is finally made.
+    alsoWatch: (dir) => [componentsOf(dir)],
+    onChange: () => {
+      scanCache = null // somebody else changed the folder
+      notify()
+    },
+  })
 
   return {
     async list() {
-      const run = chain.then(readIndex)
-      chain = run.catch(() => undefined)
-      return run.then((index) => index.items)
+      return chain.run(readIndex).then((index) => index.items)
     },
 
     async save(req) {
@@ -283,7 +238,10 @@ export function createComponentStore(initialFolder: string, deps: { now?: () => 
       const bytes = Buffer.from(preview.base64, 'base64')
       return mutate(async (index) => {
         const taken = new Set(index.items.map((item) => item.slug))
-        const slug = uniqueComponentSlug(slugForComponentName(name), taken)
+        // `requireSlug`'s own rule, applied BEFORE anything is written: a name that only produces
+        // an over-long slug is refused here rather than becoming a tile that can never be read,
+        // previewed or deleted.
+        const slug = requireSlug(uniqueComponentSlug(slugForComponentName(name), taken))
         const at = now()
         // The fragment's own bytes, as the renderer serialised them: a component IS an Excalidraw
         // document, and re-spelling it here would only make the two disagree.
@@ -321,13 +279,14 @@ export function createComponentStore(initialFolder: string, deps: { now?: () => 
         const fragment = fragmentPath(slug)
         await fsCall(fragment, async () => {
           await trash(fragment)
-          ownWrites.set(fragment, null)
+          watched.noteOwnWrite(fragment, null)
         })
         const preview = previewPath(slug)
         await trash(preview).then(
-          () => ownWrites.set(preview, null),
+          () => watched.noteOwnWrite(preview, null),
           () => undefined,
         )
+        scanCache = null
         return { index: next, value: undefined }
       })
     },
@@ -341,11 +300,9 @@ export function createComponentStore(initialFolder: string, deps: { now?: () => 
 
     setFolder(next) {
       if (next === folder) return
-      void watcher.close()
-      if (timer !== null) clearTimeout(timer)
-      timer = null
       folder = next
-      watcher = startWatching()
+      scanCache = null
+      watched.setFolder(next)
     },
 
     onChanged(listener) {
@@ -356,10 +313,8 @@ export function createComponentStore(initialFolder: string, deps: { now?: () => 
     },
 
     close() {
-      if (timer !== null) clearTimeout(timer)
-      timer = null
       listeners.clear()
-      return watcher.close()
+      return watched.close()
     },
   }
 }

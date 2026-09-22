@@ -43,7 +43,7 @@ async function runIn(bin: string, root: string, args: string[]): Promise<string>
 /** A temp repo on `main` with a local identity, ready for `write` + `add` + `commit`. Zero commits until you make one. */
 export async function makeGitRepo(): Promise<GitRepo> {
   const bin = await requireGit()
-  const root = await mkdtemp(path.join(tmpdir(), 'mdapp-git-'))
+  const root = await mkdtemp(path.join(tmpdir(), 'yaseendraw-git-'))
   const run = (args: string[]) => runIn(bin, root, args)
   await run(['init', '-b', 'main', '.'])
   await run(['config', 'user.name', 'Yaseen Draw Test'])
@@ -65,7 +65,7 @@ export async function makeGitRepo(): Promise<GitRepo> {
 /** A temp bare repo to stand in for GitHub — wire it up with `wireOrigin`, push to it, clone from it. */
 export async function makeBareRemote(): Promise<BareRemote> {
   const bin = await requireGit()
-  const root = await mkdtemp(path.join(tmpdir(), 'mdapp-remote-'))
+  const root = await mkdtemp(path.join(tmpdir(), 'yaseendraw-remote-'))
   await runIn(bin, root, ['init', '--bare', '-b', 'main', '.'])
   return { url: root, cleanup: () => rm(root, { recursive: true, force: true }) }
 }

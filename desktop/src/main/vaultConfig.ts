@@ -1,9 +1,8 @@
-import { watch, type FSWatcher } from 'chokidar'
-import { existsSync, type Stats } from 'node:fs'
 import { mkdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { VAULT_CONFIG_DIR, type VaultConfigChange } from '@shared/types'
 import { atomicWrite, BridgeFailure, fsCall, requireAbsPath, toBridgeFailure } from './fs/fsUtils'
+import { createWatchedFolder, type WatchedFolder } from './watchedFolder'
 
 /**
  * Vault-local config store (Desktop J, GRO-2188): JSON files in `<root>/.yaseendraw/`, the
@@ -35,20 +34,11 @@ import { atomicWrite, BridgeFailure, fsCall, requireAbsPath, toBridgeFailure } f
  */
 export { VAULT_CONFIG_DIR }
 
-const NOTIFY_DEBOUNCE_MS = 50
-
 type Listener = (change: VaultConfigChange) => void
 
 interface Entry {
-  watcher: FSWatcher
+  watched: WatchedFolder
   listeners: Set<Listener>
-  /** name → mtime of this process's last write, so the watcher echo of an own write is dropped. */
-  ownMtimes: Map<string, number>
-  /** Names with a watcher event waiting for the debounce flush. */
-  pending: Set<string>
-  timer: ReturnType<typeof setTimeout> | null
-  /** True once the dotfolder existed when the watcher (re-)anchored to it; see the init-race caveat above. */
-  anchored: boolean
 }
 
 /** One chokidar per root's dotfolder, shared by every subscriber; closed when the last one leaves. */
@@ -119,44 +109,25 @@ export async function writeConfig(root: string, name: string, value: unknown): P
   })
   const entry = entries.get(r)
   if (entry !== undefined) {
-    entry.ownMtimes.set(n, mtime)
-    if (!entry.anchored) {
-      // The watcher attached while the folder was still missing; this write created it, possibly
-      // during the watcher's initialisation (where polling loses the path for good). Re-anchor once.
-      entry.watcher.add(dir)
-      entry.anchored = true
-    }
+    entry.watched.noteOwnWrite(file, mtime)
     entry.listeners.forEach((l) => l({ root: r, name: n }))
   }
 }
 
 function createEntry(root: string): Entry {
   const dir = path.join(root, VAULT_CONFIG_DIR)
-  const watcher = watch(dir, {
-    ignoreInitial: true,
-    alwaysStat: true,
-    awaitWriteFinish: { stabilityThreshold: 200, pollInterval: 50 },
-  })
-  const entry: Entry = { watcher, listeners: new Set(), ownMtimes: new Map(), pending: new Set(), timer: null, anchored: existsSync(dir) }
-  const schedule = (p: string, stats?: Stats) => {
-    // Only config files directly in the dotfolder count — atomicWrite tmp files and subdirs don't.
-    if (path.dirname(p) !== dir || !p.endsWith('.json')) return
-    const name = path.basename(p)
-    if (stats !== undefined && stats.mtimeMs === entry.ownMtimes.get(name)) return // echo of an own write
-    entry.pending.add(name)
-    if (entry.timer !== null) clearTimeout(entry.timer)
-    entry.timer = setTimeout(() => {
-      entry.timer = null
-      const names = [...entry.pending]
-      entry.pending.clear()
-      for (const n of names) entry.listeners.forEach((l) => l({ root, name: n }))
-    }, NOTIFY_DEBOUNCE_MS)
+  const entry: Entry = {
+    listeners: new Set(),
+    watched: createWatchedFolder({
+      dir,
+      tag: 'vaultConfig',
+      // Only config files directly in the dotfolder count — atomicWrite tmp files and subdirs don't.
+      relevant: (p, d) => path.dirname(p) === d && p.endsWith('.json'),
+      onChange: (paths) => {
+        for (const name of new Set(paths.map((p) => path.basename(p)))) entry.listeners.forEach((l) => l({ root, name }))
+      },
+    }),
   }
-  watcher
-    .on('add', (p, stats) => schedule(p, stats))
-    .on('change', (p, stats) => schedule(p, stats))
-    .on('unlink', (p) => schedule(p))
-    .on('error', (err) => console.warn(`[vaultConfig] watcher error under ${dir}: ${String(err)}`))
   return entry
 }
 
@@ -173,8 +144,7 @@ export function subscribeConfig(root: string, listener: Listener): () => void {
     entry.listeners.delete(listener)
     if (entry.listeners.size === 0 && entries.get(r) === entry) {
       entries.delete(r)
-      if (entry.timer !== null) clearTimeout(entry.timer)
-      void entry.watcher.close()
+      void entry.watched.close()
     }
   }
 }

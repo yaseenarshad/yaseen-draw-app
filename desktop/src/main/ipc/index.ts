@@ -7,7 +7,7 @@ import { registerDrawingIpc } from './drawing'
 import { registerFavoritesIpc } from './favorites'
 import { registerFsIpc } from './fs'
 import { registerGithubIpc } from './github'
-import { registerMediaIpc } from './media'
+import { registerMediaLibraryIpc } from './mediaLibrary'
 import { registerMediaStudioIpc } from './mediaStudio'
 import { registerSecretsIpc } from './secrets'
 import { registerStateIpc } from './state'
@@ -31,7 +31,7 @@ export function registerIpc(store: Store, windows: WindowManagerIpc, userData: s
   registerWatchIpc()
   registerStateIpc(store)
   registerFavoritesIpc(store)
-  registerMediaIpc(store, userData)
+  registerMediaLibraryIpc(store, userData)
   registerComponentsIpc(store, userData)
   // 🔒 D4: the secrets instance is THREADED into the studio's providers — that is how a Pixabay
   // request gets its key without the key ever leaving main.
