@@ -1,5 +1,5 @@
 /**
- * What a launch was asked to OPEN (2I, YAZ-1815).
+ * What a launch was asked to OPEN (YAZ-1815, YAZ-1815).
  *
  * The app claims `.excalidraw` as an Owner file association (🔒 YAZ-1775 D1), and the OS
  * delivers a double-clicked file differently on each platform:

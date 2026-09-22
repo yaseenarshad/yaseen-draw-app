@@ -124,7 +124,7 @@ export function buildMenuTemplate({ recents, isDev, activeIsDrawing }: MenuInput
         { type: 'separator' },
         // 🔒 YAZ-1775 D10: the drawing's image export left the canvas hamburger for the app menu bar. It
         // opens the ENGINE's own export dialog (`openDialog: { name: 'imageExport' }`) — a
-        // standalone `.excalidraw` export is 3E's.
+        // standalone `.excalidraw` export is YAZ-1821's.
         { id: 'menu.file.export-image', label: 'Export Image…', accelerator: 'CmdOrCtrl+Shift+E', enabled: activeIsDrawing, click: () => handlers.exportImage() },
         // 🔒 YAZ-1775 D3: the ONE place a `.excalidraw` embeds its images, so a board can be handed to
         // someone with no vault and no `assets/` folder. ⌘⇧S is free in this menu — the engine's

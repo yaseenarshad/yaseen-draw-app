@@ -30,7 +30,7 @@ export function entryPath(parentDir: string, name: string, kind: EntryKind): str
 export const UNTITLED_DRAWING = 'Untitled'
 
 /**
- * The next free "New drawing" name in a folder (🔒 R1 on YAZ-1775, 2I): `Untitled`, then
+ * The next free "New drawing" name in a folder (🔒 R1 on YAZ-1775, YAZ-1815): `Untitled`, then
  * `Untitled 2`, `Untitled 3`… — never a name the folder already holds, because the birth must not
  * overwrite anything (`fs:create-file` writes `wx` and would refuse anyway; this is so the user
  * sees a new board rather than an error). `taken` is the folder's existing entry names WITH their

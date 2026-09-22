@@ -3,7 +3,7 @@
  * `{ version: 1, values: Record<name, base64(safeStorage.encryptString(value))> }`.
  *
  * THE RULE, and it has no exceptions: **the renderer never receives a value.** It may write one
- * (`set`) and ask whether one is there (`has`); reading (`read`) is main's alone — 3B's provider
+ * (`set`) and ask whether one is there (`has`); reading (`read`) is main's alone — YAZ-1818's provider
  * code calls it when it builds a Pixabay request. That is why the Pixabay key is not a
  * `SettingsState` field: the store is broadcast to every window on every change, and a key in it
  * would be a key in every renderer's devtools console.
@@ -39,7 +39,7 @@ export interface Secrets {
   set(name: string, value: string | null): Promise<void>
   /** Stored AND decryptable on this machine. The only question a renderer may ask. */
   has(name: string): Promise<boolean>
-  /** The plaintext, for MAIN only (3B's providers). Null when absent, undecryptable, or without a keychain. */
+  /** The plaintext, for MAIN only (YAZ-1818's providers). Null when absent, undecryptable, or without a keychain. */
   read(name: string): Promise<string | null>
 }
 

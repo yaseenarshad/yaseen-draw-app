@@ -8,7 +8,7 @@
  * `id` doubles as the row's `data-setting` address — for the `SettingsState` rows it IS the field
  * name, so a test or spec that knows the field knows the row.
  *
- * Two settings are NOT in `SettingsState`. GitHub sync (YAZ-1081 3B) lives per-vault in
+ * Two settings are NOT in `SettingsState`. GitHub sync (YAZ-1081 YAZ-1818) lives per-vault in
  * `.yaseendraw/github.json`, read and written through the engine, so its section is `available`
  * only when App hands the engine's status + setter over. The Pixabay API key (🔒 YAZ-1775 D4) lives in
  * main's encrypted `secrets.json` and is never in any renderer's state at all — its row writes

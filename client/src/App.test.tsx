@@ -153,7 +153,7 @@ function installBridge(state: AppState, identity: IdentityFixture) {
         return () => fileDeleted.delete(l)
       }),
     },
-    // Sync off (YAZ-1081 3A): App owns one `useGithubSync`, which subscribes on mount. `off` is
+    // Sync off (YAZ-1081 YAZ-1817): App owns one `useGithubSync`, which subscribes on mount. `off` is
     // the real default for a vault nobody switched on — no chip state to assert here, and no
     // attention banner. The sync UI's own tests are SyncIndicator/SettingsDialog/syncAttention.
     github: {

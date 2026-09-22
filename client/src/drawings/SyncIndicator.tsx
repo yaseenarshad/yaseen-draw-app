@@ -18,7 +18,7 @@ const LABEL: Record<GithubSyncStatus['state'], string> = {
   off: 'Sync off',
 }
 
-/** What the chip says on hover — the one place a status message reaches the user in 3A. */
+/** What the chip says on hover — the one place a status message reaches the user (YAZ-1081). */
 function title(status: GithubSyncStatus): string {
   switch (status.state) {
     case 'synced':

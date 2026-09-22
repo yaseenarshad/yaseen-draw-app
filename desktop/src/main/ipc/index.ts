@@ -17,7 +17,7 @@ import { registerWindowIpc } from './window'
 /**
  * Every `ipcMain` handler the preload's bridge invokes; call once before the first window loads.
  *
- * Returns the GitHub sync manager (YAZ-1081, 2C) — the one registration with triggers no renderer
+ * Returns the GitHub sync manager (YAZ-1081, YAZ-1809) — the one registration with triggers no renderer
  * can send (window focus, OS wake, the last flush before quit), which `main/index.ts` owns.
  *
  * `userData` is passed in rather than read from `app`: it is the library folder's default root

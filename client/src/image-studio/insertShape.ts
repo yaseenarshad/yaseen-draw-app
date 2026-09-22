@@ -8,7 +8,7 @@
  *   placed. Nothing is fetched and nothing is written to disk — a shape is geometry.
  * - An IMAGE becomes a `File` handed to the engine's own `insertImages`, which is the door that
  *   knows how to make an image element, register its bytes and size it. The bytes then become an
- *   `assets/` file through the save path built in 2E (🔒 YAZ-1775 D3): the engine's files map grows an id
+ *   `assets/` file through the save path built in YAZ-1811 (🔒 YAZ-1775 D3): the engine's files map grows an id
  *   the store does not hold, `unpersistedFiles` picks it up, and `drawing:save` writes it BEFORE
  *   the scene that names it. Nothing here touches the disk either.
  *

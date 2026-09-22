@@ -2,7 +2,7 @@ import type { GithubSyncStatus, VaultConfigChange, WatchEvent } from '@shared/ty
 import { isRecord } from '@shared/guards'
 
 /**
- * Per-root sync orchestration (YAZ-1081, 2B): WHEN a pass runs, and what the app is told about it.
+ * Per-root sync orchestration (YAZ-1081 2B): WHEN a pass runs, and what the app is told about it.
  * `sync.ts` owns what a pass does; this module owns the clock, the serialisation and the adoption.
  *
  * Electron-free by construction — every edge (config store, vault watcher, status broadcast, the

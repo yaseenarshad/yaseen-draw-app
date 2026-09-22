@@ -1,7 +1,7 @@
 /**
  * What a component is made of, and what an insert does (🔒 YAZ-1775 D5, YAZ-1819). The engine comes in as a
  * stub — the web app's rules are the thing under test, plus the one promise about an insert that
- * 2E has to be able to keep: the bytes arrive at the canvas UNPERSISTED, which is how they become
+ * YAZ-1811 has to be able to keep: the bytes arrive at the canvas UNPERSISTED, which is how they become
  * an `assets/` file.
  */
 import { describe, expect, it, vi } from 'vitest'
@@ -148,10 +148,10 @@ describe('insertComponent — an INDEPENDENT copy, at the viewport centre', () =
     expect(canvas.addFiles).not.toHaveBeenCalled()
   })
 
-  it('leaves the inserted bytes reported as UNPERSISTED, which is how they become an `assets/` file (🔒 YAZ-1775 D3, through 2E)', () => {
+  it('leaves the inserted bytes reported as UNPERSISTED, which is how they become an `assets/` file (🔒 YAZ-1775 D3, through YAZ-1811)', () => {
     const canvas = fakeCanvas()
     insertComponent(engine, canvas.api, componentFragmentJson({ elements: [image('a', 'f1')], files: { f1: bytes() } }))
-    // What the engine now holds, and what the scene references — 2E's own function on both.
+    // What the engine now holds, and what the scene references — YAZ-1811's own function on both.
     const files: Record<string, DrawingFileData> = Object.fromEntries((canvas.addFiles.mock.calls[0][0] as { id: string }[]).map((f) => [f.id, bytes()]))
     expect(unpersistedFiles(files, new Set(['f1']), new Set()).map((f) => f.fileId)).toEqual(['f1'])
     // …and nothing once the save has confirmed it: a second insert of the same component in the

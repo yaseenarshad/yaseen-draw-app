@@ -9,7 +9,7 @@ import { handle } from './envelope'
 /**
  * The `secrets.*` half of `window.yaseenDraw` (🔒 YAZ-1775 D4, YAZ-1817): two channels, `set` and `has`.
  * There is deliberately no third — a renderer can never ask for a value. `read` is on the
- * returned instance, for main's own callers (3B's providers) only. Secrets are NOT app state:
+ * returned instance, for main's own callers (YAZ-1818's providers) only. Secrets are NOT app state:
  * nothing here touches the store, so a key can never ride `state:changed` into a renderer.
  */
 

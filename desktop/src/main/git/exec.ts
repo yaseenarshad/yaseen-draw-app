@@ -3,7 +3,7 @@ import { stat } from 'node:fs/promises'
 import path from 'node:path'
 
 /**
- * Git runner (YAZ-1081, 2A) — the one place this app starts a child process, and the documented
+ * Git runner (YAZ-1081 2A) — the one place this app starts a child process, and the documented
  * exception (D1) to the no-spawn ruling in `fs/openInVsCode.ts`.
  *
  * That ruling's objection is specific: a packaged app has no developer `PATH`, so "find the tool

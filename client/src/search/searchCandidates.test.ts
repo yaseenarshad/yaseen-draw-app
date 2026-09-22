@@ -149,7 +149,7 @@ describe('searchTitles', () => {
 })
 
 /**
- * The perf tripwire (2H): ⌘K has NO debounce, so every keystroke builds nothing and scans the whole
+ * The perf tripwire (YAZ-1814): ⌘K has NO debounce, so every keystroke builds nothing and scans the whole
  * catalog. These budgets are an order of magnitude above what the scan costs — they exist to fail
  * loudly if the matcher ever grows a per-row allocation, a regex or a sort, not to time a machine.
  */

@@ -4,7 +4,7 @@ import path from 'node:path'
 import { GIT_CANDIDATES, git, resolveGit } from './exec'
 
 /**
- * Test fixtures for the git layer (YAZ-1081, 2A), in the shape of `fs/testFixture.ts`.
+ * Test fixtures for the git layer (YAZ-1081 2A), in the shape of `fs/testFixture.ts`.
  *
  * These run the REAL git, not a mock: the whole point of `detect.ts` is that it reads git's actual
  * output, so a fake would only test the fake. Every repo is a throwaway under the temp dir and

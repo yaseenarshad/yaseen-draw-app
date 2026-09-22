@@ -261,10 +261,10 @@ describe('Sidebar file-row open gestures (D2 GRO-2168, I3 GRO-2235)', () => {
   })
 
   /**
-   * "New drawing" (🔒 R1 on YAZ-1775, 2I): the app's ONE file-creation door, and it never asks for
+   * "New drawing" (🔒 R1 on YAZ-1775, YAZ-1815): the app's ONE file-creation door, and it never asks for
    * a name — the board is born `Untitled`, opens in the current tab, and offers the inline rename.
    */
-  describe('"New drawing" (2I)', () => {
+  describe('"New drawing" (YAZ-1815)', () => {
     /** Right-click blank space and take the item; the whole birth settles inside one act. */
     const newDrawing = async (el: HTMLElement) => {
       act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
@@ -950,7 +950,7 @@ describe('search results (YAZ-803)', () => {
     expect(el.querySelector('.search-results__folder')?.textContent).toBe('Docs')
   })
 
-  it('a NON-drawing file is never a result row (2H, YAZ-1814) — it still lists in the tree', async () => {
+  it('a NON-drawing file is never a result row (YAZ-1814, YAZ-1814) — it still lists in the tree', async () => {
     const withPng: TreeNode[] = [...SEARCH_TREE, { type: 'file', name: 'alpaca.png', path: '/v/alpaca.png', size: 1, mtime: 1, kind: null }]
     const m = await mount({}, (b) => b.tree.mockResolvedValue({ root: '/v', tree: withPng, generatedAt: 1 }))
     expect(m.el.querySelector('.tree__row--file[title="/v/alpaca.png"]')).not.toBeNull()
@@ -958,7 +958,7 @@ describe('search results (YAZ-803)', () => {
     expect(rowLabels(m.el)).toEqual(['Alpha'])
   })
 
-  it('a drawing created after the search opened turns up on the next tree — no restart (2H)', async () => {
+  it('a drawing created after the search opened turns up on the next tree — no restart (YAZ-1814)', async () => {
     // The feed is the tree the STRUCTURAL WATCHER refreshes: fire the watch event the main process
     // would send for a new file and the result list follows, with the query still standing.
     let notify: ((ev: WatchEvent) => void) | null = null
@@ -972,7 +972,7 @@ describe('search results (YAZ-803)', () => {
     expect(rowLabels(el)).toEqual(['Alpha', 'Anchor', 'Abacus'])
   })
 
-  it('the top row starts selected; ArrowDown/ArrowUp WRAP at both ends (2H, YAZ-1814)', async () => {
+  it('the top row starts selected; ArrowDown/ArrowUp WRAP at both ends (YAZ-1814, YAZ-1814)', async () => {
     const { el, input } = await search('a')
     expect(activeLabel(el)).toBe('Alpha')
     await press(input, 'ArrowUp')

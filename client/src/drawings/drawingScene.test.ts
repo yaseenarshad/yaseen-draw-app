@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DRAWING_SOURCE, EMPTY_SCENE, EMPTY_SCENE_JSON, parseSceneText } from './drawingScene'
 
 /**
- * `parseSceneText` is 2D's acceptance criterion in one function: "corrupt and empty files show a
+ * `parseSceneText` is YAZ-1810's acceptance criterion in one function: "corrupt and empty files show a
  * readable error, never a blank pane". Every throw path below is a file a user can really hand it.
  */
 describe('parseSceneText', () => {
