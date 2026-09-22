@@ -78,11 +78,12 @@ export function rewriteClientPackageJson(pkgJson, engineMap) {
 }
 
 /**
- * Rewrites every trace of the five packages in a parsed `package-lock.json`:
+ * Rewrites every trace of the five packages in a parsed `package-lock.json` (v3 — this script
+ * only ever runs in THIS repo, whose lockfile is v3, so the v1/v2 parallel `dependencies` tree
+ * is not handled):
  *
  *  - `packages["node_modules/@excalidraw/<p>"]` -> `resolved` + `integrity` + `version`
  *  - `packages["client"].dependencies` (and `devDependencies`) -> the `file:vendor/…` spec
- *  - any lockfileVersion-1/2 `dependencies` block -> same treatment, recursively
  *
  * Returns the count of edits per package so the caller can assert nothing was skipped.
  */
@@ -113,25 +114,6 @@ export function rewriteLockfile(lock, engineMap) {
       bump(name)
     }
   }
-
-  // lockfileVersion 1/2 keep a parallel `dependencies` tree; v3 drops it. Handle both so the
-  // script does not quietly leave half a lockfile pointing at deleted tarballs.
-  const walkLegacy = (tree) => {
-    if (!tree || typeof tree !== 'object') return
-    for (const [name, node] of Object.entries(tree)) {
-      if (!node || typeof node !== 'object') continue
-      const info = engineMap[name]
-      if (info && typeof node.resolved === 'string' && node.resolved.startsWith('file:')) {
-        node.resolved = info.lockResolved
-        node.integrity = info.integrity
-        node.version = info.version
-        bump(name)
-      }
-      rewriteSpecs(node.requires)
-      walkLegacy(node.dependencies)
-    }
-  }
-  walkLegacy(lock.dependencies)
 
   return edits
 }

@@ -4,13 +4,7 @@
  * without writing a 130 MB vault to disk.
  */
 import { createHash } from 'node:crypto'
-import { homedir } from 'node:os'
 import path from 'node:path'
-
-/** The vault the YAZ-1775 demo used and phase 4 reuses. `$HOME` is resolved, never hardcoded. */
-export const defaultVault = () => path.join(homedir(), 'Desktop', 'Port to Electron App - Local Version')
-/** The bare repo the vault's GitHub sync pushes to, beside it on the Desktop. */
-export const defaultOrigin = () => path.join(homedir(), 'Desktop', 'Port to Electron App - Local Version (origin).git')
 
 /** Mime → the extension `assets/<fileId>.<ext>` uses (🔒 YAZ-1775 D3). */
 export const EXT = {
@@ -44,16 +38,21 @@ export const fracIndex = (i) =>
   i < 62 ? `a${BASE62[i]}` : `b${BASE62[Math.floor((i - 62) / 62)]}${BASE62[(i - 62) % 62]}`
 
 /**
- * `--vault <dir>` and `--origin <bare-dir>`, both optional, both defaulting to the Desktop names
- * above. Unknown flags and missing values throw rather than silently seeding somewhere else — the
- * script wipes what it is pointed at.
+ * `--vault <dir>` is REQUIRED and has no default: this script wipes what it is pointed at, and a
+ * default would one day be pointed at somebody's real vault. `--origin` defaults to
+ * `<vault> (origin).git` beside it, `--force` is what allows an existing directory to be wiped,
+ * and unknown flags or missing values throw rather than silently seeding somewhere else.
  */
-export function parseArgs(argv, { vault = defaultVault(), origin = defaultOrigin() } = {}) {
-  const out = { vault, origin, help: false }
+export function parseArgs(argv) {
+  const out = { vault: null, origin: null, force: false, help: false }
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
     if (arg === '--help' || arg === '-h') {
       out.help = true
+      continue
+    }
+    if (arg === '--force') {
+      out.force = true
       continue
     }
     if (arg !== '--vault' && arg !== '--origin') throw new Error(`unknown argument: ${arg}`)
@@ -62,5 +61,8 @@ export function parseArgs(argv, { vault = defaultVault(), origin = defaultOrigin
     if (arg === '--vault') out.vault = path.resolve(value)
     else out.origin = path.resolve(value)
   }
+  if (out.help) return out
+  if (out.vault === null) throw new Error('--vault <dir> is required')
+  out.origin ??= `${out.vault} (origin).git`
   return out
 }

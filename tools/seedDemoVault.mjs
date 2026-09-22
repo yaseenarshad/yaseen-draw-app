@@ -1,17 +1,16 @@
 #!/usr/bin/env node
 /**
- * USAGE: node tools/seedDemoVault.mjs [--vault <dir>] [--origin <bare-dir>]
+ * USAGE: node tools/seedDemoVault.mjs --vault <dir> [--origin <bare-dir>] [--force]
  *
  * Builds the stress-test vault the phase-4 behaviour checks run against: a git repo full of
  * `.excalidraw` boards plus a content-addressed `assets/` folder, and a bare origin beside it so
  * the sidebar's GitHub sync chip has somewhere to push. Node built-ins only (fs, path, crypto,
  * zlib, child_process) — the images are generated here, nothing is downloaded.
  *
- * Defaults (the names the YAZ-1775 demo used, resolved from `$HOME`):
- *   ~/Desktop/Port to Electron App - Local Version              the vault, a git repo on `main`
- *   ~/Desktop/Port to Electron App - Local Version (origin).git the bare origin it pushes to
- *
- * BOTH PATHS ARE WIPED FIRST. Point `--vault` at a scratch dir; never at a real vault.
+ * `--vault` IS REQUIRED AND BOTH PATHS ARE WIPED. There is deliberately no default: this script
+ * `rm -rf`s what it is given, and any default would one day be somebody's real vault. A target
+ * that already exists is REFUSED unless `--force` says otherwise. `--origin` defaults to
+ * `<vault> (origin).git` beside it.
  *
  * What it seeds, and the scenario each board is for: simple shapes · images from `assets/` ·
  * legacy embedded dataURLs (extracted to `assets/` on first save) · a missing asset (placeholder,
@@ -31,22 +30,36 @@ import zlib from 'node:zlib'
 import { assetFileName, fileIdFor, fracIndex, parseArgs } from './lib/seedDemoVault.mjs'
 
 // ---------------------------------------------------------------- paths
+const USAGE = 'usage: node tools/seedDemoVault.mjs --vault <dir> [--origin <bare-dir>] [--force]'
+
 let args
 try {
   args = parseArgs(process.argv.slice(2))
 } catch (err) {
-  console.error(`${err.message}\nusage: node tools/seedDemoVault.mjs [--vault <dir>] [--origin <bare-dir>]`)
+  console.error(`${err.message}\n${USAGE}`)
   process.exit(2)
 }
 if (args.help) {
-  console.log('usage: node tools/seedDemoVault.mjs [--vault <dir>] [--origin <bare-dir>]')
+  console.log(USAGE)
   process.exit(0)
 }
 const VAULT = args.vault
 const ORIGIN = args.origin
 const ASSETS = path.join(VAULT, 'assets')
 
-const GIT = process.env.GIT || '/usr/bin/git'
+// A target that already exists is somebody's data until they say otherwise.
+for (const [label, target] of [
+  ['vault', VAULT],
+  ['origin', ORIGIN],
+]) {
+  if (fs.existsSync(target) && !args.force) {
+    console.error(`refusing to wipe an existing ${label}: ${target}\npass --force if that is really what you want\n${USAGE}`)
+    process.exit(2)
+  }
+}
+
+/** `git` is found on PATH like every other tool here; `GIT` overrides it for an odd install. */
+const GIT = process.env.GIT || 'git'
 const NOW = Date.now()
 
 // ---------------------------------------------------------------- tiny image encoders
@@ -140,11 +153,11 @@ const TINY_JPEG = Buffer.from([
 ])
 
 // ---------------------------------------------------------------- Excalidraw helpers
-let seedCounter = 1
 let idCounter = 1
-const rnd = () => Math.floor(Math.random() * 2 ** 31)
+/** 1…2³¹: Excalidraw treats a `seed` of 0 as unset, so the range starts at one. */
+const rnd = () => 1 + Math.floor(Math.random() * (2 ** 31 - 1))
 const newId = () => `demo-${(idCounter++).toString(36).padStart(4, '0')}-${rnd().toString(36)}`
-const common = (i) => ({
+const common = (i, roundness = null) => ({
   angle: 0,
   strokeColor: '#1e1e1e',
   backgroundColor: 'transparent',
@@ -156,8 +169,8 @@ const common = (i) => ({
   groupIds: [],
   frameId: null,
   index: fracIndex(i),
-  roundness: null,
-  seed: rnd() || seedCounter++,
+  roundness,
+  seed: rnd(),
   version: 1,
   versionNonce: rnd(),
   isDeleted: false,
@@ -167,7 +180,7 @@ const common = (i) => ({
   locked: false,
 })
 function rect(i, x, y, width, height, extra = {}) {
-  return { id: newId(), type: 'rectangle', x, y, width, height, ...common(i), roundness: { type: 3 }, ...extra }
+  return { id: newId(), type: 'rectangle', x, y, width, height, ...common(i, { type: 3 }), ...extra }
 }
 function text(i, x, y, str, fontSize = 20) {
   const lines = str.split('\n')
