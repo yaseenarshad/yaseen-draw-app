@@ -233,6 +233,8 @@ describe('dialog:save-file', () => {
     const target = await destination('Roadmap.excalidraw')
     showSaveDialog.mockResolvedValue({ canceled: false, filePath: target })
     expect(await save({ defaultName: 'Roadmap.excalidraw', content: SCENE })).toEqual({ ok: true, value: { path: target } })
+    // An export is a snapshot, not a board: the bytes land verbatim, with no `yaseendraw` block (🔒 YAZ-1834 D3).
+    expect(await readFile(target, 'utf8')).toBe(SCENE)
     expect(showSaveDialog).toHaveBeenCalledWith(win, {
       title: 'Export Drawing',
       filters: [{ name: 'Excalidraw', extensions: ['excalidraw'] }],

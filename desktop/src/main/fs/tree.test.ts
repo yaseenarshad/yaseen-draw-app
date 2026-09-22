@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { rm, writeFile } from 'node:fs/promises'
+import { chmod, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { TreeNode } from '@shared/types'
 import { tree } from './tree'
@@ -44,6 +44,44 @@ describe('tree', () => {
     expect(all).toContain(path.join(root, 'Zeta', 'assets', 'theirs.excalidraw'))
     // `.yaseendraw/` (vault-local config, GRO-2188) never reaches the tree — the sidebar renders the tree as-is.
     expect(all.some((p) => p.includes('.yaseendraw'))).toBe(false)
+  })
+
+  it('carries `meta` for a stamped board and nothing for a legacy, misplaced-block, corrupt or non-drawing file (🔒 YAZ-1834 D6/D7)', async () => {
+    const block = { createdAt: 1600000000000, updatedAt: 1700000000000 }
+    const candidates: Array<[string, string]> = [
+      [path.join(root, 'stamped.excalidraw'), `${JSON.stringify({ yaseendraw: { ...block, cloudId: 'x' }, type: 'excalidraw', elements: [] }, null, 2)}\n`],
+      [path.join(root, 'legacy.excalidraw'), '{"type":"excalidraw","elements":[]}\n'],
+      [path.join(root, 'misplaced.excalidraw'), JSON.stringify({ type: 'excalidraw', elements: [], yaseendraw: block })],
+      [path.join(root, 'corrupt.excalidraw'), '{ not json'],
+      [path.join(root, 'empty.excalidraw'), ''],
+      [path.join(root, 'stamped.txt'), JSON.stringify({ yaseendraw: block })],
+    ]
+    try {
+      await Promise.all(candidates.map(([file, content]) => writeFile(file, content)))
+      const all = files(await tree(root))
+      const node = (name: string) => all.find((n) => n.name === name)
+      expect(node('stamped.excalidraw')).toMatchObject({ meta: block, size: candidates[0][1].length })
+      for (const name of ['legacy.excalidraw', 'misplaced.excalidraw', 'corrupt.excalidraw', 'empty.excalidraw', 'stamped.txt']) {
+        expect(node(name), name).toBeDefined()
+        expect(node(name), name).not.toHaveProperty('meta')
+      }
+    } finally {
+      await Promise.all(candidates.map(([file]) => rm(file, { force: true })))
+    }
+  })
+
+  it.skipIf(process.getuid?.() === 0)('still lists a board main cannot OPEN, without meta — no metadata is never no board (🔒 YAZ-1834 D7)', async () => {
+    const file = path.join(root, 'locked.excalidraw')
+    await writeFile(file, `${JSON.stringify({ yaseendraw: { createdAt: 1, updatedAt: 2 }, elements: [] })}\n`)
+    await chmod(file, 0o000)
+    try {
+      const node = files(await tree(root)).find((n) => n.name === 'locked.excalidraw')
+      expect(node).toMatchObject({ kind: 'drawing', size: expect.any(Number) })
+      expect(node).not.toHaveProperty('meta')
+    } finally {
+      await chmod(file, 0o644)
+      await rm(file, { force: true })
+    }
   })
 
   it('classifies a drawing by kind whatever the case, and lists every other file with kind null (YAZ-1577 D1)', async () => {

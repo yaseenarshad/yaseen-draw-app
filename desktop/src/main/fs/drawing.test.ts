@@ -3,10 +3,10 @@ import { mkdir, mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from '
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { MAX_DRAWING_BYTES } from '@shared/types'
-import { ORPHAN_MAX_AGE_MS } from '@shared/drawingAssets'
+import { BOARD_META_KEY, ORPHAN_MAX_AGE_MS } from '@shared/drawingAssets'
 import { sweepOrphanAssets } from '../drawings/orphanSweep'
 import { loadDrawing, saveDrawing } from './drawing'
-import { failure } from './testFixture'
+import { blockOf, failure, withoutBlock } from './testFixture'
 
 const PNG_B64 = 'aGVsbG8='
 const dataUrl = (b64 = PNG_B64) => `data:image/png;base64,${b64}`
@@ -105,17 +105,24 @@ describe('drawing:save', () => {
     const res = await saveDrawing({ root, path: 'Board.excalidraw', json: body, newFiles: [] })
     expect(res.path).toBe(file)
     expect(res.persisted).toEqual([])
-    expect(await readFile(file, 'utf8')).toBe(body)
+    const written = await readFile(file, 'utf8')
+    expect(withoutBlock(written)).toBe(body)
+    expect(blockOf(written)).toMatchObject({ createdAt: expect.any(Number), updatedAt: expect.any(Number) })
     expect(res.mtime).not.toBe(before.mtimeMs)
-    expect(res.size).toBe(Buffer.byteLength(body, 'utf8'))
+    expect(res.size).toBe(Buffer.byteLength(written, 'utf8'))
     // No stray tmp file survives the rename.
-    await expect(loadDrawing({ root, path: 'Board.excalidraw' })).resolves.toMatchObject({ json: body })
+    expect(await readdir(root)).toEqual(['Board.excalidraw'])
+    await expect(loadDrawing({ root, path: 'Board.excalidraw' })).resolves.toMatchObject({ json: written })
   })
 
   it('creates a document that is not there yet (a rename raced the save; the canvas is the only copy)', async () => {
     const body = scene()
     const res = await saveDrawing({ root, path: 'Fresh.excalidraw', json: body, expectedMtime: 123, newFiles: [] })
-    expect(await readFile(res.path, 'utf8')).toBe(body)
+    const written = await readFile(res.path, 'utf8')
+    expect(withoutBlock(written)).toBe(body)
+    // Born on this save: no prior file, so both dates are the save itself.
+    const block = blockOf(written)
+    expect(block.createdAt).toBe(block.updatedAt)
   })
 
   it('rejects a stale expectedMtime as CONFLICT carrying the disk mtime, and writes NOTHING', async () => {
@@ -158,7 +165,7 @@ describe('drawing:save', () => {
     const edited = scene([{ id: 'x', type: 'rectangle' }])
     const saved = await saveDrawing({ root, path: 'Board.excalidraw', json: edited, expectedMtime: first.mtime, newFiles: [] })
     const second = await loadDrawing({ root, path: 'Board.excalidraw' })
-    expect(second.json).toBe(edited)
+    expect(withoutBlock(second.json)).toBe(edited)
     expect(second.mtime).toBe(saved.mtime)
   })
 })
@@ -259,11 +266,18 @@ describe('🔒 YAZ-1775 D3 — the image store on save', () => {
     expect(await readdir(path.join(root, 'assets')).catch(() => null)).toBeNull()
   })
 
-  it('leaves an already-lean scene BYTE-IDENTICAL, so an untouched save does not churn git', async () => {
+  it('leaves an already-lean scene byte-identical BELOW the block: an untouched save moves only `updatedAt` (🔒 YAZ-1834 D3)', async () => {
     const lean = scene([{ id: 'a' }])
     await seed('Board.excalidraw', lean)
     await saveDrawing({ root, path: 'Board.excalidraw', json: lean, newFiles: [] })
-    expect(await readFile(path.join(root, 'Board.excalidraw'), 'utf8')).toBe(lean)
+    const once = await readFile(path.join(root, 'Board.excalidraw'), 'utf8')
+    expect(withoutBlock(once)).toBe(lean)
+    await new Promise((r) => setTimeout(r, 5))
+    await saveDrawing({ root, path: 'Board.excalidraw', json: lean, newFiles: [] })
+    const twice = await readFile(path.join(root, 'Board.excalidraw'), 'utf8')
+    expect(withoutBlock(twice)).toBe(lean)
+    expect(blockOf(twice).createdAt).toBe(blockOf(once).createdAt)
+    expect(blockOf(twice).updatedAt).toBeGreaterThan(blockOf(once).updatedAt as number)
   })
 
   it('refuses a malformed newFiles entry and writes NOTHING — not the assets, not the scene', async () => {
@@ -299,6 +313,56 @@ describe('🔒 YAZ-1775 D3 — the image store on save', () => {
     await saveDrawing({ root, path: 'A.excalidraw', json: scene([imageEl('shared')]), newFiles: [entry] })
     await saveDrawing({ root, path: 'B.excalidraw', json: scene([imageEl('shared')]), newFiles: [entry] })
     expect(await readdir(path.join(root, 'assets'))).toEqual(['shared.png'])
+  })
+})
+
+describe('🔒 YAZ-1834 — the yaseendraw block on save', () => {
+  it('births a block on a LEGACY board: createdAt = its pre-save mtime, updatedAt = the save', async () => {
+    const file = await seed('Old.excalidraw', scene())
+    const born = new Date('2021-03-04T05:06:07Z')
+    await utimes(file, born, born)
+    const before = Date.now()
+    await saveDrawing({ root, path: file, json: scene([{ id: 'a' }]), newFiles: [] })
+    const after = Date.now()
+    const block = blockOf(await readFile(file, 'utf8'))
+    expect(block.createdAt).toBe(born.getTime())
+    expect(block.updatedAt).toBeGreaterThanOrEqual(before)
+    expect(block.updatedAt).toBeLessThanOrEqual(after)
+  })
+
+  it('keeps createdAt and the backfill`s own keys, bumps only updatedAt (D5) — across saves that do not send the block back', async () => {
+    // As the importer writes it: the block FIRST (D1 — a block anywhere else is not read, and is replaced on save).
+    const backfilled = `${JSON.stringify({ [BOARD_META_KEY]: { createdAt: 1600000000000, updatedAt: 1600000000001, cloudId: 'k7' }, type: 'excalidraw', elements: [], files: {} }, null, 2)}\n`
+    const file = await seed('Cloud.excalidraw', backfilled)
+    // The renderer's json never carries the block (the engine drops unknown keys): plain scenes in.
+    await saveDrawing({ root, path: file, json: scene([{ id: 'a' }]), newFiles: [] })
+    await saveDrawing({ root, path: file, json: scene([{ id: 'a' }, { id: 'b' }]), newFiles: [] })
+    const block = blockOf(await readFile(file, 'utf8'))
+    expect(block).toMatchObject({ createdAt: 1600000000000, cloudId: 'k7' })
+    expect(block.updatedAt).toBeGreaterThan(1600000000001)
+  })
+
+  it('lifts a legacy embedded scene AND places the block first in the same write', async () => {
+    const legacy = scene([imageEl('abc')], { files: { abc: { mimeType: 'image/png', dataURL: dataUrl() } } })
+    const file = await seed('Legacy.excalidraw', legacy)
+    await saveDrawing({ root, path: file, json: legacy, newFiles: [] })
+    const written = await readFile(file, 'utf8')
+    expect(Object.keys(JSON.parse(written) as object)[0]).toBe(BOARD_META_KEY)
+    expect((JSON.parse(written) as { files: unknown }).files).toEqual({})
+    expect(await readdir(path.join(root, 'assets'))).toEqual(['abc.png'])
+  })
+
+  it('a block that is NOT the first key is not trusted: the save births a fresh one from the mtime (D7 — the importer must write it first)', async () => {
+    const file = await seed('Misplaced.excalidraw', scene([], { [BOARD_META_KEY]: { createdAt: 5, updatedAt: 6 } }))
+    await saveDrawing({ root, path: file, json: scene(), newFiles: [] })
+    expect(blockOf(await readFile(file, 'utf8')).createdAt).toBeGreaterThan(6)
+  })
+
+  it('a refused save (CONFLICT) stamps nothing — the legacy file stays block-less and byte-identical', async () => {
+    const original = scene()
+    const file = await seed('Board.excalidraw', original)
+    await failure(saveDrawing({ root, path: file, json: scene([{ id: 'b' }]), expectedMtime: 1, newFiles: [] }))
+    expect(await readFile(file, 'utf8')).toBe(original)
   })
 })
 
