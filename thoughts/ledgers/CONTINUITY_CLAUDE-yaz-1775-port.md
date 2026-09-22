@@ -50,17 +50,17 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
   - [x] 3C1 — Import JSON into the components library (YAZ-1833)
   - [x] 3D — Present tab: presentation sidebar and player (YAZ-1820)
   - [x] 3E — Export menu: PNG, SVG, standalone `.excalidraw` (YAZ-1821)
+  - [x] 4D — Release workflow verified and a local DMG built (YAZ-1826) — 🔒 tag on Yasin's word only: no tag, no GitHub release, no `npm version` from an agent
 - Now: [→] 4A — Prove the image-heavy board round trip through quit, relaunch, sync and clone (YAZ-1823)
 - Remaining:
   - [ ] 4B — Prove windows, tabs, favorites, vault switcher and same-board-in-two-windows (YAZ-1824)
   - [ ] 4C — Prove Image Studio, Components and Present online and offline (YAZ-1825)
-  - [ ] 4D — Release workflow renamed and a local DMG install verified (YAZ-1826)
   - [ ] 5A — Audit the change set and scope the polish, comment only (YAZ-1828)
   - [ ] 5B — Apply the audit: simplify, finalize, docs, ledger, cleanup (YAZ-1829)
 
 ## Open Questions
 
-- UNCONFIRMED: `desktop/build/icon.png` is the only icon asset; the stale docs-app `icon.icns`/`icon.ico` were deleted and electron-builder now derives both from the PNG. Confirm during the 4D packaging run.
+- RESOLVED (4D packaging run): `desktop/build/icon.png` is the only icon asset and electron-builder derives the rest — the packed bundle carries `Contents/Resources/icon.icns` at 1024², and `CFBundleIconFile`/`CFBundleTypeIconFile` both name it.
 - RESOLVED (🔒 "Dead asset pipe deleted" on YAZ-1775): the image half of the asset pipe is gone — module, tests, channels, preload methods, types and CONTRACTS rows — in 2F's first commit.
 - RESOLVED (🔒 "Focus handoff on tab reveal" on YAZ-1812, built in 2I): a revealed drawing tab takes the keyboard through `DrawingSurfaceApi.focus()`, gated by `drawings/focusHandoff.ts` — never from the sidebar search, the vault switcher or a dialog.
 - UNCONFIRMED (posted on YAZ-1815, awaiting Yasin): where a drawing outside EVERY open vault should open. 2I kept the shipped E1 rule — a NEW window rooted at the file's parent folder — rather than repointing the focused window's vault, which would discard its tabs and would need a main→renderer "switch vault and open this" message that does not exist. Documented in CONTRACTS as built.
@@ -226,6 +226,13 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 - **`stripEmbeddedFiles` must be byte-stable on a lean scene**, or every untouched save rewrites the file and churns the vault's git history.
 - **The sweep's age guard is the whole safety property.** Unreferenced is not enough — a paste lands in `assets/` before the board that names it is saved.
 - **Pre-existing flake:** `desktop/src/main/git/{sync,guarantees}.test.ts` intermittently time out under full-suite load (real git subprocesses). Reproduced on the 2D baseline with 2E stashed — not caused by either. Worth a look in 5A/5B.
+
+- **The packaged bundle is the only proof that the names took.** `plutil -p` on the packed
+  `Info.plist` is what says `CFBundleName`/`CFBundleDisplayName` "Yaseen Draw", `CFBundleIdentifier`
+  `com.yasinarshad.yaseendraw`, the `yaseendraw` URL scheme and the `.excalidraw` document type at
+  rank `Owner` — the builder config only says what was ASKED for. `spctl` rejecting the ad-hoc
+  bundle is the expected result, not a regression; `codesign -dv` printing `Signature=adhoc` is the
+  one that has to hold.
 
 ## Working Set
 

@@ -30,7 +30,7 @@ marks an amendment to an earlier locked decision; the amendment wins.
 | `client/vendor/` | the five vendored `yaseendraw-*-<forkCommit>.tgz` engine tarballs (🔒 D2) |
 | `desktop/` | the Electron shell: `src/main` (files, state, windows, menu, git sync), `src/preload` (the bridge) |
 | `shared/` | types and pure helpers imported by BOTH sides (`@shared/*`) |
-| `tools/` | `packEngine.mjs` (bump the vendored engine), `packDesktop.mjs` (electron-builder) |
+| `tools/` | `packEngine.mjs` (bump the vendored engine), `packDesktop.mjs` (electron-builder), `seedDemoVault.mjs` (the stress-test vault the behaviour checks run against) |
 | `docs/` | this file |
 | `thoughts/ledgers/` | continuity ledgers for in-flight work |
 
@@ -691,17 +691,30 @@ unsupported or missing file shows the window's one passive notice, never a dialo
 ## Packaging
 
 `npm run desktop:build` runs `electron-vite build` and then electron-builder through
-`tools/packDesktop.mjs`.
+`tools/packDesktop.mjs`, which stamps the ROOT `package.json` version (`0.1.0`) into the bundle —
+`desktop/package.json`'s own version is never what ships.
 
-- appId `com.yasinarshad.yaseendraw`, productName **Yaseen Draw**, icon from `desktop/build/`.
+- appId `com.yasinarshad.yaseendraw`, productName **Yaseen Draw**, icon from `desktop/build/`
+  (one 1024² `icon.png`; electron-builder derives `Contents/Resources/icon.icns`).
 - macOS: arm64 `dmg` + `dir`, `identity: null` — ad-hoc signed by `desktop/build/adhocSign.cjs`,
-  never Developer-ID signed or notarized (out of scope).
+  never Developer-ID signed or notarized (out of scope). `codesign -dv` on the packed bundle reads
+  `Signature=adhoc` with `TeamIdentifier=not set`; `spctl -a -t install` therefore REJECTS it, and
+  that rejection is the expected result, not a defect — it is what the one-time **Open Anyway**
+  below answers.
+- The bundle declares what it owns: `CFBundleURLSchemes` `yaseendraw`, and a `.excalidraw`
+  document type named "Excalidraw Drawing" with role `Editor` and `LSHandlerRank` `Owner`, so
+  Finder hands `.excalidraw` files to this app (🔒 D1).
 - Windows: unsigned x64 NSIS installer.
 - `files: ["out/**"]` is the whole payload: the main bundle carries its dependencies (chokidar is
-  pure JS and gets bundled), so the packaged app ships no `node_modules`.
+  pure JS and gets bundled), so the packaged app ships no `node_modules`. There are no
+  `extraResources` — the CLI shim that needed them was deleted (🔒 OD3).
 - The renderer serves from the custom `app://yaseen/` protocol; Excalidraw's fonts are copied
   beside the bundle at build time so a scene with text never reaches a CDN (🔒 the offline rule).
-- `.github/workflows/release.yml` builds both on a `v*` tag and attaches them to the release.
+- `.github/workflows/release.yml` builds both on a `v*` tag (node 22, `CSC_IDENTITY_AUTO_DISCOVERY:
+  false`, `fail_on_unmatched_files: true`) and attaches them to that tag's release.
+- 🔒 **Releases are Yasin's call.** No tag, no GitHub release and no `npm version` without him
+  saying so — he batches releases. The workflow is verified by a local `npm run desktop:build`,
+  never by pushing a tag to see what happens.
 
 Bumping the vendored engine is `node tools/packEngine.mjs --commit <sha>` followed by `npm ci` —
 see `client/vendor/README.md` for the two traps that script exists to defuse.
