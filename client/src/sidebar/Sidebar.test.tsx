@@ -15,7 +15,15 @@ import { EMPTY_SCENE_JSON } from '../drawings/drawingScene'
 // how a test hands the Sidebar a focus restored from an earlier session (YAZ-1605).
 import { storage } from '../lib/storage'
 import { BridgeRequestError } from '../api'
-import { countChildren, Sidebar, type SidebarClipboard } from './Sidebar'
+import { BOARD_PREVIEW_DWELL_MS, countChildren, Sidebar, type SidebarClipboard } from './Sidebar'
+
+// The hover preview's picture (YAZ-1800) is drawn by the engine, which jsdom cannot run: the cache is
+// stubbed to answer a dataURL, the key is the real one.
+const previewLoad = vi.hoisted(() => vi.fn(async (_key: string): Promise<string | null> => 'data:image/png;base64,AA'))
+vi.mock('./boardPreviewCache', async (importActual) => ({
+  ...(await importActual<typeof import('./boardPreviewCache')>()),
+  boardPreviews: { load: previewLoad, clear: () => undefined, Preview: () => null },
+}))
 
 
 const TREE: TreeNode[] = [
@@ -2613,7 +2621,7 @@ const SORTABLE: TreeNode[] = [
   { type: 'file', name: 'notes.txt', path: '/v/notes.txt', size: 1, mtime: 5, kind: null },
 ]
 /** The visible board rows, top level only unless asked — the real `storage` keeps `sub` expanded across mounts. */
-const rowPaths = (el: HTMLElement, nested = false) => [...el.querySelectorAll<HTMLElement>('.tree__row--file')].map((r) => r.title.replace('/v/', '')).filter((p) => nested || !p.includes('/'))
+const rowPaths = (el: HTMLElement, nested = false) => [...el.querySelectorAll<HTMLElement>('.tree__row--file')].map((r) => (r.dataset.path ?? '').replace('/v/', '')).filter((p) => nested || !p.includes('/'))
 const sortButton = (el: HTMLElement) => el.querySelector<HTMLButtonElement>('.sidebar__sort')
 const mountSortable = (over: Partial<SidebarProps> = {}) => mount(over, (b) => b.tree.mockResolvedValue({ root: '/v', tree: SORTABLE, generatedAt: 1 }))
 
@@ -2734,7 +2742,7 @@ describe('sort control (🔒 YAZ-1835)', () => {
  */
 describe('Info popover (🔒 YAZ-1835 D6/D7)', () => {
   const rightClick = (target: Element | null | undefined) => act(() => void target?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 50 })))
-  const rowFor = (el: HTMLElement, name: string) => [...el.querySelectorAll<HTMLElement>('.tree__row--file')].find((r) => r.title === `/v/${name}`)
+  const rowFor = (el: HTMLElement, name: string) => [...el.querySelectorAll<HTMLElement>('.tree__row--file')].find((r) => r.dataset.path === `/v/${name}`)
   const popover = (el: HTMLElement) => el.querySelector<HTMLElement>('.board-info')
   const row = (el: HTMLElement, label: string) => [...(popover(el)?.querySelectorAll('dt') ?? [])].find((dt) => dt.textContent === label)?.nextElementSibling?.textContent
 
@@ -2811,5 +2819,156 @@ describe('Info popover (🔒 YAZ-1835 D6/D7)', () => {
     bridge.tree.mockResolvedValue({ root: '/v', tree: SORTABLE, generatedAt: 3 })
     await act(async () => notify?.({ type: 'add', path: '/v/Apple.excalidraw', mtime: 3 }))
     expect(popover(el)).toBeNull()
+  })
+})
+
+describe('hover preview (YAZ-1800)', () => {
+  const panel = () => document.querySelector<HTMLElement>('.board-preview')
+  const enter = (row: Element) => act(() => void row.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, relatedTarget: document.body })))
+  const leave = (row: Element) => act(() => void row.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body })))
+  const dwell = (ms = BOARD_PREVIEW_DWELL_MS) => act(async () => void vi.advanceTimersByTime(ms))
+  const previewButton = (el: HTMLElement) => el.querySelector<HTMLButtonElement>('.sidebar__preview')
+
+  beforeEach(() => previewLoad.mockReset().mockResolvedValue('data:image/png;base64,AA'))
+  afterEach(() => vi.useRealTimers())
+
+  it('opens after the dwell on a board row, shows the picture, and closes the moment the pointer leaves', async () => {
+    const { el } = await mount()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const row = fileRow(el)!
+    expect(row.title).toBe('') // the path tooltip gives way to the panel
+    await enter(row)
+    await dwell(BOARD_PREVIEW_DWELL_MS - 1)
+    expect(panel()).toBeNull()
+    await dwell(1)
+    expect(panel()?.getAttribute('aria-label')).toBe('Preview of a')
+    expect(panel()?.querySelector('img')?.getAttribute('src')).toBe('data:image/png;base64,AA')
+    expect(previewLoad).toHaveBeenCalledWith(['/v', '/v/a.excalidraw', 1, 'light'].join('\n'))
+    await leave(row)
+    expect(panel()).toBeNull()
+  })
+
+  it('leaving before the dwell ends never opens it; Escape and a row click close an open one', async () => {
+    const { el } = await mount()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const row = fileRow(el)!
+    await enter(row)
+    await leave(row)
+    await dwell()
+    expect(panel()).toBeNull()
+    await enter(row)
+    await dwell()
+    expect(panel()).not.toBeNull()
+    act(() => void document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+    expect(panel()).toBeNull()
+    await leave(row)
+    await enter(row)
+    await dwell()
+    await act(async () => row.click())
+    expect(panel()).toBeNull()
+  })
+
+  it('says so when a board is empty or cannot be drawn', async () => {
+    const { el } = await mount()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    // StrictMode runs the panel's effect twice, so the stub answers the same for every call.
+    previewLoad.mockResolvedValue('')
+    await enter(fileRow(el)!)
+    await dwell()
+    expect(panel()?.textContent).toContain('Empty board')
+    await leave(fileRow(el)!)
+    previewLoad.mockResolvedValue(null)
+    await enter(fileRow(el)!)
+    await dwell()
+    expect(panel()?.textContent).toContain('Preview unavailable')
+    previewLoad.mockResolvedValue('data:image/png;base64,AA')
+  })
+
+  it('the header toggle flips the setting; OFF, a board row keeps its tooltip and hovering does nothing', async () => {
+    const { el, props } = await mount({ settings: { ...DEFAULT_SETTINGS, hoverPreview: false } })
+    expect(previewButton(el)?.getAttribute('aria-pressed')).toBe('false')
+    act(() => previewButton(el)?.click())
+    expect(props.onChangeSettings).toHaveBeenCalledWith({ ...DEFAULT_SETTINGS, hoverPreview: true })
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const row = fileRow(el)!
+    expect(row.title).toBe('/v/a.excalidraw')
+    await enter(row)
+    await dwell()
+    expect(panel()).toBeNull()
+  })
+
+  // The watcher is the one door a save or a delete reaches the tree through; each emit re-reads `bridge.tree`.
+  const watched = () => {
+    const w: { emit: ((ev: WatchEvent) => void) | null; watch: SidebarProps['watch'] } = { emit: null, watch: { subscribe: (l) => ((w.emit = l), () => (w.emit = null)) } }
+    return w
+  }
+
+  it('a save to the hovered board keeps the panel up and asks for the new picture (🔒 D5 amendment: swap in place)', async () => {
+    const w = watched()
+    const { el, bridge } = await mount({ watch: w.watch })
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    await enter(fileRow(el)!)
+    await dwell()
+    expect(panel()).not.toBeNull()
+    bridge.tree.mockResolvedValue({ root: '/v', tree: TREE.map((n) => (n.path === '/v/a.excalidraw' ? { ...n, mtime: 9 } : n)), generatedAt: 2 })
+    await act(async () => w.emit?.({ type: 'change', path: '/v/a.excalidraw', mtime: 9 }))
+    expect(panel()).not.toBeNull()
+    expect(previewLoad).toHaveBeenLastCalledWith(['/v', '/v/a.excalidraw', 9, 'light'].join('\n'))
+  })
+
+  it('the hovered board disappearing from the tree (deleted, renamed, moved) closes the panel', async () => {
+    const w = watched()
+    const { el, bridge } = await mount({ watch: w.watch })
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    await enter(fileRow(el)!)
+    await dwell()
+    bridge.tree.mockResolvedValue({ root: '/v', tree: TREE.filter((n) => n.path !== '/v/a.excalidraw'), generatedAt: 2 })
+    await act(async () => w.emit?.({ type: 'unlink', path: '/v/a.excalidraw' }))
+    expect(panel()).toBeNull()
+  })
+
+  it('a right-click or a drag on the row closes an open panel', async () => {
+    const { el } = await mount()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const row = fileRow(el)!
+    await enter(row)
+    await dwell()
+    act(() => void row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })))
+    expect(panel()).toBeNull()
+    expect(document.querySelector('[role="menu"]')).not.toBeNull() // and nothing opens under the menu while it stands
+    act(() => void window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+    expect(document.querySelector('[role="menu"]')).toBeNull()
+    await leave(row)
+    await enter(row)
+    await dwell()
+    expect(panel()).not.toBeNull()
+    act(() => void row.dispatchEvent(new Event('dragstart', { bubbles: true })))
+    expect(panel()).toBeNull()
+  })
+
+  it('keyboard focus on a board row previews it like the pointer; blur closes it; a search starting closes it too', async () => {
+    const { el } = await mount()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const row = fileRow(el)!
+    act(() => row.focus())
+    await dwell()
+    expect(panel()?.getAttribute('aria-label')).toBe('Preview of a')
+    act(() => row.blur())
+    expect(panel()).toBeNull()
+    await enter(row) // by pointer this time, so typing's focus move is not what closes it
+    await dwell()
+    expect(panel()).not.toBeNull()
+    await type(searchInput(el)!, 'a')
+    expect(panel()).toBeNull()
+  })
+
+  it('turning the toggle off closes an open preview', async () => {
+    const { el, rerender } = await mount()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    await enter(fileRow(el)!)
+    await dwell()
+    expect(panel()).not.toBeNull()
+    await rerender({ settings: { ...DEFAULT_SETTINGS, hoverPreview: false } })
+    expect(panel()).toBeNull()
   })
 })

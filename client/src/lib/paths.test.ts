@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { basename, stripExt } from './paths'
+import { basename, boardFolder, stripExt } from './paths'
 
 describe('basename', () => {
   it('returns the last segment, ignoring trailing slashes', () => {
@@ -19,5 +19,13 @@ describe('stripExt', () => {
     expect(stripExt('notes.txt')).toBe('notes.txt')
     expect(stripExt('note.md')).toBe('note.md')
     expect(stripExt('database')).toBe('database')
+  })
+})
+
+describe('boardFolder', () => {
+  it('is the vault-relative folder, `/` at the root, however deep', () => {
+    expect(boardFolder('/v', '/v/a.excalidraw')).toBe('/')
+    expect(boardFolder('/v', '/v/Nested/Deeper/b.excalidraw')).toBe('Nested/Deeper')
+    expect(boardFolder('/v', '/vault2/c.excalidraw')).toBe('/vault2') // a sibling root is not inside /v
   })
 })

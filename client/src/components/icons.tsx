@@ -64,6 +64,15 @@ export const EyeIcon = () => (
   </svg>
 )
 
+/** The sidebar's hover-preview toggle (YAZ-1800): a framed picture; accent while previews are on. */
+export const PreviewIcon = () => (
+  <svg {...svg}>
+    <rect x="2" y="3" width="12" height="10" rx="1.5" />
+    <path d="M2 11l3.5-3.5 2.5 2.5 2-2L14 12" />
+    <circle cx="10.5" cy="6" r="1" />
+  </svg>
+)
+
 /** The Favorites lens tab (YAZ-1766 D1, a glyph not a word); filled while active via CSS. */
 export const HeartIcon = () => (
   <svg {...svg} width={15} height={15} viewBox="0 0 24 24" strokeWidth={2} className="heart-icon">
