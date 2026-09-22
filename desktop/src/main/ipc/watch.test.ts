@@ -78,7 +78,7 @@ describe('watch IPC', () => {
     await until(() => sent(s).length >= 2)
     unsubscribeAs(s, 'drop')
     expect(activeWatcherRoots()).toEqual([root])
-    const file = path.join(root, 'alpha', 'ipc-watched.md')
+    const file = path.join(root, 'alpha', 'ipc-watched.excalidraw')
     await writeFile(file, 'v1')
     await until(() => sent(s).some((m) => m.ev.type === 'add'))
     const adds = sent(s).filter((m) => m.ev.type === 'add')
@@ -105,7 +105,7 @@ describe('watch IPC', () => {
     expect(activeWatcherRoots()).toEqual([root])
 
     // Window A saves the file both windows have open → the shared watcher emits one `change` to each.
-    const file = path.join(root, 'alpha', 'a.md')
+    const file = path.join(root, 'alpha', 'a.excalidraw')
     await writeFile(file, 'saved by window A')
     const change = (s: Sender) => sent(s).filter((m) => m.ev.type === 'change')
     await until(() => change(a).length >= 1 && change(b).length >= 1)
@@ -129,7 +129,7 @@ describe('watch IPC', () => {
     const s = makeSender()
     await subscribeAs(s, 'rel', root.slice(1))
     await subscribeAs(s, 'missing', path.join(root, 'nope'))
-    await subscribeAs(s, 'file', path.join(root, 'b.md'))
+    await subscribeAs(s, 'file', path.join(root, 'b.excalidraw'))
     expect(sent(s).map((m) => [m.id, m.ev.type, (m.ev as { message: string }).message])).toEqual([
       ['rel', 'error', "'root' must be an absolute path"],
       ['missing', 'error', 'path does not exist'],

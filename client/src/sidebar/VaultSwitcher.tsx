@@ -28,11 +28,11 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { ContextMenuSurface } from '../components/ContextMenuSurface'
-import { matchLinkCandidates } from '../links/completion'
+import { matchCandidates } from '../search/matchCandidates'
 import { basename } from '../lib/paths'
 import { relativeTime } from '../lib/relativeTime'
 import { storage } from '../lib/storage'
-import { TriangleIcon } from '../views/view/icons'
+import { TriangleIcon } from '../components/icons'
 
 export interface VaultSwitcherProps {
   root: string
@@ -64,7 +64,7 @@ export const OPEN_FOLDER_TEXT = 'Open folder…'
 
 /** The rows `query` keeps, ranked (D7): an empty query is MRU order untouched; otherwise the `[[` picker's ranking, uncapped. */
 export function rankVaultRows(rows: readonly VaultRow[], query: string): VaultRow[] {
-  return query.trim() === '' ? [...rows] : matchLinkCandidates(rows, query, Math.max(1, rows.length))
+  return query.trim() === '' ? [...rows] : matchCandidates(rows, query, Math.max(1, rows.length))
 }
 
 /**
@@ -126,7 +126,7 @@ export function VaultSwitcher({ root, onPickFolder, pickDisabled, openRequest }:
   }, [matches, query, root])
 
   const choose = (path: string): void => {
-    void window.yaseenDocs.window
+    void window.yaseenDraw.window
       .openRecent(path)
       .catch((err: unknown) => {
         console.error('[vault-switcher] openRecent failed:', err)

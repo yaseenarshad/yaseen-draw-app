@@ -10,7 +10,9 @@ export default defineConfig({
   test: {
     name: 'desktop',
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    // `shared/` has no project of its own; its pure-rule tests (🔒 YAZ-1811 `drawingAssets.test.ts`)
+    // run here under node, which is the environment they promise to need nothing more than.
+    include: ['src/**/*.test.ts', '../shared/**/*.test.ts'],
     // chokidar tests write right after `ready`; stat polling makes that deterministic (macOS FSEvents start asynchronously).
     env: { CHOKIDAR_USEPOLLING: '1' },
   },

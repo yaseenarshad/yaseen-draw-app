@@ -2,10 +2,9 @@ import type { TreeNode } from '@shared/types'
 import { stripExt } from '../lib/paths'
 import { CreateInline } from './CreateInline'
 import { renameInputName, type EntryKind } from './createEntry'
-import { focusOpenDocument } from '../lib/focusHandoff'
 import { RenameInline } from './RenameInline'
 
-/** Inline "New note"/"New folder page"/"New folder" input pending inside the tree (GRO-2022, YAZ-841). */
+/** Inline "New drawing"/"New folder" input pending inside the tree (GRO-2022). */
 export interface PendingCreate {
   kind: EntryKind
   seed: string
@@ -66,7 +65,7 @@ const edgeOf = (e: React.DragEvent): 'before' | 'after' => {
 /**
  * Sidebar multi-select (YAZ-1336, 🔒 D1) as both trees take it: the selected PATHS plus the two
  * gestures that change them. The Sidebar owns the reducer behind it; keying by path is 🔒 D3, so
- * a page standing under two parents in Topics shows selected on BOTH of its rows. A path is a
+ * a folder drawn on both lenses shows selected on BOTH of its rows. A path is a
  * file or a FOLDER (YAZ-1578): a selected folder is the folder itself, never its contents.
  */
 export interface TreeSelection {
@@ -99,7 +98,7 @@ interface TreeProps {
   renaming: PendingRename | null
   /** File drag-to-move state + callbacks (E1b); owned by the Sidebar. */
   move: TreeFileMove
-  /** Multi-select state + gestures (YAZ-1336); owned by the Sidebar, shared with the Topics lens. */
+  /** Multi-select state + gestures (YAZ-1336); owned by the Sidebar, shared by both lenses. */
   selection: TreeSelection
   /** Favorites-only (YAZ-1766 D4): root rows reorder the list instead of moving files; nested rows do not drag. */
   reorder?: TreeReorder
@@ -203,7 +202,7 @@ export function Tree({
             {expanded.has(node.path) && <Tree nodes={node.children} dirPath={node.path} depth={depth + 1} {...recurse} />}
           </li>
         ) : renaming !== null && renaming.path === node.path ? (
-          // Inline rename (Links E1, GRO-2194): Markdown hides its suffix and re-appends it on
+          // Inline rename (Links E1, GRO-2194): a drawing hides its suffix and re-appends it on
           // commit; view-only files show the full filename so their extension stays explicit.
           <li key={node.path} role="treeitem">
             <RenameInline initial={renameInputName(node.name)} indent={8 + depth * 14 + 14} onSubmit={renaming.onSubmit} onCancel={renaming.onCancel} />
@@ -230,15 +229,9 @@ export function Tree({
                   onOpenDefault(node.path)
                   return
                 }
-                // First activation previews, second commits — the Topics rows' rule (YAZ-921):
-                // opening keeps focus on the row, re-activating the open page enters its text.
-                // The commit is KEYBOARD-only since D11 (YAZ-1674): Enter on the open row takes the
-                // caret in (a keyboard click has `detail === 0`); a MOUSE click on the open note
-                // just selects it, so click-then-⌘C works on every row instead of handing the key
-                // to the editor.
+                // Opening keeps focus on the row (YAZ-921), so ↑/↓ carry on walking the tree.
                 if (e.metaKey) onOpenFileBackground(node.path)
                 else if (node.path !== activeFile) onOpenFile(node.path)
-                else if (e.detail === 0) focusOpenDocument() // YAZ-961: the VISIBLE one
               }}
               onContextMenu={(e) => onNodeContextMenu(node, e)}
               title={node.path}

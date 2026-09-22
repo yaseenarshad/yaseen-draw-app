@@ -34,9 +34,9 @@ beforeEach(() => {
 const exists = async (p: string) => stat(p).then(() => true, () => false)
 
 describe('removeEntry (GRO-2272 A1)', () => {
-  it('moves a markdown file to the Trash and reports kind file', async () => {
+  it('moves a drawing file to the Trash and reports kind file', async () => {
     trashResolves()
-    const p = path.join(root, 'b.md')
+    const p = path.join(root, 'b.excalidraw')
     expect(await removeEntry({ path: p })).toEqual({ path: p, kind: 'file' })
     expect(trashItem).toHaveBeenCalledExactlyOnceWith(p)
   })
@@ -60,7 +60,7 @@ describe('removeEntry (GRO-2272 A1)', () => {
     trashItem.mockImplementation(async () => {
       throw new Error('no Trash on this volume')
     })
-    const p = path.join(root, 'A.md')
+    const p = path.join(root, 'A.excalidraw')
     const err = await failure(removeEntry({ path: p }))
     expect(err.code).toBe('IO_ERROR')
     expect(err.path).toBe(p)
@@ -70,13 +70,13 @@ describe('removeEntry (GRO-2272 A1)', () => {
 
   it('NOT_FOUND for a missing path, and nothing is trashed', async () => {
     trashResolves()
-    expect((await failure(removeEntry({ path: path.join(root, 'nope.md') }))).code).toBe('NOT_FOUND')
+    expect((await failure(removeEntry({ path: path.join(root, 'nope.excalidraw') }))).code).toBe('NOT_FOUND')
     expect(trashItem).not.toHaveBeenCalled()
   })
 
   it('refuses everything the tree hides — dot-entries AND node_modules — never deletable from a UI that never showed them', async () => {
     trashResolves()
-    for (const p of [path.join(root, '.obsidian'), path.join(root, '.yaseendocs'), path.join(root, '.hidden.md'), path.join(root, 'node_modules')]) {
+    for (const p of [path.join(root, '.obsidian'), path.join(root, '.yaseendraw'), path.join(root, '.hidden.excalidraw'), path.join(root, 'node_modules')]) {
       const err = await failure(removeEntry({ path: p }))
       expect(err.code).toBe('BAD_REQUEST')
       expect(await exists(p)).toBe(true)
@@ -93,7 +93,7 @@ describe('removeEntry (GRO-2272 A1)', () => {
   it('rejects a missing or relative path argument before touching the disk', async () => {
     trashResolves()
     expect((await failure(removeEntry({}))).code).toBe('BAD_REQUEST')
-    expect((await failure(removeEntry({ path: 'relative/x.md' }))).code).toBe('NOT_ABSOLUTE')
+    expect((await failure(removeEntry({ path: 'relative/x.excalidraw' }))).code).toBe('NOT_ABSOLUTE')
     expect((await failure(removeEntry(null))).code).toBe('BAD_REQUEST')
     expect(trashItem).not.toHaveBeenCalled()
   })
@@ -109,8 +109,8 @@ describe('removeEntry (GRO-2272 A1)', () => {
   it('deletes a nested file inside a folder without touching the folder', async () => {
     trashResolves()
     await mkdir(path.join(root, 'Nest'), { recursive: true })
-    await writeFile(path.join(root, 'Nest', 'n.md'), 'n')
-    const p = path.join(root, 'Nest', 'n.md')
+    await writeFile(path.join(root, 'Nest', 'n.excalidraw'), 'n')
+    const p = path.join(root, 'Nest', 'n.excalidraw')
     expect(await removeEntry({ path: p })).toEqual({ path: p, kind: 'file' })
     expect(await exists(path.join(root, 'Nest'))).toBe(true)
   })

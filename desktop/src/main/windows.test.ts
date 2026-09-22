@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { defaultRightPanelIdentity, type RecentRoots, type WindowBounds, type WindowEntry } from '@shared/types'
+import type { RecentRoots, WindowBounds, WindowEntry } from '@shared/types'
 import { CH } from '../channels'
 import { createStore, type Store } from './store'
 import {
@@ -131,7 +131,7 @@ let dir: string
 let store: Store
 beforeEach(async () => {
   dir = await mkdtemp(path.join(tmpdir(), 'yd-windows-'))
-  store = createStore(path.join(dir, 'yaseendocs.json'))
+  store = createStore(path.join(dir, 'yaseendraw.json'))
   vi.useFakeTimers()
 })
 afterEach(async () => {
@@ -142,8 +142,8 @@ afterEach(async () => {
 
 /** Two stored windows, restored: the common close/quit fixture. */
 function seedTwo() {
-  store.upsertWindow({ id: 'w1', root: '/v', file: '/v/a.md', tabs: ['/v/a.md'], sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 10, y: 10, width: 800, height: 600 } })
-  store.upsertWindow({ id: 'w2', root: null, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 40, y: 40, width: 800, height: 600 } })
+  store.upsertWindow({ id: 'w1', root: '/v', file: '/v/a.excalidraw', tabs: ['/v/a.excalidraw'], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: { x: 10, y: 10, width: 800, height: 600 } })
+  store.upsertWindow({ id: 'w2', root: null, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: { x: 40, y: 40, width: 800, height: 600 } })
   const { host, created } = makeHost()
   const manager = createWindowManager(store, host)
   manager.restoreAll()
@@ -158,14 +158,13 @@ describe('createWindowManager: restore', () => {
     expect(created[0].entry.root).toBeNull()
     expect(created[0].entry.file).toBeNull()
     expect(created[0].entry.tabs).toEqual([])
-    expect(created[0].entry.rightPanel).toEqual(defaultRightPanelIdentity())
     expect(created[0].entry.sidebarCollapsed).toBe(false)
     expect(store.get().windows).toEqual([created[0].entry])
   })
 
   it('restores every stored entry, clamping lost bounds back onto a display and persisting the clamp', () => {
-    store.upsertWindow({ id: 'w1', root: '/v', file: '/v/a.md', tabs: ['/v/a.md'], sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 10, y: 10, width: 800, height: 600 } })
-    store.upsertWindow({ id: 'w2', root: null, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 9000, y: 9000, width: 800, height: 600 } })
+    store.upsertWindow({ id: 'w1', root: '/v', file: '/v/a.excalidraw', tabs: ['/v/a.excalidraw'], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: { x: 10, y: 10, width: 800, height: 600 } })
+    store.upsertWindow({ id: 'w2', root: null, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: { x: 9000, y: 9000, width: 800, height: 600 } })
     const { host, created } = makeHost()
     createWindowManager(store, host).restoreAll()
     expect(created.map((c) => c.entry.id)).toEqual(['w1', 'w2'])
@@ -182,7 +181,7 @@ describe('createWindowManager: restore', () => {
 
 describe('createWindowManager: bounds', () => {
   it('saves moved/resized bounds once per burst (debounced), onto the entry as it is now', () => {
-    store.upsertWindow({ id: 'w1', root: null, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 10, y: 10, width: 800, height: 600 } })
+    store.upsertWindow({ id: 'w1', root: null, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: { x: 10, y: 10, width: 800, height: 600 } })
     const { host, created } = makeHost()
     createWindowManager(store, host).restoreAll()
     const win = created[0].win
@@ -197,7 +196,7 @@ describe('createWindowManager: bounds', () => {
     expect(changes).toBe(0)
     vi.advanceTimersByTime(BOUNDS_DEBOUNCE_MS)
     expect(changes).toBe(1)
-    expect(store.get().windows[0]).toEqual({ id: 'w1', root: '/v', file: null, tabs: [], rightPanel: defaultRightPanelIdentity(), sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 50, y: 60, width: 900, height: 700 } })
+    expect(store.get().windows[0]).toEqual({ id: 'w1', root: '/v', file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: { x: 50, y: 60, width: 900, height: 700 } })
   })
 })
 
@@ -215,7 +214,7 @@ describe('createWindowManager: close', () => {
   })
 
   it('the last window keeps its entry (its close is the quit) and saves its final bounds', async () => {
-    store.upsertWindow({ id: 'w1', root: '/v', file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 10, y: 10, width: 800, height: 600 } })
+    store.upsertWindow({ id: 'w1', root: '/v', file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: { x: 10, y: 10, width: 800, height: 600 } })
     const { host, created } = makeHost()
     const manager = createWindowManager(store, host)
     manager.restoreAll()
@@ -225,7 +224,7 @@ describe('createWindowManager: close', () => {
     manager.handleFlushed(win.webContents)
     await vi.advanceTimersByTimeAsync(0)
     expect(win.isDestroyed()).toBe(true)
-    expect(store.get().windows).toEqual([{ id: 'w1', root: '/v', file: null, tabs: [], rightPanel: defaultRightPanelIdentity(), sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 200, y: 100, width: 800, height: 600 } }])
+    expect(store.get().windows).toEqual([{ id: 'w1', root: '/v', file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: { x: 200, y: 100, width: 800, height: 600 } }])
   })
 
   it('a hung renderer cannot block close: the handshake times out after FLUSH_TIMEOUT_MS', async () => {
@@ -322,14 +321,14 @@ describe('createWindowManager: openRecentBeside (YAZ-1767 D1 — the one open-re
   it('a live folder: bumps it to the top of the MRU, opens a window on its remembered last file (D2), returns true', () => {
     store.pushRecent('/v/other', 1)
     store.pushRecent('/v/notes', 2)
-    store.setFolder('/v/other', { lastFile: '/v/other/Start here.md' })
+    store.setFolder('/v/other', { lastFile: '/v/other/Start here.excalidraw' })
     const { host, created } = makeHost()
     const manager = createWindowManager(store, host)
     expect(manager.openRecentBeside('/v/other')).toBe(true)
     expect(created).toHaveLength(1)
     expect(created[0].entry.root).toBe('/v/other')
-    expect(created[0].entry.file).toBe('/v/other/Start here.md')
-    expect(created[0].entry.tabs).toEqual(['/v/other/Start here.md'])
+    expect(created[0].entry.file).toBe('/v/other/Start here.excalidraw')
+    expect(created[0].entry.tabs).toEqual(['/v/other/Start here.excalidraw'])
     expect(store.get().recents.map((r) => r.path)).toEqual(['/v/other', '/v/notes'])
     expect(store.get().windows).toEqual([created[0].entry])
   })
@@ -343,7 +342,7 @@ describe('createWindowManager: openRecentBeside (YAZ-1767 D1 — the one open-re
   })
 
   it('D9: the vault is already open in ONE window → that window is raised, nothing new opens, true', () => {
-    store.upsertWindow({ id: 'w1', root: '/v/other/', file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 0, y: 0, width: 800, height: 600 } })
+    store.upsertWindow({ id: 'w1', root: '/v/other/', file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: { x: 0, y: 0, width: 800, height: 600 } })
     const { host, created } = makeHost()
     const manager = createWindowManager(store, host)
     manager.restoreAll()
@@ -360,7 +359,7 @@ describe('createWindowManager: openRecentBeside (YAZ-1767 D1 — the one open-re
   })
 
   it('D9: two windows on the vault, focus history A then B → raised A then B, so B (most recently focused) ends on top', () => {
-    const entry = (id: string) => ({ id, root: '/v/other', file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'topics' as const, focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 0, y: 0, width: 800, height: 600 } })
+    const entry = (id: string) => ({ id, root: '/v/other', file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files' as const, focusDirs: [], focusFavorites: [], bounds: { x: 0, y: 0, width: 800, height: 600 } })
     store.upsertWindow(entry('a'))
     store.upsertWindow(entry('b'))
     store.upsertWindow({ ...entry('c'), root: '/v/notes' })
@@ -386,7 +385,7 @@ describe('createWindowManager: openRecentBeside (YAZ-1767 D1 — the one open-re
   })
 
   it('D9: a window never focused ranks LAST (raised first, ends underneath)', () => {
-    const entry = (id: string) => ({ id, root: '/v/other', file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'topics' as const, focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 0, y: 0, width: 800, height: 600 } })
+    const entry = (id: string) => ({ id, root: '/v/other', file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files' as const, focusDirs: [], focusFavorites: [], bounds: { x: 0, y: 0, width: 800, height: 600 } })
     store.upsertWindow(entry('a'))
     store.upsertWindow(entry('b'))
     const { host, created } = makeHost()
@@ -402,7 +401,7 @@ describe('createWindowManager: openRecentBeside (YAZ-1767 D1 — the one open-re
   })
 
   it('D9: a matching entry with NO live window (mid-close) falls through to a new window', () => {
-    store.upsertWindow({ id: 'w1', root: '/v/other', file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 0, y: 0, width: 800, height: 600 } })
+    store.upsertWindow({ id: 'w1', root: '/v/other', file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: { x: 0, y: 0, width: 800, height: 600 } })
     const { host, created } = makeHost()
     const manager = createWindowManager(store, host)
     manager.restoreAll()
@@ -427,22 +426,20 @@ describe('createWindowManager: openWindow / duplicateWindow (D6 plumbing)', () =
   it('openWindow creates an independent window and persists its entry', () => {
     const { host, created } = makeHost()
     const manager = createWindowManager(store, host)
-    manager.openWindow({ root: '/v', file: '/v/a.md' })
+    manager.openWindow({ root: '/v', file: '/v/a.excalidraw' })
     expect(created).toHaveLength(1)
     expect(created[0].entry.root).toBe('/v')
-    expect(created[0].entry.file).toBe('/v/a.md')
-    expect(created[0].entry.tabs).toEqual(['/v/a.md']) // the opened file is the one tab (GRO-2232)
-    expect(created[0].entry.rightPanel).toEqual(defaultRightPanelIdentity())
+    expect(created[0].entry.file).toBe('/v/a.excalidraw')
+    expect(created[0].entry.tabs).toEqual(['/v/a.excalidraw']) // the opened file is the one tab (GRO-2232)
     expect(created[0].entry.sidebarCollapsed).toBe(false)
-    expect(created[0].entry.sidebarLens).toBe('topics') // a new window starts on Topics (YAZ-847, YAZ-1628)
+    expect(created[0].entry.sidebarLens).toBe('files') // a new window starts on Files (YAZ-847, YAZ-1628)
     expect(created[0].entry.focusDirs).toEqual([]) // a new window starts unfocused (YAZ-1628)
-    expect(created[0].entry.focusTopics).toEqual([])
+    expect(created[0].entry.focusFavorites).toEqual([])
     expect(store.get().windows).toEqual([created[0].entry])
   })
 
   it('duplicateWindow copies the complete workspace identity, then the two entries can diverge', () => {
-    const rightPanel = { open: true, width: 560, items: ['/v/right-a.md', '/v/right-b.md'], expanded: '/v/right-b.md' }
-    const from: WindowEntry = { id: 'w1', root: '/v', file: '/v/a.md', tabs: ['/v/a.md', '/v/b.md'], rightPanel, sidebarCollapsed: true, sidebarLens: 'files', focusDirs: ['/v/a'], focusTopics: ['/v/T.md'], focusFavorites: [], bounds: { x: 100, y: 100, width: 800, height: 600 } }
+    const from: WindowEntry = { id: 'w1', root: '/v', file: '/v/a.excalidraw', tabs: ['/v/a.excalidraw', '/v/b.excalidraw'], sidebarCollapsed: true, sidebarLens: 'favorites', focusDirs: ['/v/a'], focusFavorites: ['/v/F'], bounds: { x: 100, y: 100, width: 800, height: 600 } }
     store.upsertWindow(from)
     const { host, created } = makeHost()
     createWindowManager(store, host).duplicateWindow(from)
@@ -450,30 +447,28 @@ describe('createWindowManager: openWindow / duplicateWindow (D6 plumbing)', () =
     const entry = created[0].entry
     expect(entry.id).not.toBe('w1')
     expect(entry.root).toBe('/v')
-    expect(entry.file).toBe('/v/a.md')
-    expect(entry.tabs).toEqual(['/v/a.md', '/v/b.md']) // the copy carries every tab, not just the active file (GRO-2232)
-    expect(entry.rightPanel).toEqual(rightPanel)
-    expect(entry.rightPanel.items).not.toBe(from.rightPanel.items)
+    expect(entry.file).toBe('/v/a.excalidraw')
+    expect(entry.tabs).toEqual(['/v/a.excalidraw', '/v/b.excalidraw']) // the copy carries every tab, not just the active file (GRO-2232)
     expect(entry.sidebarCollapsed).toBe(true)
-    expect(entry.sidebarLens).toBe('files') // the lens comes along too (YAZ-1628)
+    expect(entry.sidebarLens).toBe('favorites') // the lens comes along too (YAZ-1628)
     // Both Focus Mode lists come along BY VALUE (YAZ-1628): the copy holds the same paths in fresh arrays.
     expect(entry.focusDirs).toEqual(['/v/a'])
-    expect(entry.focusTopics).toEqual(['/v/T.md'])
+    expect(entry.focusFavorites).toEqual(['/v/F'])
     expect(entry.focusDirs).not.toBe(from.focusDirs)
-    expect(entry.focusTopics).not.toBe(from.focusTopics)
+    expect(entry.focusFavorites).not.toBe(from.focusFavorites)
     expect(entry.bounds).toEqual({ x: 100 + WINDOW_CASCADE_PX, y: 100 + WINDOW_CASCADE_PX, width: 800, height: 600 })
     expect(store.get().windows).toContainEqual(entry)
     store.upsertWindow({ ...entry, sidebarCollapsed: false })
     expect(store.get().windows.find((w) => w.id === 'w1')?.sidebarCollapsed).toBe(true)
     expect(store.get().windows.find((w) => w.id === entry.id)?.sidebarCollapsed).toBe(false)
     from.focusDirs.push('/v/mutated') // mutating the source afterwards never reaches the copy
-    from.focusTopics.push('/v/Mutated.md')
+    from.focusFavorites.push('/v/Mutated')
     expect(entry.focusDirs).toEqual(['/v/a'])
-    expect(entry.focusTopics).toEqual(['/v/T.md'])
+    expect(entry.focusFavorites).toEqual(['/v/F'])
   })
 
   it('duplicating a Welcome window keeps root and file null — Welcome → Welcome (⌘⇧N, GRO-2167)', () => {
-    const from: WindowEntry = { id: 'w1', root: null, file: null, tabs: [], rightPanel: defaultRightPanelIdentity(), sidebarCollapsed: true, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 100, y: 100, width: 800, height: 600 } }
+    const from: WindowEntry = { id: 'w1', root: null, file: null, tabs: [], sidebarCollapsed: true, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: { x: 100, y: 100, width: 800, height: 600 } }
     store.upsertWindow(from)
     const { host, created } = makeHost()
     createWindowManager(store, host).duplicateWindow(from)
@@ -486,7 +481,7 @@ describe('createWindowManager: openWindow / duplicateWindow (D6 plumbing)', () =
 
   it('the cascade is clamped: duplicating a window at the display edge stays fully on-screen (GRO-2167)', () => {
     // Bottom-right corner of the 1440×900 area: the +24/+24 cascade would hang off the display.
-    const from: WindowEntry = { id: 'w1', root: '/v', file: null, tabs: [], rightPanel: defaultRightPanelIdentity(), sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 640, y: 300, width: 800, height: 600 } }
+    const from: WindowEntry = { id: 'w1', root: '/v', file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: { x: 640, y: 300, width: 800, height: 600 } }
     store.upsertWindow(from)
     const { host, created } = makeHost()
     createWindowManager(store, host).duplicateWindow(from)
@@ -497,58 +492,69 @@ describe('createWindowManager: openWindow / duplicateWindow (D6 plumbing)', () =
 // ---------- deep-link routing (E1, GRO-2171) ----------
 
 describe('resolveLinkTarget (pure)', () => {
-  const win = (id: string, root: string | null): WindowEntry => ({ id, root, file: null, tabs: [], rightPanel: defaultRightPanelIdentity(), sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 0, y: 0, width: 800, height: 600 } })
+  const win = (id: string, root: string | null): WindowEntry => ({ id, root, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: { x: 0, y: 0, width: 800, height: 600 } })
   const recents = (...paths: string[]): RecentRoots => paths.map((path, i) => ({ path, lastOpened: 100 - i }))
 
   it('picks the open window whose root contains the path (root = dirname included)', () => {
-    expect(resolveLinkTarget('/v/a.md', [win('w1', '/v')], [])).toEqual({ kind: 'existing', id: 'w1' })
-    expect(resolveLinkTarget('/v/sub/deep/a.md', [win('w1', '/v')], [])).toEqual({ kind: 'existing', id: 'w1' })
+    expect(resolveLinkTarget('/v/a.excalidraw', [win('w1', '/v')], [])).toEqual({ kind: 'existing', id: 'w1' })
+    expect(resolveLinkTarget('/v/sub/deep/a.excalidraw', [win('w1', '/v')], [])).toEqual({ kind: 'existing', id: 'w1' })
   })
 
-  it('containment is by path segment: /a/b does not contain /a/bc/x.md', () => {
-    expect(resolveLinkTarget('/a/bc/x.md', [win('w1', '/a/b')], [])).toEqual({ kind: 'new', root: '/a/bc', file: '/a/bc/x.md' })
+  it('containment is by path segment: /a/b does not contain /a/bc/x.excalidraw', () => {
+    expect(resolveLinkTarget('/a/bc/x.excalidraw', [win('w1', '/a/b')], [])).toEqual({ kind: 'new', root: '/a/bc', file: '/a/bc/x.excalidraw' })
   })
 
   it('the most specific (longest) containing root wins; a tie keeps the first in windows[]', () => {
     const windows = [win('w1', '/v'), win('w2', '/v/sub'), win('w3', '/v/sub')]
-    expect(resolveLinkTarget('/v/sub/a.md', windows, [])).toEqual({ kind: 'existing', id: 'w2' })
+    expect(resolveLinkTarget('/v/sub/a.excalidraw', windows, [])).toEqual({ kind: 'existing', id: 'w2' })
   })
 
   it('Welcome windows (root null) are never targets', () => {
-    expect(resolveLinkTarget('/v/a.md', [win('w1', null)], [])).toEqual({ kind: 'new', root: '/v', file: '/v/a.md' })
+    expect(resolveLinkTarget('/v/a.excalidraw', [win('w1', null)], [])).toEqual({ kind: 'new', root: '/v', file: '/v/a.excalidraw' })
   })
 
   it('no containing window: the first (most recent) recents entry containing the path roots a new window', () => {
-    const target = resolveLinkTarget('/w/sub/b.md', [win('w1', '/v')], recents('/other', '/w', '/w/sub'))
-    expect(target).toEqual({ kind: 'new', root: '/w', file: '/w/sub/b.md' })
+    const target = resolveLinkTarget('/w/sub/b.excalidraw', [win('w1', '/v')], recents('/other', '/w', '/w/sub'))
+    expect(target).toEqual({ kind: 'new', root: '/w', file: '/w/sub/b.excalidraw' })
   })
 
   it('nothing contains the path: a new window rooted at its parent folder', () => {
-    expect(resolveLinkTarget('/elsewhere/deep/c.md', [win('w1', '/v')], recents('/w'))).toEqual({
+    expect(resolveLinkTarget('/elsewhere/deep/c.excalidraw', [win('w1', '/v')], recents('/w'))).toEqual({
       kind: 'new',
       root: '/elsewhere/deep',
-      file: '/elsewhere/deep/c.md',
+      file: '/elsewhere/deep/c.excalidraw',
+    })
+  })
+
+  it('a Finder double-click on a drawing OUTSIDE every open vault opens its PARENT FOLDER as the vault (2I)', () => {
+    // The file association travels this same path (`open-file` / argv → `yaseendraw://` → here),
+    // so a board that belongs to no open and no recent vault still opens — in a new window whose
+    // root is the folder the file sits in.
+    expect(resolveLinkTarget('/Users/me/Desktop/Sketch.excalidraw', [win('w1', '/v')], [])).toEqual({
+      kind: 'new',
+      root: '/Users/me/Desktop',
+      file: '/Users/me/Desktop/Sketch.excalidraw',
     })
   })
 
   it('a containing rootOverride wins: the open window on exactly that root first, else a new window there', () => {
     const windows = [win('w1', '/v'), win('w2', '/v/sub')]
     // Without the override, the more specific /v/sub would win; the override pins /v.
-    expect(resolveLinkTarget('/v/sub/a.md', windows, [], '/v')).toEqual({ kind: 'existing', id: 'w1' })
-    expect(resolveLinkTarget('/v/sub/a.md', [], [], '/v')).toEqual({ kind: 'new', root: '/v', file: '/v/sub/a.md' })
+    expect(resolveLinkTarget('/v/sub/a.excalidraw', windows, [], '/v')).toEqual({ kind: 'existing', id: 'w1' })
+    expect(resolveLinkTarget('/v/sub/a.excalidraw', [], [], '/v')).toEqual({ kind: 'new', root: '/v', file: '/v/sub/a.excalidraw' })
   })
 
   it('a rootOverride that does not contain the path is ignored', () => {
-    expect(resolveLinkTarget('/v/a.md', [win('w1', '/v')], [], '/w')).toEqual({ kind: 'existing', id: 'w1' })
-    expect(resolveLinkTarget('/v/a.md', [], [], null)).toEqual({ kind: 'new', root: '/v', file: '/v/a.md' })
+    expect(resolveLinkTarget('/v/a.excalidraw', [win('w1', '/v')], [], '/w')).toEqual({ kind: 'existing', id: 'w1' })
+    expect(resolveLinkTarget('/v/a.excalidraw', [], [], null)).toEqual({ kind: 'new', root: '/v', file: '/v/a.excalidraw' })
   })
 })
 
 describe('createWindowManager: routeToFile (E1)', () => {
   /** One folder window on /v plus a Welcome window — the routing fixture. */
   function seedRouting(exists: (path: string) => boolean = () => true) {
-    store.upsertWindow({ id: 'w1', root: '/v', file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 10, y: 10, width: 800, height: 600 } })
-    store.upsertWindow({ id: 'w2', root: null, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 40, y: 40, width: 800, height: 600 } })
+    store.upsertWindow({ id: 'w1', root: '/v', file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: { x: 10, y: 10, width: 800, height: 600 } })
+    store.upsertWindow({ id: 'w2', root: null, file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: { x: 40, y: 40, width: 800, height: 600 } })
     const { host, created } = makeHost([AREA], exists)
     const manager = createWindowManager(store, host)
     manager.restoreAll()
@@ -560,61 +566,54 @@ describe('createWindowManager: routeToFile (E1)', () => {
   it('routes into the containing open window: restored if minimized, focused, sent link:open-file with the path', () => {
     const { manager, created, w1 } = seedRouting()
     w1.minimized = true
-    manager.routeToFile('/v/sub/a.md')
+    manager.routeToFile('/v/sub/a.excalidraw')
     expect(w1.isMinimized()).toBe(false)
     expect(w1.focusCount).toBe(1)
-    expect(w1.webContents.send).toHaveBeenCalledWith(CH.linkOpenFile, '/v/sub/a.md')
+    expect(w1.webContents.send).toHaveBeenCalledWith(CH.linkOpenFile, '/v/sub/a.excalidraw')
     expect(created).toHaveLength(2) // no new window
   })
 
-  it('.markdown and upper-case extensions route too', () => {
+  it('an upper-case extension routes too', () => {
     const { manager, w1 } = seedRouting()
-    manager.routeToFile('/v/A.MARKDOWN')
-    expect(w1.webContents.send).toHaveBeenCalledWith(CH.linkOpenFile, '/v/A.MARKDOWN')
-  })
-
-  it.each(['/v/data.json', '/v/tool.PY', '/v/report.pdf'])('routes supported view-only file %s through the existing window', (file) => {
-    const { manager, created, w1 } = seedRouting()
-    manager.routeToFile(file)
-    expect(w1.webContents.send).toHaveBeenCalledWith(CH.linkOpenFile, file)
-    expect(created).toHaveLength(2)
+    manager.routeToFile('/v/A.EXCALIDRAW')
+    expect(w1.webContents.send).toHaveBeenCalledWith(CH.linkOpenFile, '/v/A.EXCALIDRAW')
   })
 
   it('no containing window: a new window on the most recent recents folder containing the file, persisted', () => {
     const { manager, created } = seedRouting()
     store.pushRecent('/w', 1)
-    manager.routeToFile('/w/sub/b.md')
+    manager.routeToFile('/w/sub/b.excalidraw')
     expect(created).toHaveLength(3)
     expect(created[2].entry.root).toBe('/w')
-    expect(created[2].entry.file).toBe('/w/sub/b.md')
+    expect(created[2].entry.file).toBe('/w/sub/b.excalidraw')
     expect(created[2].entry.sidebarCollapsed).toBe(false)
     expect(store.get().windows).toContainEqual(created[2].entry)
   })
 
   it('nothing matches: a new window rooted at the file parent folder', () => {
     const { manager, created } = seedRouting()
-    manager.routeToFile('/elsewhere/deep/c.md')
+    manager.routeToFile('/elsewhere/deep/c.excalidraw')
     expect(created).toHaveLength(3)
     expect(created[2].entry.root).toBe('/elsewhere/deep')
-    expect(created[2].entry.file).toBe('/elsewhere/deep/c.md')
+    expect(created[2].entry.file).toBe('/elsewhere/deep/c.excalidraw')
   })
 
   it('a rootOverride routes into the open window on exactly that root', () => {
     const { manager, created, w1 } = seedRouting()
-    manager.routeToFile('/v/sub/a.md', '/v')
-    expect(w1.webContents.send).toHaveBeenCalledWith(CH.linkOpenFile, '/v/sub/a.md')
+    manager.routeToFile('/v/sub/a.excalidraw', '/v')
+    expect(w1.webContents.send).toHaveBeenCalledWith(CH.linkOpenFile, '/v/sub/a.excalidraw')
     expect(created).toHaveLength(2)
   })
 
   it('a stored entry with no live window (mid-close race) falls back to a fresh window on that entry root', () => {
     const { manager, created } = seedRouting()
     // The entry exists in the state but was never attached — its window is already gone.
-    store.upsertWindow({ id: 'w3', root: '/v/deeper', file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 20, y: 20, width: 800, height: 600 } })
-    manager.routeToFile('/v/deeper/n.md') // most specific root wins → resolves to the dead w3
+    store.upsertWindow({ id: 'w3', root: '/v/deeper', file: null, tabs: [], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: { x: 20, y: 20, width: 800, height: 600 } })
+    manager.routeToFile('/v/deeper/n.excalidraw') // most specific root wins → resolves to the dead w3
     expect(created).toHaveLength(3)
     expect(created[2].entry.id).not.toBe('w3') // a fresh window, not a resurrection of the dead entry
     expect(created[2].entry.root).toBe('/v/deeper')
-    expect(created[2].entry.file).toBe('/v/deeper/n.md')
+    expect(created[2].entry.file).toBe('/v/deeper/n.excalidraw')
   })
 
   it('an unsupported path opens nothing and reports “unsupported file type” passively', () => {
@@ -629,14 +628,14 @@ describe('createWindowManager: routeToFile (E1)', () => {
 
   it('a missing file (host.exists false) gets the same notice: no window, no dialog', () => {
     const { manager, created, w1 } = seedRouting(() => false)
-    manager.routeToFile('/v/gone.md')
+    manager.routeToFile('/v/gone.excalidraw')
     expect(created).toHaveLength(2)
     expect(sentOn(w1, CH.linkNotice)).toHaveLength(1)
     expect(sentOn(w1, CH.linkOpenFile)).toHaveLength(0)
   })
 
   it('a directory with a supported-looking suffix is refused passively by the regular-file probe', () => {
-    const directory = '/v/folder.pdf'
+    const directory = '/v/folder.excalidraw'
     const { manager, created, w1 } = seedRouting((candidate) => candidate !== directory)
     manager.routeToFile(directory)
     expect(created).toHaveLength(2)

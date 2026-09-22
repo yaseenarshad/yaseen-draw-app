@@ -27,7 +27,7 @@ export function useWatch(root: string | null): WatchSource {
   )
   useEffect(() => {
     if (root === null) return
-    return window.yaseenDocs.watch(root, (ev) => listeners.current.forEach((l) => l(ev)))
+    return window.yaseenDraw.watch(root, (ev) => listeners.current.forEach((l) => l(ev)))
   }, [root])
   return source
 }

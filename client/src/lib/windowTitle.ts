@@ -1,6 +1,6 @@
 import { basename, stripExt } from './paths'
 
-export const APP_NAME = 'Yaseen Docs'
+export const APP_NAME = 'Yaseen Draw'
 
 /**
  * Obsidian-style window title (C3, GRO-2165): `<file> — <folder>` (vault extension stripped),

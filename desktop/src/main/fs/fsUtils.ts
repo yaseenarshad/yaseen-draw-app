@@ -1,10 +1,10 @@
 import { randomBytes } from 'node:crypto'
 import { readdir, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import type { BridgeError, FileKind, TreeNode } from '@shared/types'
-import { fileKind, isMarkdown, isSupportedFile } from '@shared/fileKind'
+import type { BridgeError, TreeNode } from '@shared/types'
+import { fileKind, isDrawing } from '@shared/fileKind'
 
-export { isMarkdown, isSupportedFile } from '@shared/fileKind'
+export { isDrawing, isSupportedFile } from '@shared/fileKind'
 
 /**
  * Thrown by the fs layer; `ipc/envelope.ts` turns it into the `BridgeError` the renderer sees.
@@ -41,17 +41,13 @@ export function requireAbsPath(p: unknown, param: string): string {
 }
 
 /** Throws unless `p` has the only editable/creatable extension kind. */
-export function requireMarkdownFile(p: string): void {
-  if (!isMarkdown(p)) throw new BridgeFailure('UNSUPPORTED_EXTENSION', 'only .md/.markdown files are editable', { path: p })
+export function requireDrawingFile(p: string): void {
+  if (!isDrawing(p)) throw new BridgeFailure('UNSUPPORTED_EXTENSION', 'only .excalidraw files are editable', { path: p })
 }
 
-/** Returns the kind for files that can cross the UTF-8 text bridge. PDFs use their own binary bridge. */
-export function requireTextReadableFile(p: string): Extract<FileKind, 'markdown' | 'text'> {
-  const kind = fileKind(p)
-  if (kind !== 'markdown' && kind !== 'text') {
-    throw new BridgeFailure('UNSUPPORTED_EXTENSION', 'only Markdown and supported text files can be read as text', { path: p })
-  }
-  return kind
+/** Throws unless `p` can cross the UTF-8 text bridge. */
+export function requireTextReadableFile(p: string): void {
+  if (fileKind(p) === null) throw new BridgeFailure('UNSUPPORTED_EXTENSION', 'only .excalidraw files can be read as text', { path: p })
 }
 
 /** Dot-entries and node_modules are invisible to every call. */
@@ -59,7 +55,7 @@ export function isSkipped(name: string): boolean {
   return name.startsWith('.') || name === 'node_modules'
 }
 
-export function byNameCi<T extends { name: string }>(a: T, b: T): number {
+function byNameCi<T extends { name: string }>(a: T, b: T): number {
   return a.name.toLowerCase().localeCompare(b.name.toLowerCase())
 }
 
@@ -131,7 +127,7 @@ export async function buildTree(dir: string): Promise<TreeNode[]> {
 
 /**
  * Writes `content` to `<file>.tmp-<rand>` then renames over `file`. Parent dir must exist.
- * A string lands as UTF-8; bytes (an image through `writeAsset`, YAZ-1661) land verbatim —
+ * A string lands as UTF-8; bytes (a scene's images through `drawing:save`, 🔒 D3) land verbatim —
  * `writeFile` ignores the encoding for a view, so one call serves both.
  */
 export async function atomicWrite(file: string, content: string | Uint8Array): Promise<{ mtime: number; size: number }> {

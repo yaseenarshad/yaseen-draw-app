@@ -7,7 +7,7 @@ import { failure } from './fs/testFixture'
 import { FAVORITES_FILE, getFavorites, isSafeRel, removePath, renamePath, setFavorites, toAbs, toRel } from './favorites'
 
 /**
- * The Favorites list in the vault (YAZ-1766 6A, D11–D14): `.yaseendocs/favorites.json` holds
+ * The Favorites list in the vault (YAZ-1766 6A, D11–D14): `.yaseendraw/favorites.json` holds
  * VAULT-RELATIVE POSIX paths; the API speaks absolute ones. Real tmp vaults, like vaultConfig.test.
  */
 
@@ -64,7 +64,7 @@ describe('getFavorites / setFavorites', () => {
     expect(await readdir(root)).not.toContain(VAULT_CONFIG_DIR)
   })
 
-  it('set creates .yaseendocs/favorites.json with RELATIVE POSIX entries in order, pretty JSON; get round-trips to absolute', async () => {
+  it('set creates .yaseendraw/favorites.json with RELATIVE POSIX entries in order, pretty JSON; get round-trips to absolute', async () => {
     const root = await makeVault()
     const abs = [path.join(root, 'Projects', 'p.md'), path.join(root, 'Notes'), path.join(root, 'top.md')]
     await setFavorites(root, abs)

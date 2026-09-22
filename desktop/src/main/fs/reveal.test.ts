@@ -23,7 +23,7 @@ beforeEach(() => {
 
 describe('revealItem (GRO-2274 A1)', () => {
   it('reveals a file at its exact path', async () => {
-    const p = path.join(root, 'b.md')
+    const p = path.join(root, 'b.excalidraw')
     expect(await revealItem({ path: p })).toEqual({ path: p })
     expect(reveal).toHaveBeenCalledExactlyOnceWith(p)
   })
@@ -40,7 +40,7 @@ describe('revealItem (GRO-2274 A1)', () => {
   })
 
   it('a missing path is NOT_FOUND and showItemInFolder is never called (the stale-row case)', async () => {
-    expect((await failure(revealItem({ path: path.join(root, 'nope.md') }))).code).toBe('NOT_FOUND')
+    expect((await failure(revealItem({ path: path.join(root, 'nope.excalidraw') }))).code).toBe('NOT_FOUND')
     expect(reveal).not.toHaveBeenCalled()
   })
 
@@ -56,7 +56,7 @@ describe('revealItem (GRO-2274 A1)', () => {
 
   it('rejects a missing or relative path argument before touching the disk', async () => {
     expect((await failure(revealItem({}))).code).toBe('BAD_REQUEST')
-    expect((await failure(revealItem({ path: 'relative/x.md' }))).code).toBe('NOT_ABSOLUTE')
+    expect((await failure(revealItem({ path: 'relative/x.excalidraw' }))).code).toBe('NOT_ABSOLUTE')
     expect((await failure(revealItem(null))).code).toBe('BAD_REQUEST')
     expect(reveal).not.toHaveBeenCalled()
   })

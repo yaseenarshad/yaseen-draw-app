@@ -16,7 +16,7 @@ import { BridgeFailure, fsCall, isSkipped, requireAbsPath } from './fsUtils'
  * future "helpful" fallback being added.
  *
  * Guards mirror `rename.ts` where they transfer, and only where they transfer:
- *  - entries the tree/index/watcher hide (dot-entries like `.yaseendocs` / `.obsidian` /
+ *  - entries the tree/index/watcher hide (dot-entries like `.yaseendraw` / `.obsidian` /
  *    `.trash`, and `node_modules`) are invisible infrastructure, so deleting one through a UI
  *    that never showed it is refused (`BAD_REQUEST`). The check reuses `isSkipped` rather than
  *    testing for a leading dot, so this guard cannot drift from the rule that justifies it;

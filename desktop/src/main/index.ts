@@ -1,36 +1,35 @@
-import { app, BrowserWindow, clipboard, Menu, nativeTheme, net, powerMonitor, protocol, screen, shell } from 'electron'
+import { app, BrowserWindow, Menu, nativeTheme, net, powerMonitor, protocol, screen, shell } from 'electron'
 import { statSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { isDrawing } from '@shared/fileKind'
 import { fileLink, parseFileLink } from '@shared/links'
-import type { ClipboardPasteRequest, WindowEntry } from '@shared/types'
-import { CH } from '../channels'
+import type { WindowEntry } from '@shared/types'
 import type { GitSyncManager } from './git/manager'
 import { registerIpc } from './ipc'
-import { registerAgentIpc } from './ipc/agent'
-import { registerClipboardIpc } from './ipc/clipboard'
+import { ensureLibraryFolder } from './library'
+import { openableFileArgs } from './fileArgs'
 import { createLinkQueue } from './linkQueue'
 import { openLink } from './fs/openLink'
-import { buildContextMenuTemplate, buildMenuTemplate, createMenuHandlers, pickMenuTargetWindow, subscribeMenuRebuild } from './menu'
-import { revealItem } from './fs/reveal'
-import { revealVaultImage, serveVaultImage } from './vaultProtocol'
+import { buildContextMenuTemplate, buildMenuTemplate, createMenuHandlers, pickMenuTargetWindow, subscribeMenuRebuild, subscribeMenuRebuildOnActiveFile } from './menu'
 import { createStore } from './store'
 import { subscribeNativeTheme, windowBackgroundColor } from './theme'
 import { applyUserDataOverride } from './userData'
-import { flushIndexCache, initIndexCache } from './vaultIndex'
 import { createWindowManager } from './windows'
 import { createWindowOpenHandler } from './windowOpenPolicy'
 
 // Before anything reads app.getPath('userData'): the workspace is named "desktop", the app is not.
-app.setName('Yaseen Docs')
-applyUserDataOverride(app, process.env.YASEEN_DOCS_USER_DATA_DIR)
+app.setName('Yaseen Draw')
+applyUserDataOverride(app, process.env.YASEEN_DRAW_USER_DATA_DIR)
 
 /** One running instance (GRO-2160): a second launch focuses the first; a link in its argv routes (E1). */
 const isPrimaryInstance = app.requestSingleInstanceLock()
 if (!isPrimaryInstance) app.quit()
 app.on('second-instance', (_event, argv) => {
-  // Windows/Linux deliver a clicked yaseendocs:// link as an argv entry of the second launch.
-  const urls = argv.filter((arg) => arg.startsWith('yaseendocs://'))
+  // Windows/Linux deliver a clicked yaseendraw:// link as an argv entry of the second launch —
+  // and a double-clicked `.excalidraw` as a bare PATH in the same place (2I): off macOS there is
+  // no `open-file` event, so argv is the only door the file association has.
+  const urls = [...argv.filter((arg) => arg.startsWith('yaseendraw://')), ...openableFileArgs(argv, argsSkip()).map(fileLink)]
   if (urls.length > 0) {
     for (const url of urls) links.push(url)
     return // routing focuses (or opens) the right window itself
@@ -42,7 +41,7 @@ app.on('second-instance', (_event, argv) => {
 })
 
 // Deep links (E1, GRO-2171): the packaged bundle's `protocols` Info.plist entry is F1's job.
-app.setAsDefaultProtocolClient('yaseendocs')
+app.setAsDefaultProtocolClient('yaseendraw')
 
 /** A parsed link routes to the best window; a bad one gets the unobtrusive notice, never a dialog. */
 function handleLink(url: string): void {
@@ -61,14 +60,18 @@ app.on('open-url', (event, url) => {
   links.push(url)
 })
 
-// Finder "Open With" (E2, GRO-2172) hands a plain absolute path — also before `ready` on cold
-// start. Encoding it as a yaseendocs:// link reuses the whole E1 pipeline (queue, parse, routing,
-// markdown/exists guards); fileLink ↔ parseFileLink is lossless (links.test.ts round trips). The
-// packaged bundle's `fileAssociations` (role Alternate) declaration is F1's job.
+// macOS hands a double-clicked (or `open`ed, or "Open With"-ed) file to `open-file` as a plain
+// absolute path — also before `ready` on a cold start. Encoding it as a yaseendraw:// link reuses
+// the whole E1 pipeline (queue, parse, routing, kind/exists guards); fileLink ↔ parseFileLink is
+// lossless (links.test.ts round trips). The bundle claims `.excalidraw` as an Owner association
+// in `desktop/package.json`, which is what makes the event fire at all (🔒 D1, YAZ-1775).
 app.on('open-file', (event, path) => {
   event.preventDefault()
   links.push(fileLink(path))
 })
+
+/** How many leading argv entries belong to the launcher: the executable, plus the app dir in dev. */
+const argsSkip = (): number => (app.isPackaged ? 1 : 2)
 
 // Privileged scheme: `standard` gives a real origin (history API, relative URLs), `secure` treats it
 // like https. VS Code (vscode-file://) and Obsidian (app://obsidian.md) do the same.
@@ -76,11 +79,10 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: t
 
 const RENDERER_DIR = join(__dirname, '../renderer')
 
-/** One user-global state file (D9, GRO-2159): `~/Library/Application Support/Yaseen Docs/yaseendocs.json`. */
-const store = createStore(join(app.getPath('userData'), 'yaseendocs.json'))
+/** One user-global state file (D9, GRO-2159): `~/Library/Application Support/Yaseen Draw/yaseendraw.json`. */
+const store = createStore(join(app.getPath('userData'), 'yaseendraw.json'))
 
 /** Persistent vault-index cache (GRO-2223 D1): one JSON per vault under userData, never in the vault. */
-initIndexCache(join(app.getPath('userData'), 'index-cache'))
 
 /** Window lifecycle (GRO-2160) lives in windows.ts; this host is its Electron-only half. */
 const manager = createWindowManager(store, {
@@ -96,14 +98,8 @@ const manager = createWindowManager(store, {
     // otherwise be unactionable; the template itself is pure and lives in menu.ts.
     win.webContents.on('context-menu', (_event, params) =>
       Menu.buildFromTemplate(buildContextMenuTemplate(params, {
-        copyAs: (mode) => win.webContents.send(CH.menuCopyAs, mode),
-        pasteAs: (mode) => win.webContents.send(CH.menuPasteAs, { mode, text: clipboard.readText() } satisfies ClipboardPasteRequest),
         replace: (s) => win.webContents.replaceMisspelling(s),
         addToDictionary: (w) => win.webContents.session.addWordToSpellCheckerDictionary(w),
-        // Image rows (YAZ-1666): Chromium copies the decoded pixels at the click point; reveal
-        // resolves the `<img src>` through vaultProtocol.ts, so a non-vault source is a no-op there.
-        copyImage: () => win.webContents.copyImageAt(params.x, params.y),
-        revealImage: (src) => void revealVaultImage(src, (file) => revealItem({ path: file })),
       })).popup({ window: win }))
     // `<renderer>?win=<id>` so the renderer can ask `window.identity()` who it is.
     const url = new URL(process.env.ELECTRON_RENDERER_URL ?? 'app://yaseen/index.html')
@@ -143,8 +139,16 @@ let lastFocusedWcId: number | undefined
 /** The per-vault GitHub sync manager (YAZ-1081), created with the rest of the IPC once `ready` fires. */
 let gitSync: GitSyncManager | undefined
 
+/**
+ * Set once the menu exists (🔒 D10): focusing another window changes which window a menu action
+ * targets, and therefore whether the two canvas items are enabled — but nothing in the STORE
+ * moved, so `subscribeMenuRebuildOnActiveFile` cannot see it. The focus hook says so directly.
+ */
+let rebuildMenuOnFocus: (() => void) | undefined
+
 app.on('browser-window-focus', (_event, win) => {
   lastFocusedWcId = win.webContents.id
+  rebuildMenuOnFocus?.()
   // YAZ-1081 D2: focusing a vault's window is a PULL trigger — alt-tabbing back from another
   // machine should converge without waiting out a timer. The manager's own cooldown throttles it.
   const root = store.get().windows.find((w) => w.id === manager.idFor(win.webContents))?.root ?? null
@@ -160,10 +164,7 @@ app.whenReady().then(() => {
     nativeTheme.themeSource = theme
   })
   protocol.handle('app', (req) => {
-    const { host, pathname } = new URL(req.url)
-    // `app://vault/…` (YAZ-1658): vault images for `<img src>`, resolved by vaultProtocol.ts;
-    // every other host is the renderer bundle, exactly as before.
-    if (host === 'vault') return serveVaultImage(req, (u) => net.fetch(u))
+    const { pathname } = new URL(req.url)
     const file = join(RENDERER_DIR, pathname === '/' ? 'index.html' : pathname)
     return net.fetch(pathToFileURL(file).toString())
   })
@@ -172,30 +173,44 @@ app.whenReady().then(() => {
   // focused window while the app is not frontmost, and a menu action must never silently no-op
   // — so the last-focused live window (tracked below) is the documented fallback target.
   const menuTarget = () => pickMenuTargetWindow(BrowserWindow.getFocusedWindow(), BrowserWindow.getAllWindows(), lastFocusedWcId)?.webContents
-  registerClipboardIpc(manager, {
-    target: menuTarget,
-    writeText: (text) => clipboard.writeText(text),
-    rendererUrl: process.env.ELECTRON_RENDERER_URL ?? 'app://yaseen/index.html',
-  })
-  // Copy for Agent (YAZ-1617): main knows where the `yaseendocs` command lives; the renderer only asks.
-  registerAgentIpc({ packaged: app.isPackaged, resourcesPath: process.resourcesPath, mainDir: __dirname })
   const handlers = createMenuHandlers(store, manager, {
     focusedWebContents: menuTarget,
-    readClipboardText: () => clipboard.readText(),
+    zoom: (step) => {
+      const wc = menuTarget()
+      if (wc !== undefined) wc.setZoomLevel(step === 0 ? 0 : wc.getZoomLevel() + 0.5 * step)
+    },
     openExternal: (url) => void shell.openExternal(url),
   })
+  // 🔒 D10: the two canvas items are enabled only while the window a menu action would target has
+  // a DRAWING in front. Read at build time from the same entry `focusedEntry` uses, so the answer
+  // and the send target can never disagree.
+  const activeFileIsDrawing = (): boolean => {
+    const wc = menuTarget()
+    const id = wc === undefined ? undefined : manager.idFor(wc)
+    const file = id === undefined ? null : (store.get().windows.find((w) => w.id === id)?.file ?? null)
+    return file !== null && isDrawing(file)
+  }
   const applyMenu = (): void =>
-    Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenuTemplate({ recents: store.get().recents, isDev: !app.isPackaged }, handlers)))
+    Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenuTemplate({ recents: store.get().recents, isDev: !app.isPackaged, activeIsDrawing: activeFileIsDrawing() }, handlers)))
   applyMenu()
   subscribeMenuRebuild(store, applyMenu)
-  const sync = registerIpc(store, manager)
+  // A tab switch changes which file is in front (🔒 D10); focus changes which window is asked.
+  subscribeMenuRebuildOnActiveFile(store, applyMenu)
+  rebuildMenuOnFocus = applyMenu
+  const sync = registerIpc(store, manager, app.getPath('userData'))
   gitSync = sync
+  // 🔒 D5: the one library folder every vault shares. Made at startup, detached — a launch must
+  // not wait on a disk, and a path that cannot be created is still what the Settings row names.
+  void ensureLibraryFolder(store.get().settings.libraryFolder, app.getPath('userData'))
   // YAZ-1081 D3: a lid that just opened is the other "the world moved on while you were away"
   // moment, and the machine that edited the vault meanwhile is usually the other one. Wired here
   // rather than at module scope because powerMonitor is only safe to touch after `ready`.
   powerMonitor.on('resume', () => sync.notifyWake())
   powerMonitor.on('unlock-screen', () => sync.notifyWake())
   manager.restoreAll()
+  // A COLD launch from a Finder / Explorer double-click: macOS has already queued its `open-file`
+  // path above, Windows and Linux put it in this process's own argv and fire nothing (2I).
+  for (const path of openableFileArgs(process.argv, argsSkip())) links.push(fileLink(path))
   links.flush()
 })
 
@@ -210,7 +225,6 @@ app.on('before-quit', (event) => {
   quitting = true
   void manager
     .flushAllForQuit()
-    .then(() => Promise.all([store.flush(), flushIndexCache(), gitSync?.flushForQuit()]))
     .finally(() => app.exit(0))
 })
 

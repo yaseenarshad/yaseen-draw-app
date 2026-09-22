@@ -2,22 +2,19 @@ import path from 'node:path'
 import { CH } from '../../channels'
 import * as favorites from '../favorites'
 import { fileClip } from '../fileClip'
-import { readAsset, writeAsset } from '../fs/assets'
 import { copyEntry, pasteEntries } from '../fs/copy'
 import { createDir, createFile } from '../fs/create'
 import { readFile, writeFile } from '../fs/file'
 import { BridgeFailure } from '../fs/fsUtils'
-import { readImage } from '../fs/image'
 import { openInDefaultApp } from '../fs/openDefault'
 import { openInVsCode } from '../fs/openInVsCode'
 import { openLink } from '../fs/openLink'
-import { readPdf } from '../fs/pdf'
-import { renameFile, repairRename } from '../fs/rename'
+import { renameFile } from '../fs/rename'
 import { removeEntry } from '../fs/remove'
 import { revealItem } from '../fs/reveal'
 import { tree } from '../fs/tree'
+import { sweepVaultOnce } from './drawing'
 import type { Store } from '../store'
-import { getColdStartDiff, getIndex } from '../vaultIndex'
 import type { WindowLookup } from '../windows'
 import { broadcastAll } from './broadcast'
 import { handle, handleWithEvent } from './envelope'
@@ -32,27 +29,21 @@ const openRoots = (store: Store): string[] => store.get().windows.map((w) => w.r
  */
 const repairFavorites = (p: Promise<void>): Promise<void> => p.catch((err: unknown) => console.warn(`[favorites] repair failed: ${String(err)}`))
 
-/** The fs half of `window.yaseenDocs` (`dialog:pick-folder` lives in `./dialog`). */
+/** The fs half of `window.yaseenDraw` (`dialog:pick-folder` lives in `./dialog`). */
 export function registerFsIpc(store: Store, windows: WindowLookup): void {
-  handle(CH.fsTree, tree)
+  // The tree, plus the one-per-session orphan sweep of this vault's image store (🔒 D3,
+  // YAZ-1811). The first `fs:tree` for a root IS "the vault was opened", and it is the only
+  // moment that means that without inventing a second signal for it. The sweep is detached: the
+  // tree answers immediately, and its own notice reaches the asking window later, if at all.
+  handleWithEvent(CH.fsTree, async (e, root: string) => {
+    const res = await tree(root)
+    sweepVaultOnce(res.root, e.sender)
+    return res
+  })
   handle(CH.fsRead, readFile)
-  handle(CH.fsReadPdf, readPdf)
-  handle(CH.fsReadImage, readImage)
   handle(CH.fsWrite, writeFile)
   handle(CH.fsCreateDir, createDir)
   handle(CH.fsCreateFile, createFile)
-  handle(CH.fsIndex, getIndex)
-  // The cold-start reconcile diff (Links E1c, GRO-2242): the client's rename detector reads it
-  // AFTER the first fs:index for the root. Null before the first build (and again once idle
-  // eviction drops the entry); the index cache's honest-miss semantics ride through untouched —
-  // consumers gate on cacheStatus === 'hit'.
-  handle(CH.fsColdDiff, async (root: unknown) => (typeof root === 'string' ? (getColdStartDiff(root) ?? null) : null))
-  handle(CH.fsReadAsset, readAsset)
-  // The asset write (YAZ-876 drawings, YAZ-1661 image bytes): no store repair and no broadcast
-  // — repair and the pushes exist for paths that MOVE or GO, and a write does neither. A
-  // `.excalidraw` is not a vault file, so nothing points at it; a pasted image is a NEW file
-  // the tree learns of from the watcher, like any add made outside the app.
-  handle(CH.fsWriteAsset, writeAsset)
   // Reveal in Finder (GRO-2274): read-only, so no store repair and no broadcast — but still
   // enveloped like every other handler so a stale row's NOT_FOUND reaches the renderer as a
   // passive notice instead of vanishing (showItemInFolder is silent on a missing path).
@@ -62,7 +53,7 @@ export function registerFsIpc(store: Store, windows: WindowLookup): void {
   handle(CH.shellOpenVsCode, openInVsCode)
   // Open in default app (YAZ-1577): third of the read-only OS verbs — same envelope, same NOT_FOUND notice.
   handle(CH.shellOpenDefault, openInDefaultApp)
-  // Standard Markdown links: main owns protocol/path validation and the Electron shell boundary.
+  // External links from the canvas: main owns protocol/path validation and the Electron shell boundary.
   handle(CH.shellOpenLink, openLink)
   // In-app rename/move (Links E1 GRO-2194, E1b GRO-2241). The SAME handler repairs the
   // store — every stored path at or under the renamed entry follows (window roots/files/
@@ -113,19 +104,6 @@ export function registerFsIpc(store: Store, windows: WindowLookup): void {
     broadcastAll(CH.fileDeleted, { path: res.path, kind: res.kind })
     return res
   })
-  // External-rename repair (Links E1c, GRO-2242): the entry ALREADY moved on disk (an external
-  // mover), the user confirmed the banner's hypothesis, so there is no fs work — validate the
-  // claim (repairRename: newPath exists, oldPath does not) and reuse E1's ENTIRE downstream:
-  // the same store repair and the same file:renamed push (tab remap, editor continuity,
-  // title/hash). No vault-root guard here — nothing moves, and a window rooted at a repaired
-  // folder is exactly what store.renamePath heals.
-  handle(CH.fileRepairRename, async (req: unknown) => {
-    const res = await repairRename(req)
-    store.renamePath(res.oldPath, res.newPath)
-    await repairFavorites(favorites.renamePath(openRoots(store), res.oldPath, res.newPath))
-    broadcastAll(CH.fileRenamed, { oldPath: res.oldPath, newPath: res.newPath, kind: res.kind })
-    return res
-  })
   // File clipboard (YAZ-1674, D1): the ONE app-wide clipboard lives in main (`fileClip`), so a
   // paste in any window takes what any window cut or copied — within a vault or across two.
   // Every change is pushed to EVERY window as `clip:changed` (the github status posture):
@@ -135,7 +113,7 @@ export function registerFsIpc(store: Store, windows: WindowLookup): void {
   // Cut / Copy is a pure clipboard write: nothing on disk is touched or even stat'ed, so there
   // is no store repair and no file push here — a path that goes stale before the paste is
   // reported per entry BY the paste. No vault-root guard either: Cut/Copy is offered on ROWS
-  // only, never on blank space, and a window's own root is never a row of its tree (D5/D6; see CONTRACTS).
+  // only, never on blank space, and a window's own root is never a row of its tree (D5/D6).
   handle(CH.fsClip, async (req: unknown) => {
     fileClip.set(req)
   })

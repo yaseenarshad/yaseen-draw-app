@@ -1,8 +1,8 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron'
-import { isSidebarLens, type RightPanelIdentity, type SidebarLens, type WindowEntry, type WindowIdentity } from '@shared/types'
+import { isSidebarLens, type SidebarLens, type WindowEntry, type WindowIdentity } from '@shared/types'
 import { CH } from '../../channels'
 import { BridgeFailure, requireAbsPath } from '../fs/fsUtils'
-import { isRecord, normalizeRightPanel, normalizeTabs, type Store } from '../store'
+import { isRecord, normalizeTabs, type Store } from '../store'
 import type { WindowManagerIpc } from '../windows'
 import { handle, handleWithEvent } from './envelope'
 
@@ -22,30 +22,14 @@ function optionalTabs(raw: Record<string, unknown>): string[] | undefined {
   return v.map((t, i) => requireAbsPath(t, `tabs[${i}]`))
 }
 
-/** `focusDirs` / `focusTopics` / `focusFavorites` in the patch (YAZ-1628, YAZ-1766): `tabs`' rule — absent (untouched), or absolute paths only, one bad element rejecting the whole call. */
-function optionalFocusList(raw: Record<string, unknown>, key: 'focusDirs' | 'focusTopics' | 'focusFavorites'): string[] | undefined {
+/** `focusDirs` / `focusFavorites` in the patch (YAZ-1628, YAZ-1766): `tabs`' rule — absent (untouched), or absolute paths only, one bad element rejecting the whole call. */
+function optionalFocusList(raw: Record<string, unknown>, key: 'focusDirs' | 'focusFavorites'): string[] | undefined {
   const v = raw[key]
   if (v === undefined) return undefined
   if (!Array.isArray(v)) throw new BridgeFailure('BAD_REQUEST', `'${key}' must be an array of absolute paths`)
   return v.map((p, i) => requireAbsPath(p, `${key}[${i}]`))
 }
 
-/** `rightPanel` is an all-or-nothing identity patch; store normalization repairs its invariants. */
-function optionalRightPanel(raw: Record<string, unknown>): RightPanelIdentity | undefined {
-  const value = raw.rightPanel
-  if (value === undefined) return undefined
-  if (!isRecord(value)
-    || typeof value.open !== 'boolean'
-    || typeof value.width !== 'number'
-    || !Number.isFinite(value.width)
-    || !Array.isArray(value.items)
-    || (value.expanded !== null && typeof value.expanded !== 'string')) {
-    throw new BridgeFailure('BAD_REQUEST', "'rightPanel' must be a complete panel identity")
-  }
-  const items = value.items.map((item, i) => requireAbsPath(item, `rightPanel.items[${i}]`))
-  const expanded = value.expanded === null ? null : requireAbsPath(value.expanded, 'rightPanel.expanded')
-  return { open: value.open, width: value.width, items, expanded }
-}
 
 /** `sidebarCollapsed`: absent (untouched), or a boolean. */
 function optionalSidebarCollapsed(raw: Record<string, unknown>): boolean | undefined {
@@ -59,12 +43,12 @@ function optionalSidebarCollapsed(raw: Record<string, unknown>): boolean | undef
 function optionalSidebarLens(raw: Record<string, unknown>): SidebarLens | undefined {
   const v = raw.sidebarLens
   if (v === undefined) return undefined
-  if (!isSidebarLens(v)) throw new BridgeFailure('BAD_REQUEST', "'sidebarLens' must be 'topics', 'files' or 'favorites'")
+  if (!isSidebarLens(v)) throw new BridgeFailure('BAD_REQUEST', "'sidebarLens' must be 'files' or 'favorites'")
   return v
 }
 
 /**
- * The `window.*` half of `window.yaseenDocs`. The caller is resolved through the window lookup
+ * The `window.*` half of `window.yaseenDraw`. The caller is resolved through the window lookup
  * (`webContents.id` → window id) and answered from `AppState.windows`. `open` / `duplicate`
  * are D6 plumbing into the window manager (GRO-2160; the gestures land in D-), and
  * `app:flushed` is the renderer's half of the close/quit flush handshake.
@@ -79,8 +63,8 @@ export function registerWindowIpc(store: Store, windows: WindowManagerIpc): void
   }
 
   handleWithEvent(CH.windowIdentity, async (e): Promise<WindowIdentity> => {
-    const { id, root, file, tabs, rightPanel, sidebarCollapsed, sidebarLens, focusDirs, focusTopics, focusFavorites } = entryFor(e)
-    return { id, root, file, tabs: [...tabs], rightPanel: { ...rightPanel, items: [...rightPanel.items] }, sidebarCollapsed, sidebarLens, focusDirs: [...focusDirs], focusTopics: [...focusTopics], focusFavorites: [...focusFavorites] }
+    const { id, root, file, tabs, sidebarCollapsed, sidebarLens, focusDirs, focusFavorites } = entryFor(e)
+    return { id, root, file, tabs: [...tabs], sidebarCollapsed, sidebarLens, focusDirs: [...focusDirs], focusFavorites: [...focusFavorites] }
   })
 
   handleWithEvent(CH.windowSetIdentity, async (e, patch: unknown) => {
@@ -88,11 +72,9 @@ export function registerWindowIpc(store: Store, windows: WindowManagerIpc): void
     const root = optionalPath(patch, 'root')
     const file = optionalPath(patch, 'file')
     const tabs = optionalTabs(patch)
-    const rightPanel = optionalRightPanel(patch)
     const sidebarCollapsed = optionalSidebarCollapsed(patch)
     const sidebarLens = optionalSidebarLens(patch)
     const focusDirs = optionalFocusList(patch, 'focusDirs')
-    const focusTopics = optionalFocusList(patch, 'focusTopics')
     const focusFavorites = optionalFocusList(patch, 'focusFavorites')
     const entry = entryFor(e)
     // The tabs invariant holds on the entry AS WRITTEN (GRO-2232): the loader's repair rule,
@@ -105,11 +87,9 @@ export function registerWindowIpc(store: Store, windows: WindowManagerIpc): void
       ...(sidebarCollapsed !== undefined ? { sidebarCollapsed } : {}),
       ...(sidebarLens !== undefined ? { sidebarLens } : {}),
       ...(focusDirs !== undefined ? { focusDirs } : {}),
-      ...(focusTopics !== undefined ? { focusTopics } : {}),
       ...(focusFavorites !== undefined ? { focusFavorites } : {}),
       file: nextFile,
       tabs: nextTabs,
-      rightPanel: normalizeRightPanel(rightPanel ?? entry.rightPanel, nextTabs),
     })
   })
 
@@ -144,12 +124,6 @@ export function registerWindowIpc(store: Store, windows: WindowManagerIpc): void
   // opened; MRU bumped), false = the folder is gone and was pruned from the MRU instead. Any
   // window may ask; the caller is not consulted.
   handle(CH.windowOpenRecent, async (path: unknown): Promise<boolean> => windows.openRecentBeside(requireAbsPath(path, 'path')))
-
-  // Explicit paste outside a Crepe editor uses Chromium insertion for native selection/undo.
-  handleWithEvent(CH.menuPasteTextFallback, async (e, text: unknown) => {
-    if (windows.idFor(e.sender) === undefined || typeof text !== 'string') throw new BridgeFailure('BAD_REQUEST', 'invalid paste target or text')
-    if (text !== '') await e.sender.insertText(text)
-  })
 
   // The renderer's ack in the flush handshake (fire-and-forget send, so no envelope).
   ipcMain.on(CH.appFlushed, (e) => windows.handleFlushed(e.sender))

@@ -31,7 +31,7 @@ function collect(root: string): VaultConfigChange[] {
 }
 
 describe('readConfig', () => {
-  it('missing folder or file → null, and reading NEVER creates .yaseendocs', async () => {
+  it('missing folder or file → null, and reading NEVER creates .yaseendraw', async () => {
     const root = await makeRoot()
     expect(await readConfig(root, 'sample.json')).toBeNull()
     expect(await readdir(root)).toEqual([])
@@ -66,7 +66,7 @@ describe('readConfigDetailed', () => {
     const root = await makeRoot()
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     expect(await readConfigDetailed(root, 'sample.json')).toEqual({ state: 'absent' })
-    expect(await readdir(root)).toEqual([]) // detailed reading NEVER creates .yaseendocs either
+    expect(await readdir(root)).toEqual([]) // detailed reading NEVER creates .yaseendraw either
     await writeConfig(root, 'sample.json', { version: 1 })
     expect(await readConfigDetailed(root, 'sample.json')).toEqual({ state: 'ok', value: { version: 1 } })
     await writeFile(path.join(root, VAULT_CONFIG_DIR, 'sample.json'), '{not json')
@@ -85,7 +85,7 @@ describe('readConfigDetailed', () => {
 })
 
 describe('writeConfig', () => {
-  it('creates .yaseendocs lazily, writes pretty JSON + newline atomically, round-trips', async () => {
+  it('creates .yaseendraw lazily, writes pretty JSON + newline atomically, round-trips', async () => {
     const root = await makeRoot()
     await writeConfig(root, 'sample.json', { version: 1, types: { due: 'date' } })
     const raw = await readFile(path.join(root, VAULT_CONFIG_DIR, 'sample.json'), 'utf8')

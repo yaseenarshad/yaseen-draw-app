@@ -9,26 +9,26 @@ describe('createLinkQueue', () => {
   it('queues pushes before flush, then replays them in order', () => {
     const handle = vi.fn()
     const q = createLinkQueue(handle)
-    q.push('yaseendocs:///v/a.md')
-    q.push('yaseendocs:///v/b.md')
+    q.push('yaseendraw:///v/a.md')
+    q.push('yaseendraw:///v/b.md')
     expect(handle).not.toHaveBeenCalled()
     q.flush()
-    expect(handle.mock.calls).toEqual([['yaseendocs:///v/a.md'], ['yaseendocs:///v/b.md']])
+    expect(handle.mock.calls).toEqual([['yaseendraw:///v/a.md'], ['yaseendraw:///v/b.md']])
   })
 
   it('handles pushes directly once flushed', () => {
     const handle = vi.fn()
     const q = createLinkQueue(handle)
     q.flush()
-    q.push('yaseendocs:///v/a.md')
-    expect(handle).toHaveBeenCalledWith('yaseendocs:///v/a.md')
+    q.push('yaseendraw:///v/a.md')
+    expect(handle).toHaveBeenCalledWith('yaseendraw:///v/a.md')
     expect(handle).toHaveBeenCalledTimes(1)
   })
 
   it('a second flush replays nothing twice', () => {
     const handle = vi.fn()
     const q = createLinkQueue(handle)
-    q.push('yaseendocs:///v/a.md')
+    q.push('yaseendraw:///v/a.md')
     q.flush()
     q.flush()
     expect(handle).toHaveBeenCalledTimes(1)

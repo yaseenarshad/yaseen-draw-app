@@ -22,7 +22,7 @@ describe('openLink', () => {
   ])('hands the safe external URL to the OS protocol handler: %s', async (href) => {
     const os = host()
 
-    await openLink({ href, sourcePath: '/vault/Nate-Scrape/Nate-Scrape.md' }, os)
+    await openLink({ href, sourcePath: '/vault/Nate-Scrape/Nate-Scrape.excalidraw' }, os)
 
     expect(os.openExternal).toHaveBeenCalledExactlyOnceWith(new URL(href).href)
     expect(os.openPath).not.toHaveBeenCalled()
@@ -32,7 +32,7 @@ describe('openLink', () => {
     const os = host()
 
     await openLink(
-      { href: 'JSONs/Gamma%20Proposal%20Generation.json', sourcePath: '/vault/Nate-Scrape/Nate-Scrape.md' },
+      { href: 'JSONs/Gamma%20Proposal%20Generation.json', sourcePath: '/vault/Nate-Scrape/Nate-Scrape.excalidraw' },
       os,
     )
 
@@ -46,18 +46,18 @@ describe('openLink', () => {
   ])('opens an absolute local target through the OS file handler: %s', async (href, expected) => {
     const os = host()
 
-    await openLink({ href, sourcePath: '/vault/Note.md' }, os)
+    await openLink({ href, sourcePath: '/vault/Note.excalidraw' }, os)
 
     expect(os.openPath).toHaveBeenCalledExactlyOnceWith(expected)
     expect(os.openExternal).not.toHaveBeenCalled()
   })
 
   it.each([
-    [{ href: '#section', sourcePath: '/vault/Note.md' }, 'fragment-only links stay inside the document'],
-    [{ href: 'javascript:alert(1)', sourcePath: '/vault/Note.md' }, 'unsupported link protocol'],
-    [{ href: 'data:text/plain,nope', sourcePath: '/vault/Note.md' }, 'unsupported link protocol'],
-    [{ href: 'app://yaseen/index.html', sourcePath: '/vault/Note.md' }, 'unsupported link protocol'],
-    [{ href: '', sourcePath: '/vault/Note.md' }, "missing 'href'"],
+    [{ href: '#section', sourcePath: '/vault/Note.excalidraw' }, 'fragment-only links stay inside the document'],
+    [{ href: 'javascript:alert(1)', sourcePath: '/vault/Note.excalidraw' }, 'unsupported link protocol'],
+    [{ href: 'data:text/plain,nope', sourcePath: '/vault/Note.excalidraw' }, 'unsupported link protocol'],
+    [{ href: 'app://yaseen/index.html', sourcePath: '/vault/Note.excalidraw' }, 'unsupported link protocol'],
+    [{ href: '', sourcePath: '/vault/Note.excalidraw' }, "missing 'href'"],
     [{ href: 'relative.txt' }, "missing 'sourcePath' for a relative link"],
     [null, 'invalid open-link request'],
   ])('rejects invalid or non-shell input without an OS side effect', async (req, message) => {
@@ -92,7 +92,7 @@ describe('openLink', () => {
     const os = host()
     vi.mocked(os.openPath).mockResolvedValue('The file does not exist')
 
-    await expect(openLink({ href: 'missing.pdf', sourcePath: '/vault/Note.md' }, os)).rejects.toMatchObject({
+    await expect(openLink({ href: 'missing.pdf', sourcePath: '/vault/Note.excalidraw' }, os)).rejects.toMatchObject({
       code: 'IO_ERROR',
       message: 'The file does not exist',
       path: '/vault/missing.pdf',

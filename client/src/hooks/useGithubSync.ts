@@ -4,9 +4,9 @@ import { api } from '../api'
 
 /**
  * Per-vault GitHub sync as the UI sees it (YAZ-1081, 3A): one `github.status(root)` fetch per
- * root, live-replaced by `github:status` broadcasts for that root — `useProperties`' idiom,
- * because the shape of the problem is identical (one bridge object per root, pushed on every
- * transition). App owns ONE of these, and both the chip and the settings section read it.
+ * root, live-replaced by `github:status` broadcasts for that root: one bridge object per root,
+ * pushed on every transition. App owns ONE of these, and both the chip and the settings section
+ * read it.
  *
  * The engine is the source of truth for every state INCLUDING its failures: `syncNow` and
  * `setEnabled` answer with the same status the push carries, so a rejected call sets nothing
@@ -24,7 +24,7 @@ export interface GithubSyncState {
 }
 
 /**
- * `root` is nullable for the same reason `useProperties`' is — App owns ONE of these and hooks
+ * `root` is nullable because App owns ONE of these and hooks
  * cannot be conditional, so a window with no vault open must make no bridge call at all. A null
  * root has a null status and inert actions.
  */

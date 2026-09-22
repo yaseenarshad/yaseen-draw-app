@@ -7,7 +7,7 @@ import { handleWithEvent } from './envelope'
 const OPTIONS: Electron.OpenDialogOptions = { title: 'Open folder', properties: ['openDirectory', 'createDirectory'] }
 
 /**
- * `window.yaseenDocs.pickFolder()`: the native open-directory dialog, parented to the calling window.
+ * `window.yaseenDraw.pickFolder()`: the native open-directory dialog, parented to the calling window.
  * One dialog in flight per window (`inFlight`; windowless senders share the `null` bucket): a second
  * call while that window's dialog is open resolves `{ cancelled: true }` — a benign no-op for the
  * renderer, same as dismissing the dialog — rather than stacking another sheet or rejecting.

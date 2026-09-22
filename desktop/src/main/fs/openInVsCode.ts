@@ -12,7 +12,7 @@ import { BridgeFailure, fsCall, requireAbsPath } from './fsUtils'
  * a PATH the packaged app does not have, would hand the editor this process' environment, and
  * would fail differently on every machine; a deep link couples to nothing but the scheme. That
  * VS Code is installed at all is never asserted — an unhandled scheme is the OS' business,
- * exactly as it is for the `yaseendocs://` links this app itself registers.
+ * exactly as it is for the `yaseendraw://` links this app itself registers.
  *
  * Every path SEGMENT is percent-encoded, separators left literal: `My Note.md` makes an invalid
  * URL raw, and encoding the whole path in one go would eat the `/` along with the spaces.

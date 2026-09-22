@@ -28,7 +28,7 @@ function ioFailure(err: unknown, path?: string): BridgeFailure {
   return new BridgeFailure('IO_ERROR', err instanceof Error ? err.message : String(err), path === undefined ? {} : { path })
 }
 
-/** Opens one validated Markdown-link target through the OS; the renderer never receives shell access. */
+/** Opens one validated link target through the OS; the renderer never receives shell access. */
 export async function openLink(req: unknown, host: OpenLinkHost = shell): Promise<void> {
   const input = requestOf(req)
   if (typeof input.href !== 'string' || input.href.trim() === '') throw new BridgeFailure('BAD_REQUEST', "missing 'href'")

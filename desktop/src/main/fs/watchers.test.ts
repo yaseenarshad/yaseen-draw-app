@@ -52,12 +52,12 @@ describe('shared watchers', () => {
     expect(activeWatcherRoots()).toEqual([root])
   })
 
-  it('add / change / unlink for a markdown file, with mtime, to every subscriber', async () => {
+  it('add / change / unlink for a drawing file, with mtime, to every subscriber', async () => {
     const a = openWatch(root)
     const b = openWatch(root)
     await a.next()
     await b.next()
-    const file = path.join(root, 'alpha', 'watched.md')
+    const file = path.join(root, 'alpha', 'watched.excalidraw')
     await writeFile(file, 'v1')
     const add = await a.next()
     expect(add).toMatchObject({ type: 'add', path: file })
@@ -100,16 +100,16 @@ describe('shared watchers', () => {
     await writeFile(base, 'views: []\n')
     expect(await a.next()).toMatchObject({ type: 'add', path: base })
     await mkdir(path.join(root, '.cache'))
-    await writeFile(path.join(root, '.cache', 'c.md'), 'x')
+    await writeFile(path.join(root, '.cache', 'c.excalidraw'), 'x')
     await mkdir(path.join(root, 'newdir'))
     expect(await a.next()).toEqual({ type: 'addDir', path: path.join(root, 'newdir') })
   })
 
-  it('a change inside .yaseendocs/ emits NOTHING on the shared watcher (GRO-2188)', async () => {
+  it('a change inside .yaseendraw/ emits NOTHING on the shared watcher (GRO-2188)', async () => {
     const a = openWatch(root)
     await a.next()
-    await writeFile(path.join(root, '.yaseendocs', 'types.json'), '{"b":2}')
-    await writeFile(path.join(root, '.yaseendocs', 'note.md'), 'even markdown in there is invisible')
+    await writeFile(path.join(root, '.yaseendraw', 'types.json'), '{"b":2}')
+    await writeFile(path.join(root, '.yaseendraw', 'note.excalidraw'), 'even a drawing in there is invisible')
     // A control event proves the silence: the next thing the subscriber sees is the unrelated mkdir.
     await mkdir(path.join(root, 'control-dir'))
     expect(await a.next()).toEqual({ type: 'addDir', path: path.join(root, 'control-dir') })

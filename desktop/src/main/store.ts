@@ -1,41 +1,29 @@
 import { mkdirSync, readFileSync, renameSync } from 'node:fs'
 import { dirname, isAbsolute } from 'node:path'
 import {
-  COMMENTS_ORDERS,
-  CONTENT_WIDTHS,
+  DEFAULT_CANVAS_PANEL,
   DEFAULT_SETTINGS,
-  MAX_COLLAPSED_GROUP_KEYS,
-  MAX_FOLD_KEYS_PER_FILE,
   MAX_RECENT_ROOTS,
-  MAX_TOPICS_EXPANDED_PAGES,
-  NEW_NOTE_LOCATIONS,
-  RIGHT_PANEL_DEFAULT_W,
-  RIGHT_PANEL_MAX_W,
-  RIGHT_PANEL_MIN_W,
   SIDEBAR_DEFAULT_W,
   SIDEBAR_MAX_W,
   SIDEBAR_MIN_W,
   THEMES,
-  THREAD_WIDTHS,
   addRecentRoot,
   defaultAppState,
   defaultFolderState,
-  defaultRightPanelIdentity,
+  isCanvasPanelTab,
   isSidebarLens,
-  isValidNewNoteFolder,
   type AppState,
-  type CommentsOrder,
-  type ContentWidth,
+  type CanvasPanelState,
   type FolderState,
-  type NewNoteLocation,
   type RecentRoots,
-  type RightPanelIdentity,
   type SettingsState,
   type SidebarLens,
   type Theme,
   type WindowBounds,
   type WindowEntry,
 } from '@shared/types'
+import { isCanvasPrefs, sanitizeCanvasPrefs } from '@shared/canvasPrefs'
 import { atomicWrite } from './fs/fsUtils'
 
 /**
@@ -51,17 +39,14 @@ export interface Store {
   setSidebarWidth(width: number): void
   pushRecent(path: string, now?: number): void
   removeRecent(path: string): void
-  setFolder(root: string, patch: Partial<Pick<FolderState, 'expanded' | 'lastFile' | 'topicsExpanded'>>): void
-  setFolds(root: string, file: string, keys: readonly string[]): void
-  setBaseGroups(root: string, key: string, collapsed: readonly string[]): void
-  upsertWindow(entry: Omit<WindowEntry, 'rightPanel'> & Partial<Pick<WindowEntry, 'rightPanel'>>): void
+  setFolder(root: string, patch: Partial<Pick<FolderState, 'expanded' | 'lastFile'>>): void
+  upsertWindow(entry: WindowEntry): void
   removeWindow(id: string): void
   /**
    * Repair every stored reference to a just-renamed file OR directory (Links E1 GRO-2194,
    * E1b GRO-2241): window `root`/`file`/`tabs` (through `normalizeTabs`) and its Focus Mode
-   * lists `focusDirs`/`focusTopics`/`focusFavorites` (YAZ-1628, YAZ-1766), recents, each
-   * folder-state key and its `expanded`/`lastFile`/`topicsExpanded`/fold keys/
-   * baseGroups keys (`<basePath>::<view>`).
+   * lists `focusDirs`/`focusFavorites` (YAZ-1628, YAZ-1766), recents, and each folder-state key
+   * with its `expanded`/`lastFile`.
    * A dir remaps by prefix — everything at or under it follows,
    * including a window ROOTED at the renamed folder. One commit; a no-op when nothing
    * references it.
@@ -72,9 +57,9 @@ export interface Store {
    * twin of `renamePath`. A directory removes BY PREFIX: everything at or under it goes.
    *
    * Per field: a window's `file` becomes null (and `normalizeTabs` then empties its tabs),
-   * deleted tabs are dropped as are its `focusDirs` / `focusTopics` / `focusFavorites` entries
+   * deleted tabs are dropped as are its `focusDirs` / `focusFavorites` entries
    * (YAZ-1628, YAZ-1766), `recents` loses the entry, and folder-state keys plus their
-   * `expanded` / `lastFile` / `topicsExpanded` / fold keys / `baseGroups` keys
+   * `expanded` / `lastFile`
    * (`<basePath>::<view>`) go too.
    * A window's `root` is deliberately LEFT ALONE: the renderer's existing `onRootMissing`
    * probe owns that repair (it also drops the dead MRU entry), and nulling it here would
@@ -94,34 +79,51 @@ export const isRecord = (v: unknown): v is Record<string, unknown> => typeof v =
 export const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string')
 const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
 const isStringOrNull = (v: unknown): v is string | null => v === null || typeof v === 'string'
-const isHexColour = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)
 const clampSidebarWidth = (w: number): number => Math.min(SIDEBAR_MAX_W, Math.max(SIDEBAR_MIN_W, w))
-const clampRightPanelWidth = (w: number): number => Math.min(RIGHT_PANEL_MAX_W, Math.max(RIGHT_PANEL_MIN_W, w))
 
 export const isRecentRoots = (v: unknown): v is RecentRoots =>
   Array.isArray(v) && v.every((x) => isRecord(x) && typeof x.path === 'string' && isFiniteNumber(x.lastOpened))
 
+/** The canvas panel's memory (🔒 D10): both halves guarded, an unknown tab reads as the default. */
+export const isCanvasPanel = (v: unknown): v is CanvasPanelState => isRecord(v) && isCanvasPanelTab(v.tab) && typeof v.docked === 'boolean'
+const sanitizeCanvasPanel = (raw: unknown): CanvasPanelState => {
+  const src = isRecord(raw) ? raw : {}
+  return { tab: isCanvasPanelTab(src.tab) ? src.tab : DEFAULT_CANVAS_PANEL.tab, docked: typeof src.docked === 'boolean' ? src.docked : DEFAULT_CANVAS_PANEL.docked }
+}
+
 /** Per-field guards shared by the loader, `sanitizeSettings` and the IPC boundary (`isSettings`). */
 const SETTINGS_FIELD_OK: { [K in keyof SettingsState]: (v: unknown) => v is SettingsState[K] } = {
-  lineSpacing: isFiniteNumber,
-  blockGap: isFiniteNumber,
-  bulletThreading: (v): v is boolean => typeof v === 'boolean',
-  threadWidth: (v): v is number => isFiniteNumber(v) && THREAD_WIDTHS.includes(v),
-  threadColor: (v): v is string | null => v === null || isHexColour(v),
   theme: (v): v is Theme => typeof v === 'string' && (THEMES as readonly string[]).includes(v),
-  contentWidth: (v): v is ContentWidth => typeof v === 'string' && (CONTENT_WIDTHS as readonly string[]).includes(v),
-  newNoteLocation: (v): v is NewNoteLocation => typeof v === 'string' && (NEW_NOTE_LOCATIONS as readonly string[]).includes(v),
-  newNoteFolder: (v): v is string => typeof v === 'string' && isValidNewNoteFolder(v),
+  // 🔒 D5: an absolute path the user picked, or null for `<userData>/library`. Never `''` — an
+  // empty string would resolve to the process cwd, which is not a place to put a user's library.
+  libraryFolder: (v): v is string | null => v === null || (typeof v === 'string' && isAbsolute(v)),
   confirmDelete: (v): v is boolean => typeof v === 'boolean',
-  commentsOrder: (v): v is CommentsOrder => typeof v === 'string' && (COMMENTS_ORDERS as readonly string[]).includes(v),
+  // 🔒 D9: STRICT at the bridge — a sandboxed renderer hands over a whole `CanvasPrefs` or nothing.
+  canvas: isCanvasPrefs,
+  canvasPanel: isCanvasPanel,
 }
 const SETTINGS_KEYS = Object.keys(SETTINGS_FIELD_OK) as Array<keyof SettingsState>
+
+/**
+ * The LENIENT half of 🔒 D9's "strict guard at IPC, lenient sanitize on load": the two composite
+ * fields are repaired key by key rather than thrown away whole, so a state file written before a
+ * canvas pref existed keeps every pref it does have instead of resetting the lot.
+ */
+const SETTINGS_SANITIZE: Partial<{ [K in keyof SettingsState]: (v: unknown) => SettingsState[K] }> = {
+  canvas: sanitizeCanvasPrefs,
+  canvasPanel: sanitizeCanvasPanel,
+}
 
 /** Stored settings merged field-by-field over defaults, so partial/stale shapes stay usable. */
 export function sanitizeSettings(raw: unknown): SettingsState {
   const src = isRecord(raw) ? raw : {}
   const out = { ...DEFAULT_SETTINGS }
   for (const k of SETTINGS_KEYS) {
+    const repair = SETTINGS_SANITIZE[k]
+    if (repair !== undefined) {
+      ;(out as Record<string, unknown>)[k] = repair(src[k])
+      continue
+    }
     const v = src[k]
     if (SETTINGS_FIELD_OK[k](v)) (out as Record<string, unknown>)[k] = v
   }
@@ -135,7 +137,7 @@ export const isWindowBounds = (v: unknown): v is WindowBounds =>
   isRecord(v) && isFiniteNumber(v.x) && isFiniteNumber(v.y) && isFiniteNumber(v.width) && isFiniteNumber(v.height)
 
 /** Core v1 shape; additive window-identity fields are repaired separately. */
-type StoredWindowEntry = Pick<WindowEntry, 'id' | 'root' | 'file' | 'bounds'> & { tabs?: unknown; rightPanel?: unknown; sidebarCollapsed?: unknown; sidebarLens?: unknown; focusDirs?: unknown; focusTopics?: unknown; focusFavorites?: unknown }
+type StoredWindowEntry = Pick<WindowEntry, 'id' | 'root' | 'file' | 'bounds'> & { tabs?: unknown; sidebarCollapsed?: unknown; sidebarLens?: unknown; focusDirs?: unknown; focusFavorites?: unknown }
 const isStoredWindowEntry = (v: unknown): v is StoredWindowEntry =>
   isRecord(v) && typeof v.id === 'string' && isStringOrNull(v.root) && isStringOrNull(v.file) && isWindowBounds(v.bounds)
 
@@ -158,24 +160,6 @@ export function normalizeTabs(tabs: readonly string[], file: string | null): str
   return out
 }
 
-/** Repair the additive v1 right-panel shape and enforce one editable owner per window. */
-export function normalizeRightPanel(raw: unknown, tabs: readonly string[]): RightPanelIdentity {
-  if (!isRecord(raw)) return defaultRightPanelIdentity()
-  const tabSet = new Set(tabs)
-  const seen = new Set<string>()
-  const items = (Array.isArray(raw.items) ? raw.items : []).filter((value): value is string => {
-    if (typeof value !== 'string' || !isAbsolute(value) || tabSet.has(value) || seen.has(value)) return false
-    seen.add(value)
-    return true
-  })
-  return {
-    open: raw.open === true,
-    width: isFiniteNumber(raw.width) ? clampRightPanelWidth(raw.width) : RIGHT_PANEL_DEFAULT_W,
-    items,
-    expanded: typeof raw.expanded === 'string' && items.includes(raw.expanded) ? raw.expanded : null,
-  }
-}
-
 function sanitizeWindows(raw: unknown, legacySidebarCollapsed: boolean, legacySidebarLens: SidebarLens): WindowEntry[] {
   if (!Array.isArray(raw)) return []
   const seen = new Set<string>()
@@ -186,24 +170,12 @@ function sanitizeWindows(raw: unknown, legacySidebarCollapsed: boolean, legacySi
     // Junk `tabs` elements (non-strings, relative paths) drop; a missing/invalid list repairs from `file`.
     const rawTabs: unknown = (w as { tabs?: unknown }).tabs
     const tabs = normalizeTabs(Array.isArray(rawTabs) ? rawTabs.filter((t): t is string => typeof t === 'string' && isAbsolute(t)) : [], w.file)
-    const rightPanel = normalizeRightPanel((w as { rightPanel?: unknown }).rightPanel, tabs)
     const sidebarCollapsed = typeof w.sidebarCollapsed === 'boolean' ? w.sidebarCollapsed : legacySidebarCollapsed
     const sidebarLens = isSidebarLens(w.sidebarLens) ? w.sidebarLens : legacySidebarLens
     // Focus Mode's lists (YAZ-1628) read with the `tabs` rule: relative paths drop, a missing or junk list is no focus.
     const focusDirs = isStringArray(w.focusDirs) ? w.focusDirs.filter(isAbsolute) : []
-    const focusTopics = isStringArray(w.focusTopics) ? w.focusTopics.filter(isAbsolute) : []
     const focusFavorites = isStringArray(w.focusFavorites) ? w.focusFavorites.filter(isAbsolute) : []
-    out.push({ id: w.id, root: w.root, file: w.file, tabs, rightPanel, sidebarCollapsed, sidebarLens, focusDirs, focusTopics, focusFavorites, bounds: { x: w.bounds.x, y: w.bounds.y, width: w.bounds.width, height: w.bounds.height } })
-  }
-  return out
-}
-
-/** Shared by `folds` and `baseGroups`: key → non-empty string list, junk dropped, each list capped. */
-function sanitizeKeyLists(raw: unknown, cap: number): Record<string, string[]> {
-  if (!isRecord(raw)) return {}
-  const out: Record<string, string[]> = {}
-  for (const [key, keys] of Object.entries(raw)) {
-    if (isStringArray(keys) && keys.length > 0) out[key] = keys.slice(0, cap)
+    out.push({ id: w.id, root: w.root, file: w.file, tabs, sidebarCollapsed, sidebarLens, focusDirs, focusFavorites, bounds: { x: w.bounds.x, y: w.bounds.y, width: w.bounds.width, height: w.bounds.height } })
   }
   return out
 }
@@ -215,9 +187,6 @@ function sanitizeFolder(raw: unknown): FolderState | null {
     // A relaunch starts every tree collapsed; a pre-1642 file's leftover lists are ignored.
     expanded: [],
     lastFile: typeof raw.lastFile === 'string' ? raw.lastFile : null,
-    folds: sanitizeKeyLists(raw.folds, MAX_FOLD_KEYS_PER_FILE),
-    baseGroups: sanitizeKeyLists(raw.baseGroups, MAX_COLLAPSED_GROUP_KEYS),
-    topicsExpanded: [],
   }
 }
 
@@ -234,7 +203,7 @@ function sanitizeFolders(raw: unknown): Record<string, FolderState> {
 /** Null when the document is not a version-1 state object at all (→ treated as corrupt). */
 /** The file's shape: each folder bucket minus its session fields (YAZ-1642) — what a relaunch restores, nothing more. */
 function toDisk(state: AppState): unknown {
-  const folders = Object.fromEntries(Object.entries(state.folders).map(([root, { expanded: _e, topicsExpanded: _t, ...kept }]) => [root, kept]))
+  const folders = Object.fromEntries(Object.entries(state.folders).map(([root, { expanded: _e, ...kept }]) => [root, kept]))
   return { ...state, folders }
 }
 
@@ -246,7 +215,7 @@ function sanitizeState(raw: unknown): AppState | null {
   // YAZ-1628 migration, the same shape: a v1 file's retired global lens (YAZ-847) seeds only
   // windows without a valid lens of their own; a pre-847 file has none at all, and missing or
   // junk both read as the default. The returned state omits the old key too.
-  const legacySidebarLens: SidebarLens = isSidebarLens(raw.sidebarLens) ? raw.sidebarLens : 'topics'
+  const legacySidebarLens: SidebarLens = isSidebarLens(raw.sidebarLens) ? raw.sidebarLens : 'files'
   return {
     version: 1,
     settings: sanitizeSettings(raw.settings),
@@ -348,32 +317,13 @@ export function createStore(filePath: string): Store {
         ...cur,
         ...(patch.expanded !== undefined ? { expanded: [...patch.expanded] } : {}),
         ...(patch.lastFile !== undefined ? { lastFile: patch.lastFile } : {}),
-        // Capped here as well as in the renderer (`folds` / `baseGroups`' rule): the store is
-        // what a hand-edited or third-party write lands in, and this bucket grows per page.
-        ...(patch.topicsExpanded !== undefined ? { topicsExpanded: patch.topicsExpanded.slice(0, MAX_TOPICS_EXPANDED_PAGES) } : {}),
       }
       commit({ ...state, folders: { ...state.folders, [root]: next } })
     },
 
-    setFolds(root, file, keys) {
-      const cur = folderOf(root)
-      const folds = { ...cur.folds }
-      if (keys.length === 0) delete folds[file]
-      else folds[file] = keys.slice(0, MAX_FOLD_KEYS_PER_FILE)
-      commit({ ...state, folders: { ...state.folders, [root]: { ...cur, folds } } })
-    },
-
-    setBaseGroups(root, key, collapsed) {
-      const cur = folderOf(root)
-      const baseGroups = { ...cur.baseGroups }
-      if (collapsed.length === 0) delete baseGroups[key]
-      else baseGroups[key] = collapsed.slice(0, MAX_COLLAPSED_GROUP_KEYS)
-      commit({ ...state, folders: { ...state.folders, [root]: { ...cur, baseGroups } } })
-    },
-
     upsertWindow(entry) {
       const tabs = normalizeTabs(entry.tabs, entry.file)
-      const normalized: WindowEntry = { ...entry, tabs, rightPanel: normalizeRightPanel(entry.rightPanel, tabs) }
+      const normalized: WindowEntry = { ...entry, tabs }
       const windows = state.windows.some((w) => w.id === entry.id) ? state.windows.map((w) => (w.id === entry.id ? normalized : w)) : [...state.windows, normalized]
       commit({ ...state, windows })
     },
@@ -386,8 +336,8 @@ export function createStore(filePath: string): Store {
     renamePath(oldPath, newPath) {
       // E1b (GRO-2241): `oldPath` may be a DIRECTORY — every stored path AT or UNDER it
       // follows: window roots (a subfolder opened as a vault!), files and tabs, recents,
-      // each folder-state KEY plus its expanded dirs, lastFile, fold keys and baseGroups
-      // keys. For a FILE rename the prefix branch is inert (nothing is ever stored under a
+      // and each folder-state KEY plus its expanded dirs and lastFile. For a FILE rename the
+      // prefix branch is inert (nothing is ever stored under a
       // file path), so ONE mapping serves both kinds — and it is still one commit, one
       // notify, a no-op when nothing references the path.
       let changed = false
@@ -397,15 +347,6 @@ export function createStore(filePath: string): Store {
         changed = true
         return newPath + p.slice(oldPath.length)
       }
-      // A baseGroups key is `<basePath>::<view>` — the exact-file half needs its own test.
-      const baseGroupPrefix = `${oldPath}::`
-      const remapBaseGroupKey = (key: string): string => {
-        if (!key.startsWith(baseGroupPrefix)) return remap(key)
-        changed = true
-        return newPath + key.slice(oldPath.length)
-      }
-      const remapKeys = (lists: Record<string, string[]>, remapKey: (key: string) => string): Record<string, string[]> =>
-        Object.fromEntries(Object.entries(lists).map(([key, value]) => [remapKey(key), value]))
       const windows = state.windows.map((w) => {
         const root = w.root === null ? null : remap(w.root)
         const file = w.file === null ? null : remap(w.file)
@@ -415,14 +356,8 @@ export function createStore(filePath: string): Store {
           root,
           file,
           tabs,
-          rightPanel: normalizeRightPanel({
-            ...w.rightPanel,
-            items: w.rightPanel.items.map(remap),
-            expanded: w.rightPanel.expanded === null ? null : remap(w.rightPanel.expanded),
-          }, tabs),
           // Focus Mode's lists (YAZ-1628, YAZ-1766): path lists like `tabs` — a renamed focus follows its folder.
           focusDirs: w.focusDirs.map(remap),
-          focusTopics: w.focusTopics.map(remap),
           focusFavorites: w.focusFavorites.map(remap),
         }
       })
@@ -434,12 +369,6 @@ export function createStore(filePath: string): Store {
             ...folder,
             expanded: folder.expanded.map(remap),
             lastFile: folder.lastFile === null ? null : remap(folder.lastFile),
-            // Path-keyed like `expanded`, only holding PAGES rather than dirs (YAZ-848) — so an
-            // expanded topic follows its own rename, and a renamed FOLDER carries every topic
-            // inside it through the same prefix branch.
-            topicsExpanded: folder.topicsExpanded.map(remap),
-            folds: remapKeys(folder.folds, remap),
-            baseGroups: remapKeys(folder.baseGroups, remapBaseGroupKey),
           },
         ]),
       )
@@ -460,13 +389,6 @@ export function createStore(filePath: string): Store {
         if (kept.length !== paths.length) changed = true
         return kept
       }
-      /** A baseGroups key is `<basePath>::<view>` — the exact-file half needs its own test. */
-      const baseGroupGone = (key: string): boolean => key.startsWith(`${deleted}::`) || gone(key)
-      const dropKeys = <T>(map: Record<string, T>, isGone: (key: string) => boolean): Record<string, T> => {
-        const kept = Object.entries(map).filter(([key]) => !isGone(key))
-        if (kept.length !== Object.keys(map).length) changed = true
-        return Object.fromEntries(kept)
-      }
       const windows = state.windows.map((w) => {
         // `root` is NOT touched here — see the interface doc: the renderer's onRootMissing owns it.
         const tabs = drop(w.tabs)
@@ -481,24 +403,12 @@ export function createStore(filePath: string): Store {
           const i = w.tabs.indexOf(file)
           file = w.tabs.slice(i + 1).find((t) => !gone(t)) ?? [...w.tabs.slice(0, i)].reverse().find((t) => !gone(t)) ?? null
         }
-        const normalizedTabs = normalizeTabs(tabs, file)
-        const rightItems = drop(w.rightPanel.items)
-        let expanded = w.rightPanel.expanded
-        if (expanded !== null && gone(expanded)) {
-          changed = true
-          const i = w.rightPanel.items.indexOf(expanded)
-          expanded = w.rightPanel.items.slice(i + 1).find((item) => !gone(item))
-            ?? [...w.rightPanel.items.slice(0, i)].reverse().find((item) => !gone(item))
-            ?? null
-        }
         return {
           ...w,
           file,
-          tabs: normalizedTabs,
-          rightPanel: normalizeRightPanel({ ...w.rightPanel, items: rightItems, expanded }, normalizedTabs),
+          tabs: normalizeTabs(tabs, file),
           // Focus Mode's lists (YAZ-1628, YAZ-1766): a deleted focus target drops out, exactly as a deleted tab does above.
           focusDirs: drop(w.focusDirs),
-          focusTopics: drop(w.focusTopics),
           focusFavorites: drop(w.focusFavorites),
         }
       })
@@ -516,12 +426,7 @@ export function createStore(filePath: string): Store {
             {
               ...folder,
               expanded: drop(folder.expanded),
-              // The Topics tree's open pages (YAZ-848): a deleted page's entry would never match
-              // a row again, so it goes with the rest rather than sitting in the file forever.
-              topicsExpanded: drop(folder.topicsExpanded),
               lastFile: folder.lastFile !== null && gone(folder.lastFile) ? ((changed = true), null) : folder.lastFile,
-              folds: dropKeys(folder.folds, gone),
-              baseGroups: dropKeys(folder.baseGroups, baseGroupGone),
             },
           ]),
       )

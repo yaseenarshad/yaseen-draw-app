@@ -7,10 +7,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { defaultAppState, defaultRightPanelIdentity, type AppState, type WindowIdentity } from '@shared/types'
+import { defaultAppState, type AppState, type WindowIdentity } from '@shared/types'
 import { storage } from '../lib/storage'
-import { _resetRenameContinuity, registerRenameContinuity, takeRenameBuffer } from '../lib/renameContinuity'
-import { bootTabs, bootWorkspace, tabsReducer, useWorkspace, workspaceReducer, type TabsState, type UseWorkspace, type WorkspaceState } from './useWorkspace'
+import { bootTabs, tabsReducer, useWorkspace, type TabsState, type UseWorkspace } from './useWorkspace'
 
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -246,8 +245,8 @@ describe('tabsReducer', () => {
   })
 })
 
-/** A fake `window.yaseenDocs` with just the surface storage touches (the storage.test.ts pattern). */
-type IdentityFixture = Omit<WindowIdentity, 'rightPanel' | 'sidebarCollapsed' | 'sidebarLens' | 'focusDirs' | 'focusTopics' | 'focusFavorites'> & Partial<Pick<WindowIdentity, 'rightPanel' | 'sidebarCollapsed' | 'sidebarLens' | 'focusDirs' | 'focusTopics' | 'focusFavorites'>>
+/** A fake `window.yaseenDraw` with just the surface storage touches (the storage.test.ts pattern). */
+type IdentityFixture = Omit<WindowIdentity, 'sidebarCollapsed' | 'sidebarLens' | 'focusDirs' | 'focusFavorites'> & Partial<Pick<WindowIdentity, 'sidebarCollapsed' | 'sidebarLens' | 'focusDirs' | 'focusFavorites'>>
 
 function installBridge(app: AppState, identity: IdentityFixture) {
   const bridge = {
@@ -259,31 +258,28 @@ function installBridge(app: AppState, identity: IdentityFixture) {
     window: {
       identity: vi.fn(async (): Promise<WindowIdentity> => ({
         ...identity,
-        rightPanel: identity.rightPanel ?? defaultRightPanelIdentity(),
         sidebarCollapsed: identity.sidebarCollapsed ?? false,
-        sidebarLens: identity.sidebarLens ?? 'topics',
+        sidebarLens: identity.sidebarLens ?? 'files',
         focusDirs: identity.focusDirs ?? [],
-        focusTopics: identity.focusTopics ?? [],
         focusFavorites: identity.focusFavorites ?? [],
       })),
       setIdentity: vi.fn(async () => undefined),
     },
   }
-  Object.defineProperty(window, 'yaseenDocs', { value: bridge, configurable: true, writable: true })
+  Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
   return bridge
 }
 
 afterEach(() => {
-  _resetRenameContinuity()
   history.replaceState(null, '', '/')
-  delete (window as unknown as Record<string, unknown>).yaseenDocs
+  delete (window as unknown as Record<string, unknown>).yaseenDraw
   vi.restoreAllMocks()
 })
 
 describe('bootTabs (rules 12/15)', () => {
   const seeded: AppState = {
     ...defaultAppState(),
-    folders: { '/v': { expanded: [], lastFile: '/v/last.md', folds: {}, baseGroups: {}, topicsExpanded: [] } },
+    folders: { '/v': { expanded: [], lastFile: '/v/last.md' } },
   }
 
   it('restores the stored tabs with the identity file active; only the active tab mounts', async () => {
@@ -304,28 +300,6 @@ describe('bootTabs (rules 12/15)', () => {
     await storage.init()
     expect(bootTabs('/v')).toEqual(state(['/v/last.md'], '/v/last.md'))
     expect(bootTabs(null)).toEqual(state([], null))
-  })
-
-  it('restores right identity with only the expanded editor mounted and lets a pasted hash take ownership', async () => {
-    installBridge(seeded, {
-      id: 'w1',
-      root: '/v',
-      file: '/v/a.md',
-      tabs: ['/v/a.md'],
-      rightPanel: { open: true, width: 560, items: ['/v/b.md', '/v/c.md'], expanded: '/v/b.md' },
-    })
-    await storage.init()
-    expect(bootWorkspace('/v')).toMatchObject({
-      tabs: ['/v/a.md'],
-      rightPanel: { open: true, width: 560, items: ['/v/b.md', '/v/c.md'], expanded: '/v/b.md' },
-      rightMounted: ['/v/b.md'],
-    })
-    history.replaceState(null, '', '#/v/b.md')
-    expect(bootWorkspace('/v')).toMatchObject({
-      tabs: ['/v/b.md', '/v/a.md'],
-      rightPanel: { items: ['/v/c.md'], expanded: null },
-      rightMounted: [],
-    })
   })
 })
 
@@ -354,17 +328,17 @@ describe('useWorkspace legacy main-tab mirror', () => {
   it('every mutating action sends ONE setIdentity carrying BOTH tabs and file, plus the folder lastFile', () => {
     act(() => latest.openCurrent('/v/a.md'))
     expect(bridge.window.setIdentity).toHaveBeenCalledTimes(1)
-    expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({ tabs: ['/v/a.md'], file: '/v/a.md', rightPanel: defaultRightPanelIdentity() })
+    expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({ tabs: ['/v/a.md'], file: '/v/a.md' })
     expect(bridge.state.setFolder).toHaveBeenLastCalledWith('/v', { lastFile: '/v/a.md' })
 
     act(() => latest.openBackground('/v/b.md'))
-    expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({ tabs: ['/v/a.md', '/v/b.md'], file: '/v/a.md', rightPanel: defaultRightPanelIdentity() })
+    expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({ tabs: ['/v/a.md', '/v/b.md'], file: '/v/a.md' })
 
     act(() => latest.next())
-    expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({ tabs: ['/v/a.md', '/v/b.md'], file: '/v/b.md', rightPanel: defaultRightPanelIdentity() })
+    expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({ tabs: ['/v/a.md', '/v/b.md'], file: '/v/b.md' })
 
     act(() => latest.close('/v/a.md'))
-    expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({ tabs: ['/v/b.md'], file: '/v/b.md', rightPanel: defaultRightPanelIdentity() })
+    expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({ tabs: ['/v/b.md'], file: '/v/b.md' })
     expect(bridge.window.setIdentity).toHaveBeenCalledTimes(4)
   })
 
@@ -378,38 +352,13 @@ describe('useWorkspace legacy main-tab mirror', () => {
     expect(bridge.window.setIdentity).toHaveBeenCalledTimes(1)
   })
 
-  it('a cross-pane action sends one complete workspace identity write', () => {
-    act(() => latest.openCurrent('/v/a.md'))
-    bridge.window.setIdentity.mockClear()
-    act(() => latest.openRight('/v/a.md'))
-    expect(bridge.window.setIdentity).toHaveBeenCalledTimes(1)
-    expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({
-      tabs: [],
-      file: null,
-      rightPanel: { open: true, width: 440, items: ['/v/a.md'], expanded: '/v/a.md' },
-    })
-  })
-
-  it('captures and retires the source editor before mirroring a pane transfer', () => {
-    act(() => latest.openCurrent('/v/a.md'))
-    bridge.window.setIdentity.mockClear()
-    const capture = vi.fn(() => ({ frontmatter: '---\n---\n', body: 'dirty' }))
-    const retire = vi.fn()
-    registerRenameContinuity('/v/a.md', { flush: vi.fn(async () => undefined), capture, retire })
-    act(() => latest.openRight('/v/a.md'))
-    expect(capture).toHaveBeenCalledTimes(1)
-    expect(retire).toHaveBeenCalledTimes(1)
-    expect(capture.mock.invocationCallOrder[0]).toBeLessThan(bridge.window.setIdentity.mock.invocationCallOrder[0])
-    expect(takeRenameBuffer('/v/a.md')).toEqual({ frontmatter: '---\n---\n', body: 'dirty' })
-  })
-
   it('move mirrors the reorder as ONE {tabs, file} write with the active file unchanged; a no-op move mirrors nothing', () => {
     act(() => latest.openCurrent('/v/a.md'))
     act(() => latest.openBackground('/v/b.md'))
     const writes = bridge.window.setIdentity.mock.calls.length
     act(() => latest.move(0, 1))
     expect(bridge.window.setIdentity).toHaveBeenCalledTimes(writes + 1)
-    expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({ tabs: ['/v/b.md', '/v/a.md'], file: '/v/a.md', rightPanel: defaultRightPanelIdentity() })
+    expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({ tabs: ['/v/b.md', '/v/a.md'], file: '/v/a.md' })
     act(() => latest.move(1, 1))
     expect(bridge.window.setIdentity).toHaveBeenCalledTimes(writes + 1)
   })
@@ -426,7 +375,7 @@ describe('useWorkspace legacy main-tab mirror', () => {
     })
     expect(closed).toBe(true)
     expect(latest.tabs).toEqual([])
-    expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({ tabs: [], file: null, rightPanel: defaultRightPanelIdentity() })
+    expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({ tabs: [], file: null })
   })
 
   it('canBack / canForward read the ACTIVE tab\'s place in its own stack (YAZ-721 D1)', () => {
@@ -448,7 +397,7 @@ describe('useWorkspace legacy main-tab mirror', () => {
     const writes = bridge.window.setIdentity.mock.calls.length
     act(() => latest.back())
     expect(bridge.window.setIdentity).toHaveBeenCalledTimes(writes + 1)
-    expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({ tabs: ['/v/a.md'], file: '/v/a.md', rightPanel: defaultRightPanelIdentity() })
+    expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({ tabs: ['/v/a.md'], file: '/v/a.md' })
   })
 
   it('back at the start of the stack (and forward at its end) mirror nothing', () => {
@@ -464,160 +413,12 @@ describe('useWorkspace legacy main-tab mirror', () => {
     act(() => latest.reset('/w', '/w/b.md'))
     expect(latest.tabs).toEqual(['/w/b.md'])
     expect(bridge.state.setFolder).toHaveBeenLastCalledWith('/w', { lastFile: '/w/b.md' })
-    expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({ tabs: ['/w/b.md'], file: '/w/b.md', rightPanel: defaultRightPanelIdentity() })
+    expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({ tabs: ['/w/b.md'], file: '/w/b.md' })
     const writes = bridge.window.setIdentity.mock.calls.length
     act(() => latest.reset(null, null)) // rides on setRoot's own {root, file: null, tabs: []} write
     expect(latest.tabs).toEqual([])
     expect(latest.active).toBeNull()
     expect(bridge.window.setIdentity).toHaveBeenCalledTimes(writes)
-  })
-})
-
-describe('workspaceReducer right-panel ownership', () => {
-  const workspace = (over: Partial<WorkspaceState> = {}): WorkspaceState => ({
-    tabs: ['/v/a.md', '/v/b.md'],
-    active: '/v/a.md',
-    mounted: ['/v/a.md'],
-    history: {},
-    rightPanel: defaultRightPanelIdentity(),
-    rightMounted: [],
-    rightHistory: {},
-    ...over,
-  })
-
-  const expectInvariants = (state: WorkspaceState) => {
-    const main = new Set(state.tabs)
-    expect(state.rightPanel.items.every((path) => !main.has(path))).toBe(true)
-    expect(state.rightPanel.expanded === null || state.rightPanel.items.includes(state.rightPanel.expanded)).toBe(true)
-    expect(state.rightMounted.every((path) => state.rightPanel.items.includes(path))).toBe(true)
-  }
-
-  it('moves an active main page to right, promotes the main heir, and mounts only the foreground item', () => {
-    const next = workspaceReducer(workspace(), { type: 'open-right', path: '/v/a.md' })
-    expect(next).toMatchObject({
-      tabs: ['/v/b.md'],
-      active: '/v/b.md',
-      rightPanel: { open: true, width: 440, items: ['/v/a.md'], expanded: '/v/a.md' },
-      rightMounted: ['/v/a.md'],
-    })
-    expectInvariants(next)
-  })
-
-  it('opens a transferred page in right background without mounting or changing the current right item', () => {
-    const next = workspaceReducer(workspace({
-      rightPanel: { open: true, width: 500, items: ['/v/c.md'], expanded: '/v/c.md' },
-      rightMounted: ['/v/c.md'],
-    }), { type: 'open-right-background', path: '/v/a.md' })
-    expect(next).toMatchObject({
-      tabs: ['/v/b.md'],
-      active: '/v/b.md',
-      rightPanel: { open: true, width: 500, items: ['/v/c.md', '/v/a.md'], expanded: '/v/c.md' },
-      rightMounted: ['/v/c.md'],
-    })
-    expectInvariants(next)
-  })
-
-  it('transfers an existing right page back to an exact main slot and activates it', () => {
-    const next = workspaceReducer(workspace({
-      rightPanel: { open: true, width: 440, items: ['/v/c.md', '/v/d.md'], expanded: '/v/c.md' },
-      rightMounted: ['/v/c.md'],
-    }), { type: 'transfer-right-to-main', path: '/v/c.md', at: 1 })
-    expect(next).toMatchObject({
-      tabs: ['/v/a.md', '/v/c.md', '/v/b.md'],
-      active: '/v/c.md',
-      rightPanel: { items: ['/v/d.md'], expanded: '/v/d.md' },
-      rightMounted: [],
-    })
-    expectInvariants(next)
-  })
-
-  it('transfers main to an exact right slot, reorders right locally, and rejects stale sources', () => {
-    const start = workspace({
-      rightPanel: { open: true, width: 440, items: ['/v/c.md', '/v/d.md'], expanded: '/v/c.md' },
-      rightMounted: ['/v/c.md'],
-    })
-    const transferred = workspaceReducer(start, { type: 'transfer-main-to-right', path: '/v/b.md', at: 1 })
-    expect(transferred.rightPanel.items).toEqual(['/v/c.md', '/v/b.md', '/v/d.md'])
-    expect(transferred.tabs).toEqual(['/v/a.md'])
-    expect(workspaceReducer(transferred, { type: 'move-right', from: 0, to: 2 }).rightPanel.items).toEqual([
-      '/v/b.md',
-      '/v/d.md',
-      '/v/c.md',
-    ])
-    expect(workspaceReducer(start, { type: 'transfer-main-to-right', path: '/v/stale.md', at: 0 })).toBe(start)
-    expect(workspaceReducer(start, { type: 'transfer-right-to-main', path: '/v/stale.md', at: 0 })).toBe(start)
-    expectInvariants(transferred)
-  })
-
-  it('navigates inside one right slot, records local history, then walks back and forward', () => {
-    const start = workspace({
-      rightPanel: { open: true, width: 440, items: ['/v/c.md'], expanded: '/v/c.md' },
-      rightMounted: ['/v/c.md'],
-    })
-    const navigated = workspaceReducer(start, { type: 'navigate-right', from: '/v/c.md', to: '/v/d.md' })
-    expect(navigated.rightPanel.items).toEqual(['/v/d.md'])
-    expect(navigated.rightHistory['/v/d.md']).toEqual({ entries: ['/v/c.md', '/v/d.md'], index: 1 })
-    const back = workspaceReducer(navigated, { type: 'right-back' })
-    expect(back.rightPanel.expanded).toBe('/v/c.md')
-    expect(back.rightHistory['/v/c.md']).toEqual({ entries: ['/v/c.md', '/v/d.md'], index: 0 })
-    const forward = workspaceReducer(back, { type: 'right-forward' })
-    expect(forward.rightPanel.expanded).toBe('/v/d.md')
-    expectInvariants(forward)
-  })
-
-  it('closes right items to the next, then previous, then null and rejects stale actions', () => {
-    const start = workspace({
-      rightPanel: { open: true, width: 440, items: ['/v/c.md', '/v/d.md'], expanded: '/v/c.md' },
-      rightMounted: ['/v/c.md', '/v/d.md'],
-    })
-    const next = workspaceReducer(start, { type: 'close-right', path: '/v/c.md' })
-    expect(next.rightPanel).toMatchObject({ items: ['/v/d.md'], expanded: '/v/d.md' })
-    const empty = workspaceReducer(next, { type: 'close-right', path: '/v/d.md' })
-    expect(empty.rightPanel).toMatchObject({ items: [], expanded: null })
-    expect(workspaceReducer(empty, { type: 'close-right', path: '/v/missing.md' })).toBe(empty)
-  })
-
-  it('main navigation takes ownership from right and lifecycle actions repair both owners', () => {
-    const start = workspace({
-      rightPanel: { open: true, width: 440, items: ['/v/c.md', '/v/Old/d.md'], expanded: '/v/c.md' },
-      rightMounted: ['/v/c.md', '/v/Old/d.md'],
-    })
-    const main = workspaceReducer(start, { type: 'open-new', path: '/v/c.md' })
-    expect(main.tabs).toEqual(['/v/a.md', '/v/b.md', '/v/c.md'])
-    expect(main.rightPanel.items).toEqual(['/v/Old/d.md'])
-    const renamed = workspaceReducer(main, { type: 'rename-dir', oldPath: '/v/Old', newPath: '/v/New' })
-    expect(renamed.rightPanel.items).toEqual(['/v/New/d.md'])
-    const deleted = workspaceReducer(renamed, { type: 'delete', path: '/v/New/d.md' })
-    expect(deleted.rightPanel.items).toEqual([])
-    expectInvariants(deleted)
-  })
-
-  it('deleting the expanded right page promotes the next surviving header, else the previous', () => {
-    const start = workspace({
-      rightPanel: { open: true, width: 440, items: ['/v/c.md', '/v/d.md', '/v/e.md'], expanded: '/v/d.md' },
-      rightMounted: ['/v/c.md', '/v/d.md', '/v/e.md'],
-    })
-    const next = workspaceReducer(start, { type: 'delete', path: '/v/d.md' })
-    expect(next.rightPanel).toMatchObject({ items: ['/v/c.md', '/v/e.md'], expanded: '/v/e.md' })
-    const previous = workspaceReducer(next, { type: 'delete', path: '/v/e.md' })
-    expect(previous.rightPanel).toMatchObject({ items: ['/v/c.md'], expanded: '/v/c.md' })
-  })
-
-  it('root reset clears right identity, mounts, and local history', () => {
-    const start = workspace({
-      rightPanel: { open: true, width: 600, items: ['/v/c.md'], expanded: '/v/c.md' },
-      rightMounted: ['/v/c.md'],
-      rightHistory: { '/v/c.md': { entries: ['/v/d.md', '/v/c.md'], index: 1 } },
-    })
-    const next = workspaceReducer(start, { type: 'reset', tabs: ['/w/a.md'], active: '/w/a.md' })
-    expect(next).toMatchObject({
-      tabs: ['/w/a.md'],
-      active: '/w/a.md',
-      rightPanel: defaultRightPanelIdentity(),
-      rightMounted: [],
-      rightHistory: {},
-    })
-    expectInvariants(next)
   })
 })
 

@@ -1,19 +1,14 @@
 /**
- * Pure logic behind the sidebar's "New note" / "New folder page" / "New folder" flow (GRO-2022):
- * name validation, target-directory resolution, and final path building.
- * The UI (context menu + inline input) lives in Sidebar/Tree; the main process
- * enforces the same rules again (absolute path, vault extension, no overwrite).
+ * Pure logic behind the sidebar's "New drawing" / "New folder" flow (GRO-2022): name validation,
+ * target-directory resolution, and final path building. The UI (context menu + inline input)
+ * lives in Sidebar/Tree; the main process enforces the same rules again (absolute path, vault
+ * extension, no overwrite).
  */
 import { fileKind } from '@shared/fileKind'
+import { DRAWING_VIEW_EXTENSIONS } from '@shared/types'
 
-/**
- * What the inline input creates: a markdown note, a folder, or a FOLDER PAGE (🔒 D4, YAZ-841)
- * — a note like any other, born carrying `folder_page: true` and nothing else (🔒 D1). It is a
- * third KIND rather than a flag beside `file` so the one difference — the seed — stays at the
- * end of the flow while every shared rule above it (validation, target dir, the `.md`
- * extension) is literally the same code.
- */
-export type EntryKind = 'file' | 'dir' | 'folderPage'
+/** What the inline input creates: a drawing or a folder. */
+export type EntryKind = 'file' | 'dir'
 
 /** Human-readable reason the name is unusable, or null when fine. Callers trim first via entryPath. */
 export function validateEntryName(name: string): string | null {
@@ -24,11 +19,34 @@ export function validateEntryName(name: string): string | null {
   return null
 }
 
-/** Absolute path for the new entry; notes (folder pages included) get `.md` unless already markdown. */
+/** Absolute path for the new entry; a drawing gains `.excalidraw` unless the typed name already carries it. */
 export function entryPath(parentDir: string, name: string, kind: EntryKind): string {
   let final = name.trim()
-  if ((kind === 'file' || kind === 'folderPage') && !/\.(md|markdown)$/i.test(final)) final += '.md'
+  if (kind === 'file' && fileKind(final) !== 'drawing') final += DRAWING_VIEW_EXTENSIONS[0]
   return `${parentDir}/${final}`
+}
+
+/** The name a new drawing is born with (🔒 R1 on YAZ-1775), before the user renames it. */
+export const UNTITLED_DRAWING = 'Untitled'
+
+/**
+ * The next free "New drawing" name in a folder (🔒 R1 on YAZ-1775, 2I): `Untitled`, then
+ * `Untitled 2`, `Untitled 3`… — never a name the folder already holds, because the birth must not
+ * overwrite anything (`fs:create-file` writes `wx` and would refuse anyway; this is so the user
+ * sees a new board rather than an error). `taken` is the folder's existing entry names WITH their
+ * extensions, compared case-insensitively: the Mac's own filesystem is, so `untitled.excalidraw`
+ * and `Untitled.excalidraw` are the same file and the second one must not be offered.
+ */
+export function untitledDrawingName(taken: readonly string[]): string {
+  const used = new Set(taken.map((n) => n.toLowerCase()))
+  const free = (name: string): boolean => !used.has(`${name}${DRAWING_VIEW_EXTENSIONS[0]}`.toLowerCase())
+  if (free(UNTITLED_DRAWING)) return UNTITLED_DRAWING
+  // At most one more than the names in the way can be taken, so this always terminates.
+  for (let n = 2; n <= used.size + 2; n++) {
+    const candidate = `${UNTITLED_DRAWING} ${n}`
+    if (free(candidate)) return candidate
+  }
+  return `${UNTITLED_DRAWING} ${used.size + 2}`
 }
 
 /** Seed for "New dated folder" (YAZ-1604): `09_14- ` — today's MM_DD, then `- ` so the title lands one space after the dash. */
@@ -39,9 +57,8 @@ export function datedFolderSeed(now: Date = new Date()): string {
 
 /**
  * The least a right-clicked row has to say for the menu to target it: its KIND and its path.
- * A `TreeNode` satisfies it structurally, and so does a Topics row built from an index record
- * (YAZ-865 — the ⚡ amendment on YAZ-821 gives those rows the file tree's own menu), which is
- * why the rule below asks for this and not for a whole tree node it would never read.
+ * A `TreeNode` satisfies it structurally, which is why the rule below asks for this and not for
+ * a whole tree node it would never read.
  */
 export interface MenuRow {
   type: 'file' | 'dir'
@@ -55,18 +72,18 @@ export function targetDirFor(node: MenuRow | null, root: string): string {
   return node.path.slice(0, node.path.lastIndexOf('/'))
 }
 
-/** Rename-field prefill: Markdown hides its suffix; view-only files show their full filename. */
+/** Rename-field prefill: a drawing hides its suffix; every other file shows its full filename. */
 export function renameInputName(fileName: string): string {
   const name = fileName.slice(fileName.lastIndexOf('/') + 1)
-  if (fileKind(name) !== 'markdown') return name
+  if (fileKind(name) !== 'drawing') return name
   return name.slice(0, name.lastIndexOf('.'))
 }
 
 /**
  * Absolute path for the sidebar's inline rename (Links E1, GRO-2194; folders E1b, GRO-2241):
- * same parent directory. Markdown keeps only an explicit Markdown suffix; any other visible name
- * inherits the old Markdown suffix. View-only files keep any explicit supported suffix and append
- * the old exact suffix only when none is recognized. Directories have no extension logic.
+ * same parent directory. A drawing keeps only an explicit `.excalidraw` suffix; any other visible
+ * name inherits the old one. An unsupported file keeps its exact suffix, since nothing else
+ * vouches for what its bytes are. Directories have no extension logic.
  */
 export function renamedPath(oldPath: string, newName: string, kind: 'file' | 'dir' = 'file'): string {
   const dir = oldPath.slice(0, oldPath.lastIndexOf('/'))
@@ -76,6 +93,6 @@ export function renamedPath(oldPath: string, newName: string, kind: 'file' | 'di
   if (final === renameInputName(oldName)) return oldPath
   const oldKind = fileKind(oldPath)
   const newKind = fileKind(final)
-  if (oldKind === 'markdown' ? newKind !== 'markdown' : newKind === null) final += oldPath.slice(oldPath.lastIndexOf('.'))
+  if (oldKind === 'drawing' ? newKind !== 'drawing' : newKind === null) final += oldPath.slice(oldPath.lastIndexOf('.'))
   return `${dir}/${final}`
 }

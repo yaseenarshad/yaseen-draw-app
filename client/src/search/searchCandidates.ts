@@ -1,29 +1,38 @@
 /**
- * Title search candidates (YAZ-802): the rows the search box matches a query against, ranked by
- * the ONE completion matcher (`links/completion.ts`) so search ranks exactly like `[[`
- * completion does. 🔒 D3 on YAZ-739: the query matches the note's BASENAME and its frontmatter
- * ALIASES only — `folder` rides along as the row's display label and is never matched. Amended
- * by 🔒 D2 on YAZ-1491: a note STILL never matches on its folder; the folder itself is one row
- * (`folderCandidates`, fed from the tree the Sidebar already holds — 🔒 D1), matched by its own
- * name through the same matcher, in the same flat list.
+ * The ⌘K CATALOG (YAZ-1814): the flat list of rows the search box matches a query against, ranked
+ * by the ONE matcher (`search/matchCandidates.ts`).
  *
- * Deliberately NOT `linkCandidates`: a link candidate must insert text that resolves back to its
- * own record, so duplicate basenames there are folder-disambiguated and only the shallowest keeps
- * the bare name. Search opens `path` directly, so there is nothing to disambiguate — every note
- * gets a row under its own basename, and duplicates are told apart by the folder label.
+ * There is no index any more — the markdown vault index went with the markdown layer (YAZ-1808) —
+ * so the catalog is derived from the tree the Sidebar already holds, which IS `fs:tree` and is
+ * kept fresh by the structural watcher (the docs-app `viewOnlyCatalog` pattern: one cheap walk of
+ * a tree somebody else is already refreshing, never a second read of the vault).
+ *
+ * What is in it (🔒 2H, YAZ-1814):
+ * - one row per `.excalidraw` FILE, named the way the tree and the tab strip spell it — without
+ *   the extension — carrying its absolute path and its root-relative folder as the row's label;
+ * - one row per FOLDER, matched by its own name (🔒 D2, YAZ-1491), labelled by ITS parent.
+ * A file never matches on its folder (🔒 D3, YAZ-739): the folder is its own row instead.
+ *
+ * What is NOT in it: a file of no supported kind (a `.png` dropped in the vault lists in the tree
+ * and opens in the OS app, but it is not a document this app can search for), and the image store
+ * `assets/` — which is already absent from `fs:tree` (🔒 D3, YAZ-1775), so the catalog inherits
+ * that rule rather than re-deciding it. A folder the user called `assets` inside a subfolder is
+ * theirs, shows in the tree, and is searchable, exactly as the tree rule says.
  */
-import type { IndexRecord } from '@shared/types'
-import { matchLinkCandidates } from '../links/completion'
+import type { TreeNode } from '@shared/types'
+import { isDrawing } from '@shared/fileKind'
+import { stripExt } from '../lib/paths'
+import { matchCandidates } from './matchCandidates'
 
 /** One search row: what the query matches, what it reads as, what activating it targets. */
 export interface SearchCandidate {
   /** What activating the row does (🔒 D3, YAZ-1491): a `dir` row REVEALS itself in Files; a `file` row OPENS. */
   kind: 'file' | 'dir'
-  /** The text the query matches: the note's basename, one of its aliases, or the folder's name. */
+  /** The text the query matches: the drawing's name without its extension, or the folder's name. */
   name: string
   /** `name.toLowerCase()`, precomputed so the ranking scan (GRO-2197) allocates nothing per keystroke. */
   lower: string
-  /** Row text: the basename, or `Alias — Basename` (the alias row's disambiguation). */
+  /** Row text — the same name. */
   label: string
   /** Absolute path — the open (or reveal) action's target. */
   path: string
@@ -31,41 +40,43 @@ export interface SearchCandidate {
   folder: string
 }
 
-/** Result cap for title search — a scrollable result list, not the `[[` picker's MAX_SUGGESTIONS popup. */
+/** Result cap for title search — a scrollable result list, not the 8-row popup `MAX_SUGGESTIONS` serves. */
 export const SEARCH_CAP = 50
 
-/**
- * Candidates for one index snapshot, in records order (i.e. path-sorted): every record under its
- * basename, followed by one row per frontmatter alias. An alias equal to its own basename
- * (case-insensitively) is SKIPPED — it would only duplicate the row above it (mirrors
- * `linkCandidates`' degenerate-alias skip).
- */
-export function searchCandidates(records: readonly IndexRecord[]): SearchCandidate[] {
-  return records.flatMap((r) => {
-    const row = (name: string, label: string): SearchCandidate => ({ kind: 'file', name, lower: name.toLowerCase(), label, path: r.path, folder: r.folder })
-    const aliases = r.aliases.filter((alias) => alias.toLowerCase() !== r.basename.toLowerCase())
-    return [row(r.basename, r.basename), ...aliases.map((alias) => row(alias, `${alias} — ${r.basename}`))]
-  })
+/** The empty catalog, shared — the lazy feed hands this back until the first query (`useSearchResults`). */
+export const EMPTY_CATALOG: readonly SearchCandidate[] = []
+
+/** One row, its `folder` read off the path relative to `prefix` (the root with exactly one trailing slash). */
+function row(kind: SearchCandidate['kind'], prefix: string, path: string, name: string): SearchCandidate {
+  const rel = path.startsWith(prefix) ? path.slice(prefix.length) : path
+  const cut = rel.lastIndexOf('/')
+  return { kind, name, lower: name.toLowerCase(), label: name, path, folder: cut === -1 ? '' : rel.slice(0, cut) }
 }
 
 /**
- * One row per folder in the loaded tree (🔒 D1, YAZ-1491): matched by its own name, labelled by
- * its parent. `dirs` are ABSOLUTE paths in tree order (`allDirs`, treeState.ts), so a folder's
- * row sits above its children's — and, spliced ahead of `searchCandidates`, above any note that
- * ties with it in a rank bucket. `folder` follows `IndexRecord.folder`: root-relative, `/`
- * separated, `''` directly under the root.
+ * The whole catalog in ONE walk of the tree: every folder (outer before inner, tree order) ahead of
+ * every drawing (tree order). Folders lead so that a folder sits above a drawing it ties with in a
+ * rank bucket — the reveal is the cheaper mistake (🔒 D1, YAZ-1491).
  */
-export function folderCandidates(root: string, dirs: readonly string[]): SearchCandidate[] {
+export function buildDrawingCatalog(root: string, tree: readonly TreeNode[]): SearchCandidate[] {
   const prefix = `${root.replace(/\/+$/, '')}/`
-  return dirs.map((dir) => {
-    const rel = dir.startsWith(prefix) ? dir.slice(prefix.length) : dir
-    const cut = rel.lastIndexOf('/')
-    const name = rel.slice(cut + 1)
-    return { kind: 'dir', name, lower: name.toLowerCase(), label: name, path: dir, folder: cut === -1 ? '' : rel.slice(0, cut) }
-  })
+  const folders: SearchCandidate[] = []
+  const drawings: SearchCandidate[] = []
+  const walk = (nodes: readonly TreeNode[]): void => {
+    for (const node of nodes) {
+      if (node.type === 'dir') {
+        folders.push(row('dir', prefix, node.path, node.name))
+        walk(node.children)
+      } else if (isDrawing(node.name)) {
+        drawings.push(row('file', prefix, node.path, stripExt(node.name)))
+      }
+    }
+  }
+  walk(tree)
+  return [...folders, ...drawings]
 }
 
 /** Rows matching `query`, ranked exact → prefix → substring by the shared matcher, capped at SEARCH_CAP. */
 export function searchTitles(candidates: readonly SearchCandidate[], query: string): SearchCandidate[] {
-  return matchLinkCandidates(candidates, query, SEARCH_CAP)
+  return matchCandidates(candidates, query, SEARCH_CAP)
 }

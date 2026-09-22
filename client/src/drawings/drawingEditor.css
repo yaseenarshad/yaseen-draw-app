@@ -1,0 +1,277 @@
+/*
+ * The drawing document (🔒 YAZ-1810) — classes applied by DrawingEditor.tsx and its surface.
+ *
+ * The host is a flex column inside `section.editor` (itself a flex column filling the tab
+ * layer): the conflict bar when there is one, then the canvas taking every remaining pixel.
+ * `min-height: 0` is load-bearing at every level: without it the engine's container measures its
+ * own content and grows past the pane instead of fitting inside it.
+ *
+ * There is no chips ROW here on purpose — the chips are handed to the engine's own top-right
+ * slot (`renderTopRight`), so the canvas starts directly under the shell's tab bar.
+ *
+ * Everything below the canvas frame is the CHROME INSIDE the engine (YAZ-1812): the rail, the
+ * docked canvas panel and the handful of `excalidraw-app/index.scss` rules the parity checklist
+ * keeps. All of it is scoped under `.editor--drawing .excalidraw` so the engine's own design
+ * tokens apply unchanged and nothing leaks into the shell.
+ */
+
+.drawing-editor {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawing-editor__canvas {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+/* Whatever the surface mounts fills the frame — an engine container measures its parent. */
+.drawing-editor__canvas > div {
+  width: 100%;
+  height: 100%;
+}
+
+/* The frame held while the engine chunk is still arriving: the same box, painted by nothing. */
+.drawing-editor__loading {
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- the status chips, in the engine's top-right row ---------- */
+
+.editor--drawing .excalidraw .drawing-editor__top-right {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  /* The row spans the canvas; only the chips themselves may take the pointer. */
+  pointer-events: none;
+}
+
+.editor--drawing .excalidraw .drawing-editor__chips {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: var(--ui-pointerEvents, all);
+}
+
+/* The surface's own element (the ⌘F / ⌘C capture host) fills the frame, as the engine's does. */
+.drawing-surface,
+.drawing-surface > div {
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- The rail (YAZ-1775 🔒 D10): `excalidraw-app/components/AppSidebar.scss`, ported ----------
+   Scoped under the engine's root so its own tokens (island background, primary colour, button
+   sizes) apply unchanged. The rail sits in the top-left row, where the engine's own menu trigger
+   used to be. */
+
+.editor--drawing .excalidraw .app-sidebar-launchers {
+  align-items: center;
+  display: flex;
+  gap: 0.25rem;
+  min-width: 0;
+  order: 2;
+  pointer-events: var(--ui-pointerEvents, all);
+}
+
+.editor--drawing .excalidraw .app-sidebar-launchers__modes {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.editor--drawing .excalidraw .app-sidebar-launcher {
+  align-items: center;
+  background: var(--island-bg-color);
+  border: 1px solid var(--default-border-color);
+  border-radius: var(--border-radius-lg);
+  color: var(--text-primary-color);
+  cursor: pointer;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+  height: var(--lg-button-size);
+  justify-content: center;
+  padding: 0 0.25rem;
+  min-width: var(--lg-button-size);
+  width: auto;
+  font: inherit;
+}
+
+.editor--drawing .excalidraw .app-sidebar-launcher:hover {
+  background: var(--button-hover-bg);
+}
+
+.editor--drawing .excalidraw .app-sidebar-launcher[aria-pressed='true'] {
+  background: var(--color-surface-primary-container);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.editor--drawing .excalidraw .app-sidebar-launcher:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.editor--drawing .excalidraw .app-sidebar-launcher svg {
+  height: var(--lg-icon-size);
+  width: var(--lg-icon-size);
+}
+
+.editor--drawing .excalidraw .app-sidebar-launcher--quiet {
+  background: transparent;
+  border-color: transparent;
+}
+
+.editor--drawing .excalidraw .app-sidebar-launcher--quiet:hover {
+  border-color: transparent;
+}
+
+/* A preference toggle, not a panel launcher: "on" is the resting state, so it stays quiet and
+   only dims once the user has switched it off. */
+.editor--drawing .excalidraw .app-sidebar-launcher--toggle[aria-pressed='true'] {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-primary-color);
+}
+
+.editor--drawing .excalidraw .app-sidebar-launcher--toggle[aria-pressed='true']:hover {
+  background: var(--button-hover-bg);
+}
+
+.editor--drawing .excalidraw .app-sidebar-launcher--toggle[aria-pressed='false'] {
+  opacity: 0.55;
+}
+
+/* The hamburger (the web app's `app-sidebar-launchers__boards-menu`): a 2rem island button, first
+   in the row, and the icon-only toggles beside it — their labels are their tooltips (🔒 D10). */
+.editor--drawing .excalidraw .app-sidebar-launchers__boards-menu,
+.editor--drawing .excalidraw .app-sidebar-launcher--icon {
+  height: 2rem;
+  min-width: 2rem;
+  width: 2rem;
+  padding: 0;
+}
+
+/* 🔒 D10: the engine's own menu trigger is not this app's door — the rail's hamburger is. This is
+   the web app's own rule (`AppSidebar.scss:3-5`), and there is no <MainMenu> here to reach anyway. */
+.editor--drawing .excalidraw .main-menu-trigger {
+  display: none;
+}
+
+/* ---------- The canvas panel (⚡ D8 amended): `AppSidebar.scss`'s `.default-sidebar` rules ---------- */
+
+.editor--drawing .excalidraw .default-sidebar .sidebar__header {
+  padding-inline-end: 0.375rem;
+  padding-inline-start: 0.5rem;
+}
+
+.editor--drawing .excalidraw .default-sidebar .sidebar-triggers {
+  flex: 1;
+  min-width: 0;
+}
+
+.editor--drawing .excalidraw .default-sidebar .app-sidebar-panel-toggle {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--border-radius-lg);
+  color: var(--text-primary-color);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 2rem;
+  height: 2rem;
+  justify-content: center;
+  margin-inline-end: 0.25rem;
+  padding: 0;
+  width: 2rem;
+}
+
+.editor--drawing .excalidraw .default-sidebar .app-sidebar-panel-toggle:hover {
+  background: var(--button-hover-bg);
+}
+
+.editor--drawing .excalidraw .default-sidebar .app-sidebar-panel-toggle svg,
+.editor--drawing .excalidraw .default-sidebar .sidebar__header__buttons button svg {
+  height: 1rem;
+  width: 1rem;
+}
+
+.editor--drawing .excalidraw .default-sidebar .sidebar-triggers .app-sidebar-tab-trigger {
+  flex-direction: column;
+  gap: 0.0625rem;
+  height: 2.75rem;
+  min-width: 2.75rem;
+  width: auto;
+}
+
+.editor--drawing .excalidraw .app-sidebar-tab-label {
+  font-size: 0.5625rem;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.editor--drawing .excalidraw .default-sidebar .sidebar__header__buttons button {
+  height: 2rem;
+  width: 2rem;
+}
+
+/* The phase-3 placeholder bodies: centred, muted, honest. */
+.editor--drawing .excalidraw .canvas-sidebar__placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 2rem 1rem;
+  color: var(--text-secondary-color, var(--fg-muted));
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+.editor--drawing .excalidraw .canvas-sidebar__placeholder strong {
+  color: var(--text-primary-color);
+}
+
+/* ---------- Engine parity: the two `excalidraw-app/index.scss` rules that survive (🔒 R3) ----------
+   Tool key hints need no override: the fork hides `.ToolIcon__keybinding` only under
+   `.App-toolbar--compact` (`Toolbar.scss`), and this app never shows that mode (⚡ R4/R5). */
+
+/* The Chubb-illusion offset of the primary colour, both themes (`index.scss:3-7`). */
+.editor--drawing .excalidraw {
+  --color-primary-contrast-offset: #625ee0;
+}
+
+.editor--drawing .excalidraw.theme--dark {
+  --color-primary-contrast-offset: #726dff;
+}
+
+/* The engine's own transient banners sit under the toolbar, centred (`index.scss:57-79`). */
+.editor--drawing .excalidraw .alert {
+  pointer-events: none;
+  position: absolute;
+  top: 6.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  text-align: center;
+  line-height: 1.5;
+  border-radius: var(--border-radius-md);
+  z-index: 6;
+  white-space: pre;
+}
+
+.editor--drawing .excalidraw .alert--warning {
+  background-color: var(--color-warning);
+  color: var(--color-text-warning);
+}
+
+.editor--drawing .excalidraw .alert--danger {
+  background-color: var(--color-danger-dark);
+  color: var(--color-danger-text);
+}

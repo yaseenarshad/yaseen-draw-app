@@ -233,7 +233,7 @@ describe('github.json drives adoption', () => {
     await until(() => h.passes.length === 1)
 
     h.enabled.set(ROOT, false)
-    h.emitConfig(ROOT, 'properties.json')
+    h.emitConfig(ROOT, 'favorites.json')
     await sleep(60)
     expect(await manager.status(ROOT)).toEqual({ root: ROOT, state: 'synced', enabled: true })
   })

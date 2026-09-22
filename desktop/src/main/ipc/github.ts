@@ -12,13 +12,13 @@ import { broadcastAll } from './broadcast'
 import { handle } from './envelope'
 
 /**
- * The `github.*` half of `window.yaseenDocs` (YAZ-1081, 2C) — and the ONE place the Electron-free
+ * The `github.*` half of `window.yaseenDraw` (YAZ-1081, 2C) — and the ONE place the Electron-free
  * sync core (`../git/`) is handed its production edges. `createGitSync` takes every edge as an
  * injected function, so this module is the whole seam: the vault-local config store, the shared
  * chokidar, the status broadcast, and the pass itself.
  *
  * Which roots exist is `AppState.windows` (null = Welcome), exactly the per-open-root idiom
- * `ipc/vaultConfig.ts` and `ipc/properties.ts` already use — the manager subscribes, times and
+ * `ipc/vaultConfig.ts` already uses — the manager subscribes, times and
  * drops per root off that one list, so a closed vault goes completely silent.
  */
 

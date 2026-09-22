@@ -3,7 +3,6 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { FileResponse } from '@shared/types'
 import { useFile, type FileState } from './useFile'
-import * as folderMigration from '../views/migrateFolderBody'
 
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),
@@ -42,7 +41,7 @@ async function flush(): Promise<void> {
 const response = (path: string, content: string, mtime = 1): FileResponse => ({ path, content, mtime, size: new TextEncoder().encode(content).byteLength })
 
 beforeEach(() => {
-  writeFile.mockResolvedValue({ path: '/vault/note.md', mtime: 2, size: 0 })
+  writeFile.mockResolvedValue({ path: '/vault/note.excalidraw', mtime: 2, size: 0 })
 })
 
 afterEach(() => {
@@ -61,22 +60,20 @@ describe('useFile reloadable read state (YAZ-1299)', () => {
     expect(readFile).not.toHaveBeenCalled()
   })
 
-  it('hands mixed-case view-only text through byte-for-byte without folder migration or writes', async () => {
-    const path = '/vault/data.JsOn'
-    const file = response(path, '---\r\nfolder_page: true\r\n---\r\n\tvalue  \r\n')
-    const migrate = vi.spyOn(folderMigration, 'migrateFolderBody')
+  it('hands the bytes through byte-for-byte, transforming nothing and writing nothing on a read', async () => {
+    const path = '/vault/Scene.excalidraw'
+    const file = response(path, '{\r\n  "type": "excalidraw",\r\n  "elements": []\r\n}\r\n')
     readFile.mockResolvedValueOnce(file)
 
     render(path)
     await flush()
 
     expect(state).toEqual({ status: 'ready', path, file })
-    expect(migrate).not.toHaveBeenCalled()
     expect(writeFile).not.toHaveBeenCalled()
   })
 
   it('a revision reload keeps the current file as prev until the replacement resolves', async () => {
-    const path = '/vault/data.json'
+    const path = '/vault/Scene.excalidraw'
     const first = response(path, 'old\r\ncontent\r\n', 1)
     let resolveReload!: (file: FileResponse) => void
     readFile.mockResolvedValueOnce(first).mockReturnValueOnce(new Promise<FileResponse>((resolve) => (resolveReload = resolve)))
@@ -94,7 +91,7 @@ describe('useFile reloadable read state (YAZ-1299)', () => {
   })
 
   it('a failed same-path reload reports the error while retaining the last readable snapshot', async () => {
-    const path = '/vault/data.json'
+    const path = '/vault/Scene.excalidraw'
     const first = response(path, 'still visible', 1)
     readFile.mockResolvedValueOnce(first).mockRejectedValueOnce(new Error('gone'))
     render(path)
@@ -107,7 +104,7 @@ describe('useFile reloadable read state (YAZ-1299)', () => {
   })
 
   it('a retry after a reload error still retains the last readable snapshot', async () => {
-    const path = '/vault/data.json'
+    const path = '/vault/Scene.excalidraw'
     const first = response(path, 'still visible', 1)
     let resolveRetry!: (file: FileResponse) => void
     readFile

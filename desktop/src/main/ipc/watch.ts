@@ -8,7 +8,7 @@ import { subscribe } from '../fs/watchers'
 const bySender = new Map<number, Map<string, () => void>>()
 
 /**
- * `window.yaseenDocs.watch(root, listener)`: the preload sends `{ id, root }`, main answers every
+ * `window.yaseenDraw.watch(root, listener)`: the preload sends `{ id, root }`, main answers every
  * event as `watch:event { id, ev }` on that sender. One chokidar per root (see `fs/watchers.ts`)
  * no matter how many windows or subscriptions; a window going away drops all of its subscriptions.
  */

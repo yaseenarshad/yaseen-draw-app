@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import type { ZoomStep } from '@shared/types'
 
 interface UseMenuEventsOptions {
   /** File › Open Folder… (⌘⇧O) targeted this window: run the pick-folder flow. */
@@ -10,7 +9,7 @@ interface UseMenuEventsOptions {
   onSearch: () => void
   /** File › Switch Vault… (⌘O): open the sidebar header's vault switcher, un-collapsing the sidebar first (YAZ-1767 D8). */
   onSwitchVault: () => void
-  /** Yaseen Docs › Settings… (⌘,): open the settings dialog (YAZ-1679). */
+  /** Yaseen Draw › Settings… (⌘,): open the settings dialog (YAZ-1679). */
   onSettings: () => void
   /** View › Toggle Sidebar: toggle only this renderer's window identity (YAZ-1280). */
   onToggleSidebar: () => void
@@ -20,15 +19,29 @@ interface UseMenuEventsOptions {
   onNextTab: () => void
   /** Window › Previous Tab (⌃⇧Tab / ⌘⇧[): activate the tab to the left, wrapping (GRO-2234). */
   onPrevTab: () => void
-  /** View › Zoom In / Out / Actual Size (⌘+ / ⌘− / ⌘0): the focused note, else the whole app (YAZ-1710). */
-  onZoom: (step: ZoomStep) => void
+  /** File › Export Image… (⌘⇧E, 🔒 D10): the visible drawing opens the engine's export dialog. */
+  onExportImage: () => void
+  /** View › Canvas Background › a pick (🔒 D10): the visible drawing takes `color`. */
+  onCanvasBackground: (color: string) => void
 }
 
 /** Menu gestures from the main process (GRO-2161, tabs GRO-2232); main sends them to the focused window only. */
-export function useMenuEvents({ onOpenFolder, onOpenRoot, onSearch, onSwitchVault, onSettings, onToggleSidebar, onCloseTab, onNextTab, onPrevTab, onZoom }: UseMenuEventsOptions): void {
+export function useMenuEvents({ onOpenFolder, onOpenRoot, onSearch, onSwitchVault, onSettings, onToggleSidebar, onCloseTab, onNextTab, onPrevTab, onExportImage, onCanvasBackground }: UseMenuEventsOptions): void {
   useEffect(() => {
-    const menu = window.yaseenDocs.menu
-    const offs = [menu.onOpenFolder(onOpenFolder), menu.onOpenRoot(onOpenRoot), menu.onSearch(onSearch), menu.onSwitchVault(onSwitchVault), menu.onSettings(onSettings), menu.onToggleSidebar(onToggleSidebar), menu.onCloseTab(onCloseTab), menu.onNextTab(onNextTab), menu.onPrevTab(onPrevTab), menu.onZoom(onZoom)]
+    const menu = window.yaseenDraw.menu
+    const offs = [
+      menu.onOpenFolder(onOpenFolder),
+      menu.onOpenRoot(onOpenRoot),
+      menu.onSearch(onSearch),
+      menu.onSwitchVault(onSwitchVault),
+      menu.onSettings(onSettings),
+      menu.onToggleSidebar(onToggleSidebar),
+      menu.onCloseTab(onCloseTab),
+      menu.onNextTab(onNextTab),
+      menu.onPrevTab(onPrevTab),
+      menu.onExportImage(onExportImage),
+      menu.onCanvasBackground(onCanvasBackground),
+    ]
     return () => offs.forEach((off) => off())
-  }, [onOpenFolder, onOpenRoot, onSearch, onSwitchVault, onSettings, onToggleSidebar, onCloseTab, onNextTab, onPrevTab, onZoom])
+  }, [onOpenFolder, onOpenRoot, onSearch, onSwitchVault, onSettings, onToggleSidebar, onCloseTab, onNextTab, onPrevTab, onExportImage, onCanvasBackground])
 }

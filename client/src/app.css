@@ -6,9 +6,6 @@
   --border: #e4e4e7;
   --accent: #5b6cff;
   --accent-soft: #eef0ff;
-  /* A voice that is not yours (a comment carrying `by`, YAZ-1472): violet, so it never reads as the accent. */
-  --agent: #7c3aed;
-  --agent-soft: #f1eaff;
   --danger: #d64545;
   --warn: #c98a1a;
   --ok: #3a9d5d;
@@ -19,11 +16,6 @@
   --fg-dir: #444444;
   --reveal-bg: #ffe36e;
   --reveal-fg: #2d2500;
-  /* `==highlight==` wash (YAZ-1480): translucent, so text colour and selection show through in both themes. */
-  --mark-bg: rgba(255, 213, 0, 0.4);
-  --mark-bg-green: rgba(80, 200, 120, 0.35);
-  --mark-bg-blue: rgba(80, 160, 255, 0.35);
-  --mark-bg-pink: rgba(255, 120, 180, 0.35);
   /* Amber notice family: conflict bar + rename banner — the two that ask for a decision. (The
      link-notice toast left it for the context menu's surface tokens, YAZ-1674: it confirms as
      often as it warns.) */
@@ -37,9 +29,8 @@
 }
 
 /* Dark palette (Desktop K, GRO-2218): the SAME tokens, near-black surfaces. App.tsx resolves the
-   Appearance setting (System follows the OS live) and stamps data-theme="light"|"dark" on <html>;
-   the Crepe frame vars swap alongside (editor/crepeTheme.ts). WINDOW_BG in
-   desktop/src/main/theme.ts mirrors --bg — change one, change both. */
+   Appearance setting (System follows the OS live) and stamps data-theme="light"|"dark" on <html>.
+   WINDOW_BG in desktop/src/main/theme.ts mirrors --bg — change one, change both. */
 [data-theme='dark'] {
   --bg: #1e1e1e;
   --bg-side: #262626;
@@ -48,8 +39,6 @@
   --border: #3a3a3a;
   --accent: #7c8aff;
   --accent-soft: #2c3050;
-  --agent: #a78bfa;
-  --agent-soft: #2e2547;
   --danger: #e06c6c;
   --warn: #d9a13c;
   --ok: #4fb573;
@@ -96,18 +85,9 @@ button {
 }
 
 .app {
-  --content-max-width: 1040px;
   display: flex;
   height: 100%;
   overflow: hidden;
-}
-
-.app[data-content-width='medium'] {
-  --content-max-width: 1440px;
-}
-
-.app[data-content-width='full'] {
-  --content-max-width: none;
 }
 
 /* ---------- editor ---------- */
@@ -119,466 +99,6 @@ button {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-/* The note's scroller. Stacked blocks live inside it: `.page-header` (block ZERO since YAZ-918 —
-   ⚡ YAZ-888's title and ⚡ YAZ-883's properties panel sharing one row), `.editor-mount`, where
-   CrepeHost appends its `.editor-instance`, and — for markdown files — the folder page's
-   contents block and the "Linked mentions" section (Links D, GRO-2193; styled by
-   links/backlinks.css), all of which therefore scroll WITH the note. */
-.editor-host {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  /* Optional sideways slack under zoom (YAZ-1710 D15): the page still reflows on screen, but a
-     zero-height runner wider than the scroller adds blank room on the right so the view can be
-     dragged left when deep bullets drift right. `--zoom-slack` is MEASURED by Editor.tsx — how far
-     the deepest bullet moved because of the zoom — so a full drag parks it where it sits at 100%
-     and never further; 0 at 100% and for a note with no bullets. */
-  overflow-x: auto;
-  /* The page's ONE tail (YAZ-1680): the blocks below the note stack flush, and whichever is last
-     still ends 64px above the bottom — each block used to carry this itself, so every pair of
-     blocks sat 64px apart. */
-  padding-bottom: 64px;
-}
-
-.editor-host::after {
-  content: '';
-  display: block;
-  height: 0;
-  width: calc(100% + var(--zoom-slack, 0px));
-}
-
-/* Document zoom lives on the CONTENT, never on a shell (YAZ-1710 D14). The scroller carries the
-   number as `--document-zoom`; every block's column shell (max-width / margin auto / 48px gutter)
-   stays in unzoomed px so the five blocks keep one aligned column, and only what is inside a shell
-   scales. The body is the special case: Crepe appends its floating chrome (toolbar, slash menu,
-   link tooltip, block handle) beside `.ProseMirror` inside `.milkdown`, so the zoom sits on the
-   ProseMirror node itself and that chrome stays at 100% — floating-ui then positions it in
-   unzoomed space, which is the only space it gets right. The properties panel is `display: contents`
-   and is NOT listed a second time: zoom propagates through its computed style to its pieces, so a
-   second rule on those pieces zoomed the chip twice (6B1). */
-.editor-host > :not(.editor-mount) > *,
-.editor-instance .milkdown > .ProseMirror {
-  zoom: var(--document-zoom, 1);
-}
-
-/* The header ROW (YAZ-918): ⚡ YAZ-888's title and ⚡ YAZ-883's properties panel share one line —
-   the row owns the content column both blocks used to declare for themselves. The panel
-   DISSOLVES into the row (display: contents): its header becomes a chevron+count chip at the
-   row's right edge, and its expanded body wraps onto its own full-width line UNDER the title —
-   opening exactly where the old stacked panel lived, from a trigger that lives on the right. */
-.page-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: 24px;
-  width: 100%;
-  max-width: var(--content-max-width);
-  margin: 0 auto;
-  padding: 8px 48px 0;
-}
-
-/* The title item (⚡ YAZ-888, at the editor's own h1 scale — GRO-2009): GROWS to fill the row
-   (the chip's margin-left: auto still parks it at the right edge), so the rename field —
-   width: 100% of this box — keeps the title's full breadth while editing. The 16px base, not
-   the app's 14px, lands the em scale on exactly the size the note's own `# H1` renders at. */
-.page-header .page-title {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: 16px;
-}
-
-.page-header .frontmatter-panel {
-  display: contents;
-}
-
-.page-header .frontmatter-panel__header {
-  margin-left: auto;
-}
-
-.page-header .frontmatter-panel__body {
-  flex: 1 1 100%;
-}
-
-.page-header .frontmatter-panel__count {
-  font-size: 12px;
-}
-
-/* Folder pages (YAZ-919): the outline IS the document — the body editor above it is gone.
-   Title, then contents, nothing else. (The divider this rule used to cancel is gone at the
-   source since YAZ-1680: no block under a note draws a hairline.) */
-.editor-host:has(.folder-page-contents) .editor-mount {
-  display: none;
-}
-
-.page-title__text {
-  margin: 0;
-  padding: 2px 4px;
-  margin-left: -4px;
-  /* The hover wash hugs the words (YAZ-918), not the row the flex header hands the title. */
-  width: fit-content;
-  max-width: 100%;
-  font-size: 1.802em;
-  font-weight: 700;
-  line-height: 1.3;
-  border-radius: 4px;
-  cursor: text;
-}
-
-/* A wash on hover says "this is editable" without a control of its own; Home has no such offer. */
-.page-title__text:hover {
-  background: var(--bg-hover);
-}
-
-.page-title__text--home:hover {
-  background: none;
-  cursor: default;
-}
-
-.page-title__input {
-  width: 100%;
-  padding: 2px 4px;
-  margin-left: -4px;
-  font-family: inherit;
-  font-size: 1.802em;
-  font-weight: 700;
-  line-height: 1.3;
-  color: var(--fg);
-  background: var(--bg);
-  border: 1px solid var(--accent);
-  border-radius: 4px;
-  outline: none;
-  /* A textarea now (YAZ-918): wraps like the rendered title and grows to fit — no scrollbar,
-     no drag handle, no sideways tunnel. */
-  display: block;
-  field-sizing: content;
-  resize: none;
-  overflow: hidden;
-}
-
-/* The properties panel (⚡ YAZ-883, folded into the header row by YAZ-918): its box dissolved
-   (`display: contents` above), so only its PIECES carry styles now. Collapsed it is one small
-   muted chip — chevron + properties glyph + bare count, the words in its tooltip (YAZ-1758) —
-   deliberately SUBORDINATE to the title beside it, since most pages have nothing to say here.
-   Header affordance is the backlinks / view-group chevron, rotated -90° while collapsed.
-   Expanded it is TYPED ROWS by default (⚡ YAZ-884) with the raw textarea as the fallback
-   under them. */
-.frontmatter-panel__header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 0;
-  font-size: 12px;
-  color: var(--fg-muted);
-}
-
-.frontmatter-panel__header:hover {
-  color: var(--fg);
-}
-
-.frontmatter-panel__chevron {
-  flex: none;
-  transition: transform 120ms ease;
-}
-
-.frontmatter-panel__header[aria-expanded='false'] .frontmatter-panel__chevron {
-  transform: rotate(-90deg);
-}
-
-/* The bare count rides along plain beside the glyph (YAZ-1758); the words are the tooltip's. */
-.frontmatter-panel__count {
-  font-weight: 400;
-}
-
-.frontmatter-panel__body {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 6px 0 0 20px;
-}
-
-/* The property search (YAZ-1473): the views' own box, one full-width line above the rows. */
-.frontmatter-panel__body > .column-search,
-.frontmatter-panel__body > .column-search__empty {
-  align-self: stretch;
-}
-.frontmatter-panel__body > .column-search {
-  padding: 5px 9px;
-  font-size: 13px;
-}
-
-/* Typed rows (⚡ YAZ-884), the DEFAULT expanded view: one line per key, the name in a fixed
-   column so the values line up, everything else riding at the end of the row. Deliberately
-   flat — this is a list of properties, not a table. */
-.frontmatter-panel__rows {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.frontmatter-panel__row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  min-height: 34px;
-  font-size: 13px;
-}
-
-.frontmatter-panel__key {
-  flex: none;
-  width: min(180px, 38%);
-  padding: 6px 5px;
-  box-sizing: border-box;
-  overflow: hidden;
-  color: var(--fg-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.frontmatter-panel__value {
-  min-height: 32px;
-  padding: 2px 0;
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-/* The read-only marker: a row with no editor says WHY, and points at the mode that can hold it. */
-.frontmatter-panel__chip {
-  flex: none;
-  padding: 0 5px;
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  color: var(--fg-muted);
-  text-transform: uppercase;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-}
-
-.frontmatter-panel__new,
-.frontmatter-panel__footer {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.frontmatter-panel__name {
-  width: 150px;
-}
-
-/* Raw YAML is code: monospace, so indentation reads as the structure it is. */
-.frontmatter-panel__text {
-  width: 100%;
-  min-height: 92px;
-  padding: 8px 10px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--fg);
-  background: var(--bg-side);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  resize: vertical;
-}
-
-.frontmatter-panel__text:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.frontmatter-panel__error {
-  margin: 0;
-  font-size: 12px;
-  color: var(--danger);
-}
-
-.frontmatter-panel__actions {
-  display: flex;
-  gap: 8px;
-}
-
-.frontmatter-panel__btn {
-  padding: 3px 10px;
-  font-size: 12px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg);
-}
-
-.frontmatter-panel__btn:hover:not(:disabled) {
-  background: var(--bg-hover);
-}
-
-.frontmatter-panel__btn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-/* Content column: centred, wide on large windows, fills the host on narrow ones (GRO-2007). */
-.editor-instance {
-  width: 100%;
-  max-width: var(--content-max-width);
-  margin: 0 auto;
-  /* No lead-in of its own (YAZ-918): the properties panel left this slot for the title row, so
-     the gap under the title is ProseMirror's 16px + the first paragraph's 4px — nothing more. */
-  padding: 0 48px 120px;
-}
-
-/* A folder page's body is a short preamble between Properties and its contents block — not a
-   document with an end (YAZ-909, tightened by YAZ-917): the column's 32px lead-in and 120px tail
-   collapse to ZERO, and so does ProseMirror's 16px halo below — the paragraph's own 4px rhythm is
-   all the air a preamble needs. Ordinary notes keep everything. */
-.editor-host:has(.folder-page-contents) .editor-mount > .editor-instance {
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-.editor-host:has(.folder-page-contents) .editor-mount .milkdown .ProseMirror {
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-.editor-instance .milkdown {
-  --crepe-color-background: transparent;
-}
-
-/* Obsidian default typography (GRO-2009): system font stack, 16px / 1.5 body, Obsidian heading scale.
-   Overrides Crepe's frame theme (Rubik/Noto Serif → serif fallback) via its own custom properties.
-   Line height and block gap come from the settings panel via App's CSS vars (GRO-2024). */
-.editor-instance .milkdown {
-  --crepe-base-font-size: 16px;
-  --crepe-font-default: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --crepe-font-title: var(--crepe-font-default);
-  --crepe-font-code: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  line-height: var(--edit-line-height, 1.5);
-}
-
-/* Highlight mark (YAZ-1480): `==text==` → <mark>. Every Crepe surface (editor, hover preview, outline), not just the main editor. */
-.milkdown .ProseMirror mark {
-  background: var(--mark-bg);
-  color: inherit;
-}
-.milkdown .ProseMirror mark.highlight-green { background: var(--mark-bg-green); }
-.milkdown .ProseMirror mark.highlight-blue { background: var(--mark-bg-blue); }
-.milkdown .ProseMirror mark.highlight-pink { background: var(--mark-bg-pink); }
-
-/* A lit swatch (🔒 D5) reads as a pressed button, one step darker than hover — the dot's fill IS its colour,
-   so Crepe's "active = primary-coloured icon" cue only reached the 0.35-opacity outline and was too easy to miss. */
-.milkdown .milkdown-toolbar .toolbar-item.active[data-toolbar-item^='highlight'] {
-  background: var(--crepe-color-selected);
-}
-
-/* Crepe's reset gives paragraphs line-height 1.5 and 4px vertical padding; the padding is
-   what reads as "space between blocks" (lists included — each bullet's text is a paragraph). */
-.editor-instance .milkdown .ProseMirror p {
-  line-height: var(--edit-line-height, 1.5);
-  padding: var(--edit-block-gap, 4px) 0;
-}
-
-.editor-instance .milkdown .ProseMirror h1,
-.editor-instance .milkdown .ProseMirror h2,
-.editor-instance .milkdown .ProseMirror h3,
-.editor-instance .milkdown .ProseMirror h4,
-.editor-instance .milkdown .ProseMirror h5,
-.editor-instance .milkdown .ProseMirror h6 {
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-/* Heading margins scale with the block-gap setting (GRO-2071): Crepe's stock margins
-   (32/28/24/20/16/16px) are exactly 8/7/6/5/4/4 × the 4px default gap, so the Default
-   preset is pixel-identical to Crepe. bullets.css derives its heading-row label offsets
-   from the same calc — change one, change both. */
-.editor-instance .milkdown .ProseMirror h1 {
-  font-size: 1.802em;
-  font-weight: 700;
-  margin-top: calc(var(--edit-block-gap, 4px) * 8);
-}
-
-/* A heading BETWEEN blocks earns its lead-in; the document's FIRST block does not (YAZ-918,
-   selector fixed twice in YAZ-932 — probe-verified) — it sits on the title row's own gap,
-   exactly like a first paragraph. The outline editor wraps its blocks in `.content-dom`,
-   so both the direct note block and the wrapped outline block are covered. */
-.editor-instance .milkdown .ProseMirror > :first-child,
-.editor-instance .milkdown .ProseMirror > .content-dom > :first-child {
-  margin-top: 0;
-}
-
-.editor-instance .milkdown .ProseMirror h2 {
-  font-size: 1.602em;
-  margin-top: calc(var(--edit-block-gap, 4px) * 7);
-}
-
-.editor-instance .milkdown .ProseMirror h3 {
-  font-size: 1.424em;
-  margin-top: calc(var(--edit-block-gap, 4px) * 6);
-}
-
-.editor-instance .milkdown .ProseMirror h4 {
-  font-size: 1.266em;
-  margin-top: calc(var(--edit-block-gap, 4px) * 5);
-}
-
-.editor-instance .milkdown .ProseMirror h5 {
-  font-size: 1.125em;
-  margin-top: calc(var(--edit-block-gap, 4px) * 4);
-}
-
-.editor-instance .milkdown .ProseMirror h6 {
-  font-size: 1em;
-  margin-top: calc(var(--edit-block-gap, 4px) * 4);
-}
-
-/* Inside a bullet a heading is an outline row, not a document section (GRO-2071, Roam model):
-   uniform rhythm — the same gap padding as any block, no extra margin. The document-rhythm
-   margins above only apply to headings outside lists. bullets.css heading-row label sizes
-   mirror this padding — change one, change both. */
-.editor-instance .milkdown .ProseMirror li h1,
-.editor-instance .milkdown .ProseMirror li h2,
-.editor-instance .milkdown .ProseMirror li h3,
-.editor-instance .milkdown .ProseMirror li h4,
-.editor-instance .milkdown .ProseMirror li h5,
-.editor-instance .milkdown .ProseMirror li h6 {
-  margin-top: 0;
-  padding: var(--edit-block-gap, 4px) 0;
-}
-
-/* Crepe's reset pads `.milkdown .ProseMirror` by 60px 120px; the column above owns the gutters.
-   overflow must stay visible (GRO-2078): a TOP-LEVEL item's fold chevron (`.outline-toggle`,
-   left: -18px) hangs outside the ProseMirror box — `overflow: hidden` clipped it into an
-   invisible, unclickable ghost, stranding any folded top-level bullet. Wide blocks are already
-   contained per-block (tables/code below), so nothing else needs the clip. */
-.editor-instance .milkdown .ProseMirror {
-  padding: 16px 0;
-  overflow: visible;
-}
-
-/* Wide blocks scroll inside the column instead of widening it. */
-.editor-instance .milkdown .milkdown-table-block,
-.editor-instance .milkdown .milkdown-code-block {
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-/* The block handle's plus is noise — Enter at line end does the same (GRO-2025).
-   First .operation-item is the plus, last is the 6-dot drag handle (Crepe renders exactly two). */
-.editor-instance .milkdown .milkdown-block-handle .operation-item:first-child {
-  display: none;
-}
-
-/* Over a guide-line strip or a fold chevron the handle yields (GRO-2081, blockHandleGate.ts):
-   pointer-events off so the click lands on the affordance beneath. */
-.editor-instance .milkdown .milkdown-block-handle.mdapp-handle-muted {
-  pointer-events: none;
-  opacity: 0 !important;
 }
 
 .editor-msg {
@@ -669,20 +189,11 @@ button {
   white-space: nowrap;
 }
 
-/* ---------- status chips: sync (YAZ-1081 D5) then save, top-right of the editor ---------- */
-
-/* Reserve a fixed-size row so document magnification cannot overlap its controls. */
-.status-chips {
-  position: relative;
-  min-height: 34px;
-  flex-shrink: 0;
-  justify-content: flex-end;
-  padding: 5px 16px;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
+/* ---------- status chips: sync (YAZ-1081 D5) then save ----------
+   There is no chips ROW here any more (🔒 YAZ-1810): a drawing hands both chips to the engine's
+   own top-right slot, so the canvas starts directly under the tab strip. The two chips keep
+   their own styles because they are the shell's, not the canvas's — `drawingEditor.css` only
+   places them. */
 
 /* ---------- save indicator ---------- */
 
@@ -861,55 +372,9 @@ button {
   }
 }
 
-/* ---------- external-rename banner (Links E1c, GRO-2242): the passive confirm-first bar ----------
-   The amber top-center toast (the link-notice's OLD idiom — that one moved bottom-left, YAZ-1674)
-   with two actions; it lingers until Update/Dismiss. */
-
-.rename-banner {
-  position: fixed;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 49;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 80vw;
-  padding: 6px 14px;
-  font-size: 13px;
-  color: var(--notice-fg);
-  background: var(--notice-bg);
-  border: 1px solid var(--notice-border);
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
-}
-
-.rename-banner__text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rename-banner code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-}
-
-.rename-banner button {
-  flex: none;
-  padding: 3px 10px;
-  border: 1px solid var(--notice-btn-border);
-  border-radius: 4px;
-  background: var(--notice-btn-bg);
-}
-
-.rename-banner button:hover {
-  background: var(--notice-btn-bg-hover);
-}
-
 /* ---------- sync attention banner (YAZ-1081 3B) ----------
    The rename-banner idiom exactly — same amber toast, same explicit buttons, never a modal.
-   It sits lowest of the three: sync is the least urgent thing on screen, and the note the
+   It sits lowest: sync is the least urgent thing on screen, and the drawing the
    user is actually looking at is untouched by it. */
 
 .sync-banner {
@@ -956,7 +421,7 @@ button {
 
 /* ---------- sidebar ---------- */
 
-/* --side-w is stamped on .app from AppState.sidebarWidth (YAZ-738). */
+/* --side-w is stamped on <html> from AppState.sidebarWidth (YAZ-738). */
 .sidebar {
   width: var(--side-w);
   flex: none;
@@ -1131,9 +596,9 @@ button {
   color: var(--fg-muted);
 }
 
-/* Lens tabs (YAZ-847) — chrome v2 ROW 1, between the header and the search bar: Topics ⇄ Files.
-   The ViewsPane tab idiom (`.view-tab`, views.css): a transparent 2px bottom border on every tab,
-   accent on the active one, pulled down over the row's own hairline so the two read as one line. */
+/* Lens tabs (YAZ-847) — chrome v2 ROW 1, between the header and the search bar: Files ⇄ Favorites.
+   A transparent 2px bottom border on every tab, accent on the active one, pulled down over the
+   row's own hairline so the two read as one line. */
 .sidebar__lenses {
   flex: none;
   display: flex;
@@ -1301,7 +766,7 @@ button {
 }
 
 /* A folder row (🔒 D4, YAZ-1491): a small folder glyph before the label. Inline, so the label
-   stays the block that owns the overflow and a long folder name still ellipsizes like a note's. */
+   stays the block that owns the overflow and a long folder name still ellipsizes like a file's. */
 .search-results__glyph {
   width: 12px;
   height: 12px;
@@ -1346,7 +811,7 @@ button {
 /* ---------- scrolling strips (YAZ-1471) ---------- */
 
 /*
- * A horizontal strip that scrolls with NO scrollbar — the window's tab strip and a folder page's
+ * A horizontal strip that scrolls with NO scrollbar — the window's tab strip and the sidebar's
  * view tabs, one utility between them: a scroll-driven fade marks whichever edge still hides
  * items. The keyframes run on the strip's OWN inline scroll position, so a strip that does not
  * overflow has no timeline and no mask applies. `scrollbar-width: none` is the whole hiding rule
@@ -1401,7 +866,7 @@ button {
   max-height: calc(100vh - 160px);
   overflow-y: auto;
   /* A short settle-in (GitHub Desktop's feel) rather than a pop: opacity + a 4px drop, GPU-composited
-     properties only, so the open costs no layout. Closing stays instant, as every menu's does. */
+     compositor-only values, so the open costs no layout. Closing stays instant, as every menu's does. */
   animation: vault-switcher-in 120ms ease-out;
 }
 
@@ -1765,73 +1230,6 @@ button {
   top: 1px;
 }
 
-/* ---------- Topics lens (YAZ-848): the same tree rows, plus what a MEANING tree needs ---------- */
-
-/* A leaf keeps the chevron's slot so its label lines up with its siblings' — the mockup's rule. */
-.tree__chevron--none::before {
-  display: none;
-}
-
-/* The folder-page marker: the app's own folder-page glyph, at the size the mockup uses. */
-.tree__glyph {
-  flex: none;
-  width: 12px;
-  height: 12px;
-  margin-right: 2px;
-  color: var(--fg-muted);
-}
-
-.tree__row--active .tree__glyph {
-  color: inherit;
-}
-
-/* Direct-member count, pushed to the right edge of the row. */
-.tree__count {
-  margin-left: auto;
-  padding-left: 6px;
-  font-size: 11px;
-  color: var(--fg-muted);
-}
-
-/* The Uncategorized row (🔒 D7): present, quiet, not one of the topics. */
-.tree__row--muted {
-  color: var(--fg-muted);
-  font-style: italic;
-}
-
-.tree--uncategorized {
-  margin-top: 10px;
-}
-
-/* The offer card (6C-, YAZ-849): shown ONLY in an un-adopted folder with no Home. Quiet, small,
-   and above the tree it does not replace — an invitation, never an empty state. */
-.topics-offer {
-  margin: 8px 8px 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--accent-soft);
-}
-
-.topics-offer__title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.topics-offer__body {
-  margin: 4px 0 10px;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--fg-muted);
-}
-
-/* One button, sized for a sidebar rather than a dialog. */
-.topics-offer__go {
-  padding: 4px 10px;
-  font-size: 12px;
-}
-
 .btn {
   padding: 6px 14px;
   border-radius: 6px;
@@ -1848,158 +1246,4 @@ button {
 .btn--primary:disabled {
   opacity: 0.5;
   cursor: default;
-}
-
-/* ---------- document magnification (YAZ-1410) ---------- */
-
-/* One segmented control (YAZ-1710): [ − | 100% | + ] inside a single hairline pill. The
-   percentage is the dropdown trigger (the arrow went with YAZ-1710 — the number alone opens
-   the menu); − / + step through the presets and grey out at 50 / 200 so the wall is visible. */
-.document-zoom {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  height: 22px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 12px;
-  color: var(--fg-muted);
-}
-
-/* No `overflow: hidden` on the pill: the dropdown menu is absolutely positioned inside it and
-   would be clipped. The end buttons round their own outer corners instead. */
-.document-zoom__step:first-of-type {
-  border-radius: 5px 0 0 5px;
-}
-
-.document-zoom__step:last-of-type {
-  border-radius: 0 5px 5px 0;
-}
-
-.document-zoom__trigger,
-.document-zoom__step {
-  height: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.document-zoom__trigger {
-  padding: 0 7px;
-  border-left: 1px solid var(--border);
-  border-right: 1px solid var(--border);
-}
-
-.document-zoom__step {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  font-size: 13px;
-  line-height: 1;
-}
-
-.document-zoom__trigger:hover,
-.document-zoom__trigger[aria-expanded="true"],
-.document-zoom__step:hover:enabled {
-  background: var(--bg-hover);
-  color: var(--fg);
-}
-
-.document-zoom__trigger:focus-visible,
-.document-zoom__step:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
-.document-zoom__step:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.document-zoom__menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  z-index: 10;
-  width: 136px;
-  max-height: min(360px, calc(100vh - 64px));
-  overflow-y: auto;
-  padding: 6px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 0 4px 14px #0002;
-  color: var(--fg);
-}
-
-.document-zoom__custom label {
-  display: block;
-  margin: 0 2px 4px;
-  color: var(--fg-muted);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.document-zoom__custom input {
-  box-sizing: border-box;
-  width: 100%;
-  height: 26px;
-  padding: 3px 7px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  outline: none;
-  background: var(--bg);
-  color: var(--fg);
-  font: inherit;
-}
-
-.document-zoom__custom input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-
-.document-zoom__custom input[aria-invalid="true"] {
-  border-color: var(--danger);
-}
-
-.document-zoom__divider {
-  height: 1px;
-  margin: 6px 0 4px;
-  background: var(--border);
-}
-
-.document-zoom__presets button {
-  display: flex;
-  width: 100%;
-  justify-content: space-between;
-  padding: 5px 7px;
-  border: 0;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--fg);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.document-zoom__presets button:hover,
-.document-zoom__presets button:focus-visible {
-  background: var(--bg-hover);
-  outline: none;
-}
-
-.document-zoom__presets button[aria-pressed="true"] {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.document-zoom__error {
-  margin: 5px 2px 0;
-  color: var(--danger);
-  font-size: 11px;
-  line-height: 1.3;
 }

@@ -2,8 +2,8 @@
   "name": "desktop",
   "private": true,
   "author": "Yasin Arshad",
-  "version": "0.4.4",
-  "description": "Yaseen Docs — Electron shell (main + preload); the renderer is ../client",
+  "version": "0.1.0",
+  "description": "Yaseen Draw \u2014 Electron shell (main + preload); the renderer is ../client",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -13,30 +13,49 @@
     "chokidar": "^4.0.3"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.1",
     "electron": "43.4.1",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0"
   },
   "build": {
-    "appId": "com.yasinarshad.yaseendocs",
-    "productName": "Yaseen Docs",
-    "directories": { "output": "dist-app" },
-    "files": ["out/**"],
-    "extraResources": [{ "from": "build/bin", "to": "bin" }],
+    "appId": "com.yasinarshad.yaseendraw",
+    "productName": "Yaseen Draw",
+    "directories": {
+      "output": "dist-app"
+    },
+    "files": [
+      "out/**"
+    ],
     "afterPack": "build/adhocSign.cjs",
     "mac": {
       "target": [
-        { "target": "dmg", "arch": ["arm64"] },
-        { "target": "dir", "arch": ["arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "dir",
+          "arch": [
+            "arm64"
+          ]
+        }
       ],
       "identity": null,
       "category": "public.app-category.productivity",
-      "icon": "build/icon.icns"
+      "icon": "build/icon.png"
     },
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
-      "icon": "build/icon.ico"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,
@@ -44,10 +63,26 @@
       "allowToChangeInstallationDirectory": true,
       "artifactName": "${productName}-${version}-win-x64-setup.${ext}"
     },
-    "dmg": { "artifactName": "${productName}-${version}-arm64.dmg" },
-    "protocols": [{ "name": "Yaseen Docs", "schemes": ["yaseendocs"] }],
+    "dmg": {
+      "artifactName": "${productName}-${version}-arm64.dmg"
+    },
+    "protocols": [
+      {
+        "name": "Yaseen Draw",
+        "schemes": [
+          "yaseendraw"
+        ]
+      }
+    ],
     "fileAssociations": [
-      { "ext": ["md", "markdown"], "name": "Markdown", "role": "Editor", "rank": "Alternate" }
+      {
+        "ext": [
+          "excalidraw"
+        ],
+        "name": "Excalidraw Drawing",
+        "role": "Editor",
+        "rank": "Owner"
+      }
     ]
   }
 }
