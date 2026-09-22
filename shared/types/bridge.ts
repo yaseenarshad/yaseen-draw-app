@@ -82,7 +82,7 @@ export interface StateApi {
   /** Drop a folder from recents (its directory vanished on disk, C2 — GRO-2164); unknown path is a no-op. */
   removeRecent(path: string): Promise<void>
   /** Merge into `folders[root]`; missing root entries are created with defaults. */
-  setFolder(root: string, patch: Partial<Pick<FolderState, 'expanded' | 'lastFile'>>): Promise<void>
+  setFolder(root: string, patch: Partial<Pick<FolderState, 'expanded' | 'lastFile' | 'sortOrder'>>): Promise<void>
   /** Fired in every window after any change; returns an unsubscribe. */
   onChange(listener: (state: AppState) => void): () => void
 }

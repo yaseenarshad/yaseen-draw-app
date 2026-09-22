@@ -1,4 +1,4 @@
-import type { FolderState } from '@shared/types'
+import { isSortOrder, type FolderState } from '@shared/types'
 import { CH } from '../../channels'
 import { BridgeFailure, requireAbsPath } from '../fs/fsUtils'
 import { isRecord } from '@shared/guards'
@@ -6,10 +6,10 @@ import { isSettings, isStringArray, type Store } from '../store'
 import { broadcastAll } from './broadcast'
 import { handle } from './envelope'
 
-/** The patch crosses IPC from a sandboxed renderer: only `expanded` / `lastFile`, each type-checked. */
-function requireFolderPatch(raw: unknown): Partial<Pick<FolderState, 'expanded' | 'lastFile'>> {
+/** The patch crosses IPC from a sandboxed renderer: only `expanded` / `lastFile` / `sortOrder`, each type-checked. */
+function requireFolderPatch(raw: unknown): Partial<Pick<FolderState, 'expanded' | 'lastFile' | 'sortOrder'>> {
   if (!isRecord(raw)) throw new BridgeFailure('BAD_REQUEST', 'patch must be an object')
-  const patch: Partial<Pick<FolderState, 'expanded' | 'lastFile'>> = {}
+  const patch: Partial<Pick<FolderState, 'expanded' | 'lastFile' | 'sortOrder'>> = {}
   if (raw.expanded !== undefined) {
     if (!isStringArray(raw.expanded)) throw new BridgeFailure('BAD_REQUEST', "'expanded' must be a string array")
     patch.expanded = raw.expanded
@@ -17,6 +17,10 @@ function requireFolderPatch(raw: unknown): Partial<Pick<FolderState, 'expanded' 
   if (raw.lastFile !== undefined) {
     if (raw.lastFile !== null && typeof raw.lastFile !== 'string') throw new BridgeFailure('BAD_REQUEST', "'lastFile' must be a string or null")
     patch.lastFile = raw.lastFile
+  }
+  if (raw.sortOrder !== undefined) {
+    if (!isSortOrder(raw.sortOrder)) throw new BridgeFailure('BAD_REQUEST', "'sortOrder' must be name, updated or created")
+    patch.sortOrder = raw.sortOrder
   }
   return patch
 }

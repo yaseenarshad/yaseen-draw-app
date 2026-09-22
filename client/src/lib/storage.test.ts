@@ -73,7 +73,7 @@ describe('storage.init', () => {
       ...defaultAppState(),
       settings: { ...DEFAULT_SETTINGS, theme: 'dark' },
       recents: [{ path: '/v', lastOpened: 5 }],
-      folders: { '/v': { expanded: ['/v/sub'], lastFile: '/v/a.excalidraw' } },
+      folders: { '/v': { expanded: ['/v/sub'], lastFile: '/v/a.excalidraw', sortOrder: 'name' } },
     }
     b = installBridge(seeded, { id: 'w2', root: '/v', file: '/v/a.excalidraw', tabs: ['/v/a.excalidraw'], sidebarCollapsed: true })
     await storage.init()
@@ -159,6 +159,16 @@ describe('storage', () => {
     expect(b.bridge.state.removeRecent).toHaveBeenCalledWith('/a')
   })
 
+  it('sortOrder is keyed by root, defaults to name, and goes over the bridge as its own patch (🔒 YAZ-1835 D3)', () => {
+    expect(storage.getSortOrder('/r1')).toBe('name')
+    storage.setSortOrder('/r1', 'updated')
+    expect(storage.getSortOrder('/r1')).toBe('updated')
+    expect(storage.getSortOrder('/r2')).toBe('name')
+    expect(b.bridge.state.setFolder).toHaveBeenLastCalledWith('/r1', { sortOrder: 'updated' })
+    storage.setExpanded('/r1', ['/r1/a'])
+    expect(storage.getSortOrder('/r1')).toBe('updated') // the other folder fields survive
+  })
+
   it('expanded and lastFile are keyed by root; setWorkspace records lastFile and one complete identity write', () => {
     storage.setExpanded('/r1', ['/r1/a'])
     storage.setExpanded('/r2', ['/r2/b'])
@@ -225,7 +235,7 @@ describe('storage', () => {
 
   it('boot precedence (GRO-2160): identity file wins over the folder lastFile, a pasted hash beats both', async () => {
     // Two windows on the same folder: w2 restored on b.excalidraw while the folder's lastFile is a.excalidraw.
-    const seeded: AppState = { ...defaultAppState(), folders: { '/v': { expanded: [], lastFile: '/v/a.excalidraw' } } }
+    const seeded: AppState = { ...defaultAppState(), folders: { '/v': { expanded: [], lastFile: '/v/a.excalidraw', sortOrder: 'name' } } }
     b = installBridge(seeded, { id: 'w2', root: '/v', file: '/v/b.excalidraw', tabs: ['/v/b.excalidraw'], sidebarCollapsed: false })
     await storage.init()
     expect(bootFile('', '/v')).toBe('/v/b.excalidraw')
@@ -324,7 +334,7 @@ describe('storage', () => {
     const next: AppState = {
       ...defaultAppState(),
       settings: { ...DEFAULT_SETTINGS, theme: 'light' },
-      folders: { '/v': { expanded: ['/v/sub'], lastFile: '/v/a.excalidraw' } },
+      folders: { '/v': { expanded: ['/v/sub'], lastFile: '/v/a.excalidraw', sortOrder: 'name' } },
     }
     b.emit(next)
     expect(seen).toHaveBeenCalledTimes(1)

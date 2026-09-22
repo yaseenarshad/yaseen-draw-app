@@ -27,6 +27,7 @@ const targets = (over: Partial<MenuSectionTargets> = {}): MenuSectionTargets => 
   focusPaths: null,
   favoritePaths: null,
   favoriteIsOn: false,
+  infoPath: null,
   clip: null,
   ...over,
 })
@@ -49,6 +50,7 @@ const handlers = (over: Partial<MenuHandlers> = {}): MenuHandlers => ({
   onToggleFavorite: vi.fn(),
   onRename: vi.fn(),
   onDelete: vi.fn(),
+  onInfo: vi.fn(),
   ...over,
 })
 
@@ -415,5 +417,28 @@ describe('favorite toggle item (YAZ-1766 D3)', () => {
     const sections = build({ ...FILE_ROW, favoritePaths: ['/v/Note.excalidraw'], favoriteIsOn: false })
     expect(sections[3].map((i) => i.label)).toEqual(['Rename'])
     expect(sections[4].map((i) => i.label)).toEqual(['Add to favorites', 'Open in'])
+  })
+})
+
+/**
+ * "Info" (🔒 YAZ-1835 D6): one BOARD row, above Delete in Delete's group; never blank space, a
+ * folder, a non-board or a 2+ selection — `infoPath` is null there, and the item is simply absent.
+ */
+describe('Info item (🔒 YAZ-1835 D6)', () => {
+  it('is offered for a board row and sits directly above Delete, in the last group', () => {
+    const sections = build({ ...FILE_ROW, infoPath: '/v/Note.excalidraw' })
+    expect(sections[5].map((i) => i.label)).toEqual(['Info', 'Delete'])
+    expect(labelsOf(sections).indexOf('Info')).toBe(labelsOf(sections).indexOf('Delete') - 1)
+  })
+
+  it('is absent when there is no single board to describe', () => {
+    expect(labelsOf(build({ ...FILE_ROW, infoPath: null }))).not.toContain('Info')
+    expect(labelsOf(build(BLANK))).not.toContain('Info')
+  })
+
+  it('hands the path to onInfo', () => {
+    const onInfo = vi.fn()
+    select(build({ ...FILE_ROW, infoPath: '/v/Note.excalidraw' }, { onInfo }), 'Info')
+    expect(onInfo).toHaveBeenCalledExactlyOnceWith('/v/Note.excalidraw')
   })
 })
