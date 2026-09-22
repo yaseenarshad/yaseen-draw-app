@@ -1,0 +1,96 @@
+/*
+ * WHAT THE CANVAS PANEL'S THREE TABS SHARE (🔒 YAZ-1775 D8 amended). Images, Components and
+ * Present are three readings of one docked panel, so their shell, their tile pictures, their
+ * placeholder and their two message boxes are declared ONCE, here, rather than three times with
+ * three sets of values — which is how the two grids ended up drawing visibly different tiles.
+ *
+ * The custom properties are the ENGINE's: this panel renders inside the engine's own sidebar and
+ * follows its light/dark theme, not the shell's. A hardcoded colour here would be unreadable in
+ * dark mode, which is exactly what happened to the Images tab's error box.
+ *
+ * Each tab keeps its own sheet for what is genuinely its own.
+ */
+
+/* The panel shell: a column that fills the sidebar and scrolls nothing itself. */
+.image-studio,
+.saved-components,
+.presentation-sidebar {
+  box-sizing: border-box;
+  color: var(--text-primary-color);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  min-height: 0;
+  padding: 12px;
+}
+
+/* A tile's picture sits on a chequerboard: these are transparent graphics, and a flat white tile
+   would hide a white icon. One board, one square size, both grids. */
+.image-studio__preview,
+.saved-components__preview {
+  align-items: center;
+  background:
+    linear-gradient(45deg, var(--color-gray-10) 25%, transparent 25%) 0 0 / 12px 12px,
+    linear-gradient(-45deg, var(--color-gray-10) 25%, transparent 25%) 0 0 / 12px 12px,
+    var(--island-bg-color);
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.image-studio__preview img,
+.saved-components__preview img {
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+/* A picture that could not be had (offline, no key, a name the set dropped, a missing PNG): the
+   tile keeps its size and the card stays clickable — only the picture is missing. */
+.image-studio__placeholder,
+.saved-components__placeholder {
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+/* The two message boxes. A passive notice never reads as danger; an error does, in both themes. */
+.image-studio__empty,
+.image-studio__notice,
+.image-studio__warning,
+.saved-components__notice,
+.saved-components__state {
+  border-radius: 8px;
+  color: var(--text-secondary-color);
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 9px;
+}
+
+.image-studio__error,
+.saved-components__error {
+  background: var(--color-danger-light);
+  border: 1px solid var(--color-danger);
+  border-radius: 8px;
+  color: var(--text-primary-color);
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 8px;
+}
+
+/* Read aloud, never drawn — the menu items' `Rename <name>` suffix and the player's live region. */
+.image-studio .visually-hidden,
+.saved-components .visually-hidden,
+.presentation-sidebar .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

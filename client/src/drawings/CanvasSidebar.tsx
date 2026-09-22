@@ -31,6 +31,7 @@ import type { ExcalidrawImperativeApi, ExcalidrawModule } from './engine'
 import { PresentationSidebar } from './presentation/PresentationSidebar'
 import { componentsIcon, hamburgerIcon, imageIcon } from './launcherIcons'
 import { presentationIcon } from './presentation/presentationIcons'
+import './canvasPanel.css'
 
 /** The engine sidebar name the web app used for its workspace panel. */
 export const CANVAS_SIDEBAR = 'default'

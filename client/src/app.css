@@ -16,8 +16,8 @@
   --fg-dir: #444444;
   --reveal-bg: #ffe36e;
   --reveal-fg: #2d2500;
-  /* Amber notice family: conflict bar + rename banner — the two that ask for a decision. (The
-     link-notice toast left it for the context menu's surface tokens, YAZ-1674: it confirms as
+  /* Amber notice family: the conflict bar and the sync banner — the two that ask for a decision.
+     (The link-notice toast left it for the context menu's surface tokens, YAZ-1674: it confirms as
      often as it warns.) */
   --notice-fg: #6b4e00;
   --notice-bg: #fff7df;
@@ -263,10 +263,9 @@ button {
   }
 }
 
-/* ---------- sync attention banner (YAZ-1081 3B) ----------
-   The rename-banner idiom exactly — same amber toast, same explicit buttons, never a modal.
-   It sits lowest: sync is the least urgent thing on screen, and the drawing the
-   user is actually looking at is untouched by it. */
+/* ---------- sync attention banner (YAZ-1081) ----------
+   The conflict bar's idiom — same amber toast, same explicit buttons, never a modal. Sync is the
+   least urgent thing on screen, and the drawing the user is looking at is untouched by it. */
 
 .sync-banner {
   position: fixed;
@@ -303,11 +302,6 @@ button {
 
 .sync-banner button:hover {
   background: var(--notice-btn-bg-hover);
-}
-
-/* The rename banner above pushes this one down (the notice lives bottom-left since YAZ-1674, so it never stacks here). */
-.rename-banner ~ .sync-banner {
-  top: 48px;
 }
 
 /* ---------- sidebar ---------- */
@@ -912,52 +906,6 @@ button {
 
 .confirm__btn--danger:hover {
   background: color-mix(in srgb, var(--danger) 12%, transparent);
-}
-
-/* Sync from folder (YAZ-952): the confirm sheet's shell, plus the two lists only it has —
-   the folder picker and the preview of what it would add. Both scroll; the sheet does not. */
-
-.sync__folders {
-  list-style: none;
-  margin: 0 0 12px;
-  padding: 0;
-  max-height: 168px;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
-
-.sync__folder {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  padding: 4px 8px;
-  font-size: 13px;
-  text-align: left;
-}
-
-.sync__folder:hover {
-  background: var(--bg-hover-row);
-}
-
-.sync__folder[aria-pressed='true'] {
-  background: var(--accent-soft);
-}
-
-.sync__count {
-  flex: none;
-  color: var(--fg-muted);
-}
-
-.sync__missing {
-  list-style: none;
-  margin: 0 0 12px;
-  padding: 0;
-  max-height: 120px;
-  overflow-y: auto;
-  font-size: 12px;
-  color: var(--fg-muted);
 }
 
 .create-inline {
