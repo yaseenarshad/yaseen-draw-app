@@ -4,12 +4,12 @@
  * `secrets:has`, "Key set" or "No key". A component rather than an inline `render` because the
  * row owns state no `SettingsState` field holds: the draft being typed, and main's yes/no.
  *
- * Save is disabled until something is typed; Clear until a key is set. A machine with no OS
- * keychain (`ENCRYPTION_UNAVAILABLE`) is told so in the status line instead of a dialog.
+ * Save is disabled until something is typed; Clear until a key is set. A failed save is told in
+ * the status line instead of a dialog (report, don't block).
  */
 import { useEffect, useState } from 'react'
 import { PIXABAY_SECRET } from '@shared/types'
-import { api, BridgeRequestError } from '../api'
+import { api } from '../api'
 
 /** `null` while the first `secrets:has` is in flight. */
 type KeyStatus = boolean | null
@@ -43,7 +43,7 @@ export function PixabayKeyControl() {
       setHas(value !== null)
       setDraft('')
     } catch (err) {
-      setProblem(err instanceof BridgeRequestError && err.code === 'ENCRYPTION_UNAVAILABLE' ? "This machine can't encrypt secrets, so the key can't be stored." : 'The key could not be saved.')
+      setProblem('The key could not be saved.')
     } finally {
       setBusy(false)
     }
