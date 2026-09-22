@@ -1,5 +1,5 @@
 /**
- * Argv is the ONLY place Windows and Linux put a double-clicked `.excalidraw` (YAZ-1815, YAZ-1815):
+ * Argv is the ONLY place Windows and Linux put a double-clicked `.excalidraw` (YAZ-1815):
  * there is no `open-file` event off macOS, so a cold launch and a `second-instance` both read it.
  */
 import { describe, expect, it } from 'vitest'

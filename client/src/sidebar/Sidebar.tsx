@@ -332,7 +332,7 @@ export function Sidebar({
   const favoriteDirs = useMemo(() => allDirs(favoriteNodes), [favoriteNodes])
   // What the chevrons button unfolds on the two disk-reading lenses.
   const bodyDirs = lens === 'favorites' ? favoriteDirs : shownDirs
-  // ⌘K's feed (YAZ-1814, YAZ-1814): the ONE tree this panel already holds and the watcher already keeps
+  // ⌘K's feed (YAZ-1814): the ONE tree this panel already holds and the watcher already keeps
   // fresh — the catalog walk lives in `search/`, is lazy until the first query, and drops
   // non-drawing files and (through `fs:tree`) the image store.
   const results = useSearchResults(root, query, tree?.tree ?? null)
