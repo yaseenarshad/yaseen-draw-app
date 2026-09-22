@@ -58,9 +58,8 @@ export function RenameInline({ initial, indent, onSubmit, onCancel }: RenameInli
         spellCheck={false}
         onFocus={(e) => e.currentTarget.select()}
         onKeyDown={(e) => {
-          // preventDefault is load-bearing since ⚡ YAZ-888: a NAME change now opens the confirm
-          // sheet, which takes focus on CANCEL — and Enter's own default activation would then
-          // land on that freshly focused button and cancel the rename the keystroke just asked for.
+          // preventDefault so Enter does nothing but commit: the blur below is the commit, and
+          // the keystroke's own default activation must not also reach whatever takes focus next.
           if (e.key === 'Enter') {
             e.preventDefault()
             e.currentTarget.blur()

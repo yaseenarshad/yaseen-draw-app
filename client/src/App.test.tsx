@@ -19,7 +19,7 @@ interface SidebarStubProps {
   onOpenFileBackground: (path: string) => void
   onRootMissing: () => void
   onFileMissing: () => void
-  /** The ONE rename door (⚡ YAZ-888): the inline rename AND the drag-move both arrive through it. */
+  /** The ONE rename door: the inline rename AND the drag-move both arrive through it. */
   onRenameFile: (oldPath: string, newPath: string, kind: 'file' | 'dir') => Promise<void>
   pendingSearchFocus: boolean
   /** ⌘O (YAZ-1767 D8): a counter, bumped per request; 0 = none pending for this root. */
@@ -890,67 +890,39 @@ describe('App tabs (I2, GRO-2234)', () => {
 })
 
 /**
- * The ONE rename door (⚡ YAZ-888, amending decision E / GRO-2096 for NAME changes): every
- * gesture — the sidebar's inline rename, its drag-move — arrives at App as (oldPath, newPath),
- * and the rule is asked here and nowhere else. A changed NAME confirms first; a MOVE runs
- * silently, exactly as it always has.
+ * The ONE rename door: every gesture — the sidebar's inline rename, its drag-move — arrives at
+ * App as (oldPath, newPath) and is committed straight away. The confirm sheet that used to sit
+ * in front of a NAME change was deleted (🔒 YAZ-1775): with wikilinks gone it warned about
+ * nothing, and every new `Untitled` board would have tripped it. Delete keeps its confirm.
  */
-describe('App rename door (⚡ YAZ-888)', () => {
+describe('App rename door', () => {
   const identity = (): IdentityFixture => ({ id: 'w1', root: '/v', file: null, tabs: [] })
-  const sheetText = (el: HTMLElement) => el.querySelector('.confirm__text')?.textContent
-  const sheetBtn = (el: HTMLElement, label: string) => [...el.querySelectorAll<HTMLButtonElement>('.confirm__btn')].find((b) => b.textContent === label)
 
-  it('a NAME change asks first — and confirming runs the rename', async () => {
+  it('a NAME change renames straight away — no sheet in between', async () => {
     const { bridge, el } = await mount(defaultAppState(), identity())
-    await act(async () => void captured.sidebar?.onRenameFile('/v/B.excalidraw', '/v/B2.excalidraw', 'file'))
-    expect(sheetText(el)).toBe("Rename 'B' to 'B2'?")
-    expect(bridge.file.rename).not.toHaveBeenCalled() // nothing moves before the beat
-
-    await act(async () => sheetBtn(el, 'Rename')?.click())
-    expect(bridge.file.rename).toHaveBeenCalledWith({ oldPath: '/v/B.excalidraw', newPath: '/v/B2.excalidraw' })
+    await act(async () => void (await captured.sidebar?.onRenameFile('/v/B.excalidraw', '/v/B2.excalidraw', 'file')))
     expect(el.querySelector('.confirm')).toBeNull()
+    expect(bridge.file.rename).toHaveBeenCalledWith({ oldPath: '/v/B.excalidraw', newPath: '/v/B2.excalidraw' })
   })
 
-  it('a MOVE stays silent: no sheet, the rename runs straight through', async () => {
+  it('a MOVE renames straight away too', async () => {
     const { bridge, el } = await mount(defaultAppState(), identity())
     await act(async () => await captured.sidebar?.onRenameFile('/v/B.excalidraw', '/v/Docs/B.excalidraw', 'file'))
     expect(el.querySelector('.confirm')).toBeNull()
     expect(bridge.file.rename).toHaveBeenCalledWith({ oldPath: '/v/B.excalidraw', newPath: '/v/Docs/B.excalidraw' })
   })
 
-  it('Cancel renames nothing', async () => {
+  it('a FOLDER rename goes through the same door', async () => {
     const { bridge, el } = await mount(defaultAppState(), identity())
-    await act(async () => void captured.sidebar?.onRenameFile('/v/B.excalidraw', '/v/B2.excalidraw', 'file'))
-    await act(async () => sheetBtn(el, 'Cancel')?.click())
+    await act(async () => void (await captured.sidebar?.onRenameFile('/v/Docs', '/v/Notes', 'dir')))
     expect(el.querySelector('.confirm')).toBeNull()
-    expect(bridge.file.rename).not.toHaveBeenCalled()
-  })
-
-  it('clears an open rename confirmation when the window switches roots', async () => {
-    const { bridge, el, emitOpenRoot } = await mount(defaultAppState(), identity())
-    await act(async () => void await captured.sidebar?.onRenameFile('/v/B.excalidraw', '/v/B2.excalidraw', 'file'))
-    expect(sheetText(el)).toBe("Rename 'B' to 'B2'?")
-
-    await act(async () => emitOpenRoot('/w'))
-
-    expect(el.querySelector('[data-sidebar]')?.getAttribute('data-root')).toBe('/w')
-    expect(el.querySelector('.confirm')).toBeNull()
-    expect(bridge.file.rename).not.toHaveBeenCalled()
-  })
-
-  it('a FOLDER rename asks too — a name IS the folder on disk', async () => {
-    const { bridge, el } = await mount(defaultAppState(), identity())
-    await act(async () => void captured.sidebar?.onRenameFile('/v/Docs', '/v/Notes', 'dir'))
-    expect(sheetText(el)).toBe("Rename 'Docs' to 'Notes'?")
-    await act(async () => sheetBtn(el, 'Rename')?.click())
     expect(bridge.file.rename).toHaveBeenCalledWith({ oldPath: '/v/Docs', newPath: '/v/Notes' })
   })
 
   it('a rename that fails lands in the passive notice, never a dialog', async () => {
     const { bridge, el } = await mount(defaultAppState(), identity())
     bridge.file.rename.mockRejectedValueOnce({ code: 'ALREADY_EXISTS', message: 'a file with this name already exists', path: '/v/B2.excalidraw' })
-    await act(async () => void await captured.sidebar?.onRenameFile('/v/B.excalidraw', '/v/B2.excalidraw', 'file'))
-    await act(async () => sheetBtn(el, 'Rename')?.click())
+    await act(async () => void (await captured.sidebar?.onRenameFile('/v/B.excalidraw', '/v/B2.excalidraw', 'file')))
     expect(el.querySelector('.confirm')).toBeNull()
     expect(el.querySelector('.link-notice')?.textContent).toBe('Can\'t rename: "B2.excalidraw" already exists')
   })
