@@ -73,3 +73,11 @@ export async function makeBareRemote(): Promise<BareRemote> {
 export async function wireOrigin(repo: GitRepo, remote: BareRemote): Promise<void> {
   await repo.run(['remote', 'add', 'origin', remote.url])
 }
+
+/**
+ * The ceiling the two REAL-git suites run under (`sync.test.ts`, `guarantees.test.ts`): every case
+ * there is a commit plus a push plus a fetch against a bare repo on disk. Vitest's 5 s default is
+ * enough on a warm Mac and not on a cold CI runner, and the work is real I/O rather than a hang,
+ * so those two describes raise it — and nothing else in the project does.
+ */
+export const REAL_GIT_TIMEOUT_MS = 20_000
