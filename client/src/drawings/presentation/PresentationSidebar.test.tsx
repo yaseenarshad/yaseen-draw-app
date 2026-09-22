@@ -111,15 +111,6 @@ describe('the slide list', () => {
     expect(canvas.setViewport).toHaveBeenCalledWith({ target: 'b', fit: 'contain', animation: true, offsets: { ui: true } })
   })
 
-  it('the canvas still mounting is a state, not a blank pane', async () => {
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
-    await act(async () => {
-      root?.render(<PresentationSidebar engine={engine} excalidrawAPI={null} onStartPresentation={onStartPresentation} />)
-    })
-    expect(container.textContent).toContain('still loading')
-  })
 })
 
 describe('reordering writes the order into the FILE', () => {

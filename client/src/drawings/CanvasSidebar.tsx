@@ -10,7 +10,7 @@
  * — the rail's hamburger being the other way. The engine's stock `DefaultSidebar.Trigger` is
  * rendered `hidden`: the panel's doors are the rail and ⌘F / ⌘C, never a floating trigger.
  *
- * The Images tab is the Image Studio (`client/src/media/`, YAZ-1818), the Components tab is the
+ * The Images tab is the Image Studio (`client/src/image-studio/`, YAZ-1818), the Components tab is the
  * saved-component library (`client/src/components-library/`, YAZ-1819 — named so it cannot be
  * mistaken for `client/src/components/`, the shell's own widgets), and the Present tab is the
  * slide list (`client/src/drawings/presentation/`, YAZ-1820).
@@ -26,7 +26,7 @@
 import type { ReactNode } from 'react'
 import { CANVAS_PANEL_TABS, type CanvasPanelTab } from '@shared/types'
 import { SavedComponents } from '../components-library/SavedComponents'
-import { ImageStudio } from '../media/ImageStudio'
+import { ImageStudio } from '../image-studio/ImageStudio'
 import type { ExcalidrawImperativeApi, ExcalidrawModule } from './engine'
 import { PresentationSidebar } from './presentation/PresentationSidebar'
 import { componentsIcon, hamburgerIcon, imageIcon } from './launcherIcons'
@@ -34,6 +34,13 @@ import { presentationIcon } from './presentation/presentationIcons'
 
 /** The engine sidebar name the web app used for its workspace panel. */
 export const CANVAS_SIDEBAR = 'default'
+
+/**
+ * What every tab shows before the engine has handed its handle over. Said ONCE, here, because
+ * this is the component that holds `excalidrawAPI` — which is also why the three tabs below take
+ * a non-null one and need no "is there a canvas yet" branch of their own.
+ */
+export const CANVAS_LOADING = 'The canvas is still loading.'
 
 /** The three tabs, left→right, with the web app's own labels. */
 export const CANVAS_SIDEBAR_TABS: ReadonlyArray<{ tab: CanvasPanelTab; label: string; shortLabel: string; icon: ReactNode }> = [
@@ -92,7 +99,11 @@ export function CanvasSidebar({ engine, activeTab, onClose, onDock, excalidrawAP
         </DefaultSidebar.TabTriggers>
         {CANVAS_SIDEBAR_TABS.map(({ tab }) => (
           <Sidebar.Tab key={tab} tab={tab}>
-            {tab === 'image-studio' ? (
+            {excalidrawAPI === null ? (
+              <div className="canvas-panel__loading" role="status">
+                {CANVAS_LOADING}
+              </div>
+            ) : tab === 'image-studio' ? (
               <ImageStudio engine={engine} excalidrawAPI={excalidrawAPI} searchFocusRequest={searchFocusRequest} />
             ) : tab === 'components' ? (
               <SavedComponents engine={engine} excalidrawAPI={excalidrawAPI} hasSelection={hasSelection} />

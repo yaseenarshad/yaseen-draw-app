@@ -365,13 +365,6 @@ describe('inserting', () => {
     expect(host.querySelector('.image-studio__error')?.textContent).toContain('20 MB')
     expect(host.querySelector('.image-studio__adding')).toBeNull()
   })
-
-  it('cannot insert while the canvas is still mounting', async () => {
-    media.search.mockResolvedValue({ items: [item()], nextCursor: null, pixabayAvailable: false, warnings: [] })
-    const { container: host } = await mount({ excalidrawAPI: null })
-    await search(host)
-    expect((byLabel(host, 'Add money bag') as HTMLButtonElement).disabled).toBe(true)
-  })
 })
 
 describe('favorites', () => {

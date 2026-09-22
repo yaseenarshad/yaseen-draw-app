@@ -1,40 +1,30 @@
 /**
- * IMPORT JSON (YAZ-1833): the web app's `parseImportedComponentJson`
- * (`excalidraw-app/components/SavedComponentsData.ts`) ported, so a `.excalidraw` picked on disk
- * becomes a library component through the SAME door "Save selection" uses (`components:save`).
+ * IMPORT JSON (YAZ-1833): a `.excalidraw` picked on disk becomes a library component through the
+ * SAME door "Save selection" uses. The envelope table below is the web app's, verbatim — four
+ * shapes plus `excalidrawlib`'s one-item rule — and every refusal is a sentence the user reads.
  *
- * WHAT IS VERBATIM: the envelope table — `growprofit/saved-component` with its schema-version and
- * element-count checks, `excalidraw`, `excalidraw/clipboard`, `excalidraw-api/clipboard`, and
- * `excalidrawlib` with its one-item rule — then `assertSupportedComponentElements`, the engine's
- * own `restoreElements(…, { repairBindings: true })`, the soft-deleted filter, a SECOND assertion
- * over what restore produced, and the size guard. Each message is a sentence the user reads.
+ * IMAGES ARE KEPT. The web app imported with `allowImages: false`, because a pasted payload had no
+ * bytes to point at; a picked FILE carries its own `files` map, so the bytes travel into the
+ * fragment exactly as a captured selection's do (🔒 D5). An image whose bytes are NOT in the file
+ * is still a refusal: a component that cannot insert is worse than no component.
  *
- * THE ONE DIFFERENCE, AND IT IS THE ISSUE'S OWN RULE: the web app called this with
- * `allowImages: false`, because an imported payload had no bytes in its object store to point at.
- * Here the picked file CARRIES its `files` map, so images are kept and their bytes travel into the
- * fragment exactly as a captured selection's do (🔒 D5) — which is what makes importing a legacy
- * embedded board yield a component with its pictures. An image whose bytes are NOT in the file is
- * still a refusal: a component that cannot insert is worse than no component.
+ * NOTHING IS WRITTEN BY A FAILURE: every refusal throws before `components:save` is called.
  *
- * NOTHING IS WRITTEN BY A FAILURE. Every refusal is a throw before `components:save` is called, so
- * a corrupt, empty or unsupported file leaves the library exactly as it was.
- *
- * ENGINE-BOUND BY DESIGN: `restoreElements` comes in as an argument (`engine.ts`'s lazy rule), the
- * same seam `componentData.ts` uses — which is also what makes this testable with a stub.
+ * ENGINE-BOUND BY DESIGN: `restoreElements` comes in as an argument (`engine.ts`'s lazy rule),
+ * which is also what makes this testable with a stub.
  */
 import { assertComponentElementsSize, assertSupportedComponentElements, type CapturedComponent, type ComponentEngine } from './componentData'
+import { isRecord } from '@shared/guards'
 
-type JsonRecord = Record<string, unknown>
-const isRecord = (v: unknown): v is JsonRecord => typeof v === 'object' && v !== null && !Array.isArray(v)
 
 /** The web app's own schema version for its saved-component envelope. */
-export const SAVED_COMPONENT_SCHEMA_VERSION = 1
+const SAVED_COMPONENT_SCHEMA_VERSION = 1
 
 /** What a name-less import is called, when the file's own base name is nothing but punctuation. */
 export const IMPORTED_COMPONENT_NAME = 'Imported component'
 
 /** `getLibraryElements` ported: one `.excalidrawlib` item, in either of its two shapes. */
-function libraryElements(payload: JsonRecord): unknown[] {
+function libraryElements(payload: Record<string, unknown>): unknown[] {
   if (payload.version !== 1 && payload.version !== 2) throw new Error('Unsupported Excalidraw Library version')
   const items = payload.libraryItems ?? payload.library
   if (!Array.isArray(items) || items.length === 0) throw new Error('The Library JSON does not contain a component')

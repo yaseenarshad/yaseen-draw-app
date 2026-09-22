@@ -79,13 +79,13 @@ function SlideNameInput({ label, initialName, onCommit, onCancel }: { label: str
 export interface PresentationSidebarProps {
   engine: PresentationEngine
   /** The engine's imperative handle, or null while it is still mounting. */
-  excalidrawAPI: PresentationSidebarTarget | null
+  excalidrawAPI: PresentationSidebarTarget
   /** Play: the SURFACE mounts the player, so it outlives this panel being closed. */
   onStartPresentation: (initialFrameId: string | null) => void
 }
 
 export function PresentationSidebar({ engine, excalidrawAPI, onStartPresentation }: PresentationSidebarProps) {
-  const [elements, setElements] = useState<readonly unknown[]>(() => excalidrawAPI?.getSceneElements() ?? [])
+  const [elements, setElements] = useState<readonly unknown[]>(() => excalidrawAPI.getSceneElements())
   const [activeFrameId, setActiveFrameId] = useState<string | null>(null)
   const [renamingFrameId, setRenamingFrameId] = useState<string | null>(null)
   const [drag, setDrag] = useState<SlideDrag | null>(null)
@@ -111,7 +111,6 @@ export function PresentationSidebar({ engine, excalidrawAPI, onStartPresentation
   // The scene is the truth: every change re-derives the deck, and a selected frame is the row the
   // panel highlights — the web app's own two-way link between the canvas and this list.
   useEffect(() => {
-    if (excalidrawAPI === null) return
     setElements(excalidrawAPI.getSceneElements())
     return excalidrawAPI.onChange((nextElements, appState) => {
       setElements(nextElements)
@@ -129,7 +128,7 @@ export function PresentationSidebar({ engine, excalidrawAPI, onStartPresentation
 
   const persistOrder = useCallback(
     (orderedFrameIds: readonly string[], announcement: string) => {
-      if (excalidrawAPI === null || element === null) return
+      if (element === null) return
       const nextElements = reorderPresentationFrames(element, excalidrawAPI.getSceneElements(), orderedFrameIds)
       excalidrawAPI.updateScene({ elements: nextElements as never, captureUpdate: engine.CaptureUpdateAction.IMMEDIATELY })
       setLiveMessage(announcement)
@@ -153,7 +152,7 @@ export function PresentationSidebar({ engine, excalidrawAPI, onStartPresentation
     (frameId: string, order: number, nextName: string) => {
       setRenamingFrameId(null)
       const name = nextName.trim()
-      if (name === '' || excalidrawAPI === null || element === null) return
+      if (name === '' || element === null) return
       excalidrawAPI.updateScene({
         elements: renamePresentationFrame(element, excalidrawAPI.getSceneElements(), frameId, name) as never,
         captureUpdate: engine.CaptureUpdateAction.IMMEDIATELY,
@@ -239,10 +238,8 @@ export function PresentationSidebar({ engine, excalidrawAPI, onStartPresentation
 
   const focusFrame = (frameId: string) => {
     setActiveFrameId(frameId)
-    excalidrawAPI?.setViewport({ target: frameId, fit: 'contain', animation: true, offsets: { ui: true } })
+    excalidrawAPI.setViewport({ target: frameId, fit: 'contain', animation: true, offsets: { ui: true } })
   }
-
-  if (excalidrawAPI === null) return <div className="presentation-sidebar presentation-sidebar--empty">The canvas is still loading.</div>
 
   if (slides.length === 0) {
     return (

@@ -1,4 +1,5 @@
 import type { GithubSyncStatus, VaultConfigChange, WatchEvent } from '@shared/types'
+import { isRecord } from '@shared/guards'
 
 /**
  * Per-root sync orchestration (YAZ-1081, 2B): WHEN a pass runs, and what the app is told about it.
@@ -84,7 +85,6 @@ interface Entry {
   dropped: boolean
 }
 
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
 /** Unref'd throughout: a sync timer must never hold the app open (the index cache's idiom). */
 function arm(ms: number, fn: () => void): ReturnType<typeof setTimeout> {

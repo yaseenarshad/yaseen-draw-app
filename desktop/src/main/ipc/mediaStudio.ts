@@ -21,7 +21,7 @@ import { createMediaCache, type MediaCache } from '../media/cache'
 import { MEDIA_CACHE_DIR } from '../media/cachePolicy'
 import { createMediaProviders, type MediaProviders } from '../media/providers'
 import type { Secrets } from '../secrets'
-import { isRecord } from '../store'
+import { isRecord } from '@shared/guards'
 import { handle } from './envelope'
 
 function requireSearchRequest(v: unknown): MediaSearchRequest {
