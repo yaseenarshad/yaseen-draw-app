@@ -36,7 +36,7 @@ afterEach(() => rm(dir, { recursive: true, force: true }))
 
 const onDisk = async () => JSON.parse(await readFile(file, 'utf8')) as { version: number; values: Record<string, string> }
 
-describe('createSecrets (🔒 D4)', () => {
+describe('createSecrets (🔒 YAZ-1775 D4)', () => {
   it('nothing stored: has is false, read is null, and asking creates no file', async () => {
     expect(await secrets.has('pixabayApiKey')).toBe(false)
     expect(await secrets.read('pixabayApiKey')).toBeNull()

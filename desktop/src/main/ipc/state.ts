@@ -1,7 +1,8 @@
 import type { FolderState } from '@shared/types'
 import { CH } from '../../channels'
 import { BridgeFailure, requireAbsPath } from '../fs/fsUtils'
-import { isRecord, isSettings, isStringArray, type Store } from '../store'
+import { isRecord } from '@shared/guards'
+import { isSettings, isStringArray, type Store } from '../store'
 import { broadcastAll } from './broadcast'
 import { handle } from './envelope'
 

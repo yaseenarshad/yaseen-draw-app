@@ -31,7 +31,7 @@
  * every mounted tab at once, and the shell keeps several mounted. The surface applies the same
  * rule to ⌘F / ⌘C, and it is why the parity checklist drops `handleKeyboardGlobally`.
  *
- * THE APPLICATION MENU'S TWO CANVAS ITEMS (🔒 D10) arrive the same way: `App` dispatches a
+ * THE APPLICATION MENU'S TWO CANVAS ITEMS (🔒 YAZ-1775 D10) arrive the same way: `App` dispatches a
  * `DRAWING_COMMAND_EVENT` on the VISIBLE `.editor--drawing` section (`drawingCommand.ts`), and
  * this host claims it on its own element. Same reason as the keys — several engines are mounted,
  * and exactly one of them is in front.
@@ -39,7 +39,7 @@
  * THE CHIPS ARE THE ENGINE'S TOP-RIGHT ROW, not a strip above the canvas: the canvas starts
  * directly under the tab bar, and the chips sit where the web app's cloud status does.
  *
- * 🔒 D3 ON SAVE. `unpersistedFiles` picks the canvas files the store lacks — referenced by a
+ * 🔒 YAZ-1775 D3 ON SAVE. `unpersistedFiles` picks the canvas files the store lacks — referenced by a
  * live image element, and not among what `drawing:load` found in `assets/` plus what earlier
  * saves reported back — and ships them as `newFiles`; main writes them BEFORE the scene. A
  * legacy embedded board comes back from load as not-stored, so its first save is the shrink:
@@ -70,12 +70,13 @@ import { ExcalidrawSurface, type DrawingSnapshot, type DrawingSurfaceApi } from 
 import { SaveIndicator } from './SaveIndicator'
 import { SyncIndicator } from './SyncIndicator'
 import './drawingEditor.css'
+import './statusChips.css'
 
 /** What a document that will not open says — one message for its three causes (missing, corrupt, empty). */
 export const BROKEN_DRAWING_DOCUMENT = "This drawing can't be opened: its file is missing or is not a scene."
 
-/** What File › Export Drawing… says when the save sheet or the write refused (🔒 D3, YAZ-1821). */
-export const EXPORT_FAILED = "The drawing couldn't be exported."
+/** What File › Export Drawing… says when the save sheet or the write refused (🔒 YAZ-1775 D3, YAZ-1821). */
+const EXPORT_FAILED = "The drawing couldn't be exported."
 
 export interface DrawingEditorProps {
   root: string
@@ -86,16 +87,16 @@ export interface DrawingEditorProps {
   sync?: GithubSyncStatus | null
   onSyncNow?: () => void
   /**
-   * The user-level canvas preferences (🔒 D9), App's copy of `SettingsState.canvas`: seeded into
+   * The user-level canvas preferences (🔒 YAZ-1775 D9), App's copy of `SettingsState.canvas`: seeded into
    * the scene at mount and kept in step with the engine both ways. Omitted = the engine's defaults.
    */
   canvasPrefs?: CanvasPrefs
   /** The engine (or the rail) moved a pref: App writes it back to the one store every window reads. */
   onCanvasPrefsChange?: (next: CanvasPrefs) => void
-  /** What the canvas panel remembers between mounts: its last-used tab and its dock pref (🔒 D10). */
+  /** What the canvas panel remembers between mounts: its last-used tab and its dock pref (🔒 YAZ-1775 D10). */
   canvasPanel?: CanvasPanelState
   onCanvasPanelChange?: (next: CanvasPanelState) => void
-  /** The window's ONE passive notice: where an export landed, or why it did not (🔒 D3, YAZ-1821). */
+  /** The window's ONE passive notice: where an export landed, or why it did not (🔒 YAZ-1775 D3, YAZ-1821). */
   onNotice?: (text: string, icon?: NoticeKind) => void
 }
 
@@ -193,7 +194,7 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasPrefs, 
   const autosave = useRef<Autosave<number> | null>(null)
   /** Set by a reload; the next snapshot is consumed as the new baseline, not as a change. */
   const reloadedTo = useRef<number | null>(null)
-  /** Ids the store holds: load's `stored`, grown by every save's `persisted` (🔒 D3). */
+  /** Ids the store holds: load's `stored`, grown by every save's `persisted` (🔒 YAZ-1775 D3). */
   const persisted = useRef(new Set(loaded.stored))
   /** A retired host never writes again (a delete, or a rename that moved this path away). */
   const retired = useRef(false)
@@ -304,7 +305,6 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasPrefs, 
         flush: async () => {
           if (!retired.current) await autosave.current?.flush()
         },
-        capture: () => null,
         retire: () => {
           retired.current = true
           autosave.current?.dispose()
@@ -313,7 +313,7 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasPrefs, 
     [path],
   )
 
-  // The application menu's two canvas items (🔒 D10), claimed on THIS host's element so only the
+  // The application menu's two canvas items (🔒 YAZ-1775 D10), claimed on THIS host's element so only the
   // drawing in front answers. `drawingCommand.ts` already picked the visible layer; a host whose
   // engine has not handed its API over yet simply has nothing to do.
   useEffect(() => {
@@ -344,7 +344,7 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasPrefs, 
     const observer = new IntersectionObserver((entries) => {
       if (!entries.some((e) => e.isIntersecting)) return
       surface.current?.refresh()
-      const layer = host.closest('.tabstack') ?? host.closest('.tabstack__layer')
+      const layer = host.closest('.tabstack')
       if (mayTakeFocus(document.activeElement, layer)) surface.current?.focus()
     })
     observer.observe(host)
@@ -368,7 +368,7 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasPrefs, 
   }, [])
 
   /**
-   * File › Export Drawing… (🔒 D3, YAZ-1821). The canvas assembles a STANDALONE scene — the whole
+   * File › Export Drawing… (🔒 YAZ-1775 D3, YAZ-1821). The canvas assembles a STANDALONE scene — the whole
    * live files map, minus what only deleted elements name, embedded — and main's save sheet writes
    * it wherever the user points. THE VAULT FILE IS NOT TOUCHED: nothing here reads it, writes it or
    * flushes the autosave, so an export of a dirty board exports what is on the canvas and the

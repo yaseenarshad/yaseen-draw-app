@@ -5,12 +5,12 @@ import { BridgeFailure } from './fsUtils'
 
 /** Creates a temp vault with drawings, files with no in-app viewer, and hidden entries; caller removes it via `cleanup`. */
 export async function makeFixture(): Promise<{ root: string; cleanup: () => Promise<void> }> {
-  const root = await mkdtemp(path.join(tmpdir(), 'mdapp-'))
+  const root = await mkdtemp(path.join(tmpdir(), 'yaseendraw-'))
   await mkdir(path.join(root, 'Zeta', 'inner'), { recursive: true })
   await mkdir(path.join(root, 'alpha'), { recursive: true })
   await mkdir(path.join(root, 'Empty'), { recursive: true })
   await mkdir(path.join(root, 'assets-only'), { recursive: true })
-  // The image store (🔒 D3) and a user folder of the same name one level down: the tree hides
+  // The image store (🔒 YAZ-1775 D3) and a user folder of the same name one level down: the tree hides
   // the first and shows the second, and `tree.test.ts` holds that line.
   await mkdir(path.join(root, 'assets'), { recursive: true })
   await mkdir(path.join(root, 'Zeta', 'assets'), { recursive: true })

@@ -15,9 +15,8 @@ export default defineConfig({
     include: ['src/**/*.test.ts', '../shared/**/*.test.ts'],
     // chokidar tests write right after `ready`; stat polling makes that deterministic (macOS FSEvents start asynchronously).
     env: { CHOKIDAR_USEPOLLING: '1' },
-    // The git suites spawn the real `git` binary in temp repos (a commit + push + fetch per case).
-    // Vitest's 5 s default is enough on a warm Mac and not on a cold GitHub macOS runner; the
-    // work is real I/O, not a hang, so the ceiling is raised rather than the tests skipped.
-    testTimeout: 20_000,
+    // Vitest's 5 s default stands for the 55 files that need nothing more. The two suites that
+    // spawn the real `git` binary raise it for themselves (`REAL_GIT_TIMEOUT_MS` in
+    // `git/gitFixture.ts`), so a hang anywhere else still fails in five seconds.
   },
 })

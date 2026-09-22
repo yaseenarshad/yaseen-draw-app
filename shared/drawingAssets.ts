@@ -1,7 +1,7 @@
 /**
- * THE IMAGE STORE'S PURE RULES (🔒 D3 on YAZ-1775, built in YAZ-1811).
+ * THE IMAGE STORE'S PURE RULES (🔒 YAZ-1775 D3 on YAZ-1775, built in YAZ-1811).
  *
- * 🔒 D3: a `.excalidraw` on disk carries `files: {}` — image ELEMENTS keep only their `fileId`,
+ * 🔒 YAZ-1775 D3: a `.excalidraw` on disk carries `files: {}` — image ELEMENTS keep only their `fileId`,
  * and the bytes live at `<vault>/assets/<fileId>.<ext>`. The id is Excalidraw's own (the SHA-1
  * of the bytes, which the engine computes on paste, so the store is content-addressed for free)
  * and the extension follows the mime. Files are therefore IMMUTABLE: the same bytes always get
@@ -44,7 +44,7 @@ const MIME_BY_EXT: Readonly<Record<string, string>> = {
  */
 export const ORPHAN_MAX_AGE_MS = 24 * 60 * 60 * 1000
 
-/** The vault-relative folder the store lives in; the sidebar tree hides it (🔒 D3). */
+/** The vault-relative folder the store lives in; the sidebar tree hides it (🔒 YAZ-1775 D3). */
 export const ASSETS_DIR = 'assets'
 
 /** One stored image as it crosses IPC. Mirrors `DrawingFileEntry` without importing the bridge types. */
@@ -159,7 +159,7 @@ export interface AssetListingEntry {
 }
 
 /**
- * The orphan sweep's DECISION (🔒 D3). An `assets/` entry goes to the trash when all three hold:
+ * The orphan sweep's DECISION (🔒 YAZ-1775 D3). An `assets/` entry goes to the trash when all three hold:
  * it is an image asset by extension, NO `.excalidraw` anywhere in the vault references its id,
  * AND it is older than `ORPHAN_MAX_AGE_MS`. Dot-entries, sub-folders and foreign files are never
  * candidates — the store is the app's, but the folder is the user's.

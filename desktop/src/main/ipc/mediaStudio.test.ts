@@ -1,5 +1,5 @@
 /**
- * The Image Studio's three channels (🔒 D4, YAZ-1818): the guard layer. What is pinned here is
+ * The Image Studio's three channels (🔒 YAZ-1775 D4, YAZ-1818): the guard layer. What is pinned here is
  * that a sandboxed renderer's arguments are checked BEFORE a provider is touched, that a typed
  * failure reaches the envelope with its code intact, and that the cache folder is made and swept
  * at registration rather than on the first search.
@@ -65,7 +65,7 @@ describe('registration', () => {
   })
 
   it('makes the cache folder and sweeps yesterday out of it, detached', async () => {
-    const { folder } = registerMediaStudioIpc(userData, fakeSecrets(null), vi.fn() as unknown as typeof globalThis.fetch)
+    const folder = registerMediaStudioIpc(userData, fakeSecrets(null), vi.fn() as unknown as typeof globalThis.fetch)
     await until(async () => (await stat(folder).then(() => true, () => false)))
     const stale = path.join(folder, 'deadbeef.json')
     await writeFile(stale, '{}')
@@ -74,8 +74,8 @@ describe('registration', () => {
 
     vi.mocked(ipcMain.handle).mockClear()
     const second = registerMediaStudioIpc(userData, fakeSecrets(null), vi.fn() as unknown as typeof globalThis.fetch)
-    await until(async () => (await readdir(second.folder)).length === 0)
-    expect(await readdir(second.folder)).toEqual([])
+    await until(async () => (await readdir(second)).length === 0)
+    expect(await readdir(second)).toEqual([])
   })
 })
 

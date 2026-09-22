@@ -1,10 +1,11 @@
 import path from 'node:path'
 import type { GithubSyncStatus } from '@shared/types'
 import { detectRepo } from './detect'
+import { ensureVaultIgnores, VAULT_IGNORED } from './ignore'
 import { git, GIT_TIMEOUT_CODE, installGitHint, resolveGit, type GitResult } from './exec'
 
 /**
- * One sync pass (YAZ-1081, 2B): everything "make this vault and its GitHub remote agree" means,
+ * One sync pass (YAZ-1081 2B): everything "make this vault and its GitHub remote agree" means,
  * as a single async function of a root that answers with a `GithubSyncStatus` and never throws.
  *
  * The order is fixed and load-bearing — commit, fetch, rebase, push:
@@ -26,6 +27,34 @@ import { git, GIT_TIMEOUT_CODE, installGitHint, resolveGit, type GitResult } fro
 
 /** How many file names a commit subject lists before it summarises the rest. */
 const SUBJECT_FILES = 3
+
+/** Git pathspecs for what a vault ignores; `*` crosses `/`, so these match at any depth. */
+const IGNORED_PATHSPEC = VAULT_IGNORED.map((entry) => `*${entry}`)
+
+const listFiles = async (bin: string, root: string, args: readonly string[]): Promise<string[]> => {
+  const listed = await git(bin, root, ['ls-files', '-z', ...args, '--', ...IGNORED_PATHSPEC])
+  return listed.code === 0 ? listed.stdout.split('\0').filter((p) => p !== '') : []
+}
+
+/**
+ * Keep the OS's droppings out of the commit `add -A` is about to make (YAZ-1829). `add -A` stages
+ * everything, so Finder's `.DS_Store` ends up committed, pushed, and in the commit SUBJECT — which
+ * is what this vault's history shows. Two steps, both idempotent and both no-ops until one of
+ * these files actually exists:
+ *  - the vault's `.gitignore` gains the entry (APPEND-ONLY; the user's own file is not ours to
+ *    reorganise, and a vault that already ignores it is not touched at all);
+ *  - anything a previous version already committed is untracked with `--cached`, so git stops
+ *    carrying it and the file stays exactly where it is on disk.
+ * Returns true when either changed something, so the caller knows there is now work to stage.
+ */
+async function keepDroppingsOut(bin: string, root: string): Promise<boolean> {
+  const tracked = await listFiles(bin, root, [])
+  const untracked = tracked.length > 0 ? [] : await listFiles(bin, root, ['-o', '--exclude-standard'])
+  if (tracked.length === 0 && untracked.length === 0) return false
+  const ignoreChanged = await ensureVaultIgnores(root).catch(() => false)
+  if (tracked.length === 0) return ignoreChanged
+  return (await git(bin, root, ['rm', '--cached', '--quiet', '--', ...tracked])).code === 0 || ignoreChanged
+}
 
 /**
  * The network budget of a flush pass (YAZ-1111): quitting must never sit out the full 30s wall,
@@ -130,7 +159,8 @@ export async function syncPass(root: string, opts?: { candidates?: readonly stri
   if (!facts.isRepo || facts.remoteUrl === null) return { root, state: 'off', repo }
 
   // ---------- 1. local edits become one commit ----------
-  if (facts.dirty) {
+  const droppings = await keepDroppingsOut(bin, root)
+  if (facts.dirty || droppings) {
     const staged = await git(bin, root, ['add', '-A'])
     if (staged.code !== 0) return fromFailure(root, repo, staged)
     const committed = await git(bin, root, ['commit', '-m', commitMessage(facts.dirtyFiles)])

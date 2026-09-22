@@ -1,5 +1,5 @@
 /**
- * The component store on a real temp library folder (🔒 D5, YAZ-1819), with `shell.trashItem`
+ * The component store on a real temp library folder (🔒 YAZ-1775 D5, YAZ-1819), with `shell.trashItem`
  * injected — no Electron import, no mocks beyond the trash spy. What is pinned here is the layout
  * the contract names, the folder-is-the-truth rule, and that a delete never reaches `fs.rm`.
  */
@@ -48,7 +48,7 @@ const componentsDir = () => path.join(library, LIBRARY_COMPONENTS_DIR)
 const indexFile = () => path.join(library, COMPONENTS_INDEX_FILE)
 const onDisk = async () => JSON.parse(await readFile(indexFile(), 'utf8')) as ComponentsIndexFile
 
-describe('createComponentStore — the layout (🔒 D5)', () => {
+describe('createComponentStore — the layout (🔒 YAZ-1775 D5)', () => {
   it('a missing library reads as an empty list and is NOT created by the read', async () => {
     expect(await store.list()).toEqual([])
     expect(await readdir(library)).toEqual([])
@@ -74,7 +74,7 @@ describe('createComponentStore — the layout (🔒 D5)', () => {
     expect((await stat(path.join(componentsDir(), 'a-card.png'))).size).toBe(Buffer.from(PNG.split(',')[1], 'base64').byteLength)
   })
 
-  it('the image bytes a component names travel INSIDE the fragment (🔒 D5: self-contained)', async () => {
+  it('the image bytes a component names travel INSIDE the fragment (🔒 YAZ-1775 D5: self-contained)', async () => {
     const files = { abc: { mimeType: 'image/png', dataURL: 'data:image/png;base64,AA==' } }
     await store.save({ name: 'Photo card', fragmentJson: fragment([{ id: 'e1', type: 'image', fileId: 'abc' }], files), previewPng: PNG })
     const written = JSON.parse(await store.read({ slug: 'photo-card' })) as { files: Record<string, unknown> }
@@ -167,7 +167,7 @@ describe('createComponentStore — rename and delete', () => {
   })
 })
 
-describe('createComponentStore — the folder is the truth, the index is a cache (🔒 D5)', () => {
+describe('createComponentStore — the folder is the truth, the index is a cache (🔒 YAZ-1775 D5)', () => {
   it('a MISSING index is rebuilt from the folder, each row named after its own slug', async () => {
     await mkdir(componentsDir(), { recursive: true })
     await writeFile(path.join(componentsDir(), 'from-elsewhere.excalidraw'), fragment([{ id: 'a', type: 'rectangle' }, { id: 'b', type: 'ellipse' }]))
@@ -221,7 +221,7 @@ describe('createComponentStore — the folder is the truth, the index is a cache
   })
 })
 
-describe('createComponentStore — watching (🔒 D5: one library, every window)', () => {
+describe('createComponentStore — watching (🔒 YAZ-1775 D5: one library, every window)', () => {
   it('an EXTERNAL write into the folder notifies — that is how a synced component appears', async () => {
     const seen = vi.fn()
     store.onChanged(seen)

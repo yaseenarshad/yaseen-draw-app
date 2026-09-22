@@ -1,8 +1,8 @@
 /**
- * THE IN-CANVAS DOCKED PANEL (YAZ-1775 ⚡ D8 amended): the web app's `AppSidebar`
+ * THE IN-CANVAS DOCKED PANEL (⚡ YAZ-1775 D8 amended): the web app's `AppSidebar`
  * (`excalidraw-app/components/AppSidebar.tsx`) minus its Boards and Docs tabs. The shell sidebar
  * is this app's file manager, so the canvas panel holds only what the canvas owns — **Images**
- * (3B), **Components** (3C), **Present** (3D) — each an icon with a small label, in the web app's
+ * (YAZ-1818), **Components** (YAZ-1819), **Present** (YAZ-1820) — each an icon with a small label, in the web app's
  * own tab strip.
  *
  * Same engine `DefaultSidebar` the web app used: its docked/pinnable panel, `hideLibrary` (the
@@ -10,7 +10,7 @@
  * — the rail's hamburger being the other way. The engine's stock `DefaultSidebar.Trigger` is
  * rendered `hidden`: the panel's doors are the rail and ⌘F / ⌘C, never a floating trigger.
  *
- * The Images tab is the Image Studio (`client/src/media/`, YAZ-1818), the Components tab is the
+ * The Images tab is the Image Studio (`client/src/image-studio/`, YAZ-1818), the Components tab is the
  * saved-component library (`client/src/components-library/`, YAZ-1819 — named so it cannot be
  * mistaken for `client/src/components/`, the shell's own widgets), and the Present tab is the
  * slide list (`client/src/drawings/presentation/`, YAZ-1820).
@@ -26,18 +26,27 @@
 import type { ReactNode } from 'react'
 import { CANVAS_PANEL_TABS, type CanvasPanelTab } from '@shared/types'
 import { SavedComponents } from '../components-library/SavedComponents'
-import { ImageStudio } from '../media/ImageStudio'
+import { ImageStudio } from '../image-studio/ImageStudio'
 import type { ExcalidrawImperativeApi, ExcalidrawModule } from './engine'
 import { PresentationSidebar } from './presentation/PresentationSidebar'
-import { hamburgerIcon, imageIcon, libraryIcon, presentationIcon } from './launcherIcons'
+import { componentsIcon, hamburgerIcon, imageIcon } from './launcherIcons'
+import { presentationIcon } from './presentation/presentationIcons'
+import './canvasPanel.css'
 
 /** The engine sidebar name the web app used for its workspace panel. */
 export const CANVAS_SIDEBAR = 'default'
 
+/**
+ * What every tab shows before the engine has handed its handle over. Said ONCE, here, because
+ * this is the component that holds `excalidrawAPI` — which is also why the three tabs below take
+ * a non-null one and need no "is there a canvas yet" branch of their own.
+ */
+export const CANVAS_LOADING = 'The canvas is still loading.'
+
 /** The three tabs, left→right, with the web app's own labels. */
 export const CANVAS_SIDEBAR_TABS: ReadonlyArray<{ tab: CanvasPanelTab; label: string; shortLabel: string; icon: ReactNode }> = [
   { tab: 'image-studio', label: 'Image Studio', shortLabel: 'Images', icon: imageIcon },
-  { tab: 'components', label: 'Components', shortLabel: 'Components', icon: libraryIcon },
+  { tab: 'components', label: 'Components', shortLabel: 'Components', icon: componentsIcon },
   { tab: 'presentation', label: 'Presentation', shortLabel: 'Present', icon: presentationIcon },
 ]
 
@@ -54,7 +63,7 @@ export interface CanvasSidebarProps {
   activeTab: CanvasPanelTab | null
   /** The header hamburger: close the panel (the engine's `toggleSidebar({ name: null })`). */
   onClose: () => void
-  /** The dock/pin gesture; the surface stores it in `SettingsState.canvasPanel` (🔒 D10). */
+  /** The dock/pin gesture; the surface stores it in `SettingsState.canvasPanel` (🔒 YAZ-1775 D10). */
   onDock: (docked: boolean) => void
   /** The engine's imperative handle, which each tab narrows to what it uses; null until it has mounted. */
   excalidrawAPI: ExcalidrawImperativeApi | null
@@ -70,7 +79,7 @@ export function CanvasSidebar({ engine, activeTab, onClose, onDock, excalidrawAP
   const { DefaultSidebar, Sidebar } = engine
   return (
     <>
-      {/* The engine's own floating trigger is not this app's door; the rail is (🔒 D10). */}
+      {/* The engine's own floating trigger is not this app's door; the rail is (🔒 YAZ-1775 D10). */}
       <DefaultSidebar.Trigger hidden />
       <DefaultSidebar
         hideLibrary
@@ -91,7 +100,11 @@ export function CanvasSidebar({ engine, activeTab, onClose, onDock, excalidrawAP
         </DefaultSidebar.TabTriggers>
         {CANVAS_SIDEBAR_TABS.map(({ tab }) => (
           <Sidebar.Tab key={tab} tab={tab}>
-            {tab === 'image-studio' ? (
+            {excalidrawAPI === null ? (
+              <div className="canvas-panel__loading" role="status">
+                {CANVAS_LOADING}
+              </div>
+            ) : tab === 'image-studio' ? (
               <ImageStudio engine={engine} excalidrawAPI={excalidrawAPI} searchFocusRequest={searchFocusRequest} />
             ) : tab === 'components' ? (
               <SavedComponents engine={engine} excalidrawAPI={excalidrawAPI} hasSelection={hasSelection} />

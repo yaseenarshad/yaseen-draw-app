@@ -1,20 +1,9 @@
 /**
- * What a launch was asked to OPEN (2I, YAZ-1815).
- *
- * The app claims `.excalidraw` as an Owner file association (🔒 D1 on YAZ-1775), and the OS
- * delivers a double-clicked file differently on each platform:
- *
- * - **macOS** fires `open-file` with the path — before `ready` on a cold start. `main/index.ts`
- *   encodes it as a `yaseendraw://` link and pushes it onto the link queue, so it travels the one
- *   routing path every deep link takes.
- * - **Windows / Linux** put the path in the process ARGV instead: in `process.argv` for the launch
- *   that starts the app, and in the `second-instance` argv when the app is already running. There
- *   is no event; this is the only place those paths exist.
- *
- * So argv gets read on both occasions and turned into the same queue pushes. The filter below is
- * deliberately narrow: an argument counts only when it is not a switch and names a file of a kind
- * this app owns. Everything else — the executable, the `.` that `electron-vite dev` passes, every
- * `--flag`, a `yaseendraw://` URL (the caller handles those itself) — is not a file to open.
+ * What a launch was asked to OPEN (YAZ-1815). macOS fires `open-file` with the path, but Windows
+ * and Linux put it in ARGV instead — `process.argv` on a cold start, the `second-instance` argv
+ * when the app is already running — and there is no event, so this is the only place those paths
+ * exist. `main/index.ts` turns each one into a `yaseendraw://` link, so a double-click travels the
+ * routing path every deep link takes.
  */
 import { isSupportedFile } from '@shared/fileKind'
 

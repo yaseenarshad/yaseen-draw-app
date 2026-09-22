@@ -1,9 +1,9 @@
 /**
  * One settings row (YAZ-1679 D7): label and hint on the left, the control on the right, a hairline
  * between rows in a card (settings.css `.setting + .setting`). `data-setting` is the row's stable
- * address — tests and the e2e specs find a row by it rather than by position or label text.
- * `wide` stacks the control full-width under the text for the two controls a right-hand cell
- * cannot hold: the hotkey tables.
+ * address — tests find a row by it rather than by position or label text.
+ * `wide` stacks the control full-width under the text for the controls a right-hand cell cannot
+ * hold: the hotkey tables and the library-folder picker.
  */
 import type { ReactNode } from 'react'
 

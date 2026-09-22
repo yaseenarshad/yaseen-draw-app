@@ -35,7 +35,7 @@ afterEach(async () => {
 const file = () => path.join(library, MEDIA_LIBRARY_FILE)
 const onDisk = async () => JSON.parse(await readFile(file(), 'utf8')) as unknown
 
-describe('createMediaStore — reading (🔒 D5)', () => {
+describe('createMediaStore — reading (🔒 YAZ-1775 D5)', () => {
   it('a missing file reads as two empty lists and is NOT created by the read', async () => {
     expect(await store.favorites({ op: 'list' })).toEqual([])
     expect(await store.recent({ op: 'list' })).toEqual([])

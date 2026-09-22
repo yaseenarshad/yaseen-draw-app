@@ -8,7 +8,7 @@
  * can swap between them without touching the registry entry's data.
  *
  * The `settings__option` / `settings__option--active` class names are the popover's (GRO-2024)
- * and stay — the e2e specs address the buttons by them.
+ * and stay — the tests address the buttons by them.
  */
 import type { Option } from './options'
 

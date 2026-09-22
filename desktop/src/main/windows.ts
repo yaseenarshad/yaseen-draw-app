@@ -80,15 +80,15 @@ export interface WindowHost {
 export interface WindowManager extends WindowLookup {
   /** One window per stored entry, bounds clamped; an empty state seeds a single Welcome window (D3). */
   restoreAll(): void
-  /** D6 plumbing: an independent window on `root`/`file` (the gestures land in D-). */
+  /** An independent window on `root`/`file`; the gesture is File › New Window on the Welcome screen. */
   openWindow(opts: OpenWindowOptions): void
-  /** D6 plumbing: same folder + file as `from`, cascaded bounds, fresh id (the ⌘⇧N gesture is GRO-2167). */
+  /** ⌘⇧N (GRO-2167): same folder + file as `from`, cascaded bounds, fresh id. Called straight from the menu. */
   duplicateWindow(from: WindowEntry): void
   /**
    * The ONE back-end door for "open a recent vault" (YAZ-1767 🔒 D1): the sidebar's vault
    * switcher (`window:open-recent`) and the menu's ⌥-click on Open Recent both land here. Probes
    * the directory FIRST (GRO-2211): a dead folder is pruned from the MRU and opens nothing →
-   * `false`. A live one is bumped to the top of the MRU, then (🔒 D9) every live window already
+   * `false`. A live one is bumped to the top of the MRU, then (🔒 YAZ-1767 D9) every live window already
    * on that vault is RAISED — most recently focused on top — and nothing new opens; with none
    * open, a new window opens on the vault's remembered `folders[root].lastFile` (D2). → `true`.
    */
@@ -110,7 +110,7 @@ export interface WindowManager extends WindowLookup {
 }
 
 /** What the IPC layer (`ipc/window.ts`) needs from the manager; tests fake just this slice. */
-export type WindowManagerIpc = Pick<WindowManager, 'idFor' | 'openWindow' | 'duplicateWindow' | 'openRecentBeside' | 'closeWindow' | 'handleFlushed'>
+export type WindowManagerIpc = Pick<WindowManager, 'idFor' | 'openWindow' | 'openRecentBeside' | 'closeWindow' | 'handleFlushed'>
 
 // ---------- bounds clamping (pure) ----------
 
@@ -163,7 +163,7 @@ export type LinkTarget = { kind: 'existing'; id: string } | { kind: 'new'; root:
 /** Trailing slash off (never off `/` itself), so `/v` and `/v/` name the same root. */
 const stripSlash = (p: string): string => (p.length > 1 && p.endsWith('/') ? p.slice(0, -1) : p)
 
-/** `root` is an ancestor directory of `path` (or its dirname) — by segment, so `/a/b` never contains `/a/bc/x.md`. */
+/** `root` is an ancestor directory of `path` (or its dirname) — by segment, so `/a/b` never contains `/a/bc/x.excalidraw`. */
 const rootContains = (root: string, path: string): boolean => {
   const r = stripSlash(root)
   return path.startsWith(r === '/' ? '/' : r + '/') && path.length > r.length + 1
@@ -343,21 +343,21 @@ export function createWindowManager(store: Store, host: WindowHost): WindowManag
 
     openWindow,
 
-      duplicateWindow(from) {
-        const cascaded = { ...from.bounds, x: from.bounds.x + WINDOW_CASCADE_PX, y: from.bounds.y + WINDOW_CASCADE_PX }
-        // Clone every ordered path list so the new window's durable identity cannot alias the source;
-        // sidebar visibility, the lens and the three Focus Mode lists (YAZ-1628, YAZ-1766) are copied by value and then persist independently.
-        open({
-          id: randomUUID(),
-          root: from.root,
-          file: from.file,
-          tabs: [...from.tabs],
-          sidebarCollapsed: from.sidebarCollapsed,
-          sidebarLens: from.sidebarLens,
-          focusDirs: [...from.focusDirs],
-          focusFavorites: [...from.focusFavorites],
-          bounds: clampBounds(cascaded, host.workAreas()),
-        })
+    duplicateWindow(from) {
+      const cascaded = { ...from.bounds, x: from.bounds.x + WINDOW_CASCADE_PX, y: from.bounds.y + WINDOW_CASCADE_PX }
+      // Clone every ordered path list so the new window's durable identity cannot alias the source;
+      // sidebar visibility, the lens and both Focus Mode lists (YAZ-1628, YAZ-1766) are copied by value and then persist independently.
+      open({
+        id: randomUUID(),
+        root: from.root,
+        file: from.file,
+        tabs: [...from.tabs],
+        sidebarCollapsed: from.sidebarCollapsed,
+        sidebarLens: from.sidebarLens,
+        focusDirs: [...from.focusDirs],
+        focusFavorites: [...from.focusFavorites],
+        bounds: clampBounds(cascaded, host.workAreas()),
+      })
     },
 
     openRecentBeside(path) {

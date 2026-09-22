@@ -1,5 +1,5 @@
 /**
- * A component's picture (🔒 D5, YAZ-1819): the bounded size the web app used, and the PNG dataURL
+ * A component's picture (🔒 YAZ-1775 D5, YAZ-1819): the bounded size the web app used, and the PNG dataURL
  * `components:save` takes. `exportToBlob` is stubbed — this pins what it is ASKED for, which is
  * the whole of the port.
  */

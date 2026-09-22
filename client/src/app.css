@@ -16,8 +16,8 @@
   --fg-dir: #444444;
   --reveal-bg: #ffe36e;
   --reveal-fg: #2d2500;
-  /* Amber notice family: conflict bar + rename banner — the two that ask for a decision. (The
-     link-notice toast left it for the context menu's surface tokens, YAZ-1674: it confirms as
+  /* Amber notice family: the conflict bar and the sync banner — the two that ask for a decision.
+     (The link-notice toast left it for the context menu's surface tokens, YAZ-1674: it confirms as
      often as it warns.) */
   --notice-fg: #6b4e00;
   --notice-bg: #fff7df;
@@ -189,115 +189,6 @@ button {
   white-space: nowrap;
 }
 
-/* ---------- status chips: sync (YAZ-1081 D5) then save ----------
-   There is no chips ROW here any more (🔒 YAZ-1810): a drawing hands both chips to the engine's
-   own top-right slot, so the canvas starts directly under the tab strip. The two chips keep
-   their own styles because they are the shell's, not the canvas's — `drawingEditor.css` only
-   places them. */
-
-/* ---------- save indicator ---------- */
-
-.save-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--fg-muted);
-  user-select: none;
-}
-
-.save-indicator__dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--ok);
-}
-
-.save-indicator--unsaved .save-indicator__dot {
-  background: var(--warn);
-}
-
-.save-indicator--saving .save-indicator__dot {
-  background: var(--accent);
-  animation: pulse 0.9s ease-in-out infinite;
-}
-
-.save-indicator--error {
-  color: var(--danger);
-}
-
-.save-indicator--error .save-indicator__dot {
-  background: var(--danger);
-}
-
-@keyframes pulse {
-  50% {
-    opacity: 0.3;
-  }
-}
-
-/* ---------- sync indicator (YAZ-1081 3A) ----------
-   The save chip's dot-plus-label idiom and tokens, but a real <button>: the chip IS the
-   one-click sync, so status and action are the same affordance. Button reset first — the
-   default border/background/font would break the row it shares with SaveIndicator. */
-
-.sync-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  font-size: 12px;
-  color: var(--fg-muted);
-  user-select: none;
-  cursor: pointer;
-}
-
-.sync-indicator:hover {
-  color: var(--fg);
-}
-
-.sync-indicator:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
-.sync-indicator__dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--ok);
-}
-
-.sync-indicator--pending .sync-indicator__dot {
-  background: var(--warn);
-}
-
-.sync-indicator--syncing .sync-indicator__dot {
-  background: var(--accent);
-  animation: pulse 0.9s ease-in-out infinite;
-}
-
-.sync-indicator--attention {
-  color: var(--danger);
-}
-
-.sync-indicator--attention .sync-indicator__dot {
-  background: var(--danger);
-}
-
-/* Off is not a failure — it is a vault nobody switched on; it reads as quiet, not broken. */
-.sync-indicator--off {
-  opacity: 0.6;
-}
-
-.sync-indicator--off .sync-indicator__dot {
-  background: var(--fg-muted);
-}
-
 /* ---------- conflict bar ---------- */
 
 .conflict-bar {
@@ -372,10 +263,9 @@ button {
   }
 }
 
-/* ---------- sync attention banner (YAZ-1081 3B) ----------
-   The rename-banner idiom exactly — same amber toast, same explicit buttons, never a modal.
-   It sits lowest: sync is the least urgent thing on screen, and the drawing the
-   user is actually looking at is untouched by it. */
+/* ---------- sync attention banner (YAZ-1081) ----------
+   The conflict bar's idiom — same amber toast, same explicit buttons, never a modal. Sync is the
+   least urgent thing on screen, and the drawing the user is looking at is untouched by it. */
 
 .sync-banner {
   position: fixed;
@@ -412,11 +302,6 @@ button {
 
 .sync-banner button:hover {
   background: var(--notice-btn-bg-hover);
-}
-
-/* The rename banner above pushes this one down (the notice lives bottom-left since YAZ-1674, so it never stacks here). */
-.rename-banner ~ .sync-banner {
-  top: 48px;
 }
 
 /* ---------- sidebar ---------- */
@@ -901,7 +786,7 @@ button {
   text-align: left;
 }
 
-/* Groups (🔒 D7): a rule between ADJACENT groups only — the component skips empty ones, so a
+/* Groups (🔒 YAZ-1674 D7): a rule between ADJACENT groups only — the component skips empty ones, so a
    blank-space menu never ends in a stray separator. */
 .ctx-menu__group + .ctx-menu__group {
   border-top: 1px solid var(--border);
@@ -933,8 +818,8 @@ button {
   height: 11px;
   background-color: currentColor;
   opacity: 0.6;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 5l7 7-7 7'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 5l7 7-7 7'/%3E%3C/svg%3E") center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%YAZ-1821%3Cpath d='M9 5l7 7-7 7'/%YAZ-1821%YAZ-1819/svg%YAZ-1821") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%YAZ-1821%3Cpath d='M9 5l7 7-7 7'/%YAZ-1821%YAZ-1819/svg%YAZ-1821") center / contain no-repeat;
 }
 
 .ctx-menu__sub {
@@ -1021,52 +906,6 @@ button {
 
 .confirm__btn--danger:hover {
   background: color-mix(in srgb, var(--danger) 12%, transparent);
-}
-
-/* Sync from folder (YAZ-952): the confirm sheet's shell, plus the two lists only it has —
-   the folder picker and the preview of what it would add. Both scroll; the sheet does not. */
-
-.sync__folders {
-  list-style: none;
-  margin: 0 0 12px;
-  padding: 0;
-  max-height: 168px;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
-
-.sync__folder {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  padding: 4px 8px;
-  font-size: 13px;
-  text-align: left;
-}
-
-.sync__folder:hover {
-  background: var(--bg-hover-row);
-}
-
-.sync__folder[aria-pressed='true'] {
-  background: var(--accent-soft);
-}
-
-.sync__count {
-  flex: none;
-  color: var(--fg-muted);
-}
-
-.sync__missing {
-  list-style: none;
-  margin: 0 0 12px;
-  padding: 0;
-  max-height: 120px;
-  overflow-y: auto;
-  font-size: 12px;
-  color: var(--fg-muted);
 }
 
 .create-inline {

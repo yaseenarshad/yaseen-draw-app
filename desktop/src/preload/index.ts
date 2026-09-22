@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AppState, FileClipState, FileDeletedEvent, FileRenamedEvent, GithubSyncStatus, VaultConfigChange, WatchEvent, YaseenDrawApi } from '@shared/types'
+import type { AppState, FileClipState, FileDeletedEvent, FileRenamedEvent, GithubSyncStatus, WatchEvent, YaseenDrawApi } from '@shared/types'
 import { CH, type Envelope } from '../channels'
 
 /** invoke + unwrap: resolves the value or rejects with the plain `BridgeError` object. */
@@ -30,8 +30,6 @@ ipcRenderer.on(CH.appFlush, () => {
 
 const api: YaseenDrawApi = {
   tree: (root) => call(CH.fsTree, root),
-  readFile: (path) => call(CH.fsRead, path),
-  writeFile: (req) => call(CH.fsWrite, req),
   createDir: (path) => call(CH.fsCreateDir, path),
   createFile: (req) => call(CH.fsCreateFile, req),
   // The drawing DOCUMENT's two doors (🔒 YAZ-1810): the only way a `.excalidraw` tab reads and writes.
@@ -68,11 +66,9 @@ const api: YaseenDrawApi = {
     identity: () => call(CH.windowIdentity),
     setIdentity: (patch) => call(CH.windowSetIdentity, patch),
     open: (opts) => call(CH.windowOpen, opts),
-    duplicate: () => call(CH.windowDuplicate),
     // The vault switcher's door (YAZ-1767 D1): true = the vault is in front (raised or newly opened), false = dead folder, pruned.
     openRecent: (path) => call(CH.windowOpenRecent, path),
     closeSelf: () => call(CH.windowCloseSelf),
-    zoom: (step) => call(CH.windowZoom, step),
     onFlush: (listener) => {
       flushListeners.add(listener)
       return () => {
@@ -91,7 +87,7 @@ const api: YaseenDrawApi = {
     onCloseTab: on<void>(CH.menuCloseTab),
     onNextTab: on<void>(CH.menuNextTab),
     onPrevTab: on<void>(CH.menuPrevTab),
-    // 🔒 D10: File › Export Image… and View › Canvas Background ▸, which main enables only while
+    // 🔒 YAZ-1775 D10: File › Export Image… and View › Canvas Background ▸, which main enables only while
     // the focused window's active tab is a drawing.
     onExportImage: on<void>(CH.menuExportImage),
     onCanvasBackground: on<string>(CH.menuCanvasBackground),
@@ -121,7 +117,6 @@ const api: YaseenDrawApi = {
     reveal: (req) => call(CH.shellReveal, req),
     openVsCode: (req) => call(CH.shellOpenVsCode, req),
     openDefault: (req) => call(CH.shellOpenDefault, req),
-    openLink: (req) => call(CH.shellOpenLink, req),
   },
   // The Favorites list over `.yaseendraw/favorites.json` (YAZ-1766 6A).
   favorites: {
@@ -129,23 +124,17 @@ const api: YaseenDrawApi = {
     set: (root, paths) => call(CH.favoritesSet, root, paths),
     onChanged: on<{ root: string }>(CH.favoritesChanged),
   },
-  // Vault-local config in `<root>/.yaseendraw/` (Desktop J, GRO-2188).
-  vaultConfig: {
-    read: (root, name) => call(CH.vaultConfigRead, root, name),
-    write: (root, name, value) => call(CH.vaultConfigWrite, root, name, value),
-    onChange: on<VaultConfigChange>(CH.vaultConfigChanged),
-  },
-  // The cross-vault media library over `<library>/media.json` (🔒 D4 / D5, YAZ-1817): pointers only, every window hears every change.
+  // The cross-vault media library over `<library>/media.json` (🔒 YAZ-1775 D4 / D5, YAZ-1817): pointers only, every window hears every change.
   media: {
     favorites: (req) => call(CH.mediaFavorites, req),
     recent: (req) => call(CH.mediaRecent, req),
     onChanged: on<void>(CH.mediaChanged),
-    // The provider doors (🔒 D4, YAZ-1818): main holds the key, does the fetching and caches.
+    // The provider doors (🔒 YAZ-1775 D4, YAZ-1818): main holds the key, does the fetching and caches.
     search: (req) => call(CH.mediaSearch, req),
     preview: (req) => call(CH.mediaPreview, req),
     import: (req) => call(CH.mediaImport, req),
   },
-  // The cross-vault saved-component library over `<library>/components/` (🔒 D5, YAZ-1819).
+  // The cross-vault saved-component library over `<library>/components/` (🔒 YAZ-1775 D5, YAZ-1819).
   components: {
     list: () => call(CH.componentsList),
     save: (req) => call(CH.componentsSave, req),
@@ -155,7 +144,7 @@ const api: YaseenDrawApi = {
     preview: (req) => call(CH.componentsPreview, req),
     onChanged: on<void>(CH.componentsChanged),
   },
-  // The secrets door (🔒 D4): write and ask, never read — there is no channel that answers a value.
+  // The secrets door (🔒 YAZ-1775 D4): write and ask, never read — there is no channel that answers a value.
   secrets: {
     set: (req) => call(CH.secretsSet, req),
     has: (req) => call(CH.secretsHas, req),

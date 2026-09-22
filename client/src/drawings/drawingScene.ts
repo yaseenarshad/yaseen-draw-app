@@ -12,14 +12,15 @@
  * editor's ONE readable error pane — never a repair, never a half-parsed render, which would be
  * a lie about what the file holds.
  */
+import { isRecord } from '@shared/guards'
 
 /** The scene shape the canvas opens on; deliberately loose, for the reason above. */
 export interface DrawingScene {
   /** Excalidraw elements exactly as the file holds them; validated only as "an array". */
   readonly elements: readonly unknown[]
-  /** Missing in the file = the engine's own defaults; 🔒 D9 prefs are layered over this at mount. */
+  /** Missing in the file = the engine's own defaults; 🔒 YAZ-1775 D9 prefs are layered over this at mount. */
   readonly appState: Record<string, unknown>
-  /** The image map, keyed by `fileId`. Empty for every file this app writes (🔒 D3). */
+  /** The image map, keyed by `fileId`. Empty for every file this app writes (🔒 YAZ-1775 D3). */
   readonly files: Record<string, unknown>
 }
 
@@ -51,10 +52,12 @@ export const EMPTY_SCENE_JSON = `${JSON.stringify(EMPTY_SCENE, null, 2)}\n`
 /** Scene JSON → the canvas's opening scene; throws on anything that is not one (see the module doc). */
 export function parseSceneText(text: string): DrawingScene {
   const parsed: unknown = JSON.parse(text)
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error('not an Excalidraw scene')
-  const scene = parsed as Record<string, unknown>
+  if (!isRecord(parsed)) throw new Error('not an Excalidraw scene')
+  const scene = parsed
   if (!Array.isArray(scene.elements)) throw new Error('not an Excalidraw scene: no elements')
-  const appState = typeof scene.appState === 'object' && scene.appState !== null ? (scene.appState as Record<string, unknown>) : {}
-  const files = typeof scene.files === 'object' && scene.files !== null ? (scene.files as Record<string, unknown>) : {}
+  // The same `isRecord` the whole scene got: a file whose `appState` is an ARRAY carries no
+  // prefs, not a list.
+  const appState = isRecord(scene.appState) ? scene.appState : {}
+  const files = isRecord(scene.files) ? scene.files : {}
   return { elements: scene.elements, appState, files }
 }

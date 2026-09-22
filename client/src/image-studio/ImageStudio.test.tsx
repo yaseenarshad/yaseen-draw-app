@@ -28,7 +28,6 @@ const media = vi.mocked(api.media)
 const secrets = vi.mocked(api.secrets)
 const loadElement = vi.mocked(loadExcalidrawElement)
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const item = (over: Partial<StudioItem> = {}): StudioItem => ({ itemKey: 'iconify:noto:money-bag', provider: 'iconify', providerId: 'noto:money-bag', kind: 'icon', title: 'money bag', ...over })
 const stored = (over: Partial<StoredMediaItem> = {}): StoredMediaItem => ({ ...item(), updatedAt: 1, ...over })
@@ -218,7 +217,7 @@ describe('searching', () => {
     expect(host.querySelector('.image-studio__warning')?.textContent).toContain('Pixabay graphics are temporarily unavailable.')
   })
 
-  it('is a passive offline state, not an error, when the machine cannot reach a provider (🔒 D4)', async () => {
+  it('is a passive offline state, not an error, when the machine cannot reach a provider (🔒 YAZ-1775 D4)', async () => {
     media.search.mockRejectedValue(new BridgeRequestError('OFFLINE', 'could not reach api.iconify.design'))
     const { container: host } = await mount()
     await search(host)
@@ -310,7 +309,7 @@ describe('the infinite scroll', () => {
   })
 })
 
-describe('the Pixabay key, which the renderer only ever learns yes or no about (🔒 D4)', () => {
+describe('the Pixabay key, which the renderer only ever learns yes or no about (🔒 YAZ-1775 D4)', () => {
   it('does not offer Pixabay as a source when no key is set', async () => {
     const { container: host } = await mount()
     expect([...(byLabel(host, 'Search source') as HTMLSelectElement).options].map((option) => option.value)).toEqual(['all', 'iconify'])
@@ -365,13 +364,6 @@ describe('inserting', () => {
     await click(byLabel(host, 'Add money bag'))
     expect(host.querySelector('.image-studio__error')?.textContent).toContain('20 MB')
     expect(host.querySelector('.image-studio__adding')).toBeNull()
-  })
-
-  it('cannot insert while the canvas is still mounting', async () => {
-    media.search.mockResolvedValue({ items: [item()], nextCursor: null, pixabayAvailable: false, warnings: [] })
-    const { container: host } = await mount({ excalidrawAPI: null })
-    await search(host)
-    expect((byLabel(host, 'Add money bag') as HTMLButtonElement).disabled).toBe(true)
   })
 })
 

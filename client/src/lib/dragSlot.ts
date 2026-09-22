@@ -1,9 +1,8 @@
 import type { DragEvent } from 'react'
 
 /**
- * The insertion-slot arithmetic BOTH horizontal tab strips reorder by — the window's tab bar
- * (GRO-2235). One spelling, so every strip that gains one cannot
- * drift apart: a slot is an index in the WITH-dragged-item list and runs 0…length.
+ * The insertion-slot arithmetic the window's tab bar reorders by (GRO-2235). One spelling, so a
+ * second strip cannot drift from it: a slot is an index in the WITH-dragged-item list, 0…length.
  */
 
 /** The slot a pointer at `clientX` over the item at `i` means: BEFORE it (`i`) or AFTER it (`i + 1`), by the target's own horizontal midpoint. */

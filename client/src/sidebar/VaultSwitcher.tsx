@@ -14,8 +14,8 @@
  * the row is disabled with "Folder not found" in the time slot and the panel STAYS open
  * (Welcome's behaviour), so the next choice is one keystroke away. `true` closes the panel.
  *
- * The keyboard model (D7): ranking is `matchLinkCandidates` over the basenames (the `[[` picker's
- * ranking: exact, then prefix, then substring; an empty query is MRU order). One highlighted row;
+ * The keyboard model (D7): ranking is `matchCandidates` over the basenames (exact, then prefix,
+ * then substring; an empty query is MRU order). One highlighted row;
  * with an EMPTY query it starts on the first row that is NOT the current vault — so ⌘O ⏎ jumps to
  * the last-used OTHER vault, like ⌘Tab — with a typed query on the top match, and with no match on
  * Open folder…. ↑/↓ clamp at both ends (the `[[` picker's no-wrap rule), hover moves it too, ⏎
@@ -44,7 +44,7 @@ export interface VaultSwitcherProps {
   openRequest: number
 }
 
-/** One recent vault as the panel ranks and draws it. `name` is what `matchLinkCandidates` matches on. */
+/** One recent vault as the panel ranks and draws it. `name` is what `matchCandidates` matches on. */
 export interface VaultRow {
   name: string
   path: string
@@ -62,9 +62,9 @@ export const NO_MATCH_TEXT = 'No matching vaults'
 export const MISSING_TEXT = 'Folder not found'
 export const OPEN_FOLDER_TEXT = 'Open folder…'
 
-/** The rows `query` keeps, ranked (D7): an empty query is MRU order untouched; otherwise the `[[` picker's ranking, uncapped. */
+/** The rows `query` keeps, ranked (D7): an empty query is MRU order untouched; otherwise the app's one ranking, uncapped. */
 export function rankVaultRows(rows: readonly VaultRow[], query: string): VaultRow[] {
-  return query.trim() === '' ? [...rows] : matchCandidates(rows, query, Math.max(1, rows.length))
+  return query.trim() === '' ? [...rows] : matchCandidates(rows, query, rows.length)
 }
 
 /**

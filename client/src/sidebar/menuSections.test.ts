@@ -102,7 +102,7 @@ const FILE_ROW: Partial<MenuSectionTargets> = {
 /** Blank space: every row-only target null, the root fallbacks in place (GRO-2273, GRO-2274). */
 const BLANK: Partial<MenuSectionTargets> = { copyPath: '/v', revealPath: '/v', openVsCodePath: '/v', openDefaultPath: '/v' }
 
-describe('the six groups (🔒 D7, amended)', () => {
+describe('the six groups (🔒 YAZ-1674 D7, amended)', () => {
   it('always answers six sections in order — Open, clipboard, create, this row, Open in, Delete — empties included', () => {
     expect(build()).toHaveLength(6)
     expect(build(FILE_ROW)).toHaveLength(6)
@@ -154,7 +154,7 @@ describe('the six groups (🔒 D7, amended)', () => {
 })
 
 /**
- * The create group (⚡ D8 amended): ONE document birth — "New drawing" — leading the two disk
+ * The create group (⚡ YAZ-1674 D8 amended): ONE document birth — "New drawing" — leading the two disk
  * folder births. The group targets a DIRECTORY, so it is offered on every row type and on blank
  * space alike.
  */
@@ -318,8 +318,7 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
 })
 
 /**
- * The text clipboard: "Copy path" (GRO-2273, the root on blank space) and "Copy N paths" (🔒 D5,
- * YAZ-1337 — the whole ordered selection, newline-joined), each confirming through the one notice
+ * The text clipboard: "Copy path" (GRO-2273, the root on blank space) and "Copy N paths" (🔒 YAZ-1337 D5 — the whole ordered selection, newline-joined), each confirming through the one notice
  * (YAZ-1341) and REPORTING a refused clipboard.
  */
 describe('Copy path / Copy N paths', () => {

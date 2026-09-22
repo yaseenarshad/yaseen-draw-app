@@ -30,15 +30,10 @@ interface SidebarStubProps {
   onCollapse: () => void
   revealRequest?: { id: number; path: string; lens: SidebarLens }
   onRevealConsumed?: (id: number) => void
-  /** A folder search row (🔒 D3, YAZ-1491): App flips to Files and issues a reveal request for the dir. */
+  /** A folder search row (🔒 YAZ-1491 D3): App flips to Files and issues a reveal request for the dir. */
   onRevealInFiles?: (path: string) => void
-  /**
-   * The read-only window onto the sidebar's selection (🔒 D4): App owns the box (the sidebar
-   * unmounts on collapse), the Sidebar owns the state (🔒 D1) and writes it here.
-   */
-  selectionRef: { current: ReadonlySet<string> }
   onNotice: (message: string, icon?: NoticeKind) => void
-  /** ⌘C / ⌘X / ⌘V's handle (D6 amended, YAZ-1674): App asks, the Sidebar (here a stub) answers. */
+  /** ⌘C / ⌘X / ⌘V's handle (⚡ YAZ-1674 D6 amended): App asks, the Sidebar (here a stub) answers. */
   clipboardRef: { current: { cutOrCopy: (op: 'copy' | 'cut') => boolean; paste: () => boolean } | null }
 }
 
@@ -58,7 +53,6 @@ vi.mock('./sidebar/Sidebar', () => ({
 
 import { App } from './App'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 /** The `window.yaseenDraw` surface the App tree touches, all observable. */
 type IdentityFixture = Omit<WindowIdentity, 'sidebarCollapsed' | 'sidebarLens' | 'focusDirs' | 'focusFavorites'> & Partial<Pick<WindowIdentity, 'sidebarCollapsed' | 'sidebarLens' | 'focusDirs' | 'focusFavorites'>>
@@ -130,7 +124,7 @@ function installBridge(state: AppState, identity: IdentityFixture) {
       onCloseTab: menuSub(menuCloseTab),
       onNextTab: menuSub(menuNextTab),
       onPrevTab: menuSub(menuPrevTab),
-      // 🔒 D10 / 🔒 D3: the three canvas items; App routes them to the visible drawing layer by DOM.
+      // 🔒 YAZ-1775 D10 / D3: the three canvas items; App routes them to the visible drawing layer by DOM.
       onExportImage: menuSub(menuExportImage),
       onCanvasBackground: menuSub(menuCanvasBackground),
       onExportDrawing: menuSub(menuExportDrawing),
@@ -159,7 +153,7 @@ function installBridge(state: AppState, identity: IdentityFixture) {
         return () => fileDeleted.delete(l)
       }),
     },
-    // Sync off (YAZ-1081 3A): App owns one `useGithubSync`, which subscribes on mount. `off` is
+    // Sync off (YAZ-1081 YAZ-1817): App owns one `useGithubSync`, which subscribes on mount. `off` is
     // the real default for a vault nobody switched on — no chip state to assert here, and no
     // attention banner. The sync UI's own tests are SyncIndicator/SettingsDialog/syncAttention.
     github: {
@@ -499,10 +493,10 @@ describe('App rename push (Links E1, GRO-2194)', () => {
     expect(bridge.window.setIdentity).not.toHaveBeenCalled()
   })
 
-  it('carries the dirty buffer BEFORE the workspace repair, and a dir rename remaps every open tab under the folder', async () => {
+  it('retires the old editor BEFORE the workspace repair, and a dir rename remaps every open tab under the folder', async () => {
     const order: string[] = []
-    const carry = vi.spyOn(continuity, 'carryEditorAcrossRename').mockImplementation(() => void order.push('carry'))
-    const carryDir = vi.spyOn(continuity, 'carryEditorsAcrossDirRename')
+    const retire = vi.spyOn(continuity, 'retirePath').mockImplementation(() => void order.push('retire'))
+    const retireDirSpy = vi.spyOn(continuity, 'retireDir')
     const { bridge, el, emitFileRenamed } = await mount(defaultAppState(), {
       id: 'w1',
       root: '/v',
@@ -511,18 +505,18 @@ describe('App rename push (Links E1, GRO-2194)', () => {
     })
     vi.mocked(bridge.window.setIdentity).mockImplementation(async () => void order.push('workspace'))
     await act(async () => emitFileRenamed('/v/Docs/a.excalidraw', '/v/Docs/b.excalidraw', 'file'))
-    expect(order).toEqual(['carry', 'workspace'])
+    expect(order).toEqual(['retire', 'workspace'])
     expect(el.querySelector('[data-editor]')?.getAttribute('data-path')).toBe('/v/Docs/b.excalidraw')
 
     // A `dir` event is a PREFIX remap: every open editor and tab under the folder follows.
     await act(async () => emitFileRenamed('/v/Docs', '/v/Notes', 'dir'))
-    expect(carryDir).toHaveBeenCalledWith('/v/Docs', '/v/Notes')
+    expect(retireDirSpy).toHaveBeenCalledWith('/v/Docs')
     expect(el.querySelector('[data-editor]')?.getAttribute('data-path')).toBe('/v/Notes/b.excalidraw')
     expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({
       tabs: ['/v/Notes/b.excalidraw', '/v/x.excalidraw'],
       file: '/v/Notes/b.excalidraw',
     })
-    carry.mockRestore()
+    retire.mockRestore()
   })
 })
 
@@ -574,11 +568,11 @@ describe('App sidebar resize (YAZ-738)', () => {
 })
 
 /**
- * The sidebar's lens (🔒 D4, YAZ-847): App-owned, persisted as window identity (YAZ-1628), and
+ * The sidebar's lens (🔒 YAZ-1775 D4, YAZ-847): App-owned, persisted as window identity (YAZ-1628), and
  * passed down — never a Sidebar-local flag. The sidebar is mounted `key={root}` and only while it
  * is open, so the collapse → reopen step below is the whole reason the value lives here.
  */
-describe('App sidebar lens (🔒 D4, YAZ-847)', () => {
+describe('App sidebar lens (🔒 YAZ-1775 D4, YAZ-847)', () => {
   it('mounts the sidebar on the STORED lens — Files by default', async () => {
     await mount(defaultAppState(), { id: 'w1', root: '/v', file: null, tabs: [] })
     expect(captured.sidebar?.lens).toBe('files')
@@ -610,12 +604,12 @@ describe('App sidebar lens (🔒 D4, YAZ-847)', () => {
 })
 
 /**
- * Reveal requests are App's (YAZ-1023, 🔒 D3 YAZ-1491): the sidebar unmounts while collapsed and
+ * Reveal requests are App's (YAZ-1023, 🔒 YAZ-1775 D3 YAZ-1491): the sidebar unmounts while collapsed and
  * is re-keyed on every root, so the request — its id, its lens, its consumption — lives up here.
  * A FOLDER search row asks for one through `onRevealInFiles`: always the Files lens, whichever
  * lens was showing, because a folder exists on no other one.
  */
-describe('App reveal request ownership (YAZ-1023, 🔒 D3 YAZ-1491)', () => {
+describe('App reveal request ownership (YAZ-1023, 🔒 YAZ-1775 D3 YAZ-1491)', () => {
   it('a folder search row flips the lens to FILES and issues the reveal request on that lens', async () => {
     await mount(defaultAppState(), { id: 'w1', root: '/v', file: '/v/a.excalidraw', tabs: ['/v/a.excalidraw'], sidebarLens: 'favorites' })
     expect(captured.sidebar?.lens).toBe('favorites') // the row was chosen from Favorites
@@ -952,7 +946,7 @@ describe('App root-missing (C2, GRO-2164)', () => {
 describe('in-app delete (GRO-2272)', () => {
   it('retires the editor BEFORE remapping the workspace — asserted by call order, not by reading the code', async () => {
     const order: string[] = []
-    const retireSpy = vi.spyOn(continuity, 'retireDeletedPath').mockImplementation(() => void order.push('retire'))
+    const retireSpy = vi.spyOn(continuity, 'retirePath').mockImplementation(() => void order.push('retire'))
     const b = installBridge(defaultAppState(), { id: 'w1', root: '/v', file: '/v/a.excalidraw', tabs: ['/v/a.excalidraw', '/v/b.excalidraw'] })
     await storage.init()
     container = document.createElement('div')
@@ -974,7 +968,7 @@ describe('in-app delete (GRO-2272)', () => {
   })
 
   it('a dir event retires and closes every tab under the folder', async () => {
-    const retireDir = vi.spyOn(continuity, 'retireDeletedDir')
+    const retireDir = vi.spyOn(continuity, 'retireDir')
     const b = await mount(defaultAppState(), { id: 'w1', root: '/v', file: '/v/Docs/a.excalidraw', tabs: ['/v/Docs/a.excalidraw', '/v/x.excalidraw'] })
     await act(async () => b.emitFileDeleted('/v/Docs', 'dir'))
     expect(retireDir).toHaveBeenCalledWith('/v/Docs')

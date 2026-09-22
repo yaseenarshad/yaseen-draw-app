@@ -1,7 +1,7 @@
 import type { GithubSyncStatus } from '@shared/types'
 
 /**
- * The GitHub sync chip (YAZ-1081 3A, 🔒 D5): sits immediately LEFT of the per-tab Saved
+ * The GitHub sync chip (YAZ-1081 🔒 YAZ-1775 D4): sits immediately LEFT of the per-tab Saved
  * indicator, top-right of the editor — SaveIndicator's exact dot-plus-label idiom, so two
  * chips read as one row rather than two competing widgets.
  *
@@ -18,7 +18,7 @@ const LABEL: Record<GithubSyncStatus['state'], string> = {
   off: 'Sync off',
 }
 
-/** What the chip says on hover — the one place a status message reaches the user in 3A. */
+/** What the chip says on hover — the one place a status message reaches the user (YAZ-1081). */
 function title(status: GithubSyncStatus): string {
   switch (status.state) {
     case 'synced':

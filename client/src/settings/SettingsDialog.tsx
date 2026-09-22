@@ -130,7 +130,7 @@ export function SettingsDialog({ ctx, onClose }: SettingsDialogProps) {
   }
 
   const row = (item: SettingDef) => (
-    <SettingRow key={item.id} id={item.id} label={item.label} hint={resolveHint(item, ctx)} wide={resolveWide(item, ctx)}>
+    <SettingRow key={item.id} id={item.id} label={item.label} hint={resolveHint(item, ctx)} wide={resolveWide(item)}>
       {item.render(ctx)}
     </SettingRow>
   )
@@ -150,7 +150,7 @@ export function SettingsDialog({ ctx, onClose }: SettingsDialogProps) {
     </section>
   )
 
-  // Hits under a breadcrumb per group ("Editor › Bullet threading"; an untitled group is just its
+  // Hits under a breadcrumb per group ("Canvas › Drawing defaults"; an untitled group is just its
   // section). `candidates` is in registry order, so walking it keeps groups and rows in the order
   // the page shows them; the matcher's ranking decided only WHICH rows are here.
   const matched = new Set(hits)

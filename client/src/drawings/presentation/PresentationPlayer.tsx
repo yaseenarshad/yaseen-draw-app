@@ -34,6 +34,7 @@ import type { ExcalidrawImperativeApi, ExcalidrawModule } from '../engine'
 import { getPresentationViewportOffsets } from './camera'
 import { arrowRightIcon, closeIcon, toolsIcon } from './presentationIcons'
 import { findSlideIndexAtPoint, getOrderedPresentationFrames, type OrderedPresentationFrame } from './slides'
+import { isFrontmost } from '../drawingCommand'
 import './presentation.css'
 
 /** The web app's own transition length; the status line and the token both key off it. */
@@ -77,7 +78,7 @@ export interface PresentationPlayerProps {
   /** Leave the presentation (the ✕ button, or the deck emptying under the presenter). */
   onExit: () => void
   /**
-   * Put the frame outlines back the way the USER's preference has them (🔒 D9:
+   * Put the frame outlines back the way the USER's preference has them (🔒 YAZ-1775 D9:
    * `SettingsState.canvas.framesVisible`, where the web app read a localStorage key). Called
    * whether the presenter left on purpose or the component was simply unmounted.
    */
@@ -114,11 +115,8 @@ export function PresentationPlayer({ engine, excalidrawAPI, initialFrameId = nul
   /** The surface's own element: what the chrome classes go on, and what the reserve is measured from. */
   const host = useCallback(() => overlayRef.current?.closest<HTMLElement>('.drawing-surface') ?? null, [])
 
-  /** This overlay is in the tab that is IN FRONT — `drawingCommand.ts`'s test, one layer down. */
-  const isFrontmost = useCallback(() => {
-    const overlay = overlayRef.current
-    return overlay !== null && overlay.closest('.tabstack__layer--hidden') === null
-  }, [])
+  /** This overlay is in the tab that is IN FRONT — `drawingCommand.ts`'s one test. */
+  const inFront = useCallback(() => isFrontmost(overlayRef.current), [])
 
   const clearTransition = useCallback(() => {
     transitionTokenRef.current += 1
@@ -259,7 +257,6 @@ export function PresentationPlayer({ engine, excalidrawAPI, initialFrameId = nul
       if (!didExitRef.current) endSession()
     }
     // Mount-only by contract: a presentation is started once and ended once.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // The deck is whatever the scene says it is: frames added, removed or reordered while presenting
@@ -289,7 +286,8 @@ export function PresentationPlayer({ engine, excalidrawAPI, initialFrameId = nul
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (didExitRef.current || !isFrontmost() || isTextEntryTarget(event.target)) return
+      // ⌘/⌃ combinations are the app's (⌘→ / ⌘← and friends), never a slide step.
+      if (didExitRef.current || event.metaKey || event.ctrlKey || !inFront() || isTextEntryTarget(event.target)) return
       const key = event.key
       let handled = true
       if (
@@ -336,14 +334,14 @@ export function PresentationPlayer({ engine, excalidrawAPI, initialFrameId = nul
     }
     document.addEventListener('keydown', handleKeyDown, true)
     return () => document.removeEventListener('keydown', handleKeyDown, true)
-  }, [isFrontmost, navigateTo, showDeck, step, toggleTools, toolsVisible])
+  }, [inFront, navigateTo, showDeck, step, toggleTools, toolsVisible])
 
   // Double-click the canvas → present the smallest slide under the pointer. Captured on the
   // document so the engine never sees the dblclick (which would otherwise start a text element or
   // edit a shape).
   useEffect(() => {
     const handleDoubleClick = (event: MouseEvent) => {
-      if (didExitRef.current || !isFrontmost() || isTextEntryTarget(event.target)) return
+      if (didExitRef.current || !inFront() || isTextEntryTarget(event.target)) return
       const index = findSlideIndexAtPoint(engine.viewportCoordsToSceneCoords(event, excalidrawAPI.getAppState() as never), slidesRef.current)
       if (index === null) return
       event.preventDefault()
@@ -353,7 +351,7 @@ export function PresentationPlayer({ engine, excalidrawAPI, initialFrameId = nul
     }
     document.addEventListener('dblclick', handleDoubleClick, true)
     return () => document.removeEventListener('dblclick', handleDoubleClick, true)
-  }, [engine, excalidrawAPI, isFrontmost, navigateTo])
+  }, [engine, excalidrawAPI, inFront, navigateTo])
 
   // The reserve is a fraction of the PANE, so the pane changing size — the window resizing, or the
   // shell sidebar opening beside it — has to re-fit. Instantly: a resize is not a navigation.
@@ -409,4 +407,3 @@ export function PresentationPlayer({ engine, excalidrawAPI, initialFrameId = nul
   )
 }
 
-export type { OrderedPresentationFrame }

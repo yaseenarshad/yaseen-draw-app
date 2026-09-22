@@ -1,5 +1,5 @@
 /**
- * File path in the URL hash (GRO-2069 Q5): the open file shows as `#/abs/path.md` so the
+ * File path in the URL hash (GRO-2069 Q5): the open file shows as `#/abs/path.excalidraw` so the
  * URL is readable/copyable and a pasted URL reopens that exact file. Written with
  * `history.replaceState` (no back-button spam); on boot the hash wins over the stored
  * last-file (App.tsx). `encodeURI` keeps `/` readable and encodes spaces.

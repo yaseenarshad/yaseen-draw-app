@@ -1,5 +1,5 @@
 /**
- * THE RAIL (YAZ-1775 🔒 D10): the canvas's top-left row, where the engine's own menu trigger used
+ * THE RAIL (🔒 YAZ-1775 D10): the canvas's top-left row, where the engine's own menu trigger used
  * to be (`drawingEditor.css` hides that, the web app's rule). Three controls and nothing else:
  *
  * - the HAMBURGER, which toggles the in-canvas workspace panel (`CanvasSidebar.tsx`) — open on the
@@ -9,7 +9,7 @@
  * - WRITING and FRAMES, two icon toggles with tooltip labels, so flipping into pen mode never
  *   costs a panel. The panel's three tabs are its own strip, so the rail launches nothing else.
  *
- * THE TOGGLES WRITE A PREFERENCE, NOT THE ENGINE (🔒 D9). Both are `SettingsState.canvas` keys:
+ * THE TOGGLES WRITE A PREFERENCE, NOT THE ENGINE (🔒 YAZ-1775 D9). Both are `SettingsState.canvas` keys:
  * the rail reports the new value up, the shell stores it, the value comes back down as a prop and
  * the surface applies it to the engine. That is the same round trip Settings › Canvas takes, which
  * is why the two can never disagree — there is one value and one path, not two.

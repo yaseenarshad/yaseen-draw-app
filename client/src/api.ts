@@ -1,4 +1,4 @@
-import type { ComponentItem, ComponentReadResponse, ComponentRenameRequest, ComponentSaveRequest, ComponentSlugRequest, DrawingLoadRequest, DrawingLoadResponse, DrawingSaveRequest, DrawingSaveResponse, BridgeError, BridgeErrorCode, CreateDirResponse, CreateFileRequest, CreateFileResponse, DeleteRequest, DeleteResponse, FileClipRequest, FileClipState, FileResponse, FileWriteRequest, FileWriteResponse, GithubSyncStatus, MediaFavoritesRequest, MediaImportRequest, MediaImportResponse, MediaPreviewRequest, MediaPreviewResponse, MediaRecentRequest, MediaSearchRequest, MediaSearchResponse, OpenDrawingResponse, OpenLinkRequest, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, RevealRequest, RevealResponse, SaveDrawingRequest, SaveDrawingResponse, SecretHasRequest, SecretSetRequest, StoredMediaItem, TreeResponse } from '@shared/types'
+import type { BridgeError, BridgeErrorCode, ComponentItem, ComponentReadResponse, ComponentRenameRequest, ComponentSaveRequest, ComponentSlugRequest, CreateDirResponse, CreateFileRequest, CreateFileResponse, DeleteRequest, DeleteResponse, DrawingLoadRequest, DrawingLoadResponse, DrawingSaveRequest, DrawingSaveResponse, FileClipRequest, FileClipState, GithubSyncStatus, MediaFavoritesRequest, MediaImportRequest, MediaImportResponse, MediaPreviewRequest, MediaPreviewResponse, MediaRecentRequest, MediaSearchRequest, MediaSearchResponse, OpenDrawingResponse, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, RevealRequest, RevealResponse, SaveDrawingRequest, SaveDrawingResponse, SecretHasRequest, SecretSetRequest, StoredMediaItem, TreeResponse } from '@shared/types'
 
 /** Typed failure from the main process (see docs/CONTRACTS.md "Bridge API"). */
 export class BridgeRequestError extends Error {
@@ -32,8 +32,6 @@ async function call<T>(fn: () => Promise<T>): Promise<T> {
 /** The fs half of `window.yaseenDraw`, with rejections wrapped in `BridgeRequestError`. */
 export const api = {
   tree: (root: string) => call<TreeResponse>(() => window.yaseenDraw.tree(root)),
-  readFile: (path: string) => call<FileResponse>(() => window.yaseenDraw.readFile(path)),
-  writeFile: (body: FileWriteRequest) => call<FileWriteResponse>(() => window.yaseenDraw.writeFile(body)),
   createDir: (path: string) => call<CreateDirResponse>(() => window.yaseenDraw.createDir(path)),
   createFile: (req: string | CreateFileRequest) => call<CreateFileResponse>(() => window.yaseenDraw.createFile(req)),
   /** In-app rename: file rename/move or folder rename, never overwrites (Links E1 GRO-2194, E1b GRO-2241). */
@@ -54,8 +52,6 @@ export const api = {
   openVsCode: (req: RevealRequest) => call<RevealResponse>(() => window.yaseenDraw.shell.openVsCode(req)),
   /** Open in the OS default app (YAZ-1577) — how a row with no in-app viewer opens; stale path → NOT_FOUND. */
   openDefault: (req: RevealRequest) => call<RevealResponse>(() => window.yaseenDraw.shell.openDefault(req)),
-  /** Open an external link target through the OS; main owns validation and resolution. */
-  openLink: (req: OpenLinkRequest) => call<void>(() => window.yaseenDraw.shell.openLink(req)),
   /**
    * The drawing DOCUMENT's two doors (🔒 YAZ-1810). Everything a `.excalidraw` tab reads and
    * writes goes through these two calls and no other — the scene and the bytes it names travel
@@ -64,7 +60,7 @@ export const api = {
   drawing: {
     load: (req: DrawingLoadRequest) => call<DrawingLoadResponse>(() => window.yaseenDraw.drawing.load(req)),
     save: (req: DrawingSaveRequest) => call<DrawingSaveResponse>(() => window.yaseenDraw.drawing.save(req)),
-    /** The RESOLVED library folder (🔒 D5): the setting, or `<userData>/library` — main's answer. */
+    /** The RESOLVED library folder (🔒 YAZ-1775 D5): the setting, or `<userData>/library` — main's answer. */
     libraryFolder: () => call<string>(() => window.yaseenDraw.drawing.libraryFolder()),
   },
   /** Native open-directory dialog parented to this window; resolves when the user picks or cancels. */
@@ -72,7 +68,7 @@ export const api = {
   /** Native file dialogs (YAZ-1833): `openDrawing()` picks one `.excalidraw` and answers its bytes. */
   dialog: {
     openDrawing: () => call<OpenDrawingResponse>(() => window.yaseenDraw.dialog.openDrawing()),
-    /** Pick a destination and write a standalone `.excalidraw` there — dialog AND write in one call (🔒 D3). */
+    /** Pick a destination and write a standalone `.excalidraw` there — dialog AND write in one call (🔒 YAZ-1775 D3). */
     saveDrawing: (req: SaveDrawingRequest) => call<SaveDrawingResponse>(() => window.yaseenDraw.dialog.saveDrawing(req)),
   },
   /** The Favorites list over `.yaseendraw/favorites.json` (YAZ-1766 6A): absolute paths in the user's order; a malformed file rejects `set` with INVALID_CONFIG. */
@@ -81,21 +77,21 @@ export const api = {
     set: (root: string, paths: readonly string[]) => call<void>(() => window.yaseenDraw.favorites.set(root, paths)),
     onChanged: (listener: (change: { root: string }) => void) => window.yaseenDraw.favorites.onChanged(listener),
   },
-  /** The cross-vault media library over `<library>/media.json` (🔒 D4 / D5, YAZ-1817): pointers only; every verb answers the list it produced. */
+  /** The cross-vault media library over `<library>/media.json` (🔒 YAZ-1775 D4 / D5, YAZ-1817): pointers only; every verb answers the list it produced. */
   media: {
     favorites: (req: MediaFavoritesRequest) => call<StoredMediaItem[]>(() => window.yaseenDraw.media.favorites(req)),
     recent: (req: MediaRecentRequest) => call<StoredMediaItem[]>(() => window.yaseenDraw.media.recent(req)),
     /** Fired in EVERY window when `media.json` changes — this app's write, another vault's window, or a synced edit. */
     onChanged: (listener: () => void) => window.yaseenDraw.media.onChanged(listener),
-    /** Federated provider search (🔒 D4, YAZ-1818): Iconify always, Pixabay when a key is set — `pixabayAvailable` says which. */
+    /** Federated provider search (🔒 YAZ-1775 D4, YAZ-1818): Iconify always, Pixabay when a key is set — `pixabayAvailable` says which. */
     search: (req: MediaSearchRequest) => call<MediaSearchResponse>(() => window.yaseenDraw.media.search(req)),
     /** One tile's picture as a dataURL, served from main's 24 h disk cache when it is there. */
     preview: (req: MediaPreviewRequest) => call<MediaPreviewResponse>(() => window.yaseenDraw.media.preview(req)),
-    /** The full-size bytes to insert — never cached, because they are about to become an `assets/` file (🔒 D3). */
+    /** The full-size bytes to insert — never cached, because they are about to become an `assets/` file (🔒 YAZ-1775 D3). */
     import: (req: MediaImportRequest) => call<MediaImportResponse>(() => window.yaseenDraw.media.import(req)),
   },
   /**
-   * The cross-vault saved-component library over `<library>/components/` (🔒 D5, YAZ-1819): a
+   * The cross-vault saved-component library over `<library>/components/` (🔒 YAZ-1775 D5, YAZ-1819): a
    * component is a whole `.excalidraw` fragment with its image bytes embedded, plus a PNG preview,
    * indexed by `<library>/components.json`. Every mutation answers what it produced, and
    * `onChanged` fires in every window whichever vault it is on.
@@ -110,7 +106,7 @@ export const api = {
     preview: (req: ComponentSlugRequest) => call<string>(() => window.yaseenDraw.components.preview(req)),
     onChanged: (listener: () => void) => window.yaseenDraw.components.onChanged(listener),
   },
-  /** The secrets door (🔒 D4): write and ask, never read. `set` rejects ENCRYPTION_UNAVAILABLE without an OS keychain. */
+  /** The secrets door (🔒 YAZ-1775 D4): write and ask, never read. `set` rejects ENCRYPTION_UNAVAILABLE without an OS keychain. */
   secrets: {
     set: (req: SecretSetRequest) => call<void>(() => window.yaseenDraw.secrets.set(req)),
     has: (req: SecretHasRequest) => call<boolean>(() => window.yaseenDraw.secrets.has(req)),

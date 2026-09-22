@@ -1,14 +1,13 @@
 /**
  * The sidebar's inline create box. Since YAZ-1604 it can start with a SEED (`09_14- `): the seed
  * is shown as the value with the caret at its end, and Enter on the untouched seed is a no-op —
- * the box stays open — so a bare date folder is never born by accident (🔒 D3).
+ * the box stays open — so a bare date folder is never born by accident (🔒 YAZ-1604 D3).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { CreateInline } from './CreateInline'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 let root: Root | null = null
 let container: HTMLElement | null = null

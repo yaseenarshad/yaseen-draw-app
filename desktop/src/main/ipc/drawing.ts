@@ -9,7 +9,7 @@
  * the conflict bar when dirty). One writer telling the others what to think would be a second,
  * competing truth about a file the disk already answers for.
  *
- * THE ORPHAN SWEEP (🔒 D3, YAZ-1811) is not an IPC of its own. `ipc/fs.ts` calls
+ * THE ORPHAN SWEEP (🔒 YAZ-1775 D3, YAZ-1811) is not an IPC of its own. `ipc/fs.ts` calls
  * `sweepVaultOnce` after answering the FIRST `fs:tree` for a root in this session — the moment a
  * vault is "opened" — DETACHED, so the tree answer never waits on it, and its result rides the
  * requesting window's existing passive notice channel ("Cleaned N unused images"), and only when
@@ -26,7 +26,7 @@ import { handle } from './envelope'
 export function registerDrawingIpc(store: Store, userData: string): void {
   handle(CH.drawingLoad, loadDrawing)
   handle(CH.drawingSave, saveDrawing)
-  // 🔒 D5: read-only and store-backed — the setting is the renderer's to WRITE (through
+  // 🔒 YAZ-1775 D5: read-only and store-backed — the setting is the renderer's to WRITE (through
   // `state:set-settings`, like every other setting); this only says where it points.
   handle(CH.drawingLibraryFolder, async () => resolveLibraryFolder(store.get().settings.libraryFolder, userData))
 }

@@ -19,11 +19,11 @@ interface UseMenuEventsOptions {
   onNextTab: () => void
   /** Window › Previous Tab (⌃⇧Tab / ⌘⇧[): activate the tab to the left, wrapping (GRO-2234). */
   onPrevTab: () => void
-  /** File › Export Image… (⌘⇧E, 🔒 D10): the visible drawing opens the engine's export dialog. */
+  /** File › Export Image… (⌘⇧E, 🔒 YAZ-1775 D10): the visible drawing opens the engine's export dialog. */
   onExportImage: () => void
-  /** View › Canvas Background › a pick (🔒 D10): the visible drawing takes `color`. */
+  /** View › Canvas Background › a pick (🔒 YAZ-1775 D10): the visible drawing takes `color`. */
   onCanvasBackground: (color: string) => void
-  /** File › Export Drawing… (⌘⇧S, 🔒 D3): the visible drawing writes a standalone `.excalidraw`. */
+  /** File › Export Drawing… (⌘⇧S, 🔒 YAZ-1775 D3): the visible drawing writes a standalone `.excalidraw`. */
   onExportDrawing: () => void
 }
 

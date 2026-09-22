@@ -1,5 +1,5 @@
 /**
- * The media library's RULES (🔒 D4 / D5, YAZ-1817), TDD'd with no Electron and no disk: what a
+ * The media library's RULES (🔒 YAZ-1775 D4 / D5, YAZ-1817), TDD'd with no Electron and no disk: what a
  * valid item is, and what add / remove / record do to the two lists. The main-process module
  * around this (`desktop/src/main/library/mediaStore.ts`) only reads, writes and watches the file.
  *

@@ -1,8 +1,8 @@
 /*
  * The settings dialog (YAZ-1679) — classes applied by SettingsDialog.tsx, SettingRow.tsx and the
  * registry's controls. Obsidian's shape: a centred sheet, page nav + search down the left, the
- * page's rows on the right. The overlay repeats the drawing modal's (drawingModal.css): fixed,
- * centred, the same scrim, the same z-index — one modal is open at a time, and this is it.
+ * page's rows on the right. Fixed, centred, its own scrim — one modal is open at a time, and
+ * this is it.
  *
  * Everything is themed through app.css's tokens, so the `[data-theme='dark']` block there covers
  * this file without a dark rule of its own.
@@ -199,13 +199,8 @@
   color: var(--fg);
 }
 
-.settings-group__hint {
-  margin: 3px 0 0;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--fg-muted);
-}
-
+/* A group's hint and a row's hint are the same line of small grey type in two places. */
+.settings-group__hint,
 /* The card: 18px inset for the row text; the rows' own padding gives the vertical rhythm. */
 .settings-group__card {
   padding: 6px 18px;
@@ -258,13 +253,6 @@
 }
 
 /* Sub-label under a setting whose consequence is not obvious from the switch (GRO-2272). */
-.setting__hint {
-  margin: 3px 0 0;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--fg-muted);
-}
-
 .setting__control {
   flex: none;
   display: flex;
@@ -344,7 +332,7 @@
   transform: translateY(-50%);
   pointer-events: none;
   background: var(--fg-muted);
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2.5 3.75 2.5 2.5 2.5-2.5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%YAZ-1821%3Cpath d='m2.5 3.75 2.5 2.5 2.5-2.5'/%YAZ-1821%YAZ-1819/svg%YAZ-1821") center / contain no-repeat;
 }
 
 /* ---------- hotkey reference (GRO-2067) — one table per Hotkeys group ---------- */
@@ -380,7 +368,7 @@
 }
 
 /*
- * The number field (Settings › Canvas's two pen widths, 🔒 D9): the `Select` pill's geometry,
+ * The number field (Settings › Canvas's two pen widths, 🔒 YAZ-1775 D9): the `Select` pill's geometry,
  * narrow enough that "0.5" and "2" read as the small numbers they are. The spinner is left alone —
  * stepping by 0.1 is exactly the gesture these want.
  */
@@ -404,14 +392,14 @@
   width: 5.5rem;
 }
 
-/* The secret field (Settings › Images › Pixabay API key, 🔒 D4): a pasted key is long, and it sits in the button row. */
+/* The secret field (Settings › Images › Pixabay API key, 🔒 YAZ-1775 D4): a pasted key is long, and it sits in the button row. */
 .settings__input--secret {
   flex: 1 1 12rem;
   min-width: 0;
 }
 
 /*
- * The resolved path a row reports (Settings › Files › Library folder, 🔒 D5). It is the row's real
+ * The resolved path a row reports (Settings › Files › Library folder, 🔒 YAZ-1775 D5). It is the row's real
  * content, so it sits above the buttons in a `wide` row — long, monospaced, and allowed to wrap
  * anywhere rather than pushing the dialog sideways.
  */

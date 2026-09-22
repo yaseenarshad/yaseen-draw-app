@@ -1,6 +1,6 @@
 /**
  * Pure multi-select reducer (YAZ-1336, 🔒 D1): the sidebar's selection is a path-keyed
- * `ReadonlySet<string>` — toggle-accumulate is the ONLY building gesture (🔒 D2 amended:
+ * `ReadonlySet<string>` — toggle-accumulate is the ONLY building gesture (🔒 YAZ-1336 D2 amended:
  * Yasin ruled toggle, range is out of v1). Reference-equality bailouts matter: Sidebar
  * feeds this to React state, so a no-op action must return the SAME set to skip a render.
  */
@@ -70,7 +70,7 @@ describe('orderedSelection (YAZ-1337, as ⚡ YAZ-1338 rules it)', () => {
     expect(orderedSelection(selected, panel('/v/a.md'))).toEqual(['/v/a.md', '/v/sub/hidden.md'])
   })
 
-  it('counts one path ONCE however many rows draw it (🔒 D3: a page under two parents)', () => {
+  it('counts one path ONCE however many rows draw it (🔒 YAZ-1336 D3: a page under two parents)', () => {
     expect(orderedSelection(new Set(['/v/Shared.md']), panel('/v/Shared.md', '/v/Shared.md'))).toEqual(['/v/Shared.md'])
   })
 

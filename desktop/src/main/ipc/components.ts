@@ -1,5 +1,5 @@
 /**
- * The `components.*` half of `window.yaseenDraw` (🔒 D5, YAZ-1819): the library's component store
+ * The `components.*` half of `window.yaseenDraw` (🔒 YAZ-1775 D5, YAZ-1819): the library's component store
  * behind the envelope, plus the ONE push. `components:changed` carries no payload — every window
  * re-lists, whichever vault it is on, because the library is the same folder for all of them.
  *
@@ -17,10 +17,17 @@ import { CH } from '../../channels'
 import { BridgeFailure } from '../fs/fsUtils'
 import { resolveLibraryFolder } from '../library/folder'
 import { createComponentStore, type ComponentStore } from '../library/componentStore'
-import { isRecord, type Store } from '../store'
+import { isRecord } from '@shared/guards'
+import type { Store } from '../store'
 import { broadcastAll } from './broadcast'
 import { handle } from './envelope'
 
+/**
+ * The SHAPE guard only — "is this field a non-empty string" — because the request crosses IPC
+ * from a sandboxed renderer and arrives as `unknown`. What the value MEANS (a real slug, a usable
+ * name, a PNG dataURL) is the store's, which is the only layer that can answer it; the messages
+ * agree on purpose, so a caller cannot tell which layer refused.
+ */
 function requireString(v: unknown, field: string): string {
   if (typeof v !== 'string' || v === '') throw new BridgeFailure('BAD_REQUEST', `'${field}' must be a non-empty string`)
   return v

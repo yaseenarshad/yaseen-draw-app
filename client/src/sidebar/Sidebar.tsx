@@ -75,16 +75,14 @@ interface SidebarProps {
   onFileMissing: () => void
   /**
    * Context-menu "Rename" committed (files E1 GRO-2194, folders E1b GRO-2241) — and the
-   * drag-a-file-onto-a-folder move (E1b) lands here too, as a plain old→new rename: App
-   * orchestrates flush → index/tree snapshots → `fs:rename` → link rewrites, and routes ANY
-   * failure to the passive notice — this promise never rejects, so the inline input just
-   * closes.
+   * drag-a-file-onto-a-folder move (E1b) lands here too, as a plain old→new rename: App flushes
+   * the open editor(s), calls `fs:rename`, and routes ANY failure to the passive notice — this
+   * promise never rejects, so the inline input just closes.
    */
   onRenameFile: (oldPath: string, newPath: string, kind: TreeNode['type']) => Promise<void>
   /**
    * Context-menu "Delete" confirmed (GRO-2272): App moves the entry to the system Trash and
-   * routes ANY failure to the passive notice — this promise never rejects, so the sheet just
-   * closes. No link rewriting happens downstream (LOCKED decision C).
+   * routes ANY failure to the passive notice — this promise never rejects, so the sheet just closes.
    */
   onDeleteFile: (path: string) => Promise<void>
   /** Show a transient, unobtrusive message — never a dialog (E1, GRO-2171). App owns the banner. */
@@ -98,20 +96,11 @@ interface SidebarProps {
   /** The focus above happened (YAZ-801); App clears its flag so the next ⌘K is a fresh request. */
   onSearchFocusHandled: () => void
   /**
-   * ⌘⇧C's read-only window onto the multi-selection (🔒 D4, YAZ-1338). The state stays HERE
-   * (🔒 D1) — it is per root and dies with the panel — but the CHORD is App's: this component is
-   * unmounted while the sidebar is collapsed, and a shortcut that stops existing when a panel is
-   * hidden is not a window shortcut. So the Sidebar writes its current selection into this box on
-   * every render and empties it on unmount, and App only ever reads it — a ref, not state,
-   * precisely so keeping App able to answer costs this tree no render at all.
-   */
-  selectionRef: { current: ReadonlySet<string> }
-  /**
-   * The file clipboard's two verbs for App's ⌘C / ⌘X / ⌘V listener (D6 amended, YAZ-1674) —
-   * `selectionRef`'s idiom, the other way round: App owns the LISTENER (the same reason as ⌘⇧C:
-   * focus after a click may sit in the editor or nowhere focusable, so a panel listener never
-   * heard the key) and this component owns the RULES, behind a handle rewritten whenever a rule
-   * input changes and emptied on unmount. Each verb answers whether it acted, so App knows what to swallow.
+   * The file clipboard's two verbs for App's ⌘C / ⌘X / ⌘V listener (D6 amended, YAZ-1674). App
+   * owns the LISTENER — this component is unmounted while the sidebar is collapsed, and focus
+   * after a click may sit in the canvas or nowhere focusable, so a panel listener never hears the
+   * key — and this component owns the RULES, behind a handle rewritten whenever a rule input
+   * changes and emptied on unmount. Each verb answers whether it acted, so App knows what to swallow.
    */
   clipboardRef: { current: SidebarClipboard | null }
 }
@@ -281,7 +270,6 @@ export function Sidebar({
   onNotice,
   pendingSearchFocus,
   onSearchFocusHandled,
-  selectionRef,
   clipboardRef,
 }: SidebarProps) {
   const [tree, setTree] = useState<TreeResponse | null>(null)
@@ -304,7 +292,7 @@ export function Sidebar({
   const [reorderDragging, setReorderDragging] = useState<string | null>(null)
   const [reorderOver, setReorderOver] = useState<{ path: string; edge: 'before' | 'after' } | null>(null)
   // Multi-select (YAZ-1336, 🔒 D1): the selected PATHS — files and, since YAZ-1578, folders —
-  // shared by BOTH lenses, one entry per path however many rows draw it (🔒 D3). It lives HERE
+  // shared by BOTH lenses, one entry per path however many rows draw it (🔒 YAZ-1336 D3). It lives HERE
   // and nowhere else on purpose: this component is mounted `key={root}` and only while the
   // sidebar is open, so a selection is honestly about rows currently on screen and cannot
   // outlive them (a collapse ends it).
@@ -344,7 +332,7 @@ export function Sidebar({
   const favoriteDirs = useMemo(() => allDirs(favoriteNodes), [favoriteNodes])
   // What the chevrons button unfolds on the two disk-reading lenses.
   const bodyDirs = lens === 'favorites' ? favoriteDirs : shownDirs
-  // ⌘K's feed (2H, YAZ-1814): the ONE tree this panel already holds and the watcher already keeps
+  // ⌘K's feed (YAZ-1814): the ONE tree this panel already holds and the watcher already keeps
   // fresh — the catalog walk lives in `search/`, is lazy until the first query, and drops
   // non-drawing files and (through `fs:tree`) the image store.
   const results = useSearchResults(root, query, tree?.tree ?? null)
@@ -352,7 +340,7 @@ export function Sidebar({
   // instead of the tree. A conditional render, not a teardown — every bit of tree state (data,
   // expansion, pending create/rename, drag) lives here and is waiting untouched when it clears.
   const searching = query.trim() !== ''
-  // An index refresh can shrink the list under the keyboard's index (F1 finding 2, YAZ-808), so
+  // A tree refresh can shrink the list under the keyboard's index (F1 finding 2, YAZ-808), so
   // every reader of the selection clamps: the highlight lands on the last row, not on nowhere.
   const sel = Math.min(selected, results.length - 1)
 
@@ -473,8 +461,9 @@ export function Sidebar({
   }, [root, activeFile])
 
   // Focus Mode (YAZ-1605): a focus target that left the vault DROPS OUT — deleted or moved out —
-  // and the last one leaving ends the focus: never an empty tree under a lit eye. The store repairs the FILE on delete; this component holds its own copy, so it prunes
-  // against the live tree / index itself, exactly as the selection does above.
+  // and the last one leaving ends the focus: never an empty tree under a lit eye. The store repairs
+  // the FILE on delete; this component holds its own copy, so it prunes against the live tree
+  // itself, exactly as the selection does above.
   useEffect(() => {
     if (tree === null || focusDirs.length === 0) return
     const kept = focusDirs.filter((dir) => findDirNode(tree.tree, dir) !== null)
@@ -504,16 +493,6 @@ export function Sidebar({
     if (tree === null) return
     dispatchSelection({ type: 'prune', exists: (path) => treeHasPath(tree.tree, path) })
   }, [tree])
-
-  // ⌘⇧C's window onto the selection (🔒 D4, YAZ-1338): App holds the box, this panel keeps it
-  // current — and EMPTIES it on the way out, so a collapsed or root-switched sidebar can never
-  // hand the chord a selection nobody can see. A ref, so this costs no render on either side.
-  useEffect(() => {
-    selectionRef.current = selectedPaths
-    return () => {
-      selectionRef.current = EMPTY_SELECTION
-    }
-  }, [selectionRef, selectedPaths])
 
   // A Files reveal targets a file — or, since a folder search row (🔒 D3, YAZ-1491), a DIR of the
   // tree. Both questions are asked once here and read by the two steps below.
@@ -553,7 +532,7 @@ export function Sidebar({
   // EXTERNALLY while it is being edited stays open and is recreated by the next save — an
   // IN-APP delete never reaches here, it closes tabs through the `file:deleted` broadcast
   // which retires the editor first (GRO-2272); do not unify the two. Files OUTSIDE the
-  // root (opened via a pasted `#/abs/path.md` URL, GRO-2069) are never in the tree — skip them.
+  // root (opened via a pasted `#/abs/path.excalidraw` URL, GRO-2069) are never in the tree — skip them.
   const validated = useRef(false)
   useEffect(() => {
     if (tree === null || validated.current) return
@@ -597,8 +576,8 @@ export function Sidebar({
    * rows on screen first, in the order the eye reads them — never click order, which is not an
    * order the user can see — and every still-selected path with no row appended after them, so
    * collapsing a folder over a selected file hides the row and keeps the file. The one rule lives
-   * in `orderedSelection`, which ⌘⇧C reads too: the menu and the chord cannot spell one selection
-   * two ways.
+   * in `orderedSelection`, which the clipboard chords read too: the menu and the chords cannot
+   * spell one selection two ways.
    */
   const orderedSelectedPaths = useCallback((): string[] => orderedSelection(selectedPaths, bodyRef.current), [selectedPaths])
 
@@ -614,7 +593,7 @@ export function Sidebar({
       // root, and a right-click into the empty space below the tree must not throw a selection away.
       if (node !== null && !selectedPaths.has(node.path)) dispatchSelection({ type: 'set', path: node.path })
       // The plural gesture exists only when the right-clicked row — file or folder (YAZ-1578) — is
-      // ITSELF in a selection of two or more (🔒 D5): a selection of one already IS the singular
+      // ITSELF in a selection of two or more (🔒 YAZ-1337 D5): a selection of one already IS the singular
       // menu, and a row outside the selection just ended it above. Read once, here, like every
       // other target this menu pins.
       const plural = node !== null && selectedPaths.has(node.path) && selectedPaths.size >= 2 ? orderedSelectedPaths() : null
@@ -660,7 +639,7 @@ export function Sidebar({
   // ---- Cut / Copy / Paste (YAZ-1674) ----
 
   /**
-   * Main's ONE app-wide file clipboard (🔒 D1): `{ count, op }` or null, pushed to every window on
+   * Main's ONE app-wide file clipboard (🔒 YAZ-1674 D1): `{ count, op }` or null, pushed to every window on
    * every change, so a menu opened here can label "Paste N items" for a copy made in another
    * window on another vault. Session-only, never persisted. A window opened AFTER a clip reads the
    * current state ONCE on mount (`clipState`), so its Paste is labelled from the start.
@@ -688,7 +667,7 @@ export function Sidebar({
   }, [])
 
   /**
-   * Cut / Copy: hand the ordered paths to main (🔒 D1) and SAY SO — every clipboard write confirms
+   * Cut / Copy: hand the ordered paths to main (🔒 YAZ-1674 D1) and SAY SO — every clipboard write confirms
    * (YAZ-1341), and a refusal is reported, never swallowed. The selection stands: acting on it is
    * not the same as ending it (YAZ-1337).
    */
@@ -704,7 +683,7 @@ export function Sidebar({
   )
 
   /**
-   * Paste into `dir` (🔒 D2–D4): PER-ENTRY results, so one bad entry never hides the rest — the
+   * Paste into `dir` (🔒 YAZ-1674 D2–D4): PER-ENTRY results, so one bad entry never hides the rest — the
    * notice counts both halves and names the first failure. The target opens (the synthetic-child
    * idiom `startCreate` uses) and the tree refreshes EXPLICITLY: a copy moves nothing, so no
    * `fileRenamed` broadcast repairs it, and the watcher's add echo is a courtesy, not a contract
@@ -744,8 +723,8 @@ export function Sidebar({
    * The chords' handle (D6 amended, YAZ-1674): App's window listener asks these two verbs; the
    * rules stay HERE. Cut / Copy need a selection ≥1 (since D9 a plain click is one); Paste needs
    * a non-empty clipboard; an open context menu owns the verbs outright (its items ARE them).
-   * Rewritten whenever a rule input changes, emptied on unmount (`selectionRef`'s idiom) — a
-   * collapsed sidebar has no tree to paste into or read an order from.
+   * Rewritten whenever a rule input changes and emptied on unmount — a collapsed sidebar has no
+   * tree to paste into or read an order from.
    */
   useEffect(() => {
     clipboardRef.current = {
@@ -784,7 +763,7 @@ export function Sidebar({
 
   /**
    * The favorite toggle (YAZ-1766 D3/D6): remove every path, or append the ones not yet pinned —
-   * insertion order, no duplicates. `isOn` arrives with the paths (the folder-page toggle's idiom).
+   * insertion order, no duplicates. `isOn` arrives with the paths, so the caller states the verb.
    * The toast confirms with its own glyph; `saveFavorites` persists.
    */
   const toggleFavorite = useCallback(
@@ -850,7 +829,7 @@ export function Sidebar({
   )
 
   /**
-   * "New drawing" (🔒 R1 on YAZ-1775, 2I): the ONE file-creation door in the app, and it does NOT
+   * "New drawing" (🔒 R1 on YAZ-1775, YAZ-1815): the ONE file-creation door in the app, and it does NOT
    * ask for a name. The board is born as `Untitled` (`Untitled 2`, `Untitled 3`… beside its
    * siblings), with the EMPTY SCENE in the same `wx` write (content-at-create, 🔒 YAZ-1810 — a
    * zero-byte `.excalidraw` is the corrupt case, not a new board), opens in the CURRENT tab, and
@@ -1092,7 +1071,7 @@ export function Sidebar({
       </div>
       {/* Lens tabs (🔒 D4/D5, YAZ-847; ⚡ D8 amended) — chrome v2 ROW 1, above the search bar:
           Files (the file explorer) ⇄ Favorites. The row stays VISIBLE and clickable during a
-          search, and switching lenses never touches the query (🔒 D5). `role="tab"` +
+          search, and switching lenses never touches the query (🔒 YAZ-847 D5). `role="tab"` +
           `aria-selected` only — no `aria-controls`/`tabpanel`, because the body below is shared
           with the flat search results and belongs to neither lens while a query is typed. */}
       <div className="sidebar__lenses" role="tablist" aria-label="Sidebar lens">
@@ -1146,7 +1125,7 @@ export function Sidebar({
           type="text"
           placeholder="Search"
           title="Search (⌘K)"
-          aria-label="Search notes"
+          aria-label="Search drawings"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value)
@@ -1161,7 +1140,7 @@ export function Sidebar({
               else e.currentTarget.blur()
               return
             }
-            // The bar keeps focus while the list is driven from it (YAZ-803). ↑/↓ WRAP (2H,
+            // The bar keeps focus while the list is driven from it (YAZ-803). ↑/↓ WRAP (YAZ-1814,
             // YAZ-1814): the list is capped at 50 and read top-down, so falling off the end is a
             // request for the other end — and ↑ from the top row is the cheapest way to the
             // bottom of a full list. Opening leaves the list up.
@@ -1212,7 +1191,7 @@ export function Sidebar({
         }}
       >
         {searching ? (
-          // A typed query replaces the ACTIVE TAB's body, whichever lens that is (🔒 D5).
+          // A typed query replaces the ACTIVE TAB's body, whichever lens that is (🔒 YAZ-847 D5).
           results.length > 0 ? (
             <SearchResults results={results} selected={sel} onSelect={setSelected} onActivate={activate} />
           ) : (
@@ -1251,7 +1230,7 @@ export function Sidebar({
             {error !== null && <p className="sidebar__msg sidebar__msg--error">{error}</p>}
             {tree === null && error === null && <p className="sidebar__msg">Loading…</p>}
             {tree !== null && tree.tree.length === 0 && pending === null && (
-              <p className="sidebar__msg">No notes here.</p>
+              <p className="sidebar__msg">No drawings here.</p>
             )}
             {tree !== null && (
               <Tree

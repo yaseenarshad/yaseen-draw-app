@@ -10,8 +10,8 @@ import { relativeTime } from './lib/relativeTime'
  * visible with its "Folder not found" note after App drops the MRU entry.
  */
 
-/** The row's "2 hours ago" is `lib/relativeTime` (shared with the comment stream since YAZ-1472); the old name stays for its test. */
-export { relativeTime as relativeLastOpened }
+/** The row's "2 hours ago". */
+export { relativeTime }
 
 interface WelcomeProps {
   /** MRU order, straight from `AppState.recents`. */
