@@ -1,4 +1,4 @@
-import type { DrawingLoadRequest, DrawingLoadResponse, DrawingSaveRequest, DrawingSaveResponse, BridgeError, BridgeErrorCode, CreateDirResponse, CreateFileRequest, CreateFileResponse, DeleteRequest, DeleteResponse, FileClipRequest, FileClipState, FileResponse, FileWriteRequest, FileWriteResponse, GithubSyncStatus, MediaFavoritesRequest, MediaRecentRequest, OpenLinkRequest, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, RevealRequest, RevealResponse, SecretHasRequest, SecretSetRequest, StoredMediaItem, TreeResponse } from '@shared/types'
+import type { DrawingLoadRequest, DrawingLoadResponse, DrawingSaveRequest, DrawingSaveResponse, BridgeError, BridgeErrorCode, CreateDirResponse, CreateFileRequest, CreateFileResponse, DeleteRequest, DeleteResponse, FileClipRequest, FileClipState, FileResponse, FileWriteRequest, FileWriteResponse, GithubSyncStatus, MediaFavoritesRequest, MediaImportRequest, MediaImportResponse, MediaPreviewRequest, MediaPreviewResponse, MediaRecentRequest, MediaSearchRequest, MediaSearchResponse, OpenLinkRequest, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, RevealRequest, RevealResponse, SecretHasRequest, SecretSetRequest, StoredMediaItem, TreeResponse } from '@shared/types'
 
 /** Typed failure from the main process (see docs/CONTRACTS.md "Bridge API"). */
 export class BridgeRequestError extends Error {
@@ -81,6 +81,12 @@ export const api = {
     recent: (req: MediaRecentRequest) => call<StoredMediaItem[]>(() => window.yaseenDraw.media.recent(req)),
     /** Fired in EVERY window when `media.json` changes — this app's write, another vault's window, or a synced edit. */
     onChanged: (listener: () => void) => window.yaseenDraw.media.onChanged(listener),
+    /** Federated provider search (🔒 D4, YAZ-1818): Iconify always, Pixabay when a key is set — `pixabayAvailable` says which. */
+    search: (req: MediaSearchRequest) => call<MediaSearchResponse>(() => window.yaseenDraw.media.search(req)),
+    /** One tile's picture as a dataURL, served from main's 24 h disk cache when it is there. */
+    preview: (req: MediaPreviewRequest) => call<MediaPreviewResponse>(() => window.yaseenDraw.media.preview(req)),
+    /** The full-size bytes to insert — never cached, because they are about to become an `assets/` file (🔒 D3). */
+    import: (req: MediaImportRequest) => call<MediaImportResponse>(() => window.yaseenDraw.media.import(req)),
   },
   /** The secrets door (🔒 D4): write and ask, never read. `set` rejects ENCRYPTION_UNAVAILABLE without an OS keychain. */
   secrets: {
