@@ -8,8 +8,8 @@
  * makes the folder at startup, so the row's hint always names a directory that exists.
  *
  * Electron-free on purpose (userData comes in as an argument), so this unit-tests against a temp
- * dir. Nothing reads the CONTENTS yet: `<library>/media.json` and `<library>/components/` are
- * 3A / 3B / 3C's.
+ * dir. The CONTENTS are the siblings' business: `mediaStore.ts` owns `<library>/media.json` (3A),
+ * `<library>/components/` is 3C's.
  */
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'

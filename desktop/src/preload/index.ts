@@ -41,6 +41,8 @@ const api: YaseenDrawApi = {
     libraryFolder: () => call(CH.drawingLibraryFolder),
   },
   pickFolder: () => call(CH.dialogPickFolder),
+  // The import picker (YAZ-1833): a native open-file dialog that answers the picked file's bytes.
+  dialog: { openDrawing: () => call(CH.dialogOpenFile), saveDrawing: (req) => call(CH.dialogSaveFile, req) },
   watch: (root, listener) => {
     const id = crypto.randomUUID()
     const onEvent = (_e: unknown, msg: { id: string; ev: WatchEvent }) => {
@@ -93,6 +95,7 @@ const api: YaseenDrawApi = {
     // the focused window's active tab is a drawing.
     onExportImage: on<void>(CH.menuExportImage),
     onCanvasBackground: on<string>(CH.menuCanvasBackground),
+    onExportDrawing: on<void>(CH.menuExportDrawing),
   },
   // Deep links (E1, GRO-2171): main routes a yaseendraw:// URL to the best window.
   link: {
@@ -131,6 +134,31 @@ const api: YaseenDrawApi = {
     read: (root, name) => call(CH.vaultConfigRead, root, name),
     write: (root, name, value) => call(CH.vaultConfigWrite, root, name, value),
     onChange: on<VaultConfigChange>(CH.vaultConfigChanged),
+  },
+  // The cross-vault media library over `<library>/media.json` (🔒 D4 / D5, YAZ-1817): pointers only, every window hears every change.
+  media: {
+    favorites: (req) => call(CH.mediaFavorites, req),
+    recent: (req) => call(CH.mediaRecent, req),
+    onChanged: on<void>(CH.mediaChanged),
+    // The provider doors (🔒 D4, YAZ-1818): main holds the key, does the fetching and caches.
+    search: (req) => call(CH.mediaSearch, req),
+    preview: (req) => call(CH.mediaPreview, req),
+    import: (req) => call(CH.mediaImport, req),
+  },
+  // The cross-vault saved-component library over `<library>/components/` (🔒 D5, YAZ-1819).
+  components: {
+    list: () => call(CH.componentsList),
+    save: (req) => call(CH.componentsSave, req),
+    read: (req) => call(CH.componentsRead, req),
+    rename: (req) => call(CH.componentsRename, req),
+    delete: (req) => call(CH.componentsDelete, req),
+    preview: (req) => call(CH.componentsPreview, req),
+    onChanged: on<void>(CH.componentsChanged),
+  },
+  // The secrets door (🔒 D4): write and ask, never read — there is no channel that answers a value.
+  secrets: {
+    set: (req) => call(CH.secretsSet, req),
+    has: (req) => call(CH.secretsHas, req),
   },
   // Per-vault GitHub sync over `.yaseendraw/github.json` (YAZ-1081); every window gets every status.
   github: {

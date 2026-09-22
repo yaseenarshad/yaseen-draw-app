@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { SIDEBAR_MAX_W, SIDEBAR_MIN_W, type CanvasPanelState, type CanvasPrefs, type SettingsState, type SidebarLens, type TreeNode } from '@shared/types'
+import { SIDEBAR_MAX_W, SIDEBAR_MIN_W, type CanvasPanelState, type CanvasPrefs, type SettingsState, type SidebarLens } from '@shared/types'
 import { prefsEqual } from '@shared/canvasPrefs'
 import { api, BridgeRequestError } from './api'
 import { requestDrawingCommand } from './drawings/drawingCommand'
@@ -21,7 +21,6 @@ import { attentionCopy, buildSetupPrompt } from './lib/syncAttention'
 import { resolveTheme, useSystemPrefersDark } from './lib/theme'
 import { fileHash } from './lib/urlHash'
 import { windowTitle } from './lib/windowTitle'
-import { ConfirmRename, isNameChange } from './sidebar/ConfirmRename'
 import { SettingsDialog } from './settings/SettingsDialog'
 import { type SidebarClipboard, Sidebar } from './sidebar/Sidebar'
 import type { SidebarRevealRequest } from './sidebar/revealRow'
@@ -292,6 +291,7 @@ export function App() {
   // in front. Main greys both items out off a drawing tab, so a miss here is already impossible.
   const exportImage = useCallback(() => void requestDrawingCommand({ kind: 'export-image' }), [])
   const setCanvasBackground = useCallback((color: string) => void requestDrawingCommand({ kind: 'canvas-background', color }), [])
+  const exportDrawing = useCallback(() => void requestDrawingCommand({ kind: 'export-drawing' }), [])
   useMenuEvents({
     onOpenFolder: pick,
     onOpenRoot: openRoot,
@@ -304,6 +304,7 @@ export function App() {
     onPrevTab: prevTab,
     onExportImage: exportImage,
     onCanvasBackground: setCanvasBackground,
+    onExportDrawing: exportDrawing,
   })
 
   // Deep links (E1, GRO-2171): a routed link behaves like a sidebar click (Tabs rule 10) —
@@ -370,8 +371,12 @@ export function App() {
   )
 
   /**
-   * The sidebar's Rename/move commit (files E1, folders + drag-moves E1b): flush our own
-   * buffer(s) for the file — or every open editor under the folder — then rename. All failures
+   * THE ONE RENAME DOOR (files E1, folders + drag-moves E1b). Every rename gesture in the app —
+   * the sidebar's inline rename, its drag-move — arrives here as (oldPath, newPath), so the
+   * behaviour is written once. Flush our own buffer(s) for the file — or every open editor under
+   * the folder — then rename; the commit is the Enter, with no confirm in between (🔒 YAZ-1775:
+   * the sheet was deleted once wikilinks were gone — it warned about nothing, and every new
+   * `Untitled` board would have tripped it. Delete and move keep their confirms). All failures
    * land in the passive notice — never a dialog, never a rejection back into the inline input.
    */
   const renameFile = useCallback(
@@ -390,38 +395,6 @@ export function App() {
     },
     [root],
   )
-
-  /**
-   * THE ONE DOOR (⚡ YAZ-888, amending decision E / GRO-2096 for NAME changes). Every rename
-   * gesture in the app arrives here as (oldPath, newPath, kind) — the sidebar's inline rename
-   * and its drag-move — so the rule is asked ONCE, here, and no surface reimplements it: a
-   * changed NAME confirms first, a MOVE runs silently exactly as it always has (a confirm on
-   * every drag would be hostile).
-   */
-  const [pendingRename, setPendingRename] = useState<{ root: string; oldPath: string; newPath: string } | null>(null)
-  useLayoutEffect(() => {
-    setPendingRename(null)
-  }, [root])
-
-  const requestRename = useCallback(
-    async (oldPath: string, newPath: string, _kind: TreeNode['type']): Promise<void> => {
-      if (root === null) return
-      if (!isNameChange(oldPath, newPath)) return renameFile(oldPath, newPath)
-      setPendingRename({ root, oldPath, newPath })
-    },
-    [root, renameFile],
-  )
-
-  const confirmRename = useCallback(() => {
-    if (pendingRename === null) return
-    if (pendingRename.root !== root) {
-      setPendingRename(null)
-      return
-    }
-    const { oldPath, newPath } = pendingRename
-    setPendingRename(null)
-    void renameFile(oldPath, newPath)
-  }, [root, pendingRename, renameFile])
 
   /**
    * In-app delete landed (GRO-2272). Reaches EVERY window, originator included.
@@ -533,7 +506,7 @@ export function App() {
           onOpenSettings={openSettings}
           onRootMissing={onRootMissing}
           onFileMissing={onFileMissing}
-          onRenameFile={requestRename}
+          onRenameFile={renameFile}
           onDeleteFile={deleteFile}
           onNotice={notify}
           // The multi-selection box (🔒 D4): the panel keeps it current, the context menu reads it.
@@ -588,21 +561,12 @@ export function App() {
                   onCanvasPrefsChange={changeCanvasPrefs}
                   canvasPanel={settings.canvasPanel}
                   onCanvasPanelChange={changeCanvasPanel}
+                  onNotice={notify}
                 />
               </div>
             ))}
           </div>
         </div>
-      )}
-      {/* The name-change confirm (⚡ YAZ-888): App's, not the sidebar's, because the door is
-          App's — the title and the tree both reach it, and one sheet answers for both. */}
-      {pendingRename !== null && (
-        <ConfirmRename
-          oldPath={pendingRename.oldPath}
-          newPath={pendingRename.newPath}
-          onConfirm={confirmRename}
-          onCancel={() => setPendingRename(null)}
-        />
       )}
     </div>
   )

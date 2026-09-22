@@ -8,9 +8,11 @@
  * `id` doubles as the row's `data-setting` address — for the `SettingsState` rows it IS the field
  * name, so a test or spec that knows the field knows the row.
  *
- * GitHub sync (YAZ-1081 3B) is the ONE setting not in `SettingsState`: the switch lives per-vault
- * in `.yaseendraw/github.json`, read and written through the engine, so its section is
- * `available` only when App hands the engine's status + setter over.
+ * Two settings are NOT in `SettingsState`. GitHub sync (YAZ-1081 3B) lives per-vault in
+ * `.yaseendraw/github.json`, read and written through the engine, so its section is `available`
+ * only when App hands the engine's status + setter over. The Pixabay API key (🔒 D4) lives in
+ * main's encrypted `secrets.json` and is never in any renderer's state at all — its row writes
+ * through `secrets:set` and reads back only "set" / "not set".
  */
 import type { ReactNode } from 'react'
 import type { GithubSyncStatus, SettingsState } from '@shared/types'
@@ -19,6 +21,7 @@ import { Segmented } from './controls'
 import { HOTKEY_GROUPS, type HotkeyEntry } from './hotkeys'
 import { LibraryFolderControl, LibraryFolderHint } from './LibraryFolderControl'
 import { ON_OFF_OPTIONS, repoHint, THEME_OPTIONS } from './options'
+import { PixabayKeyControl } from './PixabayKeyControl'
 
 export interface SettingsCtx {
   settings: SettingsState
@@ -37,7 +40,7 @@ export interface SettingDef {
   render: (ctx: SettingsCtx) => ReactNode
 }
 
-export type SettingsSectionId = 'appearance' | 'canvas' | 'files' | 'sync' | 'hotkeys'
+export type SettingsSectionId = 'appearance' | 'canvas' | 'files' | 'images' | 'sync' | 'hotkeys'
 
 /** Rows that belong together under one sub-heading; no title = plain rows straight under the section. */
 export interface SettingsGroup {
@@ -128,6 +131,27 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
                 </div>
               </>
             ),
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'images',
+    title: 'Images',
+    groups: [
+      {
+        items: [
+          {
+            // 🔒 D4: the key is typed here once, encrypted by main, and never shown again. Its id is
+            // not a `SettingsState` field — the state file is broadcast to every window, and a key
+            // in it would be a key in every devtools console.
+            id: 'pixabayApiKey',
+            label: 'Pixabay API key',
+            hint: 'Stored encrypted on this machine and never shown again. Iconify needs no key.',
+            keywords: ['pixabay', 'api key', 'iconify', 'photos', 'icons', 'image studio', 'secret'],
+            wide: true,
+            render: () => <PixabayKeyControl />,
           },
         ],
       },

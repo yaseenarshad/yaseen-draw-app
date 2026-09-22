@@ -31,6 +31,7 @@
  * THE THIRD PIN IS NOT A GLOBAL BUT A localStorage KEY (⚡ R4/R5, YAZ-1812), and it is the ONE
  * engine localStorage key this app touches — WRITTEN, never read. See `YASEEN_FULL_TOOLBAR_MODE`.
  */
+import type { ComponentProps } from 'react'
 import { DRAWING_SOURCE } from './drawingScene'
 
 /** Bundle-relative home of the package's `fonts/…` tree (see `excalidrawAssets()` in the vite config). */
@@ -90,6 +91,37 @@ function safeLocalStorage(): Storage | null {
 
 /** The engine module, named here and nowhere else. */
 export type ExcalidrawModule = typeof import('@excalidraw/excalidraw')
+
+/**
+ * The engine's IMPERATIVE HANDLE, derived from the engine's own component type rather than
+ * re-declared: a hand-written interface is contravariant against `updateScene`'s generic and will
+ * not accept the real API. Named here beside the module for the same reason the module is — the
+ * canvas panel's tabs each narrow it to the four or five methods they actually use (`Pick<>`), so
+ * a change to any of those signatures is a build error at the call site.
+ */
+export type ExcalidrawImperativeApi = NonNullable<Parameters<NonNullable<ComponentProps<ExcalidrawModule['Excalidraw']>['onExcalidrawAPI']>>[0]>
+
+/**
+ * THE ELEMENT PACKAGE, FOR THE SMART SHAPES ONLY (YAZ-1818). `@excalidraw/element` is the second
+ * package of the vendored engine tree, and it is named HERE for the same reason the first one is:
+ * it is ~300 kB that must not reach the renderer's entry chunk. The Image Studio's Shapes view
+ * needs three values out of it — `SMART_SHAPE_DEFINITIONS`, `generateSmartShapePoints`,
+ * `createSmartShapeMetadata` — which are not re-exported by `@excalidraw/excalidraw`'s index, so
+ * they cannot come through `loadExcalidraw()`.
+ *
+ * It is a SEPARATE promise on purpose: the seven basic shapes need nothing at all, so the Shapes
+ * view renders them immediately and the twelve Smart Shapes join a tick later, rather than the
+ * panel waiting on a second download.
+ */
+export type ExcalidrawElementModule = typeof import('@excalidraw/element')
+
+let elementLoading: Promise<ExcalidrawElementModule> | null = null
+
+/** The element package, loaded lazily and shared; every consumer waits on this ONE promise. */
+export function loadExcalidrawElement(): Promise<ExcalidrawElementModule> {
+  elementLoading ??= import('@excalidraw/element')
+  return elementLoading
+}
 
 /** The in-flight (then settled) module load; one per renderer, never re-imported. */
 let loading: Promise<ExcalidrawModule> | null = null

@@ -1,9 +1,10 @@
 /**
  * MENU → THE VISIBLE DRAWING (YAZ-1775 🔒 D10).
  *
- * File › Export Image… and View › Canvas Background live in the Electron application menu now —
- * the canvas hamburger belongs to the workspace panel — so main pushes `menu:export-image` /
- * `menu:canvas-background` to the focused window and `App` routes them here.
+ * File › Export Image…, File › Export Drawing… and View › Canvas Background live in the Electron
+ * application menu now — the canvas hamburger belongs to the workspace panel — so main pushes
+ * `menu:export-image` / `menu:export-drawing` / `menu:canvas-background` to the focused window and
+ * `App` routes them here.
  *
  * WHY A DOM EVENT AND NOT A PROP. The shell keeps several tabs MOUNTED at once: all but the
  * active one are `visibility: hidden` layers, each with its own live engine. A prop, a context or
@@ -12,13 +13,13 @@
  * host — the same reasoning that keeps ⌘S and the panel shortcuts off `window`, and the reason
  * `handleKeyboardGlobally` is the parity checklist's one deliberate drop.
  *
- * No drawing in front → nothing happens and the caller is told so. Main already greys the two
+ * No drawing in front → nothing happens and the caller is told so. Main already greys the three
  * items out off a drawing tab; this is the belt to that pair of braces.
  */
 
 export const DRAWING_COMMAND_EVENT = 'yaseendraw:drawing-command'
 
-export type DrawingCommand = { kind: 'export-image' } | { kind: 'canvas-background'; color: string }
+export type DrawingCommand = { kind: 'export-image' } | { kind: 'export-drawing' } | { kind: 'canvas-background'; color: string }
 
 /** The workspace's VISIBLE drawing section, if the active tab is a drawing. */
 export function activeDrawingSection(root: ParentNode = document): Element | null {

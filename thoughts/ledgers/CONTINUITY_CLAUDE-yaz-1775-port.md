@@ -44,13 +44,14 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
   - [x] 2G — Settings: canvas preferences, Library folder, trims (YAZ-1813)
   - [x] 2H — ⌘K search over the drawing catalog (YAZ-1814)
   - [x] 2I — New drawing, naming, extension display, file association (YAZ-1815)
-- Now: [→] 3A — Library folder and secrets plumbing (YAZ-1817)
+  - [x] 3A — Library folder and secrets plumbing (YAZ-1817)
+  - [x] 3B — Images tab: Image Studio with main-process providers (YAZ-1818)
+  - [x] 3C — Components tab: Saved Components as library files (YAZ-1819)
+  - [x] 3C1 — Import JSON into the components library (YAZ-1833)
+  - [x] 3D — Present tab: presentation sidebar and player (YAZ-1820)
+  - [x] 3E — Export menu: PNG, SVG, standalone `.excalidraw` (YAZ-1821)
+- Now: [→] 4A — Prove the image-heavy board round trip through quit, relaunch, sync and clone (YAZ-1823)
 - Remaining:
-  - [ ] 3B — Images tab: Image Studio with main-process providers (YAZ-1818)
-  - [ ] 3C — Components tab: Saved Components as library files (YAZ-1819)
-  - [ ] 3D — Present tab: presentation sidebar and player (YAZ-1820)
-  - [ ] 3E — Export menu: PNG, SVG, standalone `.excalidraw` (YAZ-1821)
-  - [ ] 4A — Prove the image-heavy board round trip through quit, relaunch, sync and clone (YAZ-1823)
   - [ ] 4B — Prove windows, tabs, favorites, vault switcher and same-board-in-two-windows (YAZ-1824)
   - [ ] 4C — Prove Image Studio, Components and Present online and offline (YAZ-1825)
   - [ ] 4D — Release workflow renamed and a local DMG install verified (YAZ-1826)
@@ -60,13 +61,133 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 ## Open Questions
 
 - UNCONFIRMED: `desktop/build/icon.png` is the only icon asset; the stale docs-app `icon.icns`/`icon.ico` were deleted and electron-builder now derives both from the PNG. Confirm during the 4D packaging run.
-- UNCONFIRMED (2B leftover, for 2D/2G): the rename CONFIRM sheet survives without its reason. ⚡ YAZ-888 made a name change ask first *because* the rename chained into every `[[wikilink]]`; with links gone the sheet now only says "Rename 'x' to 'y'?". Kept rather than removed — deleting a confirm is a product decision, not a strip — but it may want to go.
 - RESOLVED (🔒 "Dead asset pipe deleted" on YAZ-1775): the image half of the asset pipe is gone — module, tests, channels, preload methods, types and CONTRACTS rows — in 2F's first commit.
 - RESOLVED (🔒 "Focus handoff on tab reveal" on YAZ-1812, built in 2I): a revealed drawing tab takes the keyboard through `DrawingSurfaceApi.focus()`, gated by `drawings/focusHandoff.ts` — never from the sidebar search, the vault switcher or a dialog.
 - UNCONFIRMED (posted on YAZ-1815, awaiting Yasin): where a drawing outside EVERY open vault should open. 2I kept the shipped E1 rule — a NEW window rooted at the file's parent folder — rather than repointing the focused window's vault, which would discard its tabs and would need a main→renderer "switch vault and open this" message that does not exist. Documented in CONTRACTS as built.
-- UNCONFIRMED (2B leftover, still open after 2I): the rename CONFIRM sheet. "New drawing" now lands on the inline rename field, so the FIRST thing a user does to a new board trips the sheet ("Rename 'Untitled' to 'Plan'?"). 2I deliberately did not touch `ConfirmRename` — a separate decision is pending with Yasin.
+- RESOLVED (🔒 on YAZ-1775, with the phase-2 merge): the rename CONFIRM sheet is **deleted** — with wikilinks gone it warned about nothing, and "New drawing" landing on the inline rename field made every new `Untitled` board trip it. `ConfirmRename.tsx`/`.test.tsx` and App's `requestRename` detour are gone; rename commits on Enter. Delete and move keep their confirms. First commit of phase 3.
 
-## Learnings (2D / 2E / 2F / 2G / 2H / 2I)
+## Learnings (2D / 2E / 2F / 2G / 2H / 2I / 3A / 3B / 3C / 3C1 / 3D / 3E)
+
+- **A save dialog and its write are ONE door.** Splitting them would hand the renderer an arbitrary
+  absolute path it may write to, which is exactly what the fs layer's root-relative rules exist to
+  prevent. `dialog:save-file` shows the sheet and does the atomic write in the same call, and
+  re-checks the extension afterwards because a name can be typed freely into a sheet.
+- **Export reads the ENGINE's files map, not the store's.** The store knows what is in `assets/`;
+  only the engine holds that plus everything pasted or inserted and not yet saved. An export off
+  the store would silently drop the second half.
+- **Filter the deleted elements' bytes yourself, even though the engine does too.** An undo leaves
+  an image's bytes in the map long after its element is gone; `referencedFileIds` is the same rule
+  2E's save uses, so the two can never disagree, and `serializeAsJSON(…, 'local')` filtering again
+  is idempotent redundancy rather than a second opinion.
+- **The player cannot live in the tab that starts it.** A `Sidebar.Tab` body is unmounted the
+  moment the panel closes, and closing the panel is the FIRST thing Play does. So `Play` goes up
+  to `ExcalidrawSurface`, which mounts the player as a sibling of `<Excalidraw>`.
+- **`body` classes do not survive a multi-tab shell.** The web app hid the editor chrome with a
+  class on `document.body`; here that would hide the chrome of every mounted tab, so the classes go
+  on `.drawing-surface` and the CSS is scoped to it. Same for the camera reserve: a fraction of the
+  PANE, not of `window.innerWidth`, because a file sidebar sits beside the canvas.
+- **A document-wide listener needs the frontmost test.** The canvas holds the keyboard while
+  presenting and it is not inside the overlay, so the key and double-click handlers stay on
+  `document` — gated on the overlay not being inside a `.tabstack__layer--hidden`, which is
+  `drawingCommand.ts`'s own test one layer down.
+- **The order is a request, not a guarantee.** The file is user data: two frames can claim slot 2
+  and a frame can claim slot 9 of a three-slide deck. Only an unambiguous, in-range claim takes its
+  slot; the rest fill the gaps in scene order, so the deck is always 1..n with no holes.
+- **A fake engine has to close its own loop.** The panel re-derives from `onChange` rather than
+  being optimistic, so a test double whose `updateScene` does not fire `onChange` shows a stale
+  list — and pins the wrong behaviour if you assert on the scene instead.
+- **Dropping the animation stack is not dropping the transition token.** The lifecycle event went
+  with its only subscriber, but the token, the `isTransitioning` state and the "no landing while
+  the deck is zoomed out" rule are the camera behaving itself and stayed.
+- **A native dialog is the only place an arbitrary path may be read.** Import JSON needed the bytes
+  of a file OUTSIDE the vault, and the bridge has no read-any-path door. Rather than open one,
+  `dialog:open-file` reads what the user has just picked, bounded by `MAX_DRAWING_BYTES` and
+  re-checked for the extension (a filter is defeated by typing a name) — so the door's reach is
+  exactly one native gesture wide.
+- **`parseImportedComponentJson` ported with its one flag inverted.** The web app passed
+  `allowImages: false` because an imported payload had no bytes in its object store; a picked
+  `.excalidraw` carries its own `files` map, so images are kept and travel into the fragment. The
+  envelope table, the restore, the deleted filter and the size ceiling are verbatim.
+- **A refusal that writes nothing is a PASSIVE notice.** `role="status"` for the import, not the
+  tab's assertive `role="alert"` — the error line means "your save failed", the notice means
+  "nothing happened".
+- **A preview settles on a TASK.** `FileReader` is how the blob becomes a dataURL, so a test that
+  flushes one turn records the call against the NEXT test under full-suite load; the import tests
+  poll until the call lands.
+- **The folder is the truth; the index is a cache.** `components.json` is rebuilt from
+  `<library>/components/` on every read — adopted, dropped and repaired — not just when it is
+  missing. That is what makes a component arriving through a synced folder, or a file deleted in
+  Finder, simply correct with no repair step anywhere. And a READ NEVER WRITES: the reconciliation
+  is in memory, so listing a library costs a read-only disk nothing.
+- **A component embeds its images; a board does not.** 🔒 D3 keeps bytes OUT of scene JSON, and
+  🔒 D5 puts them INSIDE a component — not a contradiction: a board lives in the vault beside its
+  `assets/`, a component has to insert into a vault it has never seen. The two meet on insert: the
+  embedded bytes are handed to the canvas, and 2E's `unpersistedFiles` turns them into THIS vault's
+  assets on the next save, deduped by `fileId`.
+- **The slug is the identity, the name is the label.** The web app's identity was a Convex `_id`;
+  a folder can only carry a filename. So a rename moves no file, and the slug is validated as a
+  path segment (lowercase words, single hyphens) rather than trusted — the `isValidFileId` posture.
+- **Echo suppression needs one entry per FILE when a mutation writes three.** `mediaStore` drops
+  its own watcher event by the single file's mtime; a component save writes a fragment, a preview
+  and the index, so the map is path → mtime (and → null for a trash). The watcher's filter is what
+  keeps `atomicWrite`'s tmp files out of it: only `<slug>.excalidraw`, `<slug>.png` and the index.
+- **Chokidar loses a subfolder created during its own initialisation** (polling), which is the
+  `mediaStore` note one level down: `components/` may be made by the first save. Re-adding it once
+  on `ready` is the recovery, and it costs nothing when the folder is not there yet.
+- **The selection is read off `onChange`, not off an engine hook.** The web app's `useUIAppState()`
+  would have made the tab engine-bound and untestable; `ExcalidrawSurface` already sees every
+  appState, so `hasSelection` is a boolean prop — and because it is a boolean, the memoized panel
+  is re-made only when it actually flips.
+- **Search is the app's ONE matcher.** The library is a folder of small files, so it is listed
+  whole and ranked in the renderer through `search/matchCandidates.ts` — the same function ⌘K uses.
+  A second search implementation would have been a second answer to the same question.
+
+- **The library store is `vaultConfig.ts` with one file.** Same shape end to end: lazy read, tmp +
+  rename write, one chokidar, own-write echo dropped by mtime, external edit debounced. The one
+  new idea is that `media:changed` has NO payload — every window re-lists whichever vault it is
+  on, because the library is one file for all of them (🔒 D5's whole point).
+- **Watch the folder, not the file, at depth 0.** Tests run chokidar in polling mode, which loses a
+  path that appears during its initialisation; the folder exists from startup (`ensureLibraryFolder`)
+  where `media.json` does not. Depth 0 keeps 3C's `components/` and the tmp files out of it; the
+  `anchored` re-add covers the folder that was unplugged at launch.
+- **Strict item, lenient file.** The web app's validator rejects an item whole (a wrong-typed
+  optional is a broken tile, not a field to drop), but the FILE drops the bad row and keeps the
+  other 499 — and the caps are enforced on read too, so a hand edit cannot grow the lists.
+- **A secret is not a setting.** `SettingsState` is broadcast to every window; a key in it would be
+  a key in every devtools console. So the Pixabay row has no `SettingsState` field, `onChange` is
+  never called, and the row's entire read-back is `secrets:has`. `has` means "stored AND
+  decryptable HERE" — a `secrets.json` copied between Macs is a file of blobs the new keychain
+  cannot open.
+- **The cipher comes in as an argument.** `createSecrets(file, safeStorage)` — the module is
+  Electron-free and its tests use a reversible scramble that is visibly not the plaintext, which is
+  how the "never on disk in clear" claim is actually asserted.
+- **The Worker's curation is four modules, and only one of them fetches.** `curation.ts` (pure
+  rules and constants), `cachePolicy.ts` (pure key scheme and 24 h), `cache.ts` (the disk), and
+  `providers.ts` (the only one that calls `fetch`, which comes in as an argument). Two of the four
+  are testable with nothing mocked at all, and the provider tests stub not one global.
+- **`curateIconifyResults` is dead in the Worker too.** It is exported and tested there and
+  `searchUncached` never calls it. Ported anyway, with the fact written down: 🔒 D4 names
+  `LOW_PRIORITY_COLLECTIONS`, and the next person to want ranking should find the rule rather than
+  invent a worse one.
+- **Put the key-presence bit IN the search cache key.** The Worker cached a search only when a
+  Pixabay key was configured — the crude version of the same idea. With the bit in the key, both
+  worlds cache and adding a key never keeps serving yesterday's Iconify-only page.
+- **Freshness is the file's own mtime.** One number, written by the write: the 24 h read guard and
+  the startup sweep become the same rule, and there is no sidecar timestamp to drift.
+- **A `fetch` that THREW is offline; a response that refused is the provider's fault.** That one
+  distinction is the whole difference between a passive "You're offline" line and an error banner.
+- **`@excalidraw/element` is a SECOND lazy package.** The Smart Shapes' three values are not
+  re-exported by `@excalidraw/excalidraw`'s index, so they need their own dynamic import — and
+  because the seven basic shapes need nothing, the Shapes view renders immediately and grows.
+- **`IMAGE_STUDIO_INSERTION` has no runtime module in the vendored build.** `@excalidraw/excalidraw/*`
+  maps to TYPES only. The two numbers are copied (the `formFactor.ts` precedent) with the TYPE
+  still imported, so a change in its shape is still a build error.
+- **The studio writes nothing to disk.** It leaves the engine holding bytes the store has not got;
+  2E's `unpersistedFiles` is what turns that into an `assets/` file, and the insert test asserts it
+  with that very function.
+- **`main/library.ts` became `main/library/folder.ts`** so `library/mediaStore.ts` could sit where
+  the contract names it; TypeScript would have resolved `./library` to the file over the folder,
+  which is a trap for the next reader.
 
 - **⌘K is derived, never indexed.** The vault index died with markdown; the catalog is one walk of
   the tree the Sidebar already holds, which the structural watcher already refreshes. Nothing new
@@ -109,7 +230,7 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 ## Working Set
 
 - **Repo:** `/Users/yasin/Documents/GitHub/yaseen-draw-app` (remote `origin` = `https://github.com/yaseenarshad/yaseen-draw-app.git`).
-- **Branch:** `yaz-1775-port` (off `main`).
+- **Branch:** `yaz-1775-phase-3` (off `main`, after the phase-2 merge).
 - **Worktree:** `/Users/yasin/Documents/GitHub/yaseen-draw-app-port` — do all work here.
 - **Test vault:** `~/Desktop/Port to Electron App - Local Version/` (plus `(origin).git` beside it for sync proofs).
 - **Read-only references:** `yaseen-docs-app` @ `66c9806` (shell source), `yaseen-excalidraw` @ `e72242f8` (engine + `public/favicon.svg` + `docs/yaseen-whiteboard-icons.md`), prototype worktree `~/Documents/GitHub/yaseen-docs-app-draw-demo` on `demo/yaz-1775-draw-prototype` (uncommitted; lift patterns, do not copy; delete after phase 2).

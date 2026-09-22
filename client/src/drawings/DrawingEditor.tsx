@@ -57,10 +57,13 @@ import type { CanvasPanelState, CanvasPrefs, DrawingLoadResponse, GithubSyncStat
 import { unpersistedFiles } from '@shared/drawingAssets'
 import { api, BridgeRequestError } from '../api'
 import type { WatchSource } from '../hooks/useWatch'
+import type { NoticeKind } from '../lib/notice'
+import { basename } from '../lib/paths'
 import { Autosave, SaveConflict, type SaveStatus } from '../lib/autosave'
 import { registerRenameContinuity } from '../lib/renameContinuity'
 import { useAppliedTheme } from '../lib/theme'
 import { DRAWING_COMMAND_EVENT, type DrawingCommand } from './drawingCommand'
+import { exportFileName } from './exportDrawing'
 import { parseSceneText, type DrawingScene } from './drawingScene'
 import { mayTakeFocus } from './focusHandoff'
 import { ExcalidrawSurface, type DrawingSnapshot, type DrawingSurfaceApi } from './ExcalidrawSurface'
@@ -70,6 +73,9 @@ import './drawingEditor.css'
 
 /** What a document that will not open says — one message for its three causes (missing, corrupt, empty). */
 export const BROKEN_DRAWING_DOCUMENT = "This drawing can't be opened: its file is missing or is not a scene."
+
+/** What File › Export Drawing… says when the save sheet or the write refused (🔒 D3, YAZ-1821). */
+export const EXPORT_FAILED = "The drawing couldn't be exported."
 
 export interface DrawingEditorProps {
   root: string
@@ -89,6 +95,8 @@ export interface DrawingEditorProps {
   /** What the canvas panel remembers between mounts: its last-used tab and its dock pref (🔒 D10). */
   canvasPanel?: CanvasPanelState
   onCanvasPanelChange?: (next: CanvasPanelState) => void
+  /** The window's ONE passive notice: where an export landed, or why it did not (🔒 D3, YAZ-1821). */
+  onNotice?: (text: string, icon?: NoticeKind) => void
 }
 
 /** A loaded document: the scene the canvas opens on, and the mtime the first save guards with. */
@@ -111,7 +119,7 @@ function toDocument(res: DrawingLoadResponse): LoadedDocument {
   return { scene: { ...parsed, files }, mtime: res.mtime, stored: res.stored }
 }
 
-export function DrawingEditor({ root, path, watch, sync, onSyncNow, canvasPrefs, onCanvasPrefsChange, canvasPanel, onCanvasPanelChange }: DrawingEditorProps) {
+export function DrawingEditor({ root, path, watch, sync, onSyncNow, canvasPrefs, onCanvasPrefsChange, canvasPanel, onCanvasPanelChange, onNotice }: DrawingEditorProps) {
   const [loaded, setLoaded] = useState<LoadedDocument | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -160,6 +168,7 @@ export function DrawingEditor({ root, path, watch, sync, onSyncNow, canvasPrefs,
           onCanvasPrefsChange={onCanvasPrefsChange}
           canvasPanel={canvasPanel}
           onCanvasPanelChange={onCanvasPanelChange}
+          onNotice={onNotice}
           onFailed={setError}
         />
       )}
@@ -173,7 +182,7 @@ interface DrawingHostProps extends DrawingEditorProps {
 }
 
 /** Mounts exactly one canvas for `loaded` and owns everything that writes. */
-function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasPrefs, onCanvasPrefsChange, canvasPanel, onCanvasPanelChange, onFailed }: DrawingHostProps) {
+function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasPrefs, onCanvasPrefsChange, canvasPanel, onCanvasPanelChange, onNotice, onFailed }: DrawingHostProps) {
   const theme = useAppliedTheme()
   const hostRef = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState<SaveStatus>('saved')
@@ -317,6 +326,7 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasPrefs, 
       const s = surface.current
       if (s === null) return
       if (command.kind === 'export-image') s.openImageExport()
+      else if (command.kind === 'export-drawing') void exportDrawingRef.current()
       else s.setCanvasBackground(command.color)
     }
     section.addEventListener(DRAWING_COMMAND_EVENT, onCommand)
@@ -356,6 +366,29 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasPrefs, 
   const onApi = useCallback((a: DrawingSurfaceApi) => {
     surface.current = a
   }, [])
+
+  /**
+   * File › Export Drawing… (🔒 D3, YAZ-1821). The canvas assembles a STANDALONE scene — the whole
+   * live files map, minus what only deleted elements name, embedded — and main's save sheet writes
+   * it wherever the user points. THE VAULT FILE IS NOT TOUCHED: nothing here reads it, writes it or
+   * flushes the autosave, so an export of a dirty board exports what is on the canvas and the
+   * board's own save timer carries on as if nothing happened.
+   *
+   * Through a ref because the command listener is bound once, at mount, on this host's section.
+   */
+  const exportDrawing = useCallback(async () => {
+    const s = surface.current
+    if (s === null || retired.current) return
+    try {
+      const answer = await api.dialog.saveDrawing({ defaultName: exportFileName(basename(path)), content: s.exportScene() })
+      if ('cancelled' in answer) return
+      onNotice?.(`Exported to ${basename(answer.path)}`)
+    } catch (err) {
+      onNotice?.(err instanceof BridgeRequestError && err.message !== '' ? err.message : EXPORT_FAILED, 'error')
+    }
+  }, [onNotice, path])
+  const exportDrawingRef = useRef(exportDrawing)
+  exportDrawingRef.current = exportDrawing
 
   /** ⌘S flushes now — caught before the engine's own keymap, and never on `window`. */
   const onKeyDownCapture = (e: ReactKeyboardEvent): void => {

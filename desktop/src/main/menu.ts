@@ -39,6 +39,8 @@ export interface MenuHandlers {
   zoom(step: ZoomStep): void
   /** File › Export Image… (⌘⇧E, 🔒 D10): the focused renderer's visible drawing opens the engine's export dialog. */
   exportImage(): void
+  /** File › Export Drawing… (⌘⇧S, 🔒 D3): the focused renderer's visible drawing writes a standalone `.excalidraw`. */
+  exportDrawing(): void
   /** View › Canvas Background › a pick (🔒 D10): the focused renderer's visible drawing takes `color`. */
   canvasBackground(color: string): void
   openHelp(): void
@@ -124,6 +126,11 @@ export function buildMenuTemplate({ recents, isDev, activeIsDrawing }: MenuInput
         // opens the ENGINE's own export dialog (`openDialog: { name: 'imageExport' }`) — a
         // standalone `.excalidraw` export is 3E's.
         { id: 'menu.file.export-image', label: 'Export Image…', accelerator: 'CmdOrCtrl+Shift+E', enabled: activeIsDrawing, click: () => handlers.exportImage() },
+        // 🔒 D3: the ONE place a `.excalidraw` embeds its images, so a board can be handed to
+        // someone with no vault and no `assets/` folder. ⌘⇧S is free in this menu — the engine's
+        // own "Save as" is off (`saveToActiveFile: false`) and a registered accelerator never
+        // reaches the page on macOS anyway — and it is the key the gesture means.
+        { id: 'menu.file.export-drawing', label: 'Export Drawing…', accelerator: 'CmdOrCtrl+Shift+S', enabled: activeIsDrawing, click: () => handlers.exportDrawing() },
         { type: 'separator' },
         // ⌘W is Close Tab (GRO-2232, locked): the renderer owns tab state, so the gesture goes to
         // the focused window's renderer. Close Window moves to ⌘⇧W and keeps `role: 'close'` — the
@@ -306,6 +313,9 @@ export function createMenuHandlers(store: Store, windows: MenuWindows, host: Men
     exportImage() {
       host.focusedWebContents()?.send(CH.menuExportImage)
     },
+    exportDrawing() {
+      host.focusedWebContents()?.send(CH.menuExportDrawing)
+    },
     canvasBackground(color) {
       host.focusedWebContents()?.send(CH.menuCanvasBackground, color)
     },
@@ -328,12 +338,13 @@ export function subscribeMenuRebuild(store: Store, rebuild: () => void): () => v
   })
 }
 
-/** The one fact the two canvas items are gated on: which file each window has in front. */
+/** The one fact the three canvas items are gated on: which file each window has in front. */
 const activeFilesKey = (state: { windows: ReadonlyArray<{ id: string; file: string | null }> }): string => state.windows.map((w) => `${w.id}=${w.file ?? ''}`).join('\n')
 
 /**
- * Rebuild when any window's ACTIVE FILE changes (🔒 D10): File › Export Image… and View › Canvas
- * Background are enabled only while the focused window's active tab is a drawing, so a tab switch
+ * Rebuild when any window's ACTIVE FILE changes (🔒 D10): File › Export Image…, File › Export
+ * Drawing… and View › Canvas Background are enabled only while the focused window's active tab is
+ * a drawing, so a tab switch
  * has to re-evaluate them. A second subscription rather than a widening of `subscribeMenuRebuild`,
  * so the recents rule — and its test — stays exactly what it was. Focus changes are the host's to
  * report (`browser-window-focus` in `main/index.ts`): they move which window is asked, not what

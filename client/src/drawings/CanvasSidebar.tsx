@@ -10,7 +10,14 @@
  * — the rail's hamburger being the other way. The engine's stock `DefaultSidebar.Trigger` is
  * rendered `hidden`: the panel's doors are the rail and ⌘F / ⌘C, never a floating trigger.
  *
- * The bodies are placeholders until phase 3 — a real label and an honest line, not a blank pane.
+ * The Images tab is the Image Studio (`client/src/media/`, YAZ-1818), the Components tab is the
+ * saved-component library (`client/src/components-library/`, YAZ-1819 — named so it cannot be
+ * mistaken for `client/src/components/`, the shell's own widgets), and the Present tab is the
+ * slide list (`client/src/drawings/presentation/`, YAZ-1820).
+ *
+ * PLAY IS NOT THIS PANEL'S. `onStartPresentation` goes up to `ExcalidrawSurface`, which mounts the
+ * player as a SIBLING of `<Excalidraw>` — a tab's body is unmounted the moment the panel closes,
+ * and closing the panel must not end a presentation.
  *
  * ENGINE-BOUND BY DESIGN: this renders the engine's own components, so it takes the LOADED module
  * as a prop rather than importing the package (`engine.ts`'s lazy rule), and it is rendered only
@@ -18,7 +25,10 @@
  */
 import type { ReactNode } from 'react'
 import { CANVAS_PANEL_TABS, type CanvasPanelTab } from '@shared/types'
-import type { ExcalidrawModule } from './engine'
+import { SavedComponents } from '../components-library/SavedComponents'
+import { ImageStudio } from '../media/ImageStudio'
+import type { ExcalidrawImperativeApi, ExcalidrawModule } from './engine'
+import { PresentationSidebar } from './presentation/PresentationSidebar'
 import { hamburgerIcon, imageIcon, libraryIcon, presentationIcon } from './launcherIcons'
 
 /** The engine sidebar name the web app used for its workspace panel. */
@@ -30,9 +40,6 @@ export const CANVAS_SIDEBAR_TABS: ReadonlyArray<{ tab: CanvasPanelTab; label: st
   { tab: 'components', label: 'Components', shortLabel: 'Components', icon: libraryIcon },
   { tab: 'presentation', label: 'Presentation', shortLabel: 'Present', icon: presentationIcon },
 ]
-
-/** What every tab body says until 3B / 3C / 3D fill it. */
-export const PHASE_3 = 'Coming in phase 3'
 
 /** The engine's sidebar state, narrowed to the tab this app recognises (anything else = closed). */
 export function openCanvasTab(openSidebar: { name?: string; tab?: string } | null | undefined): CanvasPanelTab | null {
@@ -49,9 +56,17 @@ export interface CanvasSidebarProps {
   onClose: () => void
   /** The dock/pin gesture; the surface stores it in `SettingsState.canvasPanel` (🔒 D10). */
   onDock: (docked: boolean) => void
+  /** The engine's imperative handle, which each tab narrows to what it uses; null until it has mounted. */
+  excalidrawAPI: ExcalidrawImperativeApi | null
+  /** Bumped by ⌘F: the Images tab switches to Search and focuses the field (YAZ-1818). */
+  searchFocusRequest: number
+  /** Whether the canvas holds a selection — the Components tab's "Save selection" gate (YAZ-1819). */
+  hasSelection: boolean
+  /** Play, from the Present tab (YAZ-1820): the SURFACE owns the player, so it outlives this panel. */
+  onStartPresentation: (initialFrameId: string | null) => void
 }
 
-export function CanvasSidebar({ engine, activeTab, onClose, onDock }: CanvasSidebarProps) {
+export function CanvasSidebar({ engine, activeTab, onClose, onDock, excalidrawAPI, searchFocusRequest, hasSelection, onStartPresentation }: CanvasSidebarProps) {
   const { DefaultSidebar, Sidebar } = engine
   return (
     <>
@@ -74,12 +89,15 @@ export function CanvasSidebar({ engine, activeTab, onClose, onDock }: CanvasSide
             </Sidebar.TabTrigger>
           ))}
         </DefaultSidebar.TabTriggers>
-        {CANVAS_SIDEBAR_TABS.map(({ tab, label }) => (
+        {CANVAS_SIDEBAR_TABS.map(({ tab }) => (
           <Sidebar.Tab key={tab} tab={tab}>
-            <div className="canvas-sidebar__placeholder" role="status">
-              <strong>{label}</strong>
-              <span>{PHASE_3}</span>
-            </div>
+            {tab === 'image-studio' ? (
+              <ImageStudio engine={engine} excalidrawAPI={excalidrawAPI} searchFocusRequest={searchFocusRequest} />
+            ) : tab === 'components' ? (
+              <SavedComponents engine={engine} excalidrawAPI={excalidrawAPI} hasSelection={hasSelection} />
+            ) : (
+              <PresentationSidebar engine={engine} excalidrawAPI={excalidrawAPI} onStartPresentation={onStartPresentation} />
+            )}
           </Sidebar.Tab>
         ))}
       </DefaultSidebar>

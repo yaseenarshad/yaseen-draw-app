@@ -12,6 +12,7 @@ function installBridge(): { [K in keyof YaseenDrawApi]: ReturnType<typeof vi.fn>
     createFile: vi.fn(),
     drawing: vi.fn(),
     pickFolder: vi.fn(),
+    dialog: vi.fn(),
     watch: vi.fn(),
     state: vi.fn(),
     window: vi.fn(),
@@ -21,6 +22,9 @@ function installBridge(): { [K in keyof YaseenDrawApi]: ReturnType<typeof vi.fn>
     shell: vi.fn(),
     vaultConfig: vi.fn(),
     favorites: vi.fn(),
+    media: vi.fn(),
+    components: vi.fn(),
+    secrets: vi.fn(),
     github: vi.fn(),
   }
   Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
@@ -49,6 +53,23 @@ describe('api', () => {
     expect(bridge.readFile).toHaveBeenCalledWith('/v/a.excalidraw')
     expect(bridge.createDir).toHaveBeenCalledWith('/v/d')
     expect(bridge.createFile).toHaveBeenCalledWith('/v/n.excalidraw')
+  })
+
+  it('the file dialogs delegate and answer what the user chose (YAZ-1833 / 🔒 D3 YAZ-1821)', async () => {
+    const dialog = { openDrawing: vi.fn(), saveDrawing: vi.fn() }
+    Object.defineProperty(window.yaseenDraw, 'dialog', { value: dialog, configurable: true })
+    const picked = { path: '/x/a.excalidraw', name: 'a', content: '{}' }
+    dialog.openDrawing.mockResolvedValue(picked)
+    await expect(api.dialog.openDrawing()).resolves.toEqual(picked)
+    const req = { defaultName: 'Board.excalidraw', content: '{"type":"excalidraw"}' }
+    dialog.saveDrawing.mockResolvedValue({ path: '/x/Board.excalidraw' })
+    await expect(api.dialog.saveDrawing(req)).resolves.toEqual({ path: '/x/Board.excalidraw' })
+    expect(dialog.saveDrawing).toHaveBeenCalledWith(req)
+    // A refusal arrives as plain data and comes back as the class.
+    dialog.saveDrawing.mockRejectedValue({ code: 'IO_ERROR', message: 'disk is full' })
+    const err = (await api.dialog.saveDrawing(req).catch((e: unknown) => e)) as BridgeRequestError
+    expect(err).toBeInstanceOf(BridgeRequestError)
+    expect(err.code).toBe('IO_ERROR')
   })
 
   it('the drawing document doors pass their request through and answer the receipt (🔒 YAZ-1810)', async () => {
@@ -115,6 +136,72 @@ describe('api', () => {
     const listener = vi.fn()
     expect(api.github.onStatus(listener)).toBe(off)
     expect(github.onStatus).toHaveBeenCalledWith(listener)
+  })
+
+  it('media calls pass the request through and answer the list; onChanged is a pass-through (🔒 D5)', async () => {
+    const media = { favorites: vi.fn(), recent: vi.fn(), onChanged: vi.fn() }
+    Object.defineProperty(window.yaseenDraw, 'media', { value: media, configurable: true })
+    const row = { itemKey: 'pixabay:1', provider: 'pixabay', providerId: '1', kind: 'photo', title: 'A tree', updatedAt: 1 }
+    media.favorites.mockResolvedValue([row])
+    await expect(api.media.favorites({ op: 'list' })).resolves.toEqual([row])
+    expect(media.favorites).toHaveBeenCalledWith({ op: 'list' })
+    media.recent.mockResolvedValue([])
+    await expect(api.media.recent({ op: 'remove' } as never)).resolves.toEqual([])
+    const off = () => {}
+    media.onChanged.mockReturnValue(off)
+    const listener = vi.fn()
+    expect(api.media.onChanged(listener)).toBe(off)
+    expect(media.onChanged).toHaveBeenCalledWith(listener)
+  })
+
+  it('the studio doors delegate, and a provider failure arrives with its typed code (🔒 D4)', async () => {
+    const media = { favorites: vi.fn(), recent: vi.fn(), onChanged: vi.fn(), search: vi.fn(), preview: vi.fn(), import: vi.fn() }
+    Object.defineProperty(window.yaseenDraw, 'media', { value: media, configurable: true })
+    media.search.mockResolvedValue({ items: [], nextCursor: null, pixabayAvailable: false, warnings: [] })
+    await expect(api.media.search({ q: 'money bag', source: 'all' })).resolves.toMatchObject({ pixabayAvailable: false })
+    expect(media.search).toHaveBeenCalledWith({ q: 'money bag', source: 'all' })
+    media.preview.mockResolvedValue({ mimeType: 'image/svg+xml', dataURL: 'data:image/svg+xml;base64,x' })
+    await expect(api.media.preview({ provider: 'iconify', id: 'noto:money-bag' })).resolves.toMatchObject({ mimeType: 'image/svg+xml' })
+    media.import.mockRejectedValue({ code: 'OFFLINE', message: 'could not reach api.iconify.design' })
+    await expect(api.media.import({ provider: 'iconify', id: 'noto:money-bag' })).rejects.toMatchObject({ name: 'BridgeRequestError', code: 'OFFLINE' })
+  })
+
+  it('components calls pass the request through and answer what main made; onChanged is a pass-through (🔒 D5)', async () => {
+    const components = { list: vi.fn(), save: vi.fn(), read: vi.fn(), rename: vi.fn(), delete: vi.fn(), preview: vi.fn(), onChanged: vi.fn() }
+    Object.defineProperty(window.yaseenDraw, 'components', { value: components, configurable: true })
+    const item = { slug: 'a-card', name: 'A card', elementCount: 2, createdAt: 1, updatedAt: 1 }
+    components.list.mockResolvedValue([item])
+    await expect(api.components.list()).resolves.toEqual([item])
+    components.save.mockResolvedValue(item)
+    await expect(api.components.save({ name: 'A card', fragmentJson: '{}', previewPng: 'data:image/png;base64,AA==' })).resolves.toEqual(item)
+    expect(components.save).toHaveBeenCalledWith({ name: 'A card', fragmentJson: '{}', previewPng: 'data:image/png;base64,AA==' })
+    components.read.mockResolvedValue({ fragmentJson: '{}' })
+    await expect(api.components.read({ slug: 'a-card' })).resolves.toEqual({ fragmentJson: '{}' })
+    components.rename.mockResolvedValue(item)
+    await expect(api.components.rename({ slug: 'a-card', name: 'B' })).resolves.toEqual(item)
+    components.preview.mockResolvedValue('data:image/png;base64,AA==')
+    await expect(api.components.preview({ slug: 'a-card' })).resolves.toBe('data:image/png;base64,AA==')
+    components.delete.mockRejectedValue({ code: 'NOT_FOUND', message: 'no such component' })
+    await expect(api.components.delete({ slug: 'gone' })).rejects.toMatchObject({ name: 'BridgeRequestError', code: 'NOT_FOUND' })
+    const off = () => undefined
+    components.onChanged.mockReturnValue(off)
+    const listener = () => undefined
+    expect(api.components.onChanged(listener)).toBe(off)
+    expect(components.onChanged).toHaveBeenCalledWith(listener)
+  })
+
+  it('secrets: set and has delegate, and ENCRYPTION_UNAVAILABLE arrives as a typed BridgeRequestError (🔒 D4)', async () => {
+    const secrets = { set: vi.fn(), has: vi.fn() }
+    Object.defineProperty(window.yaseenDraw, 'secrets', { value: secrets, configurable: true })
+    secrets.set.mockResolvedValue(undefined)
+    await expect(api.secrets.set({ name: 'pixabayApiKey', value: 'k' })).resolves.toBeUndefined()
+    expect(secrets.set).toHaveBeenCalledWith({ name: 'pixabayApiKey', value: 'k' })
+    secrets.has.mockResolvedValue(true)
+    await expect(api.secrets.has({ name: 'pixabayApiKey' })).resolves.toBe(true)
+    secrets.set.mockRejectedValue({ code: 'ENCRYPTION_UNAVAILABLE', message: 'no keychain' })
+    const err = (await api.secrets.set({ name: 'pixabayApiKey', value: 'k' }).catch((e: unknown) => e)) as BridgeRequestError
+    expect(err).toBeInstanceOf(BridgeRequestError)
+    expect(err.code).toBe('ENCRYPTION_UNAVAILABLE')
   })
 
   it('a BridgeError without path / mtime leaves those fields undefined', async () => {
