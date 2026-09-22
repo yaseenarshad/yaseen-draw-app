@@ -55,6 +55,9 @@ Turn on **Settings › Sync** to push a vault to GitHub. It uses the computer's 
 A drawing is one `.excalidraw` file — Excalidraw's own scene JSON, readable by excalidraw.com and
 by any other tool that speaks the format. The app never invents a wrapper around it.
 
+A drawing opens zoomed out to show everything on it (never past 100%, down to 10% for a huge board),
+so you start from the overview and zoom into the part you want. An empty drawing opens at 100%.
+
 Image bytes are kept OUT of the scene: a pasted or dropped image is written once to
 `<vault>/assets/<contentId>.<ext>` and the scene refers to it, so a board full of screenshots stays
 a small JSON file that git can actually diff and GitHub will actually accept. The same image used

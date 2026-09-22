@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DRAWING_SOURCE, EMPTY_SCENE, EMPTY_SCENE_JSON, parseSceneText } from './drawingScene'
+import { DRAWING_SOURCE, EMPTY_SCENE, EMPTY_SCENE_JSON, openViewport, parseSceneText } from './drawingScene'
 
 /**
  * `parseSceneText` is YAZ-1810's acceptance criterion in one function: "corrupt and empty files show a
@@ -64,5 +64,27 @@ describe('the bytes a new drawing is born with', () => {
     expect(EMPTY_SCENE.type).toBe('excalidraw')
     expect(EMPTY_SCENE.version).toBe(2)
     expect(EMPTY_SCENE.source).toBe(DRAWING_SOURCE)
+  })
+})
+
+/** 🔒 YAZ-1855 D1: a board opens on ALL of its content, never past 100%; an empty one stays at 100%. */
+describe('openViewport', () => {
+  const scene = (elements: unknown[]) => ({ elements, appState: {}, files: {} })
+
+  it('fits every live element, scaling down only', () => {
+    const a = { id: 'a' }
+    const b = { id: 'b', isDeleted: false }
+    expect(openViewport(scene([a, b]))).toEqual({ viewport: { target: [a, b], fit: 'scale-down' } })
+  })
+
+  it('leaves deleted elements out of the target', () => {
+    const live = { id: 'live' }
+    expect(openViewport(scene([{ id: 'gone', isDeleted: true }, live]))?.viewport.target).toEqual([live])
+  })
+
+  it('has nothing to fit on an empty, all-deleted or non-element board', () => {
+    expect(openViewport(scene([]))).toBeUndefined()
+    expect(openViewport(scene([null, 'x']))).toBeUndefined()
+    expect(openViewport(scene([{ id: 'gone', isDeleted: true }]))).toBeUndefined()
   })
 })
