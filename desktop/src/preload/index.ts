@@ -142,6 +142,16 @@ const api: YaseenDrawApi = {
     preview: (req) => call(CH.mediaPreview, req),
     import: (req) => call(CH.mediaImport, req),
   },
+  // The cross-vault saved-component library over `<library>/components/` (🔒 D5, YAZ-1819).
+  components: {
+    list: () => call(CH.componentsList),
+    save: (req) => call(CH.componentsSave, req),
+    read: (req) => call(CH.componentsRead, req),
+    rename: (req) => call(CH.componentsRename, req),
+    delete: (req) => call(CH.componentsDelete, req),
+    preview: (req) => call(CH.componentsPreview, req),
+    onChanged: on<void>(CH.componentsChanged),
+  },
   // The secrets door (🔒 D4): write and ask, never read — there is no channel that answers a value.
   secrets: {
     set: (req) => call(CH.secretsSet, req),

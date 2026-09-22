@@ -785,6 +785,8 @@ export const MEDIA_LIBRARY_FILE = 'media.json'
  * Named here so nothing else claims it; 3A creates NOTHING — the folder appears on 3C's first write.
  */
 export const LIBRARY_COMPONENTS_DIR = 'components'
+/** The components index beside that folder: `<library>/components.json` (🔒 D5, YAZ-1819). */
+export const COMPONENTS_INDEX_FILE = 'components.json'
 /** Favorites are capped at the web app's `listFavorites` ceiling; the oldest fall off the end. */
 export const MAX_MEDIA_FAVORITES = 500
 /** The MRU's length, the web app's `RECENT_LIMIT` exactly. */
@@ -881,6 +883,82 @@ export interface MediaPreviewResponse {
  */
 export interface MediaImportResponse extends MediaPreviewResponse {
   item: StudioItem
+}
+
+
+// ---------- Saved components (`<library>/components/` — 🔒 D5, YAZ-1819) ----------
+
+/**
+ * ONE saved component as the index names it (🔒 D5). The SLUG is the identity: it is the file's
+ * own basename (`<library>/components/<slug>.excalidraw` + `<slug>.png`), so the folder can be
+ * read back into an index with nothing else on hand. The NAME is only the label, which is why a
+ * rename never moves a file — a component inserted into a board is not addressed by either.
+ */
+export interface ComponentItem {
+  slug: string
+  name: string
+  elementCount: number
+  createdAt: number
+  updatedAt: number
+}
+
+/** `<library>/components.json`: the index, rebuilt from the folder whenever it is missing or unreadable. */
+export interface ComponentsIndexFile {
+  version: 1
+  items: ComponentItem[]
+}
+
+/**
+ * `components:save` — the fragment and its picture, both already made by the renderer (only it has
+ * an engine). `fragmentJson` is a whole `.excalidraw` document with the component's image bytes
+ * EMBEDDED (🔒 D5: a component is small and self-contained, so it inserts into any vault);
+ * `previewPng` is a `data:image/png;base64,…` dataURL, which is the only way bytes cross the bridge.
+ */
+export interface ComponentSaveRequest {
+  name: string
+  fragmentJson: string
+  previewPng: string
+}
+
+/** `components:read` / `components:delete` / `components:preview` — a component by its slug. */
+export interface ComponentSlugRequest {
+  slug: string
+}
+
+/** `components:rename` — the label only; the slug, and therefore both files, stay put. */
+export interface ComponentRenameRequest {
+  slug: string
+  name: string
+}
+
+/** `components:read`'s answer: the fragment's bytes, exactly as they are on disk. */
+export interface ComponentReadResponse {
+  fragmentJson: string
+}
+
+/** The longest name a component may carry — the web app's `MAX_SAVED_COMPONENT_NAME_LENGTH`. */
+export const MAX_COMPONENT_NAME_LENGTH = 120
+
+/**
+ * The saved-component library as `window.yaseenDraw.components` (🔒 D5, YAZ-1819). The same shape
+ * as `media`: every mutation answers what it produced, and ONE payload-free push tells every
+ * window in every vault to re-list, because the library is one folder for all of them.
+ */
+export interface ComponentsApi {
+  /** The index, newest-updated first; a missing or corrupt index is rebuilt from the folder. */
+  list(): Promise<ComponentItem[]>
+  /** Write `<slug>.excalidraw` + `<slug>.png` and index them; the slug is derived from the name and uniqued. */
+  save(req: ComponentSaveRequest): Promise<ComponentItem>
+  /** The fragment's bytes, for an insert. */
+  read(req: ComponentSlugRequest): Promise<ComponentReadResponse>
+  /** Change the label; both files keep their names. */
+  rename(req: ComponentRenameRequest): Promise<ComponentItem>
+  /** Both files to the OS trash (`shell.trashItem`, never `fs.rm`), and the row out of the index. */
+  delete(req: ComponentSlugRequest): Promise<void>
+  /** The stored `<slug>.png` as a dataURL — the grid's tile picture. */
+  preview(req: ComponentSlugRequest): Promise<string>
+  /** Fired in EVERY window whenever the components library changes. Returns an unsubscribe. */
+  onChanged(listener: () => void): () => void
 }
 
 // ---------- Secrets (`userData/secrets.json` — 🔒 D4) ----------
@@ -1208,6 +1286,8 @@ export interface YaseenDrawApi {
   favorites: FavoritesApi
   /** The cross-vault media library over `<library>/media.json` (🔒 D4 / D5, YAZ-1817). */
   media: MediaApi
+  /** The cross-vault saved-component library over `<library>/components/` (🔒 D5, YAZ-1819). */
+  components: ComponentsApi
   /** Encrypted secrets in `userData/secrets.json` (🔒 D4) — write and ask, never read. */
   secrets: SecretsApi
   /** Per-vault GitHub sync, off by default (YAZ-1081). */

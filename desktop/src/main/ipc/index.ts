@@ -1,6 +1,7 @@
 import type { GitSyncManager } from '../git/manager'
 import type { Store } from '../store'
 import type { WindowManagerIpc } from '../windows'
+import { registerComponentsIpc } from './components'
 import { registerDialogIpc } from './dialog'
 import { registerDrawingIpc } from './drawing'
 import { registerFavoritesIpc } from './favorites'
@@ -33,6 +34,7 @@ export function registerIpc(store: Store, windows: WindowManagerIpc, userData: s
   registerVaultConfigIpc(store)
   registerFavoritesIpc(store)
   registerMediaIpc(store, userData)
+  registerComponentsIpc(store, userData)
   // 🔒 D4: the secrets instance is THREADED into the studio's providers — that is how a Pixabay
   // request gets its key without the key ever leaving main.
   registerMediaStudioIpc(userData, registerSecretsIpc(userData))

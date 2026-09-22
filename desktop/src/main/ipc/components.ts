@@ -1,0 +1,64 @@
+/**
+ * The `components.*` half of `window.yaseenDraw` (🔒 D5, YAZ-1819): the library's component store
+ * behind the envelope, plus the ONE push. `components:changed` carries no payload — every window
+ * re-lists, whichever vault it is on, because the library is the same folder for all of them.
+ *
+ * The store follows `settings.libraryFolder` exactly as the media store does: a change re-points
+ * it and counts as a change of the library (the components a window can offer are different now),
+ * so it broadcasts too.
+ *
+ * Validation is here rather than in the store for the shape of a request (a sandboxed renderer's
+ * arguments are input); the store owns what a NAME, a SLUG and a FRAGMENT have to be, because
+ * those are the same rules whether the call came over the bridge or not.
+ */
+import { shell } from 'electron'
+import type { AppState, ComponentRenameRequest, ComponentSaveRequest, ComponentSlugRequest } from '@shared/types'
+import { CH } from '../../channels'
+import { BridgeFailure } from '../fs/fsUtils'
+import { resolveLibraryFolder } from '../library/folder'
+import { createComponentStore, type ComponentStore } from '../library/componentStore'
+import { isRecord, type Store } from '../store'
+import { broadcastAll } from './broadcast'
+import { handle } from './envelope'
+
+function requireString(v: unknown, field: string): string {
+  if (typeof v !== 'string' || v === '') throw new BridgeFailure('BAD_REQUEST', `'${field}' must be a non-empty string`)
+  return v
+}
+
+function requireSlugRequest(v: unknown): ComponentSlugRequest {
+  if (!isRecord(v)) throw new BridgeFailure('BAD_REQUEST', 'missing request')
+  return { slug: requireString(v.slug, 'slug') }
+}
+
+function requireSaveRequest(v: unknown): ComponentSaveRequest {
+  if (!isRecord(v)) throw new BridgeFailure('BAD_REQUEST', 'missing request')
+  return { name: requireString(v.name, 'name'), fragmentJson: requireString(v.fragmentJson, 'fragmentJson'), previewPng: requireString(v.previewPng, 'previewPng') }
+}
+
+function requireRenameRequest(v: unknown): ComponentRenameRequest {
+  if (!isRecord(v)) throw new BridgeFailure('BAD_REQUEST', 'missing request')
+  return { slug: requireString(v.slug, 'slug'), name: requireString(v.name, 'name') }
+}
+
+/** Returns the store so a test can close its watcher; `main/index.ts` lets the process end take it. */
+export function registerComponentsIpc(store: Store, userData: string, trash: (p: string) => Promise<void> = (p) => shell.trashItem(p)): ComponentStore {
+  const folderFor = (state: AppState): string => resolveLibraryFolder(state.settings.libraryFolder, userData)
+  let folder = folderFor(store.get())
+  const components = createComponentStore(folder, { trash })
+  components.onChanged(() => broadcastAll(CH.componentsChanged))
+  store.onChange((state) => {
+    const next = folderFor(state)
+    if (next === folder) return
+    folder = next
+    components.setFolder(next)
+    broadcastAll(CH.componentsChanged)
+  })
+  handle(CH.componentsList, async () => components.list())
+  handle(CH.componentsSave, async (req: unknown) => components.save(requireSaveRequest(req)))
+  handle(CH.componentsRead, async (req: unknown) => ({ fragmentJson: await components.read(requireSlugRequest(req)) }))
+  handle(CH.componentsRename, async (req: unknown) => components.rename(requireRenameRequest(req)))
+  handle(CH.componentsDelete, async (req: unknown) => components.delete(requireSlugRequest(req)))
+  handle(CH.componentsPreview, async (req: unknown) => components.preview(requireSlugRequest(req)))
+  return components
+}
