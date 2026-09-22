@@ -19,9 +19,12 @@
  * - **`window.prompt` / `window.confirm` became inline UI.** The rename is a field in the card and
  *   the delete is a confirm row in it — the shell does not put native dialogs in front of the
  *   user, and 🔒 `confirmDelete` (Settings › Files) is what decides whether the row appears at all.
- * - **Import JSON is not here.** The tab's doors are Save selection and the per-item menu; pasting
- *   foreign JSON is not one of the things 3C was asked for, and `parseImportedComponentJson` was
- *   its only caller.
+ * - **Import JSON is a FILE PICKER, not a paste box** (YAZ-1833). The web app pasted JSON into a
+ *   dialog textarea because a browser tab has no other way to reach a file; this app has a native
+ *   open dialog, so the button opens one (`.excalidraw` filter) and the bytes come back with the
+ *   file's own base name, which becomes the component's name. Everything between — the envelope
+ *   table, the restore, the deleted filter, the size guard — is `componentImport.ts`, ported
+ *   verbatim. A file that cannot be imported shows a PASSIVE notice and writes nothing.
  * - **Insert is local and instant.** `insertRemoteSavedComponent`'s manifest, downloads and
  *   validation are one `components:read`, because the bytes are already in the fragment (🔒 D5).
  *
@@ -44,6 +47,7 @@ import {
   type ComponentTarget,
 } from './componentData'
 import { createComponentPreviewPng, type PreviewEngine } from './componentPreview'
+import { importedComponentName, parseImportedComponentJson } from './componentImport'
 import './savedComponents.css'
 
 /** The page the grid grows by — the web app's own `PAGE_SIZE`. */
@@ -52,6 +56,8 @@ export const PAGE_SIZE = 24
 /** What the tab says when the library is empty, and when a search matches nothing. */
 export const EMPTY_LIBRARY = 'No saved components yet'
 export const NOTHING_SELECTED = 'Select something on the canvas to save it as a component.'
+/** What a file that is not an importable component says — passively, because nothing was written. */
+export const IMPORT_FAILED = 'That file could not be imported as a component.'
 
 export interface SavedComponentsProps {
   /** The engine values a capture, an insert and a preview need; the tab only exists once it loaded. */
@@ -128,6 +134,9 @@ export function SavedComponents({ engine, excalidrawAPI, hasSelection }: SavedCo
   const [confirmingSlug, setConfirmingSlug] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(() => storage.getSettings().confirmDelete)
   const [error, setError] = useState<string | null>(null)
+  /** The import's own line: PASSIVE, because a refused import changed nothing (YAZ-1833). */
+  const [notice, setNotice] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
 
   // The library, and the ONE push that keeps it true in every window and every vault (🔒 D5).
   useEffect(() => {
@@ -222,6 +231,34 @@ export function SavedComponents({ engine, excalidrawAPI, hasSelection }: SavedCo
     }
   }
 
+  /**
+   * Import JSON (YAZ-1833): the native picker, the ported parser, then the SAME save door
+   * "Save selection" uses. The name is the file's own base name; the preview is drawn from the
+   * fragment and bounded like every other, so importing a whole board is allowed and its tile is
+   * still a tile. A failure anywhere is a passive notice and NOTHING written.
+   */
+  const importJson = async () => {
+    setError(null)
+    setNotice(null)
+    if (excalidrawAPI === null) return
+    setImporting(true)
+    try {
+      const picked = await api.dialog.openDrawing()
+      if ('cancelled' in picked) return
+      const imported = parseImportedComponentJson(engine, picked.content)
+      const previewPng = await createComponentPreviewPng(engine, {
+        elements: imported.elements,
+        appState: excalidrawAPI.getAppState() as unknown as Record<string, unknown>,
+        files: imported.files,
+      })
+      setItems([await api.components.save({ name: importedComponentName(picked.name), fragmentJson: componentFragmentJson(imported), previewPng }), ...items])
+    } catch (cause) {
+      setNotice(getErrorMessage(cause, IMPORT_FAILED))
+    } finally {
+      setImporting(false)
+    }
+  }
+
   const insert = (item: ComponentItem) =>
     run(
       item.slug,
@@ -272,6 +309,9 @@ export function SavedComponents({ engine, excalidrawAPI, hasSelection }: SavedCo
           <button type="button" onClick={startSave} disabled={!canSaveSelection} title={hasSelection ? 'Save selection' : NOTHING_SELECTED}>
             Save selection
           </button>
+          <button type="button" onClick={() => void importJson()} disabled={!canInsert || importing} title="Import an .excalidraw file as a component">
+            {importing ? 'Importing…' : 'Import JSON'}
+          </button>
         </div>
       </header>
 
@@ -309,6 +349,11 @@ export function SavedComponents({ engine, excalidrawAPI, hasSelection }: SavedCo
       />
 
       {!canInsert && <div className="saved-components__state">The canvas is still loading.</div>}
+      {notice !== null && (
+        <div className="saved-components__notice" role="status">
+          {notice}
+        </div>
+      )}
       {error !== null && (
         <div className="saved-components__error" role="alert">
           {error}

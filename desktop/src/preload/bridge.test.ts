@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { ComponentsApi, DrawingApi, FavoritesApi, FileApi, FileClipState, GithubApi, GithubSyncStatus, LinkApi, MediaApi, MenuApi, SecretsApi, ShellApi, StateApi, VaultConfigApi, WatchEvent, WindowApi, YaseenDrawApi } from '@shared/types'
+import type { ComponentsApi, DialogApi, DrawingApi, FavoritesApi, FileApi, FileClipState, GithubApi, GithubSyncStatus, LinkApi, MediaApi, MenuApi, SecretsApi, ShellApi, StateApi, VaultConfigApi, WatchEvent, WindowApi, YaseenDrawApi } from '@shared/types'
 import { CH } from '../channels'
 
 const exposed: Record<string, unknown> = {}
@@ -13,7 +13,7 @@ vi.mock('electron', () => ({
  * typecheck. `as const satisfies` keeps each tuple's literal type (a plain `readonly (keyof T)[]`
  * annotation would widen it and make `Exhaustive<>` vacuous) while still rejecting typos.
  */
-const TOP = ['tree', 'readFile', 'writeFile', 'createDir', 'createFile', 'drawing', 'pickFolder', 'watch', 'state', 'window', 'menu', 'link', 'file', 'shell', 'vaultConfig', 'favorites', 'media', 'components', 'secrets', 'github'] as const satisfies readonly (keyof YaseenDrawApi)[]
+const TOP = ['tree', 'readFile', 'writeFile', 'createDir', 'createFile', 'drawing', 'pickFolder', 'dialog', 'watch', 'state', 'window', 'menu', 'link', 'file', 'shell', 'vaultConfig', 'favorites', 'media', 'components', 'secrets', 'github'] as const satisfies readonly (keyof YaseenDrawApi)[]
 const STATE = ['get', 'setSettings', 'setSidebarWidth', 'pushRecent', 'removeRecent', 'setFolder', 'onChange'] as const satisfies readonly (keyof StateApi)[]
 const WINDOW = ['identity', 'setIdentity', 'open', 'duplicate', 'openRecent', 'closeSelf', 'zoom', 'onFlush'] as const satisfies readonly (keyof WindowApi)[]
 const MENU = ['onOpenFolder', 'onOpenRoot', 'onSearch', 'onSwitchVault', 'onSettings', 'onToggleSidebar', 'onCloseTab', 'onNextTab', 'onPrevTab', 'onExportImage', 'onCanvasBackground'] as const satisfies readonly (keyof MenuApi)[]
@@ -23,6 +23,7 @@ const SHELL = ['reveal', 'openVsCode', 'openDefault', 'openLink'] as const satis
 const VAULT_CONFIG = ['read', 'write', 'onChange'] as const satisfies readonly (keyof VaultConfigApi)[]
 const FAVORITES = ['get', 'set', 'onChanged'] as const satisfies readonly (keyof FavoritesApi)[]
 const DRAWING = ['load', 'save', 'libraryFolder'] as const satisfies readonly (keyof DrawingApi)[]
+const DIALOG = ['openDrawing'] as const satisfies readonly (keyof DialogApi)[]
 const GITHUB = ['status', 'syncNow', 'setEnabled', 'onStatus'] as const satisfies readonly (keyof GithubApi)[]
 const MEDIA = ['favorites', 'recent', 'onChanged', 'search', 'preview', 'import'] as const satisfies readonly (keyof MediaApi)[]
 const COMPONENTS = ['list', 'save', 'read', 'rename', 'delete', 'preview', 'onChanged'] as const satisfies readonly (keyof ComponentsApi)[]
@@ -38,11 +39,12 @@ const _shell: Exhaustive<ShellApi, typeof SHELL> = true
 const _vaultConfig: Exhaustive<VaultConfigApi, typeof VAULT_CONFIG> = true
 const _favorites: Exhaustive<FavoritesApi, typeof FAVORITES> = true
 const _drawing: Exhaustive<DrawingApi, typeof DRAWING> = true
+const _dialog: Exhaustive<DialogApi, typeof DIALOG> = true
 const _github: Exhaustive<GithubApi, typeof GITHUB> = true
 const _media: Exhaustive<MediaApi, typeof MEDIA> = true
 const _components: Exhaustive<ComponentsApi, typeof COMPONENTS> = true
 const _secrets: Exhaustive<SecretsApi, typeof SECRETS> = true
-void [_top, _state, _window, _menu, _link, _file, _shell, _vaultConfig, _favorites, _drawing, _github, _media, _components, _secrets]
+void [_top, _state, _window, _menu, _link, _file, _shell, _vaultConfig, _favorites, _drawing, _dialog, _github, _media, _components, _secrets]
 
 describe('preload bridge', () => {
   it('installs window.yaseenDraw with every contract method', async () => {
@@ -61,6 +63,7 @@ describe('preload bridge', () => {
     for (const k of GITHUB) expect(typeof api.github[k], `github.${k}`).toBe('function')
     for (const k of MEDIA) expect(typeof api.media[k], `media.${k}`).toBe('function')
     for (const k of COMPONENTS) expect(typeof api.components[k], `components.${k}`).toBe('function')
+    for (const k of DIALOG) expect(typeof api.dialog[k], `dialog.${k}`).toBe('function')
     for (const k of SECRETS) expect(typeof api.secrets[k], `secrets.${k}`).toBe('function')
   })
 

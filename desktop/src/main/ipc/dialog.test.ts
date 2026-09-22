@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { CH, type Envelope } from '../../channels'
 import { registerDialogIpc } from './dialog'
@@ -29,10 +32,11 @@ beforeEach(() => {
 })
 
 const pick = () => registered(CH.dialogPickFolder)({ sender })
+const open = () => registered(CH.dialogOpenFile)({ sender })
 
 describe('dialog:pick-folder', () => {
-  it('registers exactly the pick-folder channel', () => {
-    expect(vi.mocked(ipcMain.handle).mock.calls.map(([ch]) => ch)).toEqual([CH.dialogPickFolder])
+  it('registers exactly the two dialog channels', () => {
+    expect(vi.mocked(ipcMain.handle).mock.calls.map(([ch]) => ch)).toEqual([CH.dialogPickFolder, CH.dialogOpenFile])
   })
 
   it('opens an openDirectory dialog parented to the calling window and answers { path }', async () => {
@@ -124,5 +128,77 @@ describe('one dialog in flight per window', () => {
     expect(await pick()).toEqual({ ok: false, error: { code: 'PICKER_FAILED', message: 'no display' } })
     showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/Users/x/vault'] })
     expect(await pick()).toEqual({ ok: true, value: { path: '/Users/x/vault' } })
+  })
+})
+
+
+/**
+ * The import picker (YAZ-1833). It answers the picked file's BYTES, so these run against a real
+ * temp file — the read is the door's own, not a mock's.
+ */
+describe('dialog:open-file', () => {
+  let dir = ''
+  const made: string[] = []
+  const file = async (name: string, content: string) => {
+    if (dir === '') {
+      dir = await mkdtemp(path.join(tmpdir(), 'yd-dialog-'))
+      made.push(dir)
+    }
+    const p = path.join(dir, name)
+    await writeFile(p, content, 'utf8')
+    return p
+  }
+  afterAll(async () => {
+    for (const d of made) await rm(d, { recursive: true, force: true })
+  })
+
+  it('opens an openFile dialog filtered to .excalidraw, parented to the calling window', async () => {
+    const win = { id: 'w' } as unknown as BrowserWindow
+    fromWebContents.mockReturnValue(win)
+    const picked = await file('03 Legacy embedded.excalidraw', '{"type":"excalidraw","elements":[]}')
+    showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [picked] })
+    expect(await open()).toEqual({
+      ok: true,
+      value: { path: picked, name: '03 Legacy embedded', content: '{"type":"excalidraw","elements":[]}' },
+    })
+    expect(showOpenDialog).toHaveBeenCalledWith(win, {
+      title: 'Import Excalidraw JSON',
+      properties: ['openFile'],
+      filters: [{ name: 'Excalidraw', extensions: ['excalidraw'] }],
+    })
+  })
+
+  it('answers { cancelled: true } when the dialog is dismissed or returns no path', async () => {
+    showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] })
+    expect(await open()).toEqual({ ok: true, value: { cancelled: true } })
+    showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [] })
+    expect(await open()).toEqual({ ok: true, value: { cancelled: true } })
+  })
+
+  it('a filter can be defeated by typing a name, so the extension is checked again', async () => {
+    const picked = await file('notes.txt', 'hello')
+    showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [picked] })
+    expect(await open()).toEqual({ ok: false, error: { code: 'UNSUPPORTED_EXTENSION', message: 'only .excalidraw files are editable', path: picked } })
+  })
+
+  it('a file that has gone between the pick and the read is NOT_FOUND, never a crash', async () => {
+    showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [path.join(tmpdir(), 'yd-dialog-missing', 'gone.excalidraw')] })
+    const answer = (await open()) as { ok: false; error: { code: string } }
+    expect(answer.ok).toBe(false)
+    expect(answer.error.code).toBe('NOT_FOUND')
+  })
+
+  it('shares the one-dialog-in-flight guard with the folder picker', async () => {
+    let settle!: (v: Electron.OpenDialogReturnValue) => void
+    showOpenDialog.mockReturnValueOnce(
+      new Promise<Electron.OpenDialogReturnValue>((r) => {
+        settle = r
+      }),
+    )
+    const first = pick()
+    expect(await open()).toEqual({ ok: true, value: { cancelled: true } })
+    expect(showOpenDialog).toHaveBeenCalledTimes(1)
+    settle({ canceled: true, filePaths: [] })
+    expect(await first).toEqual({ ok: true, value: { cancelled: true } })
   })
 })

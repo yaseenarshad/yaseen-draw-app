@@ -313,6 +313,17 @@
   text-align: center;
 }
 
+/* The import's passive line (YAZ-1833): nothing was written, so it never reads as danger. */
+.saved-components__notice {
+  background: var(--island-bg-color);
+  border: 1px solid var(--default-border-color);
+  border-radius: 8px;
+  color: var(--text-secondary-color);
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 8px;
+}
+
 .saved-components__error {
   background: var(--color-danger-light);
   border: 1px solid var(--color-danger);

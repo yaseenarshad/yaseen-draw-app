@@ -12,7 +12,10 @@ import { DEFAULT_SETTINGS, type ComponentItem } from '@shared/types'
 
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),
-  api: { components: { list: vi.fn(), save: vi.fn(), read: vi.fn(), rename: vi.fn(), delete: vi.fn(), preview: vi.fn(), onChanged: vi.fn() } },
+  api: {
+    components: { list: vi.fn(), save: vi.fn(), read: vi.fn(), rename: vi.fn(), delete: vi.fn(), preview: vi.fn(), onChanged: vi.fn() },
+    dialog: { openDrawing: vi.fn() },
+  },
 }))
 vi.mock('../drawings/engine', () => ({ loadExcalidrawElement: vi.fn() }))
 vi.mock('../lib/storage', () => ({ storage: { getSettings: vi.fn(), subscribe: vi.fn() } }))
@@ -25,6 +28,7 @@ import type { ComponentElementApi, ComponentEngine, ComponentTarget } from './co
 import type { PreviewEngine } from './componentPreview'
 
 const components = vi.mocked(api.components)
+const dialog = vi.mocked(api.dialog)
 const loadElement = vi.mocked(loadExcalidrawElement)
 const store = vi.mocked(storage)
 
@@ -71,6 +75,7 @@ beforeEach(() => {
   components.delete.mockReset().mockResolvedValue(undefined)
   components.preview.mockReset().mockResolvedValue('data:image/png;base64,AA==')
   components.onChanged.mockReset().mockReturnValue(() => undefined)
+  dialog.openDrawing.mockReset().mockResolvedValue({ cancelled: true })
   loadElement.mockReset().mockResolvedValue(element as never)
   store.getSettings.mockReset().mockReturnValue(DEFAULT_SETTINGS)
   store.subscribe.mockReset().mockReturnValue(() => undefined)
@@ -101,6 +106,18 @@ const button = (el: HTMLElement, label: string) => el.querySelector<HTMLButtonEl
 const byText = (el: HTMLElement, label: string) => [...el.querySelectorAll('button')].find((b) => b.textContent?.trim() === label)
 /** The menu items carry a visually-hidden name after their verb (`Rename A card`). */
 const byPrefix = (el: HTMLElement, label: string) => [...el.querySelectorAll('button')].find((b) => b.textContent?.trim().startsWith(label))
+/**
+ * Flush TASKS until `check` holds. A preview goes through `FileReader`, which settles on a task
+ * rather than a microtask, so under full-suite load one turn is not always enough — and a call
+ * that lands late would be recorded against the NEXT test.
+ */
+const settle = async (check: () => boolean, turns = 40) => {
+  for (let i = 0; i < turns && !check(); i += 1) {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+  }
+}
 /** A click, then everything it started: a save goes through FileReader, which settles on a task. */
 const click = async (node: Element | null | undefined) => {
   await act(async () => node?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
@@ -209,6 +226,61 @@ describe('SavedComponents — saving the selection', () => {
     })
     // The new component is at the head of the grid without waiting for the push.
     expect(text(el)).toContain('A card')
+  })
+
+  it('Import JSON opens the native picker, saves under the FILE\u2019s base name, and previews the fragment (YAZ-1833)', async () => {
+    dialog.openDrawing.mockResolvedValue({
+      path: '/Users/x/boards/03 Legacy embedded.excalidraw',
+      name: '03 Legacy embedded',
+      content: JSON.stringify({
+        type: 'excalidraw',
+        version: 2,
+        elements: [
+          { id: 'i1', type: 'image', fileId: 'f1' },
+          { id: 'i2', type: 'image', fileId: 'f2' },
+        ],
+        appState: {},
+        files: { f1: { mimeType: 'image/png', dataURL: 'data:image/png;base64,AA==' }, f2: { mimeType: 'image/png', dataURL: 'data:image/png;base64,BB==' } },
+      }),
+    })
+    components.save.mockResolvedValue(item({ slug: '03-legacy-embedded', name: '03 Legacy embedded', elementCount: 2 }))
+    const { el } = await mount({ hasSelection: false })
+    await click(byText(el, 'Import JSON'))
+    await settle(() => components.save.mock.calls.length > 0)
+    expect(dialog.openDrawing).toHaveBeenCalledOnce()
+    expect(components.save).toHaveBeenCalledExactlyOnceWith({
+      name: '03 Legacy embedded',
+      // The two images are EMBEDDED in the fragment, which is what makes a component portable.
+      fragmentJson: expect.stringContaining('data:image/png;base64,AA=='),
+      previewPng: expect.stringMatching(/^data:image\/png;base64,/),
+    })
+    expect(text(el)).toContain('03 Legacy embedded')
+  })
+
+  it('a cancelled picker writes nothing and says nothing', async () => {
+    const { el } = await mount({ hasSelection: false })
+    components.save.mockClear()
+    await click(byText(el, 'Import JSON'))
+    expect(components.save).not.toHaveBeenCalled()
+    expect(el.querySelector('[role="status"]')).toBe(null)
+  })
+
+  it('a corrupt or empty file is a PASSIVE notice, and nothing is written', async () => {
+    dialog.openDrawing.mockResolvedValue({ path: '/x/broken.excalidraw', name: 'broken', content: 'not json' })
+    const { el } = await mount({ hasSelection: false })
+    components.save.mockClear()
+    await click(byText(el, 'Import JSON'))
+    await settle(() => el.querySelector('[role="status"]') !== null)
+    expect(components.save).not.toHaveBeenCalled()
+    expect(el.querySelector('[role="status"]')?.textContent).toContain('not valid JSON')
+    // Passive: the import failure never claims the assertive error line.
+    expect(el.querySelector('[role="alert"]')).toBe(null)
+
+    dialog.openDrawing.mockResolvedValue({ path: '/x/empty.excalidraw', name: 'empty', content: JSON.stringify({ type: 'excalidraw', elements: [] }) })
+    await click(byText(el, 'Import JSON'))
+    await settle(() => (el.querySelector('[role="status"]')?.textContent ?? '').includes('at least one element'))
+    expect(components.save).not.toHaveBeenCalled()
+    expect(el.querySelector('[role="status"]')?.textContent).toContain('at least one element')
   })
 
   it('a selection that cannot be a component says why, and asks for no name', async () => {
