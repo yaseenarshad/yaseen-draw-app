@@ -1909,6 +1909,8 @@ describe('context menu order (GRO-2272 C1a)', () => {
       // The favorite toggle (YAZ-1766 D3) leads the "Open in ▸" group, one hairline above Delete.
       'Add to favorites',
       'Open in',
+      // Info (🔒 YAZ-1835 D6) sits in Delete's group, right above it.
+      'Info',
       'Delete',
     ])
   })
@@ -2593,5 +2595,221 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
     shiftClickRow(rowByPath(el, '/v/c.excalidraw'))
     act(() => void rowByPath(el, '/v/a.excalidraw')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 })))
     expect(el.querySelectorAll('.tree__row--selected')).toHaveLength(2)
+  })
+})
+
+/**
+ * The sort control (🔒 YAZ-1835 D1–D5): a header button on the Files lens opening the three-item
+ * menu; the order is a VIEW applied to the rows, remembered per vault through `storage`, followed
+ * across windows through the store's subscription, and a watcher `change` event (a save) refreshes
+ * the tree so a saved board can rise.
+ */
+const SORTABLE: TreeNode[] = [
+  // Inside `sub`, name order and date order DISAGREE, so a recursion test can tell them apart.
+  { type: 'dir', name: 'sub', path: '/v/sub', children: [{ type: 'file', name: 'a-first.excalidraw', path: '/v/sub/a-first.excalidraw', size: 1, mtime: 1, kind: 'drawing', meta: { createdAt: 1, updatedAt: 1 } }, { type: 'file', name: 'b-second.excalidraw', path: '/v/sub/b-second.excalidraw', size: 1, mtime: 1, kind: 'drawing', meta: { createdAt: 2, updatedAt: 2 } }] },
+  { type: 'file', name: 'Apple.excalidraw', path: '/v/Apple.excalidraw', size: 1, mtime: 10, kind: 'drawing', meta: { createdAt: 400, updatedAt: 900 } },
+  { type: 'file', name: 'Banana.excalidraw', path: '/v/Banana.excalidraw', size: 1, mtime: 10, kind: 'drawing', meta: { createdAt: 990, updatedAt: 991 } },
+  { type: 'file', name: 'Cherry.excalidraw', path: '/v/Cherry.excalidraw', size: 1, mtime: 10, kind: 'drawing', meta: { createdAt: 300, updatedAt: 950 } },
+  { type: 'file', name: 'notes.txt', path: '/v/notes.txt', size: 1, mtime: 5, kind: null },
+]
+/** The visible board rows, top level only unless asked — the real `storage` keeps `sub` expanded across mounts. */
+const rowPaths = (el: HTMLElement, nested = false) => [...el.querySelectorAll<HTMLElement>('.tree__row--file')].map((r) => r.title.replace('/v/', '')).filter((p) => nested || !p.includes('/'))
+const sortButton = (el: HTMLElement) => el.querySelector<HTMLButtonElement>('.sidebar__sort')
+const mountSortable = (over: Partial<SidebarProps> = {}) => mount(over, (b) => b.tree.mockResolvedValue({ root: '/v', tree: SORTABLE, generatedAt: 1 }))
+
+describe('sort control (🔒 YAZ-1835)', () => {
+  it('shows on the Files lens, not on Favorites and not while a query is typed; the tree starts in name order', async () => {
+    const { el } = await mountSortable()
+    expect(sortButton(el)?.getAttribute('aria-label')).toBe('Sort by Name')
+    expect(rowPaths(el)).toEqual(['Apple.excalidraw', 'Banana.excalidraw', 'Cherry.excalidraw', 'notes.txt'])
+    const input = searchInput(el)
+    if (input === null) throw new Error('no search input')
+    await type(input, 'a')
+    expect(sortButton(el)).toBeNull()
+    await type(input, '')
+    expect(sortButton(el)).not.toBeNull()
+    const fav = await mountSortable({ lens: 'favorites' })
+    expect(sortButton(fav.el)).toBeNull()
+  })
+
+  it('opens a three-item menu with a check on the current order; picking one reorders the rows and writes the vault`s sortOrder', async () => {
+    const { el, bridge } = await mountSortable()
+    act(() => sortButton(el)?.click())
+    const items = menuItems(el)
+    expect(items.map((b) => b.textContent)).toEqual(['Name', 'Last updated', 'Created'])
+    expect(items.map((b) => b.dataset.hint ?? '')).toEqual(['✓', '', ''])
+    await act(async () => itemByLabel(el, 'Last updated')?.click())
+    expect(rowPaths(el)).toEqual(['Banana.excalidraw', 'Cherry.excalidraw', 'Apple.excalidraw', 'notes.txt'])
+    expect(bridge.state.setFolder).toHaveBeenLastCalledWith('/v', { sortOrder: 'updated' })
+    expect(sortButton(el)?.getAttribute('aria-label')).toBe('Sort by Last updated')
+    expect(menuItems(el)).toEqual([]) // the menu closed on select
+    act(() => sortButton(el)?.click())
+    await act(async () => itemByLabel(el, 'Created')?.click())
+    expect(rowPaths(el)).toEqual(['Banana.excalidraw', 'Apple.excalidraw', 'Cherry.excalidraw', 'notes.txt'])
+  })
+
+  it('folder contents follow the order once the folder is open', async () => {
+    vi.spyOn(storage, 'getSortOrder').mockReturnValue('name') // the real `storage` still holds the previous test's pick
+    const { el } = await mountSortable()
+    act(() => el.querySelector<HTMLButtonElement>('.tree__row--dir')?.click())
+    expect(rowPaths(el, true).slice(0, 2)).toEqual(['sub/a-first.excalidraw', 'sub/b-second.excalidraw'])
+    act(() => sortButton(el)?.click())
+    await act(async () => itemByLabel(el, 'Last updated')?.click())
+    expect(rowPaths(el, true).slice(0, 2)).toEqual(['sub/b-second.excalidraw', 'sub/a-first.excalidraw'])
+    act(() => el.querySelector<HTMLButtonElement>('.tree__row--dir')?.click()) // fold it back: `storage` remembers expansion across mounts
+  })
+
+  it('starts on the order the vault remembers, and follows another window`s change through the store', async () => {
+    const get = vi.spyOn(storage, 'getSortOrder').mockReturnValue('updated')
+    let wake: (() => void) | null = null
+    vi.spyOn(storage, 'subscribe').mockImplementation((l) => ((wake = l), () => (wake = null)))
+    const { el } = await mountSortable()
+    expect(rowPaths(el)[0]).toBe('Banana.excalidraw')
+    get.mockReturnValue('name')
+    await act(async () => wake?.())
+    expect(rowPaths(el)[0]).toBe('Apple.excalidraw')
+  })
+
+  it('sorts inside Focus Mode too — the focused folder`s children, in the order', async () => {
+    vi.spyOn(storage, 'getFocusDirs').mockReturnValue(['/v/sub'])
+    vi.spyOn(storage, 'getSortOrder').mockReturnValue('updated')
+    const { el } = await mountSortable()
+    // The focused folder IS the top row; open it and its children come in the order.
+    act(() => el.querySelector<HTMLButtonElement>('.tree__row--dir')?.click())
+    expect(rowPaths(el, true)).toEqual(['sub/b-second.excalidraw', 'sub/a-first.excalidraw'])
+    act(() => el.querySelector<HTMLButtonElement>('.tree__row--dir')?.click()) // fold it back for the tests after
+  })
+
+  it('the Favorites lens keeps the hand order and ⌘K keeps its ranking, whatever the sort (D1)', async () => {
+    vi.spyOn(storage, 'getSortOrder').mockReturnValue('updated')
+    const { el } = await mount({ lens: 'favorites' }, (b) => {
+      b.tree.mockResolvedValue({ root: '/v', tree: SORTABLE, generatedAt: 1 })
+      b.favorites.get.mockResolvedValue(['/v/Cherry.excalidraw', '/v/Apple.excalidraw', '/v/Banana.excalidraw'])
+    })
+    expect(rowPaths(el)).toEqual(['Cherry.excalidraw', 'Apple.excalidraw', 'Banana.excalidraw']) // NOT Banana, Cherry, Apple
+    // Info is offered on a board row here as well (either lens, D6).
+    act(() => void [...el.querySelectorAll<HTMLElement>('.tree__row--file')][0]?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
+    expect(itemByLabel(el, 'Info')).toBeDefined()
+    const files = await mountSortable()
+    const input = searchInput(files.el)
+    if (input === null) throw new Error('no search input')
+    await type(input, 'an')
+    expect([...files.el.querySelectorAll('.search-results__row .search-results__label')].map((n) => n.textContent)).toEqual(['Banana']) // ranked, not sorted
+    await type(input, 'a')
+    const labels = [...files.el.querySelectorAll('.search-results__row .search-results__label')].map((n) => n.textContent)
+    expect(labels.indexOf('Apple')).toBeLessThan(labels.indexOf('Banana')) // the catalog's own order, though "updated" would flip them
+  })
+
+  it('an older tree walk that lands AFTER a newer one is dropped (D4 — walks overlap now)', async () => {
+    let notify: ((ev: WatchEvent) => void) | null = null
+    const { el, bridge } = await mountSortable({ watch: { subscribe: (l) => ((notify = l), () => (notify = null)) } })
+    const resolvers: Array<(v: { root: string; tree: TreeNode[]; generatedAt: number }) => void> = []
+    bridge.tree.mockImplementation(() => new Promise((r) => resolvers.push(r)))
+    await act(async () => notify?.({ type: 'change', path: '/v/Apple.excalidraw', mtime: 1 }))
+    await act(async () => notify?.({ type: 'change', path: '/v/Apple.excalidraw', mtime: 2 }))
+    expect(resolvers).toHaveLength(2)
+    const renamed = (name: string, at: number) => ({ root: '/v', tree: [{ type: 'file' as const, name, path: `/v/${name}`, size: 1, mtime: 1, kind: 'drawing' as const }], generatedAt: at })
+    await act(async () => resolvers[1]?.(renamed('newer.excalidraw', 20)))
+    await act(async () => resolvers[0]?.(renamed('older.excalidraw', 10)))
+    expect(rowPaths(el)).toEqual(['newer.excalidraw'])
+  })
+
+  it('a watcher `change` event refreshes the tree, so a saved board can rise (D4)', async () => {
+    let notify: ((ev: WatchEvent) => void) | null = null
+    const { el, bridge } = await mountSortable({ watch: { subscribe: (l) => ((notify = l), () => (notify = null)) } })
+    act(() => sortButton(el)?.click())
+    await act(async () => itemByLabel(el, 'Last updated')?.click())
+    const calls = bridge.tree.mock.calls.length
+    const saved = SORTABLE.map((n) => (n.type === 'file' && n.name === 'Apple.excalidraw' ? { ...n, meta: { createdAt: 400, updatedAt: 5000 } } : n))
+    bridge.tree.mockResolvedValue({ root: '/v', tree: saved, generatedAt: 2 })
+    await act(async () => notify?.({ type: 'change', path: '/v/Apple.excalidraw', mtime: 5000 }))
+    expect(bridge.tree.mock.calls.length).toBe(calls + 1)
+    expect(rowPaths(el)[0]).toBe('Apple.excalidraw')
+  })
+})
+
+/**
+ * "Info" (🔒 YAZ-1835 D6/D7): above Delete on a board row only, opening a popover that reads the LIVE
+ * tree node — a refresh moves its dates, the board vanishing closes it, Escape closes it.
+ */
+describe('Info popover (🔒 YAZ-1835 D6/D7)', () => {
+  const rightClick = (target: Element | null | undefined) => act(() => void target?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 50 })))
+  const rowFor = (el: HTMLElement, name: string) => [...el.querySelectorAll<HTMLElement>('.tree__row--file')].find((r) => r.title === `/v/${name}`)
+  const popover = (el: HTMLElement) => el.querySelector<HTMLElement>('.board-info')
+  const row = (el: HTMLElement, label: string) => [...(popover(el)?.querySelectorAll('dt') ?? [])].find((dt) => dt.textContent === label)?.nextElementSibling?.textContent
+
+  it('is offered on a board row, directly above Delete, and on nothing else', async () => {
+    const { el } = await mountSortable()
+    rightClick(rowFor(el, 'Apple.excalidraw'))
+    const labels = menuItems(el).map((b) => b.textContent)
+    expect(labels.indexOf('Info')).toBe(labels.indexOf('Delete') - 1)
+    rightClick(rowFor(el, 'notes.txt'))
+    expect(itemByLabel(el, 'Info')).toBeUndefined()
+    rightClick(el.querySelector('.tree__row--dir'))
+    expect(itemByLabel(el, 'Info')).toBeUndefined()
+    rightClick(el.querySelector('.sidebar__body'))
+    expect(itemByLabel(el, 'Info')).toBeUndefined()
+    // A 2+ selection has no single board to describe (the multi-select idiom: shift-click extends).
+    act(() => void rowFor(el, 'Apple.excalidraw')?.dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: true })))
+    act(() => void rowFor(el, 'Banana.excalidraw')?.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true })))
+    expect(el.querySelectorAll('.tree__row--selected').length).toBe(2)
+    rightClick(rowFor(el, 'Apple.excalidraw'))
+    expect(itemByLabel(el, 'Info')).toBeUndefined()
+    expect(itemByLabel(el, 'Delete')).toBeDefined()
+  })
+
+  it('opens the popover with the six rows, follows a tree refresh, and closes when the board is gone', async () => {
+    let notify: ((ev: WatchEvent) => void) | null = null
+    const { el, bridge } = await mountSortable({ watch: { subscribe: (l) => ((notify = l), () => (notify = null)) } })
+    rightClick(rowFor(el, 'Apple.excalidraw'))
+    await act(async () => itemByLabel(el, 'Info')?.click())
+    expect(menuItems(el)).toEqual([]) // the menu closed; the popover stands on its own
+    expect(row(el, 'Name')).toBe('Apple.excalidraw')
+    expect(row(el, 'Folder')).toBe('/')
+    expect(row(el, 'Size')).toBe('1 B')
+    expect(row(el, 'Created')).toMatch(/^(Dec 31, 1969|Jan 1, 1970)/) // epoch 400 ms, in whatever zone the machine keeps
+    const before = row(el, 'Updated')
+    // A save elsewhere: the watcher refreshes the tree and the popover shows the new date.
+    const later = Date.now()
+    bridge.tree.mockResolvedValue({ root: '/v', tree: SORTABLE.map((n) => (n.type === 'file' && n.name === 'Apple.excalidraw' ? { ...n, meta: { createdAt: 400, updatedAt: later } } : n)), generatedAt: 2 })
+    await act(async () => notify?.({ type: 'change', path: '/v/Apple.excalidraw', mtime: later }))
+    expect(row(el, 'Updated')).not.toBe(before)
+    expect(row(el, 'Updated')).toMatch(/· just now$/)
+    // The board vanishes: the popover has nothing to describe and closes.
+    bridge.tree.mockResolvedValue({ root: '/v', tree: SORTABLE.filter((n) => n.name !== 'Apple.excalidraw'), generatedAt: 3 })
+    await act(async () => notify?.({ type: 'unlink', path: '/v/Apple.excalidraw' }))
+    expect(popover(el)).toBeNull()
+  })
+
+  it('a legacy board reads "Not stamped yet"; Escape closes the popover, and so does a click away', async () => {
+    const legacy = [...SORTABLE, { type: 'file' as const, name: 'Legacy.excalidraw', path: '/v/Legacy.excalidraw', size: 2048, mtime: 7, kind: 'drawing' as const }]
+    const { el } = await mount({}, (b) => b.tree.mockResolvedValue({ root: '/v', tree: legacy, generatedAt: 1 }))
+    const open = async () => {
+      rightClick(rowFor(el, 'Legacy.excalidraw'))
+      await act(async () => itemByLabel(el, 'Info')?.click())
+    }
+    await open()
+    expect(el.querySelector('[role="dialog"] .board-info')).not.toBeNull()
+    expect(row(el, 'Created')).toBe('Not stamped yet · written on the next save')
+    expect(row(el, 'Size')).toBe('2.0 KB')
+    act(() => void window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+    expect(popover(el)).toBeNull()
+    await open()
+    act(() => void window.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })))
+    expect(popover(el)).toBeNull()
+  })
+
+  it('a board that comes BACK after vanishing does not reopen its popover', async () => {
+    let notify: ((ev: WatchEvent) => void) | null = null
+    const { el, bridge } = await mountSortable({ watch: { subscribe: (l) => ((notify = l), () => (notify = null)) } })
+    rightClick(rowFor(el, 'Apple.excalidraw'))
+    await act(async () => itemByLabel(el, 'Info')?.click())
+    expect(popover(el)).not.toBeNull()
+    bridge.tree.mockResolvedValue({ root: '/v', tree: SORTABLE.filter((n) => n.name !== 'Apple.excalidraw'), generatedAt: 2 })
+    await act(async () => notify?.({ type: 'unlink', path: '/v/Apple.excalidraw' }))
+    expect(popover(el)).toBeNull()
+    bridge.tree.mockResolvedValue({ root: '/v', tree: SORTABLE, generatedAt: 3 })
+    await act(async () => notify?.({ type: 'add', path: '/v/Apple.excalidraw', mtime: 3 }))
+    expect(popover(el)).toBeNull()
   })
 })

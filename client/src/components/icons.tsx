@@ -49,6 +49,13 @@ export const ChevronsIcon = () => (
   </svg>
 )
 
+/** The sort control (YAZ-1835): three bars, shortest last. */
+export const SortIcon = () => (
+  <svg {...svg}>
+    <path d="M3 4.5h10M3 8h7M3 11.5h4" />
+  </svg>
+)
+
 /** Focus Mode's eye (YAZ-1605). */
 export const EyeIcon = () => (
   <svg {...svg}>

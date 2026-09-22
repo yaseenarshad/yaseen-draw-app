@@ -98,7 +98,7 @@ describe('registerStateIpc', () => {
 
   it('state:set-folder checks the root and the patch shape', async () => {
     expect(await registered(CH.stateSetFolder)({ sender }, '/v', { expanded: ['/v/sub'], lastFile: '/v/a.excalidraw' })).toEqual(ok(undefined))
-    expect(store.get().folders['/v']).toEqual({ expanded: ['/v/sub'], lastFile: '/v/a.excalidraw' })
+    expect(store.get().folders['/v']).toEqual({ expanded: ['/v/sub'], lastFile: '/v/a.excalidraw', sortOrder: 'name' })
     expect(await registered(CH.stateSetFolder)({ sender }, '/v', { lastFile: null })).toEqual(ok(undefined))
     expect(store.get().folders['/v'].lastFile).toBeNull()
     expect(await registered(CH.stateSetFolder)({ sender }, 'v', {})).toEqual(bad('NOT_ABSOLUTE'))
@@ -106,10 +106,18 @@ describe('registerStateIpc', () => {
     expect(await registered(CH.stateSetFolder)({ sender }, '/v', { expanded: 'nope' })).toEqual(bad('BAD_REQUEST'))
     expect(await registered(CH.stateSetFolder)({ sender }, '/v', { expanded: [1] })).toEqual(bad('BAD_REQUEST'))
     expect(await registered(CH.stateSetFolder)({ sender }, '/v', { lastFile: 5 })).toEqual(bad('BAD_REQUEST'))
-    expect(store.get().folders['/v']).toEqual({ expanded: ['/v/sub'], lastFile: null })
+    expect(store.get().folders['/v']).toEqual({ expanded: ['/v/sub'], lastFile: null, sortOrder: 'name' })
     // Focus Mode's lists are window identity since YAZ-1628 (`window.setIdentity`): here they are unknown keys, ignored like any other.
     expect(await registered(CH.stateSetFolder)({ sender }, '/v', { focusDirs: ['/v/sub'] })).toEqual(ok(undefined))
-    expect(store.get().folders['/v']).toEqual({ expanded: ['/v/sub'], lastFile: null })
+    expect(store.get().folders['/v']).toEqual({ expanded: ['/v/sub'], lastFile: null, sortOrder: 'name' })
+    // The sort order (🔒 YAZ-1835 D3): the three values pass, anything else — "opened" above all — is refused.
+    for (const sortOrder of ['updated', 'created', 'name'] as const) {
+      expect(await registered(CH.stateSetFolder)({ sender }, '/v', { sortOrder })).toEqual(ok(undefined))
+      expect(store.get().folders['/v'].sortOrder).toBe(sortOrder)
+    }
+    expect(await registered(CH.stateSetFolder)({ sender }, '/v', { sortOrder: 'opened' })).toEqual(bad('BAD_REQUEST'))
+    expect(await registered(CH.stateSetFolder)({ sender }, '/v', { sortOrder: 1 })).toEqual(bad('BAD_REQUEST'))
+    expect(store.get().folders['/v'].sortOrder).toBe('name')
   })
 
   it('broadcasts state:changed with the new state to every live window, skipping destroyed ones', async () => {

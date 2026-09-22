@@ -24,7 +24,7 @@ import type { MenuTargets } from './Sidebar'
 interface MenuItemBase {
   id: string
   label: string
-  /** Right-aligned shortcut hint (⌘X …), drawn from `data-hint` by CSS — never part of the label. */
+  /** Right-aligned hint — a shortcut (⌘X …) or a state mark (the sort menu's ✓, 🔒 YAZ-1835 D5) — drawn from `data-hint` by CSS, never part of the label. */
   hint?: string
   danger?: boolean
 }
@@ -87,6 +87,8 @@ export interface MenuHandlers {
   /** "Add to favorites" / "Remove N from favorites" (YAZ-1766 D3): the paths and the direction the menu read, same idiom. */
   onToggleFavorite: (paths: string[], isOn: boolean) => void
   onRename: (path: string) => void
+  /** "Info" (🔒 YAZ-1835 D6): open the board's popover; the caller anchors it where the menu was. */
+  onInfo: (path: string) => void
   onDelete: (path: string) => void
 }
 
@@ -277,13 +279,14 @@ const openIn: Item = (t, h) => {
   return { id: 'open-in', label: 'Open in', children }
 }
 
-// ---- (6) Delete: LAST, alone (GRO-2272 `C1a-`, LOCKED) ----
+// ---- (6) Delete's group: Info, then Delete — LAST (GRO-2272 `C1a-`, LOCKED; Info above it, 🔒 YAZ-1835 D6) ----
 
 /**
  * Delete renders LAST (GRO-2272 `C1a-`, LOCKED): VS Code's Explorer puts it at the bottom, and
  * destructive-last is safer on its own merits — Delete used to sit directly under Rename, the
  * misclick pair that matters most; 🔒 YAZ-1337 D7 now puts a whole group ("Open in ▸") and two
- * separators between them.
+ * separators between them. Its one neighbour is now Info (🔒 YAZ-1835 D6), a read-only item —
+ * the safest thing a misclick can land on.
  * Delete opens the confirm sheet; it must NEVER delete directly. Null on blank space: no target,
  * and main refuses the vault root anyway.
  */
@@ -293,12 +296,19 @@ const del: Leaf = (t, h) => {
   return { id: 'delete', label: 'Delete', danger: true, onSelect: () => h.onDelete(path) }
 }
 
+/** "Info" (🔒 YAZ-1835 D6): one BOARD row, never blank space, a folder or a multi-select — above Delete, in its group. */
+const info: Leaf = (t, h) => {
+  const path = t.infoPath
+  if (path === null) return null
+  return { id: 'info', label: 'Info', onSelect: () => h.onInfo(path) }
+}
+
 const OPEN_GROUP: readonly Item[] = [openInNewTabs, focus]
 const CLIPBOARD_GROUP: readonly Item[] = [cut, copy, paste, copyPaths, copyPath]
 const CREATE_GROUP: readonly Item[] = [newDrawing, newFolder, newDatedFolder]
 const ROW_GROUP: readonly Item[] = [rename]
 const OPEN_IN_GROUP: readonly Item[] = [toggleFavorite, openIn]
-const DELETE_GROUP: readonly Item[] = [del]
+const DELETE_GROUP: readonly Item[] = [info, del]
 
 /** Runs a group's rules and keeps the items they offered — the root's groups and a flyout's leaves alike. */
 const build = <T extends MenuItem>(group: readonly ((t: MenuSectionTargets, h: MenuHandlers) => T | null)[], t: MenuSectionTargets, h: MenuHandlers): T[] =>
