@@ -274,7 +274,7 @@ export interface LinkApi {
 export interface YaseenDrawApi {
   tree(root: string): Promise<TreeResponse>
   createDir(path: string): Promise<CreateDirResponse>
-  createFile(req: string | CreateFileRequest): Promise<CreateFileResponse>
+  createFile(req: CreateFileRequest): Promise<CreateFileResponse>
   /** The drawing DOCUMENT's two doors (🔒 YAZ-1810): the only way a `.excalidraw` tab reads and writes. */
   drawing: DrawingApi
   /** Native open-directory dialog parented to the calling window (GRO-2163). */

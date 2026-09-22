@@ -5,6 +5,7 @@ import path from 'node:path'
 import { ipcMain } from 'electron'
 import { CH, type Envelope } from '../../channels'
 import { createStore, type Store } from '../store'
+import { blockOf, withoutBlock } from '../fs/testFixture'
 import { _resetSweeps, registerDrawingIpc, sweepVaultOnce } from './drawing'
 
 vi.mock('electron', () => ({ ipcMain: { handle: vi.fn(), on: vi.fn() }, shell: { trashItem: vi.fn(async () => undefined) } }))
@@ -59,11 +60,13 @@ describe('drawing IPC', () => {
   it('answers drawing:save in the standard envelope and writes the bytes', async () => {
     const file = path.join(root, 'Board.excalidraw')
     await writeFile(file, SCENE)
-    // The pretty, `files: {}` form the renderer's serializer produces — written back verbatim.
+    // The pretty, `files: {}` form the renderer's serializer produces — written back verbatim below the block (🔒 YAZ-1834 D1).
     const next = `${JSON.stringify({ type: 'excalidraw', version: 2, elements: [{ id: 'a' }], appState: {}, files: {} }, null, 2)}\n`
     const res = (await registered(CH.drawingSave)({}, { root, path: file, json: next, newFiles: [] })) as Envelope<unknown>
     expect(res.ok).toBe(true)
-    expect(await readFile(file, 'utf8')).toBe(next)
+    const written = await readFile(file, 'utf8')
+    expect(blockOf(written)).toMatchObject({ createdAt: expect.any(Number), updatedAt: expect.any(Number) })
+    expect(withoutBlock(written)).toBe(next)
   })
 
   it('turns a failure into the envelope`s BridgeError rather than a rejection (Electron flattens throws)', async () => {

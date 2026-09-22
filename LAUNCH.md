@@ -40,7 +40,7 @@ open -a "Yaseen Draw" "/path/to/some drawing.excalidraw"
 ## App state — where it lives, how to reset it
 
 - ONE user-global file, owned by the main process: `~/Library/Application Support/Yaseen Draw/yaseendraw.json` (settings, recents, open windows and their tabs, per-folder `lastFile` — schema in `docs/CONTRACTS.md` "App state schema"). Nothing is ever stored in the browser profile.
-- TWO things do live in the vault, both by design and both the user's own data rather than app state: the favorites list at `<vault>/.yaseendraw/favorites.json` and the per-vault GitHub sync switch at `<vault>/.yaseendraw/github.json`. The dotfolder is created lazily on the first write and never otherwise; reading it creates nothing. Image bytes written by a drawing land in `<vault>/assets/`. Everything else about a vault stays in the state file above.
+- TWO things do live in the vault, both by design and both the user's own data rather than app state: the favorites list at `<vault>/.yaseendraw/favorites.json` and the per-vault GitHub sync switch at `<vault>/.yaseendraw/github.json`. The dotfolder is created lazily on the first write and never otherwise; reading it creates nothing. Image bytes written by a drawing land in `<vault>/assets/`, and a board's own `createdAt` / `updatedAt` sit inside the drawing itself as its first key (🔒 YAZ-1834). Everything else about a vault stays in the state file above.
 - To reset or hand-edit: **quit the app first** (⌘Q — quitting flushes the file), then delete or edit the JSON; on the next launch a missing file gets defaults and a corrupt one is moved aside as `yaseendraw.json.corrupt-<epoch>`, never silently overwritten. To find it (the folder first appears after the app has run once against the real state):
 
 ```bash

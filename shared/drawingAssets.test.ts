@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   ASSETS_DIR,
+  BOARD_META_HEAD_BYTES,
+  BOARD_META_KEY,
   ORPHAN_MAX_AGE_MS,
   assetFileName,
   extForMime,
@@ -9,7 +11,9 @@ import {
   mimeForAssetExt,
   parseDataUrl,
   planOrphanSweep,
+  parseBoardMetaBlock,
   referencedFileIds,
+  stampBoardMeta,
   stripEmbeddedFiles,
   unpersistedFiles,
   type AssetListingEntry,
@@ -197,5 +201,92 @@ describe('planOrphanSweep', () => {
 
   it('takes a caller-supplied age so a test does not have to wait a day', () => {
     expect(planOrphanSweep([{ name: 'a.png', mtime: NOW - 10 }], new Set(), NOW, 5)).toEqual(['a.png'])
+  })
+})
+
+describe('stampBoardMeta (🔒 YAZ-1834 D3/D5/D7)', () => {
+  const at = { createdAt: 1000, updatedAt: 2000 }
+  const lean = (extra: Record<string, unknown> = {}) => `${JSON.stringify({ type: 'excalidraw', elements: [], files: {}, ...extra }, null, 2)}\n`
+  const firstKey = (json: string) => Object.keys(JSON.parse(json) as object)[0]
+  const block = (json: string) => (JSON.parse(json) as Record<string, Record<string, unknown>>)[BOARD_META_KEY]
+
+  it('births the block FIRST on a scene that has none, from the given dates', () => {
+    const out = stampBoardMeta(lean(), at)
+    expect(firstKey(out)).toBe(BOARD_META_KEY)
+    expect(block(out)).toEqual({ createdAt: 1000, updatedAt: 2000 })
+    expect(out.endsWith('\n')).toBe(true)
+    // The drawing itself is untouched, and the block reads back off the head.
+    expect(JSON.parse(out)).toMatchObject({ type: 'excalidraw', elements: [], files: {} })
+    expect(parseBoardMetaBlock(out.slice(0, BOARD_META_HEAD_BYTES))).toEqual({ createdAt: 1000, updatedAt: 2000 })
+  })
+
+  it('keeps an existing createdAt and every unknown key, bumps only updatedAt — the backfill contract', () => {
+    const backfilled = lean({ [BOARD_META_KEY]: { createdAt: 1600000000000, updatedAt: 1600000000001, cloudId: 'abc', note: 'has a } brace' } })
+    const out = stampBoardMeta(backfilled, at)
+    expect(block(out)).toEqual({ createdAt: 1600000000000, updatedAt: 2000, cloudId: 'abc', note: 'has a } brace' })
+    expect(parseBoardMetaBlock(out)).toEqual({ createdAt: 1600000000000, updatedAt: 2000, cloudId: 'abc', note: 'has a } brace' })
+  })
+
+  it('takes the block the FILE holds (`prior`) over one inside the text — the disk is the block`s truth on save', () => {
+    const prior = { createdAt: 10, updatedAt: 11, cloudId: 'disk' }
+    // The renderer's json carries no block (the usual save)…
+    expect(block(stampBoardMeta(lean(), at, prior))).toEqual({ createdAt: 10, updatedAt: 2000, cloudId: 'disk' })
+    // …and even when it does, the file's wins.
+    expect(block(stampBoardMeta(lean({ [BOARD_META_KEY]: { createdAt: 1, updatedAt: 2, cloudId: 'text' } }), at, prior))).toEqual({ createdAt: 10, updatedAt: 2000, cloudId: 'disk' })
+    // A null prior means "the file has no block": the text's own, if any, then birth.
+    expect(block(stampBoardMeta(lean(), at, null))).toEqual({ createdAt: 1000, updatedAt: 2000 })
+  })
+
+  it('moves a block that was NOT first to the front and keeps every other key in its order', () => {
+    const out = stampBoardMeta(lean({ appState: { a: 1 }, [BOARD_META_KEY]: { createdAt: 5, updatedAt: 6 } }), at)
+    expect(Object.keys(JSON.parse(out) as object)).toEqual([BOARD_META_KEY, 'type', 'elements', 'files', 'appState'])
+    expect(block(out)).toEqual({ createdAt: 5, updatedAt: 2000 })
+  })
+
+  it('replaces a block that is not a plain object, or whose createdAt is not a finite number', () => {
+    for (const bad of [7, 'x', null, [1], { createdAt: 'yesterday', updatedAt: 1 }, { createdAt: Infinity }, { updatedAt: 3 }]) {
+      expect(block(stampBoardMeta(lean({ [BOARD_META_KEY]: bad }), at)), JSON.stringify(bad)).toMatchObject({ createdAt: 1000, updatedAt: 2000 })
+    }
+  })
+
+  it('is byte-stable: stamping its own output with the same dates changes nothing', () => {
+    const once = stampBoardMeta(lean({ [BOARD_META_KEY]: { z: 1, updatedAt: 9, createdAt: 8 } }), at)
+    expect(stampBoardMeta(once, at)).toBe(once)
+    // …and the block's key order is normalized whatever the input spelled.
+    expect(Object.keys(block(once))).toEqual(['createdAt', 'updatedAt', 'z'])
+  })
+
+  it('throws on text that is not a JSON object', () => {
+    for (const bad of ['', '{ not json', '[1,2]', 'null', '"s"']) expect(() => stampBoardMeta(bad, at), bad).toThrow()
+  })
+})
+
+describe('parseBoardMetaBlock (🔒 YAZ-1834 D6/D7)', () => {
+  const head = (obj: unknown) => `${JSON.stringify(obj, null, 2)}\n`.slice(0, BOARD_META_HEAD_BYTES)
+
+  it('reads the two dates when the block is the first key', () => {
+    expect(parseBoardMetaBlock(head({ [BOARD_META_KEY]: { createdAt: 1, updatedAt: 2 }, type: 'excalidraw' }))).toEqual({ createdAt: 1, updatedAt: 2 })
+    // Minified, and with the head cut off mid-document, still fine: only the block is parsed.
+    expect(parseBoardMetaBlock('{"yaseendraw":{"createdAt":1,"updatedAt":2},"elements":[{"id":"a","ty')).toEqual({ createdAt: 1, updatedAt: 2 })
+  })
+
+  it('carries extra keys in the block back, even one whose value holds a brace', () => {
+    expect(parseBoardMetaBlock(head({ [BOARD_META_KEY]: { createdAt: 1, updatedAt: 2, note: 'a } b', cloudId: 'x' } }))).toEqual({ createdAt: 1, updatedAt: 2, note: 'a } b', cloudId: 'x' })
+    expect(parseBoardMetaBlock(head({ [BOARD_META_KEY]: { createdAt: 1, updatedAt: 2, note: 'esc \\" } q' } }))).toEqual({ createdAt: 1, updatedAt: 2, note: 'esc \\" } q' })
+  })
+
+  it('is null when the block is missing, not first, malformed, non-finite, or cut short', () => {
+    const cases: Record<string, string> = {
+      missing: head({ type: 'excalidraw', elements: [] }),
+      notFirst: head({ type: 'excalidraw', [BOARD_META_KEY]: { createdAt: 1, updatedAt: 2 } }),
+      notObject: head({ [BOARD_META_KEY]: 7 }),
+      oneDate: head({ [BOARD_META_KEY]: { createdAt: 1 } }),
+      stringDate: head({ [BOARD_META_KEY]: { createdAt: '1', updatedAt: 2 } }),
+      cutShort: '{"yaseendraw":{"createdAt":1,"upda',
+      notJson: 'hello',
+      empty: '',
+      array: '[{"yaseendraw":{}}]',
+    }
+    for (const [name, text] of Object.entries(cases)) expect(parseBoardMetaBlock(text), name).toBeNull()
   })
 })

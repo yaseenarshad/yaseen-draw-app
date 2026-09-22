@@ -1,6 +1,8 @@
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { expect } from 'vitest'
+import { BOARD_META_KEY } from '@shared/drawingAssets'
 import { BridgeFailure } from './fsUtils'
 
 /** Creates a temp vault with drawings, files with no in-app viewer, and hidden entries; caller removes it via `cleanup`. */
@@ -35,6 +37,19 @@ export async function makeFixture(): Promise<{ root: string; cleanup: () => Prom
     writeFile(path.join(root, 'node_modules', 'pkg', 'README.excalidraw'), 'readme'),
   ])
   return { root, cleanup: () => rm(root, { recursive: true, force: true }) }
+}
+
+/** A saved board's bytes with its `yaseendraw` block taken out again — what the SCENE half of a save wrote (🔒 YAZ-1834). */
+export function withoutBlock(json: string): string {
+  const { [BOARD_META_KEY]: _block, ...rest } = JSON.parse(json) as Record<string, unknown>
+  return `${JSON.stringify(rest, null, 2)}\n`
+}
+
+/** The block a saved board starts with, asserting it IS the first key (🔒 YAZ-1834 D1). */
+export function blockOf(json: string): Record<string, unknown> {
+  const parsed = JSON.parse(json) as Record<string, Record<string, unknown>>
+  expect(Object.keys(parsed)[0]).toBe(BOARD_META_KEY)
+  return parsed[BOARD_META_KEY]
 }
 
 /** The `BridgeFailure` a promise rejects with. */
