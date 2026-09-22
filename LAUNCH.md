@@ -96,6 +96,11 @@ chip. `--vault` is REQUIRED and has no default, because the script WIPES what it
 that already exists is refused unless you add `--force`. It writes no profile: open the vault with
 ⌘O.
 
+A feature's own demo vault can bring its profile: `node tools/seedPreviewDemoVault.mjs --vault <dir>
+--profile <profile-dir>` (YAZ-1800, the hover preview) writes the vault AND a `yaseendraw.json`
+whose one window is already on it, so the recipe above needs no hand-written JSON — launch with
+`YASEEN_DRAW_USER_DATA_DIR=<profile-dir>`. Every board name says the case it covers.
+
 Then run the scenario list by hand (or by computer-use). The standing list, from the demo Yasin
 approved on YAZ-1775, is: external disk edit hot-reloads a clean tab · paste → one asset, small
 JSON, survives relaunch · same image twice → one asset · missing asset → placeholder, no crash ·
