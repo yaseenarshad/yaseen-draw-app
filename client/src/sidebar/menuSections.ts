@@ -87,6 +87,8 @@ export interface MenuHandlers {
   /** "Add to favorites" / "Remove N from favorites" (YAZ-1766 D3): the paths and the direction the menu read, same idiom. */
   onToggleFavorite: (paths: string[], isOn: boolean) => void
   onRename: (path: string) => void
+  /** "Info" (🔒 YAZ-1835 D6): open the board's popover; the caller anchors it where the menu was. */
+  onInfo: (path: string) => void
   onDelete: (path: string) => void
 }
 
@@ -293,12 +295,19 @@ const del: Leaf = (t, h) => {
   return { id: 'delete', label: 'Delete', danger: true, onSelect: () => h.onDelete(path) }
 }
 
+/** "Info" (🔒 YAZ-1835 D6): one BOARD row, never blank space, a folder or a multi-select — above Delete, in its group. */
+const info: Leaf = (t, h) => {
+  const path = t.infoPath
+  if (path === null) return null
+  return { id: 'info', label: 'Info', onSelect: () => h.onInfo(path) }
+}
+
 const OPEN_GROUP: readonly Item[] = [openInNewTabs, focus]
 const CLIPBOARD_GROUP: readonly Item[] = [cut, copy, paste, copyPaths, copyPath]
 const CREATE_GROUP: readonly Item[] = [newDrawing, newFolder, newDatedFolder]
 const ROW_GROUP: readonly Item[] = [rename]
 const OPEN_IN_GROUP: readonly Item[] = [toggleFavorite, openIn]
-const DELETE_GROUP: readonly Item[] = [del]
+const DELETE_GROUP: readonly Item[] = [info, del]
 
 /** Runs a group's rules and keeps the items they offered — the root's groups and a flyout's leaves alike. */
 const build = <T extends MenuItem>(group: readonly ((t: MenuSectionTargets, h: MenuHandlers) => T | null)[], t: MenuSectionTargets, h: MenuHandlers): T[] =>

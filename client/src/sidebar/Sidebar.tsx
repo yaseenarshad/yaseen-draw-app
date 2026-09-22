@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import { DRAWING_VIEW_EXTENSIONS, SIDEBAR_LENSES, type FileClipState, type SettingsState, type SidebarLens, type TreeNode, type TreeResponse } from '@shared/types'
+import { DRAWING_VIEW_EXTENSIONS, SIDEBAR_LENSES, SORT_ORDERS, type FileClipState, type SettingsState, type SidebarLens, type SortOrder, type TreeNode, type TreeResponse } from '@shared/types'
 import { api, BridgeRequestError } from '../api'
 import { EMPTY_SCENE_JSON } from '../drawings/drawingScene'
-import { ChevronsIcon, EyeIcon, HeartIcon, SearchIcon, SidebarPanelIcon } from '../components/icons'
+import { ContextMenuSurface } from '../components/ContextMenuSurface'
+import { ChevronsIcon, EyeIcon, HeartIcon, SearchIcon, SidebarPanelIcon, SortIcon } from '../components/icons'
 import type { WatchSource } from '../hooks/useWatch'
 import { basename } from '../lib/paths'
 import { storage } from '../lib/storage'
 import { EMPTY_SELECTION, orderedSelection, selectionReducer } from '../lib/selection'
-import { allDirs, ancestorDirs, favoriteRoots, findDirNode, focusRoots, treeHasFile, treeHasPath, treeReducer } from '../lib/treeState'
+import { allDirs, ancestorDirs, favoriteRoots, findDirNode, findNode, focusRoots, treeHasFile, treeHasPath, treeReducer } from '../lib/treeState'
+import { sortTree } from '@shared/treeSort'
+import { BoardInfo } from './BoardInfo'
 import { SearchResults } from '../search/SearchResults'
 import type { SearchCandidate } from '../search/searchCandidates'
 import { useSearchResults } from '../search/useSearchResults'
@@ -186,6 +189,8 @@ export interface MenuTargets {
   favoritePaths: string[] | null
   /** True only when EVERY `favoritePaths` entry is already a favorite — a mixed selection reads as Add. */
   favoriteIsOn: boolean
+  /** "Info" (🔒 YAZ-1835 D6): the ONE board row under the pointer; null on blank space, a folder, or a 2+ selection. Its OWN field. */
+  infoPath: string | null
 }
 
 /**
@@ -239,6 +244,13 @@ function findDir(nodes: readonly TreeNode[], dir: string): readonly TreeNode[] |
 
 /** The lens tabs' copy; the ORDER is `SIDEBAR_LENSES`', so the default lens leads (YAZ-847). */
 const LENS_LABEL: Record<SidebarLens, string> = { files: 'Files', favorites: 'Favorites' }
+/** A drawing row, by the live tree's word (🔒 YAZ-1835 D6): Info describes boards, not `notes.txt`. */
+function isBoard(tree: TreeResponse | null, path: string): boolean {
+  const node = tree === null ? null : findNode(tree.tree, path)
+  return node !== null && node.type === 'file' && node.kind === 'drawing'
+}
+/** The sort control's labels (🔒 YAZ-1835 D5), in `SORT_ORDERS` order. */
+const SORT_LABEL: Record<SortOrder, string> = { name: 'Name', updated: 'Last updated', created: 'Created' }
 
 /** The Favorites tree's file move (YAZ-1766 D4): nothing on that tab drags to disk, so every callback is a no-op. */
 const INERT_MOVE: TreeFileMove = { dragging: null, dropDir: null, start: () => undefined, end: () => undefined, hover: () => undefined, drop: () => undefined }
@@ -298,6 +310,11 @@ export function Sidebar({
   // outlive them (a collapse ends it).
   const [selectedPaths, dispatchSelection] = useReducer(selectionReducer, EMPTY_SELECTION)
   const [menu, setMenu] = useState<MenuTargets | null>(null)
+  // The Files lens's order (🔒 YAZ-1835 D3): per vault, read off the store and re-read when another window changes it.
+  const [sortOrder, setSortOrderState] = useState<SortOrder>(() => storage.getSortOrder(root))
+  const [sortMenu, setSortMenu] = useState<{ x: number; y: number } | null>(null)
+  // The "Info" popover (🔒 YAZ-1835 D6): the board's PATH, resolved against the live tree at render.
+  const [info, setInfo] = useState<{ x: number; y: number; path: string } | null>(null)
   const [creating, setCreating] = useState<{ kind: EntryKind; seed: string; parentDir: string } | null>(null)
   const [renamingEntry, setRenamingEntry] = useState<{ path: string; kind: 'file' | 'dir' } | null>(null)
   // The delete confirm sheet's target (GRO-2272 `C3-`); null when the sheet is closed.
@@ -330,6 +347,14 @@ export function Sidebar({
   // in STORED order, off the live tree; nesting and redundancy are kept (`favoriteRoots`, not `focusRoots`).
   const favoriteNodes = useMemo(() => (tree === null ? [] : favoriteRoots(tree.tree, focusFavorites.length > 0 ? focusFavorites : favorites)), [tree, favorites, focusFavorites])
   const favoriteDirs = useMemo(() => allDirs(favoriteNodes), [favoriteNodes])
+  // 🔒 YAZ-1835 D1: the order is a VIEW applied here, to the Files lens only — `fs:tree`, ⌘K and the Favorites lens never see it.
+  const sortedNodes = useMemo(() => sortTree(focusNodes.length > 0 ? focusNodes : (tree?.tree ?? []), sortOrder), [focusNodes, tree, sortOrder])
+  // The Info popover's board, off the LIVE tree (🔒 YAZ-1835 D7): a refresh moves its dates; a deletion closes it.
+  const infoNode = useMemo(() => {
+    if (info === null || tree === null) return null
+    const n = findNode(tree.tree, info.path)
+    return n !== null && n.type === 'file' ? n : null
+  }, [info, tree])
   // What the chevrons button unfolds on the two disk-reading lenses.
   const bodyDirs = lens === 'favorites' ? favoriteDirs : shownDirs
   // ⌘K's feed (YAZ-1814): the ONE tree this panel already holds and the watcher already keeps
@@ -390,14 +415,26 @@ export function Sidebar({
 
   useEffect(() => refresh(), [refresh])
 
-  // Refresh on structural changes; `ready` also fires on every watch (re)subscription, covering missed events.
+  // Refresh on EVERY change, not only structural ones (🔒 YAZ-1835 D4): a save moves a board's
+  // `updatedAt`, and with it its place under "Last updated" — in this window and every other one
+  // on the vault. `ready` also fires on every watch (re)subscription, covering missed events.
   useEffect(
     () =>
       watch.subscribe((ev) => {
         if (ev.type === 'error') setError(ev.message)
-        else if (ev.type !== 'change') refresh()
+        else refresh()
       }),
     [watch, refresh],
+  )
+
+  // Another window's sort change lands in the store cache; follow it (🔒 YAZ-1835 D3).
+  useEffect(() => storage.subscribe(() => setSortOrderState(storage.getSortOrder(root))), [root])
+  const setSortOrder = useCallback(
+    (order: SortOrder) => {
+      setSortOrderState(order)
+      storage.setSortOrder(root, order)
+    },
+    [root],
   )
 
   useEffect(() => {
@@ -631,6 +668,9 @@ export function Sidebar({
         // Favorites (YAZ-1766 D3): the row or its ordered selection, any kind, any lens; blank space has nothing to pin.
         favoritePaths: node === null ? null : plural ?? [node.path],
         favoriteIsOn: node !== null && (plural ?? [node.path]).every((p) => favorites.includes(p)),
+        // Info (🔒 YAZ-1835 D6): one BOARD, on its own — the live tree says whether the row is a drawing;
+        // a plural gesture has no single thing to describe.
+        infoPath: plural === null && filePath !== null && isBoard(tree, filePath) ? filePath : null,
       })
     },
     [root, tree, selectedPaths, orderedSelectedPaths, favorites],
@@ -1096,6 +1136,22 @@ export function Sidebar({
             then) and whenever the active reading has no folder to unfold. */}
         {/* Focus Mode's eye (YAZ-1605): lit ONLY while the active lens is focused, one slot left of
             the chevrons; one click ends the focus. Gone while a query is typed, like its neighbour. */}
+        {/* The sort control (🔒 YAZ-1835 D5): Files lens only, gone while a query is typed; it opens the
+            same menu component the rows use, with a check on the current order. */}
+        {!searching && lens === 'files' && (
+          <button
+            type="button"
+            className="sidebar__sort"
+            aria-label={`Sort by ${SORT_LABEL[sortOrder]}`}
+            title={`Sort by ${SORT_LABEL[sortOrder]}`}
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect()
+              setSortMenu({ x: r.left, y: r.bottom + 2 })
+            }}
+          >
+            <SortIcon />
+          </button>
+        )}
         {!searching && focused && (
           <button type="button" className="sidebar__focus-off" aria-label="Exit focus mode" title="Exit focus mode" onClick={exitFocus}>
             <EyeIcon />
@@ -1234,7 +1290,7 @@ export function Sidebar({
             )}
             {tree !== null && (
               <Tree
-                nodes={focusNodes.length > 0 ? focusNodes : tree.tree}
+                nodes={sortedNodes}
                 dirPath={root}
                 expanded={new Set(expanded)}
                 activeFile={activeFile}
@@ -1281,11 +1337,25 @@ export function Sidebar({
               onNewDatedFolder: canNewFolder ? () => startCreate('dir', datedFolderSeed()) : null,
               onToggleFavorite: toggleFavorite,
               onRename: (path) => setRenamingEntry({ path, kind: menu.rowKind === 'file' ? 'file' : 'dir' }),
+              onInfo: (path) => setInfo({ x: menu.x, y: menu.y, path }),
               onDelete: askDelete,
             },
           )}
           onClose={() => setMenu(null)}
         />
+      )}
+      {sortMenu !== null && (
+        <ContextMenu
+          x={sortMenu.x}
+          y={sortMenu.y}
+          sections={[SORT_ORDERS.map((order) => ({ id: `sort-${order}`, label: SORT_LABEL[order], hint: order === sortOrder ? '✓' : undefined, onSelect: () => setSortOrder(order) }))]}
+          onClose={() => setSortMenu(null)}
+        />
+      )}
+      {info !== null && infoNode !== null && (
+        <ContextMenuSurface x={info.x} y={info.y} width={300} onClose={() => setInfo(null)}>
+          <BoardInfo node={infoNode} root={root} now={Date.now()} />
+        </ContextMenuSurface>
       )}
       {confirmingDelete !== null && <ConfirmDelete target={confirmingDelete} onConfirm={confirmDelete} onCancel={() => setConfirmingDelete(null)} />}
     </aside>

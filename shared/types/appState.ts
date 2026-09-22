@@ -26,6 +26,14 @@ export type SidebarLens = 'files' | 'favorites'
 export const SIDEBAR_LENSES: readonly SidebarLens[] = ['files', 'favorites']
 export const isSidebarLens = (v: unknown): v is SidebarLens => SIDEBAR_LENSES.includes(v as SidebarLens)
 
+/**
+ * The Files lens's order (🔒 YAZ-1835 D2): by name, by last save, or by birth. Dates read a board's
+ * own block first and its mtime when it has none (🔒 YAZ-1834 D6); folders always lead, by name.
+ */
+export type SortOrder = 'name' | 'updated' | 'created'
+export const SORT_ORDERS: readonly SortOrder[] = ['name', 'updated', 'created']
+export const isSortOrder = (v: unknown): v is SortOrder => SORT_ORDERS.includes(v as SortOrder)
+
 /** `AppState.sidebarWidth` — the drag-to-resize bounds (YAZ-738), clamped on every write and on load. */
 export const SIDEBAR_MIN_W = 180
 export const SIDEBAR_MAX_W = 520
@@ -131,6 +139,8 @@ export interface WindowEntry {
 export interface FolderState {
   expanded: string[]
   lastFile: string | null
+  /** The Files lens's order for this vault (🔒 YAZ-1835 D3): persisted, and every window on the vault follows it. */
+  sortOrder: SortOrder
 }
 
 /**
@@ -155,5 +165,5 @@ export function defaultAppState(): AppState {
 }
 
 export function defaultFolderState(): FolderState {
-  return { expanded: [], lastFile: null }
+  return { expanded: [], lastFile: null, sortOrder: 'name' }
 }

@@ -61,7 +61,7 @@ describe('createStore: loading', () => {
       sidebarWidth: 320,
       recents: [{ path: '/v', lastOpened: 5 }],
       windows: [win('w1', { root: '/v', file: '/v/a.excalidraw', tabs: ['/v/a.excalidraw', '/v/b.excalidraw'], sidebarCollapsed: true, sidebarLens: 'files' })],
-      folders: { '/v': { expanded: ['/v/sub'], lastFile: '/v/a.excalidraw' } },
+      folders: { '/v': { expanded: ['/v/sub'], lastFile: '/v/a.excalidraw', sortOrder: 'name' } },
     }
     await seed(state)
     expect(createStore(file).get()).toEqual({ ...state, folders: { '/v': { ...state.folders['/v'], expanded: [] } } })
@@ -257,17 +257,17 @@ describe('createStore: loading', () => {
         folders: {
           '/a': { expanded: 'nope', lastFile: 5 },
           '/b': 'nope',
-          '/c': { expanded: ['/c/sub'], lastFile: '/c/a.excalidraw' },
+          '/c': { expanded: ['/c/sub'], lastFile: '/c/a.excalidraw', sortOrder: 'name' },
           '/d': {},
         },
       }),
     )
     const { folders } = createStore(file).get()
-    expect(folders['/a']).toEqual({ expanded: [], lastFile: null })
+    expect(folders['/a']).toEqual({ expanded: [], lastFile: null, sortOrder: 'name' })
     expect(folders['/b']).toBeUndefined()
     expect(folders['/c'].expanded).toEqual([]) // a session list: the file's value is ignored (YAZ-1642)
     expect(folders['/c'].lastFile).toBe('/c/a.excalidraw')
-    expect(folders['/d']).toEqual({ expanded: [], lastFile: null })
+    expect(folders['/d']).toEqual({ expanded: [], lastFile: null, sortOrder: 'name' })
     await seed(valid({ folders: [] }))
     expect(createStore(file).get().folders).toEqual({})
   })
@@ -297,7 +297,7 @@ describe('createStore: loading', () => {
     )
     const store = createStore(file)
     // No migration: the vault bucket could not say WHICH window was focused, so every window starts unfocused.
-    expect(store.get().folders['/v']).toEqual({ expanded: [], lastFile: null })
+    expect(store.get().folders['/v']).toEqual({ expanded: [], lastFile: null, sortOrder: 'name' })
     expect(store.get().windows[0]).toMatchObject({ focusDirs: [], focusFavorites: [] })
     store.setSidebarWidth(321)
     await store.flush()
@@ -306,11 +306,30 @@ describe('createStore: loading', () => {
     expect(persisted.folders['/v']).not.toHaveProperty('focusFavorites')
   })
 
+  it('folders: sortOrder loads as stored, a junk or missing value reads as name, and it survives a relaunch (🔒 YAZ-1835 D3)', async () => {
+    await seed(
+      valid({
+        folders: {
+          '/a': { lastFile: null, sortOrder: 'created' },
+          '/b': { lastFile: null }, // a pre-1835 file
+          '/c': { lastFile: null, sortOrder: 'opened' }, // never a value; dropped, not migrated
+        },
+      }),
+    )
+    const store = createStore(file)
+    expect(store.get().folders['/a'].sortOrder).toBe('created')
+    expect(store.get().folders['/b'].sortOrder).toBe('name')
+    expect(store.get().folders['/c'].sortOrder).toBe('name')
+    store.setFolder('/b', { sortOrder: 'updated' })
+    await store.flush()
+    expect(createStore(file).get().folders['/b']).toEqual({ expanded: [], lastFile: null, sortOrder: 'updated' })
+  })
+
   it('folders: expanded is a session list — present, junk or missing, a launch reads it as [] (YAZ-1642)', async () => {
     await seed(
       valid({
         folders: {
-          '/a': { expanded: ['/a/sub'], lastFile: null }, // a pre-1642 file still carrying it
+          '/a': { expanded: ['/a/sub'], lastFile: null, sortOrder: 'name' }, // a pre-1642 file still carrying it
           '/b': { lastFile: null }, // what this version writes: no key
           '/c': { expanded: 'nope', lastFile: null },
         },
@@ -389,13 +408,15 @@ describe('createStore: mutations', () => {
   it('setFolder creates the entry with defaults, merges the patch and ignores unknown keys', () => {
     const store = createStore(file)
     store.setFolder('/r1', { expanded: ['/r1/a'] })
-    expect(store.get().folders['/r1']).toEqual({ expanded: ['/r1/a'], lastFile: null })
+    expect(store.get().folders['/r1']).toEqual({ expanded: ['/r1/a'], lastFile: null, sortOrder: 'name' })
     store.setFolder('/r1', { lastFile: '/r1/a/x.excalidraw' })
-    expect(store.get().folders['/r1']).toEqual({ expanded: ['/r1/a'], lastFile: '/r1/a/x.excalidraw' })
-    store.setFolder('/r1', { lastFile: null, sortOrder: 'name' } as never)
-    expect(store.get().folders['/r1']).toEqual({ expanded: ['/r1/a'], lastFile: null })
+    expect(store.get().folders['/r1']).toEqual({ expanded: ['/r1/a'], lastFile: '/r1/a/x.excalidraw', sortOrder: 'name' })
+    store.setFolder('/r1', { lastFile: null, openedAt: 5 } as never)
+    expect(store.get().folders['/r1']).toEqual({ expanded: ['/r1/a'], lastFile: null, sortOrder: 'name' })
+    store.setFolder('/r1', { sortOrder: 'updated' })
+    expect(store.get().folders['/r1']).toEqual({ expanded: ['/r1/a'], lastFile: null, sortOrder: 'updated' })
     store.setFolder('/r2', {})
-    expect(store.get().folders['/r2']).toEqual({ expanded: [], lastFile: null })
+    expect(store.get().folders['/r2']).toEqual({ expanded: [], lastFile: null, sortOrder: 'name' })
   })
 
   it('two windows on one root hold independent focusDirs / focusFavorites — upsertWindow on one leaves the other untouched (YAZ-1628)', () => {
@@ -621,9 +642,10 @@ describe('createStore: mutations', () => {
       expect(store.get().folders['/v']).toEqual({
         lastFile: `${NEW}/a.excalidraw`,
         expanded: [NEW, `${NEW}/deep`, '/v/other'],
+        sortOrder: 'name',
       })
       expect(store.get().folders[OLD]).toBeUndefined()
-      expect(store.get().folders[NEW]).toEqual({ lastFile: `${NEW}/a.excalidraw`, expanded: [] })
+      expect(store.get().folders[NEW]).toEqual({ lastFile: `${NEW}/a.excalidraw`, expanded: [], sortOrder: 'name' })
     })
 
     it('remaps a recents entry at or under the dir (a subfolder that was opened as a vault)', () => {
@@ -667,17 +689,17 @@ describe('createStore: persistence', () => {
     await vi.advanceTimersByTimeAsync(60)
     await store.flush()
     expect(renames()).toHaveLength(1)
-    expect(await onDisk()).toEqual({ ...store.get(), folders: { '/v': { lastFile: '/v/a.excalidraw' } } })
+    expect(await onDisk()).toEqual({ ...store.get(), folders: { '/v': { lastFile: '/v/a.excalidraw', sortOrder: 'name' } } })
     expect((await readdir(dir)).filter((n) => n.includes('.tmp-'))).toEqual([])
   })
 
   it('the session list lives in get() for every window but never reaches disk, so a relaunch starts collapsed (YAZ-1642)', async () => {
     const store = createStore(file)
     store.setFolder('/v', { expanded: ['/v/sub'] })
-    expect(store.get().folders['/v']).toEqual({ expanded: ['/v/sub'], lastFile: null })
+    expect(store.get().folders['/v']).toEqual({ expanded: ['/v/sub'], lastFile: null, sortOrder: 'name' })
     await store.flush()
-    expect((await onDisk()).folders['/v']).toEqual({ lastFile: null })
-    expect(createStore(file).get().folders['/v']).toEqual({ expanded: [], lastFile: null })
+    expect((await onDisk()).folders['/v']).toEqual({ lastFile: null, sortOrder: 'name' })
+    expect(createStore(file).get().folders['/v']).toEqual({ expanded: [], lastFile: null, sortOrder: 'name' })
   })
 
   it('flush writes at once, cancels the pending timer, and is a no-op when nothing changed', async () => {
