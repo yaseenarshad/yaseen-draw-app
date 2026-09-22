@@ -20,7 +20,7 @@ marks an amendment to an earlier locked decision; the amendment wins.
 | `client/` | the renderer: React 19, Vite. Talks to nothing but `window.yaseenDraw`. |
 | `client/src/drawings/` | the drawing document: the engine seam (`ExcalidrawSurface`, the ONE importer of the package), its host, and what a scene is |
 | `client/src/drawings/presentation/` | the canvas panel's Present tab: the slide rules, the panel and the full-pane player |
-| `client/src/media/` | the canvas panel's Images tab: the Image Studio, the shapes catalog, both insert paths |
+| `client/src/image-studio/` | the canvas panel's Images tab: the Image Studio, the shapes catalog, both insert paths |
 | `client/src/components-library/` | the canvas panel's Components tab: the saved-component library, its capture, import, preview and insert (named so it is never confused with `client/src/components/`) |
 | `client/src/sidebar/` | the file tree, its context menu, rename/move/trash, favorites, vault switcher |
 | `client/src/tabs/` | the tab strip |
@@ -350,7 +350,7 @@ one rule. The sweep runs once at registration, detached, and removes only `*.jso
 which is exactly what a read would have refused. Imports are never written here. A cache that
 cannot read or write is a miss, never an error.
 
-The renderer half is `client/src/media/`: `ImageStudio.tsx` (Search / Shapes / Favorites / Recent),
+The renderer half is `client/src/image-studio/`: `ImageStudio.tsx` (Search / Shapes / Favorites / Recent),
 `shapes.ts` (7 basic shapes plus the engine's 12 Smart Shapes as NATIVE elements — the smart half
 needs `@excalidraw/element`, which arrives on its own lazy promise so the basics render at once),
 `insertShape.ts` (both insert paths, and `IMAGE_STUDIO_INSERTION` = 320 px capped at 55 % of the

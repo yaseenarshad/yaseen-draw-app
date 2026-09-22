@@ -15,7 +15,7 @@ import type { ExcalidrawModule } from '../drawings/engine'
 export const PREVIEW_MAX_WIDTH = 800
 export const PREVIEW_MAX_HEIGHT = 600
 export const PREVIEW_PADDING = 12
-export const PREVIEW_MIME_TYPE = 'image/png'
+const PREVIEW_MIME_TYPE = 'image/png'
 
 /** The engine value a preview needs. */
 export type PreviewEngine = Pick<ExcalidrawModule, 'exportToBlob'>

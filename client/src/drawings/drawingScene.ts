@@ -12,6 +12,7 @@
  * editor's ONE readable error pane — never a repair, never a half-parsed render, which would be
  * a lie about what the file holds.
  */
+import { isRecord } from '@shared/guards'
 
 /** The scene shape the canvas opens on; deliberately loose, for the reason above. */
 export interface DrawingScene {
@@ -48,17 +49,15 @@ export const EMPTY_SCENE = {
  */
 export const EMPTY_SCENE_JSON = `${JSON.stringify(EMPTY_SCENE, null, 2)}\n`
 
-const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
-
 /** Scene JSON → the canvas's opening scene; throws on anything that is not one (see the module doc). */
 export function parseSceneText(text: string): DrawingScene {
   const parsed: unknown = JSON.parse(text)
-  if (!isPlainObject(parsed)) throw new Error('not an Excalidraw scene')
+  if (!isRecord(parsed)) throw new Error('not an Excalidraw scene')
   const scene = parsed
   if (!Array.isArray(scene.elements)) throw new Error('not an Excalidraw scene: no elements')
-  // `typeof [] === 'object'`, so the array check is part of "is this a plain object" — the same
-  // test `parsed` gets above. A file whose `appState` is an array carries no prefs, not a list.
-  const appState = isPlainObject(scene.appState) ? scene.appState : {}
-  const files = isPlainObject(scene.files) ? scene.files : {}
+  // The same `isRecord` the whole scene got: a file whose `appState` is an ARRAY carries no
+  // prefs, not a list.
+  const appState = isRecord(scene.appState) ? scene.appState : {}
+  const files = isRecord(scene.files) ? scene.files : {}
   return { elements: scene.elements, appState, files }
 }

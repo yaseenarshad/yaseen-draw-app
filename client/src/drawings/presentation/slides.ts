@@ -25,6 +25,7 @@
  * `unknown` and are narrowed here, for the same reason: the file is user data.
  */
 import type { ExcalidrawElementModule } from '../engine'
+import { isRecord } from '@shared/guards'
 
 /** The one element-package value these rules need. */
 export type SlideElementApi = Pick<ExcalidrawElementModule, 'newElementWith'>
@@ -49,7 +50,6 @@ export interface OrderedPresentationFrame {
 }
 
 type JsonRecord = Record<string, unknown>
-const isRecord = (v: unknown): v is JsonRecord => typeof v === 'object' && v !== null && !Array.isArray(v)
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
 
 /** The two ordering keys, root first — see the module doc. `null` means "no claim". */

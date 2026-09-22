@@ -4,7 +4,7 @@ import { MAX_DRAWING_BYTES, type OpenDrawingResponse, type PickFolderResponse, t
 import { CH } from '../../channels'
 import { readBoundedRegularFile } from '../fs/boundedRead'
 import { atomicWrite, BridgeFailure, fsCall, requireDrawingFile } from '../fs/fsUtils'
-import { isRecord } from '../store'
+import { isRecord } from '@shared/guards'
 import { handleWithEvent } from './envelope'
 
 const OPTIONS: Electron.OpenDialogOptions = { title: 'Open folder', properties: ['openDirectory', 'createDirectory'] }

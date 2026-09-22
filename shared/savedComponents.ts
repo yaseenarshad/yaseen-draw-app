@@ -17,6 +17,7 @@
  * file outside the components folder (`drawingAssets.ts`'s `isValidFileId` posture, same reason).
  */
 import { COMPONENTS_INDEX_FILE, LIBRARY_COMPONENTS_DIR, MAX_COMPONENT_NAME_LENGTH, type ComponentItem, type ComponentsIndexFile } from './types'
+import { isFiniteNumber, isRecord } from './guards'
 
 export { COMPONENTS_INDEX_FILE, LIBRARY_COMPONENTS_DIR }
 
@@ -36,8 +37,6 @@ export const FALLBACK_COMPONENT_SLUG = 'component'
 
 export const EMPTY_COMPONENTS_INDEX: ComponentsIndexFile = { version: 1, items: [] }
 
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
-const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
 
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 

@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { CH } from '../../channels'
 import { BridgeFailure } from '../fs/fsUtils'
 import { createSecrets, SECRETS_FILE, type Secrets } from '../secrets'
-import { isRecord } from '../store'
+import { isRecord } from '@shared/guards'
 import { handle } from './envelope'
 
 /**

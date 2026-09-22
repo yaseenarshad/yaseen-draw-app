@@ -21,7 +21,7 @@
  */
 import { readFile, rename } from 'node:fs/promises'
 import { atomicWrite, BridgeFailure, fsCall } from './fs/fsUtils'
-import { isRecord } from './store'
+import { isRecord } from '@shared/guards'
 
 export const SECRETS_FILE = 'secrets.json'
 

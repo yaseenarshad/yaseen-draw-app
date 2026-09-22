@@ -12,11 +12,10 @@
  * `by_ownerId_and_updatedAt` index answered in.
  */
 import { MAX_MEDIA_FAVORITES, RECENT_LIMIT, isMediaItemKind, isMediaProvider, type MediaItem, type MediaLibraryFile, type StoredMediaItem } from './types'
+import { isFiniteNumber, isRecord } from './guards'
 
 export const EMPTY_MEDIA_LIBRARY: MediaLibraryFile = { version: 1, favorites: [], recent: [] }
 
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
-const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
 
 /** The optional fields and their one type each — `mediaItemValidator`'s `v.optional(...)` rows. */
 const OPTIONAL_STRINGS = ['previewUrl', 'creator', 'creatorUrl', 'collectionName', 'sourceUrl', 'licenseName', 'licenseUrl', 'attribution'] as const

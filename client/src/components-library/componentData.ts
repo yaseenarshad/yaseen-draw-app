@@ -1,26 +1,18 @@
 /**
- * WHAT A COMPONENT IS MADE OF, AND WHAT AN INSERT DOES (🔒 D5, YAZ-1819):
- * `excalidraw-app/components/SavedComponentsData.ts` ported — its validation, its capture and its
- * insert-as-an-independent-copy — with the Convex half replaced by the library folder.
+ * WHAT A COMPONENT IS MADE OF, AND WHAT AN INSERT DOES (🔒 YAZ-1775 D5, YAZ-1819).
  *
- * THE CAPTURE IS THE WEB APP'S, RULE FOR RULE. `getSelectedElements` with
- * `includeBoundTextElement` and `includeElementsInFrames`, `deepCopyElement` over the result, and
- * then the same four assertions: at least one element, no duplicate ids, no `iframe` / `embeddable`,
- * and no dangling `frameId` / `containerId` / bound-text reference. A component that references
- * something it does not carry would insert broken, which is the whole reason those checks exist.
+ * THE CAPTURE'S FOUR ASSERTIONS are the point: at least one element, no duplicate ids, no
+ * `iframe` / `embeddable`, and no dangling `frameId` / `containerId` / bound-text reference. A
+ * component that references something it does not carry would insert broken.
  *
- * IMAGES ARE ALWAYS ALLOWED, AND THEIR BYTES TRAVEL WITH THEM. The web app listed `image` as
- * unsupported and then passed `allowImages: true` everywhere it mattered, because its images lived
- * in its own object store. 🔒 D5 makes the same call for a different reason: a component is small
- * and self-contained, so its bytes are EMBEDDED in the fragment as dataURLs and it inserts into
- * any vault, on any machine, with no shared store at all.
+ * IMAGES ARE ALWAYS ALLOWED, AND THEIR BYTES TRAVEL WITH THEM: a component is small and
+ * self-contained, so its bytes are EMBEDDED in the fragment as dataURLs and it inserts into any
+ * vault, on any machine, with no shared store at all.
  *
  * WHAT AN INSERT COSTS ON DISK: nothing, here. `insertElements` is the engine's own paste door —
- * it runs the elements through `duplicateElements`, so every insert is a FRESH set of ids placed
- * at the middle of what the user can see, and two inserts of one component are two independent
- * copies. The files handed to `addFiles` beside them become `assets/` files through 2E (🔒 D3):
- * the engine's files map grows ids the store does not hold, `unpersistedFiles` picks them up, and
- * `drawing:save` writes them BEFORE the scene that names them, deduped by `fileId`.
+ * it duplicates ids, so two inserts of one component are two independent copies. The files handed
+ * to `addFiles` beside them become `assets/` files on the next save (🔒 D3): the engine's files
+ * map grows ids the store does not hold, and `drawing:save` writes them BEFORE the scene names them.
  *
  * ENGINE-BOUND BY DESIGN: every engine value comes in as an argument rather than being imported
  * (`engine.ts`'s lazy rule), which is also what makes this testable with a stub.
@@ -28,9 +20,10 @@
 import { DRAWING_SOURCE } from '../drawings/drawingScene'
 import { parseComponentFragment } from '@shared/savedComponents'
 import type { ExcalidrawElementModule, ExcalidrawImperativeApi, ExcalidrawModule } from '../drawings/engine'
+import { isRecord } from '@shared/guards'
 
 /** The element types a component may not contain — the web app's list, minus the images it carries. */
-export const UNSUPPORTED_COMPONENT_ELEMENT_TYPES = ['iframe', 'embeddable'] as const
+const UNSUPPORTED_COMPONENT_ELEMENT_TYPES = ['iframe', 'embeddable'] as const
 
 /**
  * The web app's `MAX_SAVED_COMPONENT_BYTES` (`packages/common/src/savedComponents.ts`), applied
@@ -46,8 +39,6 @@ export type ComponentElementApi = Pick<ExcalidrawElementModule, 'getSelectedElem
 /** The slice of the engine's imperative handle a capture and an insert use. */
 export type ComponentTarget = Pick<ExcalidrawImperativeApi, 'getAppState' | 'getSceneElements' | 'getFiles' | 'addFiles' | 'insertElements'>
 
-type JsonRecord = Record<string, unknown>
-const isRecord = (v: unknown): v is JsonRecord => typeof v === 'object' && v !== null && !Array.isArray(v)
 
 /** A component's elements and the image bytes they name, in hand. */
 export interface CapturedComponent {
