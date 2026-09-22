@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { execFile } from 'node:child_process'
-import { chmod, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
@@ -26,10 +26,7 @@ beforeAll(async () => {
   vault = path.join(work, 'Sidebar Sort and Board Info')
   await run(process.execPath, [SEED, '--vault', vault])
 }, 60_000)
-afterAll(async () => {
-  await chmod(path.join(vault, 'Locked — chmod 000, still listed.excalidraw'), 0o644).catch(() => undefined)
-  await rm(work, { recursive: true, force: true })
-})
+afterAll(() => rm(work, { recursive: true, force: true }))
 
 const names = (nodes: TreeNode[]) => nodes.map((n) => n.name.replace(/\.excalidraw$/, ''))
 const dirOf = (nodes: TreeNode[], name: string) => {
@@ -72,7 +69,7 @@ describe('1835F — the sort orders on the seeded vault', () => {
     expect(fifteen.at(-1)).toBe('Board 15')
   })
 
-  it('every junk board is listed under every order, without meta, and nothing throws', async () => {
+  it('every junk board is listed under every order, without meta, and nothing throws; the two non-boards sit among the files by name', async () => {
     const junk = ['Corrupt — not JSON', 'Empty — zero bytes', 'Misplaced — block is LAST, so it is ignored', 'Bad block — createdAt is a string', 'Locked — chmod 000, still listed']
     for (const order of ['name', 'updated', 'created'] as const) {
       const list = await sorted(order)
@@ -81,10 +78,19 @@ describe('1835F — the sort orders on the seeded vault', () => {
         expect(node, `${name} under ${order}`).toBeDefined()
         expect(node).not.toHaveProperty('meta')
       }
+      const files = list.filter((n) => n.type === 'file').map((n) => n.name)
+      expect(files).toContain('notes.txt')
+      expect(files).toContain('photo.png')
+      if (order === 'name') expect(files.indexOf('notes.txt')).toBeLessThan(files.indexOf('photo.png'))
     }
   })
 
-  it('saving a legacy board stamps it and moves it to the top under Last updated; a backfilled board keeps Created', async () => {
+  it('saving a legacy board stamps it and moves it to the top under Last updated; a backfilled board keeps Created (its own seed: it writes)', async () => {
+    // Its own vault, so the read-only cases above never depend on running first.
+    const own = path.join(work, 'writes')
+    await run(process.execPath, [SEED, '--vault', own])
+    const vault = own
+    const sorted = async (order: 'name' | 'updated' | 'created') => sortTree((await tree(vault)).tree, order)
     const legacy = path.join(vault, 'Legacy — no block, mtime 90 days ago.excalidraw')
     const doc = await loadDrawing({ root: vault, path: legacy })
     await saveDrawing({ root: vault, path: legacy, json: doc.json, expectedMtime: doc.mtime, newFiles: [] })
@@ -96,6 +102,10 @@ describe('1835F — the sort orders on the seeded vault', () => {
     await saveDrawing({ root: vault, path: cloud, json: cdoc.json, expectedMtime: cdoc.mtime, newFiles: [] })
     const block = (JSON.parse(await readFile(cloud, 'utf8')) as { yaseendraw: Record<string, unknown> }).yaseendraw
     expect(block).toMatchObject({ createdAt: Date.UTC(2021, 2, 4, 15, 6), cloudId: 'k97abc12' })
-    expect(names(await sorted('created')).indexOf('From the cloud — 2021 board with cloudId')).toBeGreaterThan(10)
+    // Newest first: a 2021 birth sits below Elder's (2023) and above the epoch-zero board, save or no save.
+    const byCreated = names(await sorted('created'))
+    const cloudAt = byCreated.indexOf('From the cloud — 2021 board with cloudId')
+    expect(cloudAt).toBeGreaterThan(byCreated.indexOf('Elder — the oldest board of all'))
+    expect(cloudAt).toBeLessThan(byCreated.indexOf('Epoch — created in 1970'))
   })
 })

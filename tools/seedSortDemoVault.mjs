@@ -2,7 +2,7 @@
 /**
  * USAGE: node tools/seedSortDemoVault.mjs --vault <dir> [--force]
  *
- * The vault the sidebar SORT and INFO checks run against (YAZ-1835 / YAZ-1847; the demo Yasin
+ * The vault the sidebar SORT and INFO checks run against (YAZ-1835, proved by 1835F = YAZ-1852; the demo Yasin
  * approved on 2026-09-22): 44 boards whose three orders all disagree, ties, legacy boards with no
  * block, the backfill shape with a `cloudId`, a "clone" whose block and mtime disagree, corrupt /
  * empty / misplaced-block / bad-block / future / epoch boards, unicode and case, nested folders,

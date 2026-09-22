@@ -245,8 +245,8 @@ function findDir(nodes: readonly TreeNode[], dir: string): readonly TreeNode[] |
 /** The lens tabs' copy; the ORDER is `SIDEBAR_LENSES`', so the default lens leads (YAZ-847). */
 const LENS_LABEL: Record<SidebarLens, string> = { files: 'Files', favorites: 'Favorites' }
 /** A drawing row, by the live tree's word (🔒 YAZ-1835 D6): Info describes boards, not `notes.txt`. */
-function isBoard(tree: TreeResponse | null, path: string): boolean {
-  const node = tree === null ? null : findNode(tree.tree, path)
+function isBoard(tree: readonly TreeNode[], path: string): boolean {
+  const node = findNode(tree, path)
   return node !== null && node.type === 'file' && node.kind === 'drawing'
 }
 /** The sort control's labels (🔒 YAZ-1835 D5), in `SORT_ORDERS` order. */
@@ -313,8 +313,9 @@ export function Sidebar({
   // The Files lens's order (🔒 YAZ-1835 D3): per vault, read off the store and re-read when another window changes it.
   const [sortOrder, setSortOrderState] = useState<SortOrder>(() => storage.getSortOrder(root))
   const [sortMenu, setSortMenu] = useState<{ x: number; y: number } | null>(null)
-  // The "Info" popover (🔒 YAZ-1835 D6): the board's PATH, resolved against the live tree at render.
-  const [info, setInfo] = useState<{ x: number; y: number; path: string } | null>(null)
+  // The "Info" popover (🔒 YAZ-1835 D6): the board's PATH, resolved against the live tree at render;
+  // `now` is pinned at open, like the vault switcher's, so a relative time never shifts on a re-render.
+  const [infoPopover, setInfoPopover] = useState<{ x: number; y: number; path: string; now: number } | null>(null)
   const [creating, setCreating] = useState<{ kind: EntryKind; seed: string; parentDir: string } | null>(null)
   const [renamingEntry, setRenamingEntry] = useState<{ path: string; kind: 'file' | 'dir' } | null>(null)
   // The delete confirm sheet's target (GRO-2272 `C3-`); null when the sheet is closed.
@@ -351,10 +352,14 @@ export function Sidebar({
   const sortedNodes = useMemo(() => sortTree(focusNodes.length > 0 ? focusNodes : (tree?.tree ?? []), sortOrder), [focusNodes, tree, sortOrder])
   // The Info popover's board, off the LIVE tree (🔒 YAZ-1835 D7): a refresh moves its dates; a deletion closes it.
   const infoNode = useMemo(() => {
-    if (info === null || tree === null) return null
-    const n = findNode(tree.tree, info.path)
+    if (infoPopover === null || tree === null) return null
+    const n = findNode(tree.tree, infoPopover.path)
     return n !== null && n.type === 'file' ? n : null
-  }, [info, tree])
+  }, [infoPopover, tree])
+  // The board went (deleted, moved): close for good, so a path that comes back does not reopen it.
+  useEffect(() => {
+    if (infoPopover !== null && tree !== null && infoNode === null) setInfoPopover(null)
+  }, [infoPopover, tree, infoNode])
   // What the chevrons button unfolds on the two disk-reading lenses.
   const bodyDirs = lens === 'favorites' ? favoriteDirs : shownDirs
   // ⌘K's feed (YAZ-1814): the ONE tree this panel already holds and the watcher already keeps
@@ -403,7 +408,9 @@ export function Sidebar({
   const refresh = useCallback(() => {
     api.tree(root).then(
       (res) => {
-        setTree(res)
+        // Walks overlap now that every watcher event refreshes (🔒 YAZ-1835 D4): a slower, older
+        // answer must never overwrite a newer one, and `generatedAt` is main's clock for exactly that.
+        setTree((cur) => (cur !== null && cur.generatedAt > res.generatedAt ? cur : res))
         setError(null)
       },
       (err: unknown) => {
@@ -670,7 +677,7 @@ export function Sidebar({
         favoriteIsOn: node !== null && (plural ?? [node.path]).every((p) => favorites.includes(p)),
         // Info (🔒 YAZ-1835 D6): one BOARD, on its own — the live tree says whether the row is a drawing;
         // a plural gesture has no single thing to describe.
-        infoPath: plural === null && filePath !== null && isBoard(tree, filePath) ? filePath : null,
+        infoPath: plural === null && filePath !== null && isBoard(tree?.tree ?? [], filePath) ? filePath : null,
       })
     },
     [root, tree, selectedPaths, orderedSelectedPaths, favorites],
@@ -1337,7 +1344,7 @@ export function Sidebar({
               onNewDatedFolder: canNewFolder ? () => startCreate('dir', datedFolderSeed()) : null,
               onToggleFavorite: toggleFavorite,
               onRename: (path) => setRenamingEntry({ path, kind: menu.rowKind === 'file' ? 'file' : 'dir' }),
-              onInfo: (path) => setInfo({ x: menu.x, y: menu.y, path }),
+              onInfo: (path) => setInfoPopover({ x: menu.x, y: menu.y, path, now: Date.now() }),
               onDelete: askDelete,
             },
           )}
@@ -1352,9 +1359,9 @@ export function Sidebar({
           onClose={() => setSortMenu(null)}
         />
       )}
-      {info !== null && infoNode !== null && (
-        <ContextMenuSurface x={info.x} y={info.y} width={300} onClose={() => setInfo(null)}>
-          <BoardInfo node={infoNode} root={root} now={Date.now()} />
+      {infoPopover !== null && infoNode !== null && (
+        <ContextMenuSurface x={infoPopover.x} y={infoPopover.y} width={300} role="dialog" onClose={() => setInfoPopover(null)}>
+          <BoardInfo node={infoNode} root={root} now={infoPopover.now} />
         </ContextMenuSurface>
       )}
       {confirmingDelete !== null && <ConfirmDelete target={confirmingDelete} onConfirm={confirmDelete} onCancel={() => setConfirmingDelete(null)} />}

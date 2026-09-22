@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { TreeNode } from './types'
-import { dateOf, sortTree } from './treeSort'
+import { sortTree, type FileNode } from './treeSort'
 
-const file = (name: string, over: Partial<Extract<TreeNode, { type: 'file' }>> = {}): TreeNode => ({ type: 'file', name, path: `/v/${name}`, size: 1, mtime: 10, kind: 'drawing', ...over })
+const file = (name: string, over: Partial<FileNode> = {}): TreeNode => ({ type: 'file', name, path: `/v/${name}`, size: 1, mtime: 10, kind: 'drawing', ...over })
 const dir = (name: string, children: TreeNode[] = []): TreeNode => ({ type: 'dir', name, path: `/v/${name}`, children })
 const names = (nodes: TreeNode[]) => nodes.map((n) => n.name)
 
@@ -50,12 +50,5 @@ describe('sortTree (🔒 YAZ-1835 D1/D2)', () => {
     sortTree(nodes, 'name')
     expect(JSON.stringify(nodes)).toBe(before)
     expect(inner[0]).toBe(banana)
-  })
-
-  it('dateOf: the block when it is there, the mtime when it is not', () => {
-    expect(dateOf(apple as never, 'updated')).toBe(900)
-    expect(dateOf(apple as never, 'created')).toBe(400)
-    expect(dateOf(legacy as never, 'updated')).toBe(960)
-    expect(dateOf(legacy as never, 'created')).toBe(960)
   })
 })

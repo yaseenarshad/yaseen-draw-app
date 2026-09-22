@@ -3,6 +3,7 @@ import { readdir, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { BoardMeta, BridgeError, TreeNode } from '@shared/types'
 import { fileKind, isDrawing } from '@shared/fileKind'
+import { byName } from '@shared/treeSort'
 import { readBoardHead } from './boardHead'
 
 /**
@@ -47,10 +48,6 @@ export function requireDrawingFile(p: string): void {
 /** Dot-entries and node_modules are invisible to every call. */
 export function isSkipped(name: string): boolean {
   return name.startsWith('.') || name === 'node_modules'
-}
-
-function byNameCi<T extends { name: string }>(a: T, b: T): number {
-  return a.name.toLowerCase().localeCompare(b.name.toLowerCase())
 }
 
 function errnoCode(err: unknown): string | undefined {
@@ -134,7 +131,7 @@ export async function buildTree(dir: string): Promise<TreeNode[]> {
       }
     }),
   )
-  return [...dirs.sort(byNameCi), ...files.sort(byNameCi)]
+  return [...dirs.sort(byName), ...files.sort(byName)]
 }
 
 /**

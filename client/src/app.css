@@ -543,7 +543,7 @@ button {
 
 /* Focus Mode's eye (YAZ-1605) — the expand-all look, one slot to its LEFT, in the accent so a lit
    eye reads as "you are in a focus" and not as one more grey chrome button. It takes the push to
-   the far end when present; the chevrons then sit flush beside it. */
+   the far end when no sort button precedes it (🔒 YAZ-1835 D5); the chevrons then sit flush beside it. */
 .sidebar__focus-off {
   flex: none;
   margin-left: auto;
