@@ -61,3 +61,13 @@ export function parseSceneText(text: string): DrawingScene {
   const files = isRecord(scene.files) ? scene.files : {}
   return { elements: scene.elements, appState, files }
 }
+
+/**
+ * The view a board OPENS on (🔒 YAZ-1855 D1): the engine's `initialState.viewport`, fitting every
+ * live element and never zooming past 100% (`scale-down`; the engine floors it at 10%). An empty
+ * board has nothing to fit, so `undefined` leaves the engine at its own 100%.
+ */
+export function openViewport(scene: DrawingScene): { viewport: { target: readonly unknown[]; fit: 'scale-down' } } | undefined {
+  const target = scene.elements.filter((e) => isRecord(e) && e.isDeleted !== true)
+  return target.length > 0 ? { viewport: { target, fit: 'scale-down' } } : undefined
+}

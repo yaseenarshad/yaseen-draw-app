@@ -68,8 +68,8 @@
  * imperative call, startup default and editor CSS rule at fork `e72242f8`, each with its reason —
  * is the "1A · Engine parity checklist" comment on YAZ-1805. This block is the short true list.
  *
- * PORTED: `onChange` · `initialData` (the scene off disk + 🔒 YAZ-1775 D3 assets + 🔒 YAZ-1775 D9 prefs) · `theme`
- *   (live) · `detectScroll: false` · `autoFocus` · `excalidrawAPI` (the fork calls it
+ * PORTED: `onChange` · `initialData` (the scene off disk + 🔒 YAZ-1775 D3 assets + 🔒 YAZ-1775 D9 prefs) ·
+ *   `initialState` (open fitted to the content, 🔒 YAZ-1855 D1) · `theme` (live) · `detectScroll: false` · `autoFocus` · `excalidrawAPI` (the fork calls it
  *   `onExcalidrawAPI`) · `renderTopLeftUI` as the 🔒 YAZ-1775 D10 rail · `renderTopRightUI` as a slot for the
  *   shell's chips · `UIOptions.canvasActions.clearCanvas: false` · the sidebar as `CanvasSidebar`
  *   (Images / Components / Present) with the web app's ⌘F / ⌘C shortcuts and their suppression
@@ -102,7 +102,7 @@ import { referencedFileIds, type DrawingFileData } from '@shared/drawingAssets'
 import { appStateToPrefs, changedPrefKeys, prefsEqual, prefsToAppState, type EngineAppStateSlice } from '@shared/canvasPrefs'
 import { DEFAULT_CANVAS_PANEL, DEFAULT_CANVAS_PREFS, type CanvasPanelState, type CanvasPanelTab, type CanvasPrefs } from '@shared/types'
 import { CANVAS_SIDEBAR, CanvasSidebar, openCanvasTab } from './CanvasSidebar'
-import type { DrawingScene } from './drawingScene'
+import { openViewport, type DrawingScene } from './drawingScene'
 import { applyToolbarMode, loadExcalidraw, type ExcalidrawModule } from './engine'
 import { yaseenFormFactor } from './formFactor'
 import { applyFramesVisibility } from './framesVisibility'
@@ -443,8 +443,10 @@ export function ExcalidrawSurface({
 
   // Built ONCE, from the mount-time scene and prefs: the engine reads `initialData` only at mount,
   // and a fresh identity on every settings write would re-render the memoized `<Excalidraw>` for
-  // nothing (the #185 rule). The saved scene may sit far from the origin, so open on what it holds.
-  const [initialData] = useState(() => ({ ...engineScene(scene, prefsToAppState(canvasPrefs)), scrollToContent: true }))
+  // nothing (the #185 rule). The saved scene may sit far from the origin, so open on ALL of it
+  // (🔒 YAZ-1855 D1) — `initialState.viewport`, which the engine resolves once the canvas is measured.
+  const [initialData] = useState(() => engineScene(scene, prefsToAppState(canvasPrefs)))
+  const [initialState] = useState(() => openViewport(scene) as ExcalidrawProps['initialState'])
 
   const onChange = useCallback(
     (elements: ChangeArgs[0], appState: EngineAppState, files: ChangeArgs[2]) => {
@@ -548,6 +550,7 @@ export function ExcalidrawSurface({
     <div ref={rootRef} className="drawing-surface" onKeyDownCapture={onKeyDownCapture}>
       <Excalidraw
         initialData={initialData}
+        initialState={initialState}
         theme={theme}
         UIOptions={UI_OPTIONS}
         onChange={onChange}
