@@ -378,6 +378,13 @@ export function ExcalidrawSurface({
   const [imperativeApi, setImperativeApi] = useState<ImperativeApi | null>(null)
   /** ⌘F's counter: every press is a fresh request to focus the Images tab's search field. */
   const [searchFocusRequest, setSearchFocusRequest] = useState(0)
+  /**
+   * Whether the canvas holds a selection, for the Components tab's "Save selection" (YAZ-1819).
+   * The web app read it with the engine's `useUIAppState()` hook inside the panel; here it is read
+   * off the SAME `onChange` the rest of this seam is driven by, so the tab needs no engine hook —
+   * and because it is a boolean, the memoized panel is re-made only when it actually flips.
+   */
+  const [hasSelection, setHasSelection] = useState(false)
   /** This seam's own element — the handle's `focus()` reaches the engine's container through it. */
   const rootRef = useRef<HTMLDivElement | null>(null)
   emitRef.current = onSnapshot
@@ -545,6 +552,7 @@ export function ExcalidrawSurface({
       if (mod !== null) emitRef.current(snapshotOf(mod, elements, appState, files))
       // The canvas panel's open tab: the rail's emphasis, the triggers' opacity, and the memory
       // the hamburger opens on next time.
+      setHasSelection(Object.keys((appState as unknown as { selectedElementIds?: Record<string, unknown> }).selectedElementIds ?? {}).length > 0)
       const activeTab = openCanvasTab((appState as unknown as { openSidebar?: { name?: string; tab?: string } | null }).openSidebar)
       if (activeTab !== null) rememberPanel({ tab: activeTab })
       rail.set({ activeTab })
@@ -609,9 +617,17 @@ export function ExcalidrawSurface({
   const canvasSidebar = useMemo(
     () =>
       engine === null ? null : (
-        <CanvasSidebar engine={engine} activeTab={activeTab} onClose={closePanel} onDock={onDock} excalidrawAPI={imperativeApi} searchFocusRequest={searchFocusRequest} />
+        <CanvasSidebar
+          engine={engine}
+          activeTab={activeTab}
+          onClose={closePanel}
+          onDock={onDock}
+          excalidrawAPI={imperativeApi}
+          searchFocusRequest={searchFocusRequest}
+          hasSelection={hasSelection}
+        />
       ),
-    [engine, activeTab, closePanel, onDock, imperativeApi, searchFocusRequest],
+    [engine, activeTab, closePanel, onDock, imperativeApi, searchFocusRequest, hasSelection],
   )
 
   if (engine === null) return <div className="drawing-editor__loading" />

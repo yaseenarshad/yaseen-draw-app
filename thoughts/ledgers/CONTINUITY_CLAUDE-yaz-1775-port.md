@@ -46,9 +46,9 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
   - [x] 2I — New drawing, naming, extension display, file association (YAZ-1815)
   - [x] 3A — Library folder and secrets plumbing (YAZ-1817)
   - [x] 3B — Images tab: Image Studio with main-process providers (YAZ-1818)
-- Now: [→] 3C — Components tab: Saved Components as library files (YAZ-1819)
+  - [x] 3C — Components tab: Saved Components as library files (YAZ-1819)
+- Now: [→] 3D — Present tab: presentation sidebar and player (YAZ-1820)
 - Remaining:
-  - [ ] 3D — Present tab: presentation sidebar and player (YAZ-1820)
   - [ ] 3E — Export menu: PNG, SVG, standalone `.excalidraw` (YAZ-1821)
   - [ ] 4A — Prove the image-heavy board round trip through quit, relaunch, sync and clone (YAZ-1823)
   - [ ] 4B — Prove windows, tabs, favorites, vault switcher and same-board-in-two-windows (YAZ-1824)
@@ -65,7 +65,35 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 - UNCONFIRMED (posted on YAZ-1815, awaiting Yasin): where a drawing outside EVERY open vault should open. 2I kept the shipped E1 rule — a NEW window rooted at the file's parent folder — rather than repointing the focused window's vault, which would discard its tabs and would need a main→renderer "switch vault and open this" message that does not exist. Documented in CONTRACTS as built.
 - RESOLVED (🔒 on YAZ-1775, with the phase-2 merge): the rename CONFIRM sheet is **deleted** — with wikilinks gone it warned about nothing, and "New drawing" landing on the inline rename field made every new `Untitled` board trip it. `ConfirmRename.tsx`/`.test.tsx` and App's `requestRename` detour are gone; rename commits on Enter. Delete and move keep their confirms. First commit of phase 3.
 
-## Learnings (2D / 2E / 2F / 2G / 2H / 2I / 3A / 3B)
+## Learnings (2D / 2E / 2F / 2G / 2H / 2I / 3A / 3B / 3C)
+
+- **The folder is the truth; the index is a cache.** `components.json` is rebuilt from
+  `<library>/components/` on every read — adopted, dropped and repaired — not just when it is
+  missing. That is what makes a component arriving through a synced folder, or a file deleted in
+  Finder, simply correct with no repair step anywhere. And a READ NEVER WRITES: the reconciliation
+  is in memory, so listing a library costs a read-only disk nothing.
+- **A component embeds its images; a board does not.** 🔒 D3 keeps bytes OUT of scene JSON, and
+  🔒 D5 puts them INSIDE a component — not a contradiction: a board lives in the vault beside its
+  `assets/`, a component has to insert into a vault it has never seen. The two meet on insert: the
+  embedded bytes are handed to the canvas, and 2E's `unpersistedFiles` turns them into THIS vault's
+  assets on the next save, deduped by `fileId`.
+- **The slug is the identity, the name is the label.** The web app's identity was a Convex `_id`;
+  a folder can only carry a filename. So a rename moves no file, and the slug is validated as a
+  path segment (lowercase words, single hyphens) rather than trusted — the `isValidFileId` posture.
+- **Echo suppression needs one entry per FILE when a mutation writes three.** `mediaStore` drops
+  its own watcher event by the single file's mtime; a component save writes a fragment, a preview
+  and the index, so the map is path → mtime (and → null for a trash). The watcher's filter is what
+  keeps `atomicWrite`'s tmp files out of it: only `<slug>.excalidraw`, `<slug>.png` and the index.
+- **Chokidar loses a subfolder created during its own initialisation** (polling), which is the
+  `mediaStore` note one level down: `components/` may be made by the first save. Re-adding it once
+  on `ready` is the recovery, and it costs nothing when the folder is not there yet.
+- **The selection is read off `onChange`, not off an engine hook.** The web app's `useUIAppState()`
+  would have made the tab engine-bound and untestable; `ExcalidrawSurface` already sees every
+  appState, so `hasSelection` is a boolean prop — and because it is a boolean, the memoized panel
+  is re-made only when it actually flips.
+- **Search is the app's ONE matcher.** The library is a folder of small files, so it is listed
+  whole and ranked in the renderer through `search/matchCandidates.ts` — the same function ⌘K uses.
+  A second search implementation would have been a second answer to the same question.
 
 - **The library store is `vaultConfig.ts` with one file.** Same shape end to end: lazy read, tmp +
   rename write, one chokidar, own-write echo dropped by mtime, external edit debounced. The one
