@@ -48,9 +48,9 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
   - [x] 3B — Images tab: Image Studio with main-process providers (YAZ-1818)
   - [x] 3C — Components tab: Saved Components as library files (YAZ-1819)
   - [x] 3C1 — Import JSON into the components library (YAZ-1833)
-- Now: [→] 3D — Present tab: presentation sidebar and player (YAZ-1820)
+  - [x] 3D — Present tab: presentation sidebar and player (YAZ-1820)
+- Now: [→] 3E — Export menu: PNG, SVG, standalone `.excalidraw` (YAZ-1821)
 - Remaining:
-  - [ ] 3E — Export menu: PNG, SVG, standalone `.excalidraw` (YAZ-1821)
   - [ ] 4A — Prove the image-heavy board round trip through quit, relaunch, sync and clone (YAZ-1823)
   - [ ] 4B — Prove windows, tabs, favorites, vault switcher and same-board-in-two-windows (YAZ-1824)
   - [ ] 4C — Prove Image Studio, Components and Present online and offline (YAZ-1825)
@@ -66,8 +66,28 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 - UNCONFIRMED (posted on YAZ-1815, awaiting Yasin): where a drawing outside EVERY open vault should open. 2I kept the shipped E1 rule — a NEW window rooted at the file's parent folder — rather than repointing the focused window's vault, which would discard its tabs and would need a main→renderer "switch vault and open this" message that does not exist. Documented in CONTRACTS as built.
 - RESOLVED (🔒 on YAZ-1775, with the phase-2 merge): the rename CONFIRM sheet is **deleted** — with wikilinks gone it warned about nothing, and "New drawing" landing on the inline rename field made every new `Untitled` board trip it. `ConfirmRename.tsx`/`.test.tsx` and App's `requestRename` detour are gone; rename commits on Enter. Delete and move keep their confirms. First commit of phase 3.
 
-## Learnings (2D / 2E / 2F / 2G / 2H / 2I / 3A / 3B / 3C / 3C1)
+## Learnings (2D / 2E / 2F / 2G / 2H / 2I / 3A / 3B / 3C / 3C1 / 3D)
 
+- **The player cannot live in the tab that starts it.** A `Sidebar.Tab` body is unmounted the
+  moment the panel closes, and closing the panel is the FIRST thing Play does. So `Play` goes up
+  to `ExcalidrawSurface`, which mounts the player as a sibling of `<Excalidraw>`.
+- **`body` classes do not survive a multi-tab shell.** The web app hid the editor chrome with a
+  class on `document.body`; here that would hide the chrome of every mounted tab, so the classes go
+  on `.drawing-surface` and the CSS is scoped to it. Same for the camera reserve: a fraction of the
+  PANE, not of `window.innerWidth`, because a file sidebar sits beside the canvas.
+- **A document-wide listener needs the frontmost test.** The canvas holds the keyboard while
+  presenting and it is not inside the overlay, so the key and double-click handlers stay on
+  `document` — gated on the overlay not being inside a `.tabstack__layer--hidden`, which is
+  `drawingCommand.ts`'s own test one layer down.
+- **The order is a request, not a guarantee.** The file is user data: two frames can claim slot 2
+  and a frame can claim slot 9 of a three-slide deck. Only an unambiguous, in-range claim takes its
+  slot; the rest fill the gaps in scene order, so the deck is always 1..n with no holes.
+- **A fake engine has to close its own loop.** The panel re-derives from `onChange` rather than
+  being optimistic, so a test double whose `updateScene` does not fire `onChange` shows a stale
+  list — and pins the wrong behaviour if you assert on the scene instead.
+- **Dropping the animation stack is not dropping the transition token.** The lifecycle event went
+  with its only subscriber, but the token, the `isTransitioning` state and the "no landing while
+  the deck is zoomed out" rule are the camera behaving itself and stayed.
 - **A native dialog is the only place an arbitrary path may be read.** Import JSON needed the bytes
   of a file OUTSIDE the vault, and the bridge has no read-any-path door. Rather than open one,
   `dialog:open-file` reads what the user has just picked, bounded by `MAX_DRAWING_BYTES` and
