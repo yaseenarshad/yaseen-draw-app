@@ -59,7 +59,7 @@ interface SlideDrag {
  */
 function SlideNameInput({ label, initialName, onCommit, onCancel }: { label: string; initialName: string; onCommit: (name: string) => void; onCancel: () => void }) {
   return (
-    // eslint-disable-next-line jsx-a11y/no-autofocus -- the rename button is the only way here
+    // Autofocused because the rename button is the only way here: the field IS the gesture.
     <input
       className="presentation-sidebar__rename"
       aria-label={label}

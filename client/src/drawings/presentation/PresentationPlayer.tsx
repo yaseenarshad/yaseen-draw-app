@@ -259,7 +259,6 @@ export function PresentationPlayer({ engine, excalidrawAPI, initialFrameId = nul
       if (!didExitRef.current) endSession()
     }
     // Mount-only by contract: a presentation is started once and ended once.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // The deck is whatever the scene says it is: frames added, removed or reordered while presenting
