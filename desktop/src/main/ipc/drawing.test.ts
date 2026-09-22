@@ -59,11 +59,13 @@ describe('drawing IPC', () => {
   it('answers drawing:save in the standard envelope and writes the bytes', async () => {
     const file = path.join(root, 'Board.excalidraw')
     await writeFile(file, SCENE)
-    // The pretty, `files: {}` form the renderer's serializer produces — written back verbatim.
+    // The pretty, `files: {}` form the renderer's serializer produces — written back verbatim below the block (🔒 YAZ-1834 D1).
     const next = `${JSON.stringify({ type: 'excalidraw', version: 2, elements: [{ id: 'a' }], appState: {}, files: {} }, null, 2)}\n`
     const res = (await registered(CH.drawingSave)({}, { root, path: file, json: next, newFiles: [] })) as Envelope<unknown>
     expect(res.ok).toBe(true)
-    expect(await readFile(file, 'utf8')).toBe(next)
+    const { yaseendraw, ...rest } = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>
+    expect(yaseendraw).toMatchObject({ createdAt: expect.any(Number), updatedAt: expect.any(Number) })
+    expect(`${JSON.stringify(rest, null, 2)}\n`).toBe(next)
   })
 
   it('turns a failure into the envelope`s BridgeError rather than a rejection (Electron flattens throws)', async () => {

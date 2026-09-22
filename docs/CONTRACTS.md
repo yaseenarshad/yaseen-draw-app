@@ -92,6 +92,9 @@ One kind, one extension.
   no other channel reads or writes a scene — a second writer with different rules about the
   scene's images is a race with no upside. `fs:create-file` is the one exception and only for
   BIRTH: "New drawing" writes the empty scene with the file, under `wx`.
+- Every board main writes starts with its own dates — `{ "yaseendraw": { "createdAt", "updatedAt" } }`
+  as the FIRST key (🔒 YAZ-1834, "Board metadata" below). Set by main in those two doors, read by
+  `fs:tree` off the file head, never touched by the renderer.
 - `client/src/Editor.tsx` dispatches on the kind: "Select a file from the sidebar." with no file,
   "Unsupported file type." for a `null` kind, and `DrawingEditor` for a drawing.
 
@@ -109,11 +112,11 @@ calls that go through it; `state`, `window`, `menu`, `link` and `watch` are call
 
 | `window.yaseenDraw` | Channel | What it does |
 |---|---|---|
-| `tree(root)` | `fs:tree` | the folder tree; dot-entries and `node_modules` are invisible |
+| `tree(root)` | `fs:tree` | the folder tree; dot-entries and `node_modules` are invisible; a drawing carries `meta` (its dates) when its head has a trustworthy block (🔒 YAZ-1834 D6) |
 | `createDir(path)` | `fs:create-dir` | never overwrites (`ALREADY_EXISTS`) |
-| `createFile(req)` | `fs:create-file` | `.excalidraw` only; content-at-create, `wx` flag |
+| `createFile(req)` | `fs:create-file` | `.excalidraw` only; content-at-create, `wx` flag; the content must be a scene object and is born stamped with `createdAt = updatedAt = now` (🔒 YAZ-1834 D3) |
 | `drawing.load(req)` | `drawing:load` | one `.excalidraw` AS A DOCUMENT: its bytes, its mtime, and the images it names |
-| `drawing.save(req)` | `drawing:save` | images first, then the scene, atomically; `expectedMtime` → `CONFLICT` with NOTHING written |
+| `drawing.save(req)` | `drawing:save` | images first, then the scene, atomically; `expectedMtime` → `CONFLICT` with NOTHING written; the scene lands with its `yaseendraw` block first, `createdAt` carried from the file, `updatedAt` = now (🔒 YAZ-1834 D3) |
 | `drawing.libraryFolder()` | `drawing:library-folder` | the RESOLVED library folder — the setting, or `<userData>/library` (🔒 YAZ-1775 D5) |
 | `pickFolder()` | `dialog:pick-folder` | the native open-directory dialog |
 | `dialog.openDrawing()` | `dialog:open-file` | the native OPEN-FILE dialog, `.excalidraw` filter → `{ path, name, content }` or `{ cancelled: true }`; the bytes come back because the picked file is outside the vault |
@@ -158,7 +161,8 @@ Rules that hold across the whole surface:
   returned and ignored; a genuine external change while the buffer is dirty raises the conflict bar.
 - **One door per direction, per kind.** Where a kind has a dedicated pair (`drawing:load` /
   `drawing:save`), nothing else may read or write those bytes. A save is an ORDER as well as a
-  write: the images the scene names land before the scene that names them.
+  write: the images the scene names land before the scene that names them, and the dates ride
+  the same atomic write (🔒 YAZ-1834 D3).
 - **Read ceilings are per door.** `MAX_FILE_BYTES` (10 MiB) bounds the text reads;
   `MAX_DRAWING_BYTES` (200 MiB) bounds `drawing:load`, which has to open legacy scenes that still
   embed their images as base64.
@@ -488,7 +492,8 @@ typed once in Settings › Images and read by main when it builds a Pixabay requ
 Two things live in the VAULT instead, because they are the user's own data:
 `<vault>/.yaseendraw/favorites.json` (YAZ-1794: vault-relative paths, so favorites travel with the
 vault) and `<vault>/.yaseendraw/github.json` (the per-vault sync switch). Nothing else is ever
-written into a vault except the drawings and `assets/`.
+written into a vault except the drawings and `assets/`. A board's own dates live INSIDE the
+drawing, not in the dotfolder — see "Board metadata" below.
 
 To reset or hand-edit the state file: **quit the app first** (⌘Q flushes it), then edit or delete
 the JSON. A missing file launches one empty window.
@@ -564,6 +569,53 @@ mounted at once, each with its own engine, so a prop or a `window` listener woul
 canvas. The drawing then calls the engine's own door: `openDialog: { name: 'imageExport' }` (the
 engine's PNG / SVG export dialog), or `viewBackgroundColor`, which the engine writes into the
 file — or, for Export Drawing…, the assembly below.
+
+### Board metadata (🔒 YAZ-1834)
+
+Every board main writes begins with its own two dates:
+
+```json
+{
+  "yaseendraw": { "createdAt": 1758500000000, "updatedAt": 1758500000000 },
+  "type": "excalidraw",
+  …
+}
+```
+
+**🔒 YAZ-1834 D1 — the block lives IN the file, as its first key.** Not in a sidecar and not in
+`.yaseendraw/`: a shared vault file that changed on every save would put the same lines under
+two machines' edits and halt the sync's rebase (the lossless rule); a block inside the drawing
+changes only when the drawing changes, travels with rename, move, clone and sync for free, and
+needs no repair code. Written first so `fs:tree` can read it from the first KB of the file
+(`BOARD_META_HEAD_BYTES`) without opening the board.
+
+**🔒 D3 — main sets both dates, in the doors that already write the file.** `fs:create-file`
+births the block (`createdAt = updatedAt = now`) inside "New drawing"'s content, under the same
+`wx`. `drawing:save` re-reads the current file's head — the engine's serializer drops keys it
+does not know, so the renderer never sends the block back — keeps `createdAt`, sets `updatedAt`
+to now, and `stampBoardMeta` places it first in the same atomic write as the scene. A board with
+no block is born one on its first save, aged by its pre-save mtime. A refused save (`CONFLICT`,
+`BAD_REQUEST`, `TOO_LARGE`) stamps nothing. Consequence: an "untouched" save moves `updatedAt`
+and nothing else; the scene below the block stays byte-identical.
+
+**🔒 D5 — the block is the backfill contract** (YAZ-1832). `createdAt` is never rewritten once
+it is a finite number, and every other key inside the block is preserved verbatim, so an importer
+may add `"cloudId"` beside the dates and it survives every save. The importer must write the
+block FIRST: a block anywhere else is not read (D7) and is replaced on the next save.
+
+**🔒 D6 — no new bridge.** `TreeNode` (file) carries `meta?: { createdAt, updatedAt }` when the
+head holds a trustworthy block. For sorting (YAZ-1835) the block WINS over `mtime`: a clone
+resets mtimes, the block travels. Boards without one sort by `mtime`.
+
+**🔒 D7 — a missing, misplaced or malformed block is simply "no metadata".** The tree shows
+none, nothing is moved aside, no save or create is ever blocked by it, and the next save births a
+fresh block. `drawing:load` passes the block through untouched inside `json`; the engine ignores
+it. Export Drawing… (below) writes NO block — an export is a snapshot, not a board. Neither
+does `fs:write` or the saved-components store. A copy (Finder or in-app) keeps its origin's
+dates. Dropped from the design on purpose: `openedAt`, an id, tags, description (🔒 D2).
+
+Pure rules and readers: `shared/drawingAssets.ts` (`stampBoardMeta`, `readBoardMetaHead`);
+the one open that serves both the tree and the save: `desktop/src/main/fs/boardHead.ts`.
 
 ### Export Drawing… (🔒 YAZ-1775 D3, YAZ-1821)
 

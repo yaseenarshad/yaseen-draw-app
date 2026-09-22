@@ -2,6 +2,19 @@
 
 import type { BridgeErrorCode, FileKind, MAX_DRAWING_BYTES } from './errors'
 
+/**
+ * The two dates every board main writes carries as its FIRST key (🔒 YAZ-1834 D1):
+ * `{ "yaseendraw": { "createdAt", "updatedAt" } }`. Set by main only (D3); the block is also the
+ * contract the cloud backfill (YAZ-1832) writes, and it may add keys of its own inside the
+ * block, which every save preserves (D5). Rules and readers: `shared/drawingAssets.ts`.
+ */
+export interface BoardMeta {
+  /** Epoch ms. Born on create or on the first save of a board without a block; never rewritten after. */
+  createdAt: number
+  /** Epoch ms of the last in-app save. */
+  updatedAt: number
+}
+
 export type TreeNode =
   | {
       type: 'dir'
@@ -17,6 +30,13 @@ export type TreeNode =
       size: number
       /** mtime in epoch ms. */
       mtime: number
+      /**
+       * The board's own dates from its `yaseendraw` block (🔒 YAZ-1834 D1/D6), read from the
+       * file head during the walk; absent when the file has no block, or it is not the first key,
+       * or it is malformed (D7). For sorting it WINS over `mtime`: a clone resets mtimes, the block
+       * travels with the bytes.
+       */
+      meta?: BoardMeta
       /** Preview classification (`shared/fileKind.ts`); `null` = listed, but no in-app viewer (YAZ-1577 D1). */
       kind: FileKind | null
     }

@@ -1,8 +1,9 @@
 import { randomBytes } from 'node:crypto'
 import { readdir, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import type { BridgeError, TreeNode } from '@shared/types'
+import type { BoardMeta, BridgeError, TreeNode } from '@shared/types'
 import { fileKind, isDrawing } from '@shared/fileKind'
+import { readBoardHead } from './boardHead'
 
 /**
  * Thrown by the fs layer; `ipc/envelope.ts` turns it into the `BridgeError` the renderer sees.
@@ -96,8 +97,22 @@ export async function requireDir(dir: string): Promise<void> {
  * Recursive tree of every regular file under `dir`, each carrying its preview `kind` (`null` = no
  * in-app viewer, YAZ-1577 D1). Dirs first, then files, each sorted case-insensitively; every dir
  * shows even when empty, so freshly created folders are visible (GRO-2022 D1). Dot-entries and
- * `node_modules` are skipped; unreadable subdirs are skipped.
+ * `node_modules` are skipped; unreadable subdirs are skipped. A drawing also carries `meta`, its
+ * `yaseendraw` block read off the file head in the same open as its stat (🔒 YAZ-1834 D6); a board
+ * without a trustworthy block simply has none.
  */
+/** A drawing's dates and stat in one open, or just the stat of any other file. */
+async function fileHead(full: string): Promise<{ meta: BoardMeta | null; mtime: number; size: number } | null> {
+  if (!isDrawing(full)) {
+    const st = await stat(full)
+    return { meta: null, mtime: st.mtimeMs, size: st.size }
+  }
+  const head = await readBoardHead(full)
+  if (head === null) return null
+  const { block, mtime, size } = head
+  return { meta: block === null ? null : { createdAt: block.createdAt, updatedAt: block.updatedAt }, mtime, size }
+}
+
 export async function buildTree(dir: string): Promise<TreeNode[]> {
   const entries = await readdir(dir, { withFileTypes: true })
   const dirs: TreeNode[] = []
@@ -110,8 +125,8 @@ export async function buildTree(dir: string): Promise<TreeNode[]> {
         const children = await buildTree(full).catch(() => null)
         if (children !== null) dirs.push({ type: 'dir', name: e.name, path: full, children })
       } else if (e.isFile()) {
-        const st = await stat(full).catch(() => undefined)
-        if (st) files.push({ type: 'file', name: e.name, path: full, size: st.size, mtime: st.mtimeMs, kind: fileKind(e.name) })
+        const head = await fileHead(full).catch(() => null)
+        if (head) files.push({ type: 'file', name: e.name, path: full, size: head.size, mtime: head.mtime, kind: fileKind(e.name), ...(head.meta ? { meta: head.meta } : {}) })
       }
     }),
   )

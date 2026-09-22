@@ -42,6 +42,8 @@ const MIME_BY_EXT: Readonly<Record<string, string>> = {
  * `assets/`, and the board that names it has not saved yet — an eager sweep would eat exactly
  * the file the user is looking at.
  */
+import type { BoardMeta } from './types'
+
 export const ORPHAN_MAX_AGE_MS = 24 * 60 * 60 * 1000
 
 /** The vault-relative folder the store lives in; the sidebar tree hides it (🔒 YAZ-1775 D3). */
@@ -136,6 +138,88 @@ export function stripEmbeddedFiles(json: string): { json: string; embedded: Reco
   }
   const lean = `${JSON.stringify({ ...scene, files: {} }, null, 2)}\n`
   return { json: !hadEntries && lean === json ? json : lean, embedded }
+}
+
+// ---------- The `yaseendraw` block (🔒 YAZ-1834 D1/D3/D5/D7) ----------
+
+/** The top-level key that carries a board's own dates; always the FIRST key of a file main writes. */
+export const BOARD_META_KEY = 'yaseendraw'
+/** How much of a board the tree walk reads to find the block: it is ~80 bytes and comes first. */
+export const BOARD_META_HEAD_BYTES = 1024
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+const isEpochMs = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+
+/** A block as it sits in a file: the two dates, plus whatever the backfill put beside them (D5). */
+export type BoardMetaBlock = BoardMeta & Record<string, unknown>
+
+/**
+ * Place and stamp the block on a scene that is on its way to disk (🔒 YAZ-1834 D3). `json` is the
+ * lean text `stripEmbeddedFiles` produced, or a fresh `EMPTY_SCENE_JSON`; `at` carries the dates
+ * the caller has decided on; `prior` is the block the FILE currently holds (the save door reads it
+ * off the head), which wins over any block inside `json` because the disk is the block's truth —
+ * the engine's serializer never sends it back. The result is re-serialized the way every board
+ * main writes it (2-space, trailing newline) with `yaseendraw` as the FIRST key, so the tree can
+ * read it back from the file head alone.
+ *
+ * What survives from the existing block (D5, the backfill contract): a finite `createdAt` is
+ * kept over `at.createdAt`; every key the app does not know is kept verbatim (an importer's
+ * `cloudId`, say). `updatedAt` is always `at.updatedAt`. A block that is not a plain object is
+ * replaced (D7). The block's own key order is normalized — `createdAt, updatedAt, …extras` — so
+ * stamping twice with the same `at` is byte-stable. Every other top-level key keeps its order.
+ *
+ * Throws when the text is not a JSON object; the save door has validated the scene before this.
+ */
+export function stampBoardMeta(json: string, at: { createdAt: number; updatedAt: number }, prior: Record<string, unknown> | null = null): string {
+  const parsed: unknown = JSON.parse(json)
+  if (!isPlainObject(parsed)) throw new Error('not an Excalidraw scene')
+  const { [BOARD_META_KEY]: own, ...rest } = parsed
+  const existing = prior ?? own
+  const { createdAt, updatedAt, ...extras } = isPlainObject(existing) ? existing : {}
+  void updatedAt // always replaced
+  const block = { createdAt: isEpochMs(createdAt) ? createdAt : at.createdAt, updatedAt: at.updatedAt, ...extras }
+  return `${JSON.stringify({ [BOARD_META_KEY]: block, ...rest }, null, 2)}\n`
+}
+
+/**
+ * The block off the HEAD of a file — the first `BOARD_META_HEAD_BYTES` decoded as text, which is
+ * a truncated document and must never be `JSON.parse`d whole. Answers the block only when the
+ * text is an object whose first key is `yaseendraw` and whose value parses to a plain object with
+ * two finite numbers; anything else (no block, block not first, malformed, cut short) is `null`
+ * (🔒 YAZ-1834 D7). Extra keys come back with it, so a save can carry them forward (D5).
+ */
+export function readBoardMetaHead(head: string): BoardMetaBlock | null {
+  const open = /^\s*\{\s*"yaseendraw"\s*:\s*\{/.exec(head)
+  if (open === null) return null
+  const end = closingBrace(head, open[0].length - 1)
+  if (end === null) return null
+  let block: unknown
+  try {
+    block = JSON.parse(head.slice(open[0].length - 1, end + 1))
+  } catch {
+    return null
+  }
+  if (!isPlainObject(block) || !isEpochMs(block.createdAt) || !isEpochMs(block.updatedAt)) return null
+  return block as BoardMetaBlock
+}
+
+/**
+ * Index of the `}` that closes the `{` at `start`, or null when the text ends first. String-aware,
+ * because an importer's extra value may legitimately contain a brace (`"note": "a }"`).
+ */
+function closingBrace(text: string, start: number): number | null {
+  let depth = 0
+  let inString = false
+  for (let i = start; i < text.length; i++) {
+    const c = text[i]
+    if (inString) {
+      if (c === '\\') i++
+      else if (c === '"') inString = false
+    } else if (c === '"') inString = true
+    else if (c === '{') depth++
+    else if (c === '}' && --depth === 0) return i
+  }
+  return null
 }
 
 /**
