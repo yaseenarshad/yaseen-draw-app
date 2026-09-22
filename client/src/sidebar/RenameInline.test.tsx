@@ -8,7 +8,6 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { RenameInline } from './RenameInline'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 let root: Root | null = null
 let container: HTMLElement | null = null

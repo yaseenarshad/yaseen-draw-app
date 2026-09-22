@@ -36,7 +36,7 @@ function syncHash(path: string | null): void {
 export function App() {
   const [root, setRoot] = useState<string | null>(storage.getRoot)
   // Workspace (Tabs I2 + YAZ-966): one renderer-owned model, seeded from the boot identity snapshot
-  // (a pasted `#/abs/path.md` URL wins as the active tab — bootTabs). The ACTIVE tab is this
+  // (a pasted `#/abs/path.excalidraw` URL wins as the active tab — bootTabs). The ACTIVE tab is this
   // window's `file`: title, URL hash and the sidebar highlight all follow it.
   const {
     tabs, active: file, mounted, openCurrent, openBackground, activate, close: closeTab, move: moveTab,
@@ -51,12 +51,6 @@ export function App() {
   // collapse/reopen and root switch. Window identity like visibility since YAZ-1628 — one
   // `WindowEntry.sidebarLens`; never a second flag.
   const [sidebarLens, setSidebarLens] = useState(storage.getSidebarLens)
-  // ⌘⇧C's read-only window onto the sidebar's multi-selection (🔒 D4, YAZ-1338). App owns the
-  // BOX and the chord; the Sidebar owns the selection (🔒 D1) and writes it in here, emptying it
-  // when it unmounts. A ref rather than state on purpose: App needs the answer only at the
-  // moment the key is pressed, and re-rendering this whole window on every shift+click would be
-  // a real cost for a fact nothing on screen up here shows.
-  const sidebarSelection = useRef<ReadonlySet<string>>(EMPTY_SELECTION)
   // ⌘C / ⌘X / ⌘V's handle (D6 amended, YAZ-1674): the mounted Sidebar's two verbs, null while collapsed.
   const sidebarClipboard = useRef<SidebarClipboard | null>(null)
   const sidebarRevealId = useRef(0)
@@ -322,13 +316,12 @@ export function App() {
   useLinkEvents({ onOpenFile: openCurrent, onNotice: notify })
 
   /**
-   * ⌘C / ⌘X / ⌘V for the sidebar's FILE clipboard (D6 amended, YAZ-1674) — ⌘⇧C's sibling in every
-   * way: a window listener (a panel listener needs focus inside the panel, and after a click on
-   * the open file focus sits in the editor — YAZ-961's handoff — while blank space is not
-   * focusable at all), the same ownership boundary (`ownsWindowChord`: a field, the ProseMirror
-   * editor or a modal keeps the key, so text copy/paste is untouched), and a handle the Sidebar
-   * fills and empties. The RULES are the Sidebar's — target, order, the clipboard gate — so
-   * this only asks, and swallows the key exactly when a verb says it acted.
+   * ⌘C / ⌘X / ⌘V for the sidebar's FILE clipboard (D6 amended, YAZ-1674). A WINDOW listener: a
+   * panel listener needs focus inside the panel, and after a click on the open file focus sits in
+   * the canvas (YAZ-961's handoff) while blank space is not focusable at all. `ownsWindowChord`
+   * draws the boundary — a text field, the canvas or a modal keeps the key, so text copy/paste is
+   * untouched. The RULES are the Sidebar's — target, order, the clipboard gate — behind a handle
+   * it fills and empties; this only asks, and swallows the key exactly when a verb says it acted.
    */
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -393,7 +386,7 @@ export function App() {
         notify(exists ? `Can't rename: "${basename(newPath)}" already exists` : `Can't rename: ${err instanceof Error ? err.message : String(err)}`)
       }
     },
-    [root],
+    [root, notify],
   )
 
   /**
@@ -442,7 +435,7 @@ export function App() {
           : `Can't delete "${name}": ${err instanceof Error ? err.message : String(err)}`,
       )
     }
-  }, [])
+  }, [notify])
 
   const onRootMissing = useCallback(() => {
     storage.setRoot(null) // one identity write: { root: null, file: null, tabs: [] }
@@ -509,8 +502,6 @@ export function App() {
           onRenameFile={renameFile}
           onDeleteFile={deleteFile}
           onNotice={notify}
-          // The multi-selection box (🔒 D4): the panel keeps it current, the context menu reads it.
-          selectionRef={sidebarSelection}
           // ⌘C / ⌘X / ⌘V's handle (D6 amended, YAZ-1674): the panel fills it, the listener above asks it.
           clipboardRef={sidebarClipboard}
           pendingSearchFocus={pendingSearchFocus}

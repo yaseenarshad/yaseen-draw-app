@@ -35,8 +35,8 @@ export interface SettingDef {
   /** Shown under the label; a hint written as a function reads live state (the sync repo facts). */
   hint?: string | ((ctx: SettingsCtx) => string)
   keywords?: readonly string[]
-  /** The control stacks full-width under the text instead of sitting beside it (D7); a function reads live state (the folder input shows only for `folder`). */
-  wide?: boolean | ((ctx: SettingsCtx) => boolean)
+  /** The control stacks full-width under the text instead of sitting beside it (D7). */
+  wide?: boolean
   render: (ctx: SettingsCtx) => ReactNode
 }
 
@@ -109,7 +109,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
             // actually means rather than being a bare switch.
             id: 'confirmDelete',
             label: 'Confirm before deleting',
-            hint: 'Deleted notes and folders move to the Trash either way.',
+            hint: 'Deleted drawings and folders move to the Trash either way.',
             render: ({ settings, onChange }) => (
               <Segmented options={ON_OFF_OPTIONS} value={settings.confirmDelete} onChange={(confirmDelete) => onChange({ ...settings, confirmDelete })} ariaLabel="Confirm before deleting" />
             ),
@@ -186,15 +186,14 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     standalone: true,
     // One group per table, so "Window" is a heading search knows. The id is the table's title
     // lower-cased (`hotkeys-window`); every key and label of the table is a keyword, so "close
-    // tab" or "⌘W" finds it, and "keyboard shortcuts" reaches every table (the Keyboard one is
-    // already labelled that).
+    // tab" or "⌘W" finds it, and "keyboard shortcuts" reaches every table.
     groups: HOTKEY_GROUPS.map(({ title, entries }) => ({
       title,
       items: [
         {
           id: `hotkeys-${title.toLowerCase()}`,
           label: `${title} shortcuts`,
-          keywords: [...(title === 'Keyboard' ? [] : ['keyboard shortcuts']), ...entries.flatMap((entry) => [entry.keys, entry.label])],
+          keywords: ['keyboard shortcuts', ...entries.flatMap((entry) => [entry.keys, entry.label])],
           wide: true,
           render: () => hotkeyTable(entries),
         },
@@ -209,5 +208,5 @@ export const availableSections = (ctx: SettingsCtx): SettingsSection[] => SETTIN
 /** A hint resolved against the context: plain text, or the live-state kind. */
 export const resolveHint = (item: SettingDef, ctx: SettingsCtx): string | undefined => (typeof item.hint === 'function' ? item.hint(ctx) : item.hint)
 
-/** Whether the row stacks its control, resolved the same way. */
-export const resolveWide = (item: SettingDef, ctx: SettingsCtx): boolean => (typeof item.wide === 'function' ? item.wide(ctx) : item.wide === true)
+/** Whether the row stacks its control. */
+export const resolveWide = (item: SettingDef): boolean => item.wide === true

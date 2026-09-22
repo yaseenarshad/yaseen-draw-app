@@ -54,7 +54,7 @@ describe('settingCandidates', () => {
 
   it('a candidate carries label, hint, keywords and section title, case-folded in `lower`', () => {
     const confirm = settingCandidates(ctx()).find((h) => h.item.id === 'confirmDelete')
-    expect(confirm?.name).toBe('Confirm before deleting Deleted notes and folders move to the Trash either way. Files')
+    expect(confirm?.name).toBe('Confirm before deleting Deleted drawings and folders move to the Trash either way. Files')
     expect(confirm?.lower).toBe(confirm?.name.toLowerCase())
     const theme = settingCandidates(ctx()).find((h) => h.item.id === 'theme')
     expect(theme?.name).toBe('Theme dark light system Appearance')

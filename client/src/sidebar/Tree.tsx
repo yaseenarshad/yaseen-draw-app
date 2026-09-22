@@ -146,7 +146,7 @@ export function Tree({
           <li key={node.path} role="treeitem" aria-expanded={expanded.has(node.path)} aria-selected={selection.paths.has(node.path)}>
             {renaming !== null && renaming.path === node.path ? (
               // Inline FOLDER rename (E1b, GRO-2241): same idiom as files, prefilled with the
-              // raw name — folders have no extension logic (one could be NAMED "Notes.md").
+              // raw name — folders have no extension logic (one could be NAMED "Plans.excalidraw").
               <RenameInline initial={node.name} indent={8 + depth * 14} onSubmit={renaming.onSubmit} onCancel={renaming.onCancel} />
             ) : (
               <button

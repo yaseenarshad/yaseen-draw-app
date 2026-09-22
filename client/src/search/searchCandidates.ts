@@ -40,7 +40,7 @@ export interface SearchCandidate {
   folder: string
 }
 
-/** Result cap for title search — a scrollable result list, not the 8-row popup `MAX_SUGGESTIONS` serves. */
+/** Result cap for title search: a scrollable result list, so generous rather than a popup's few rows. */
 export const SEARCH_CAP = 50
 
 /** The empty catalog, shared — the lazy feed hands this back until the first query (`useSearchResults`). */

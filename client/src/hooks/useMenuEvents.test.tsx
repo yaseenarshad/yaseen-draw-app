@@ -8,7 +8,6 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { useMenuEvents } from './useMenuEvents'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 function installBridge() {
   const openFolderListeners = new Set<() => void>()

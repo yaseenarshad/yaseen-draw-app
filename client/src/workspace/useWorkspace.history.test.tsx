@@ -6,15 +6,17 @@
 import { describe, expect, it } from 'vitest'
 import { tabsReducer, type TabsState } from './useWorkspace'
 
-const A = '/v/a.md'
-const B = '/v/b.md'
-const C = '/v/c.md'
-const D = '/v/d.md'
+const A = '/v/a.excalidraw'
+const B = '/v/b.excalidraw'
+const C = '/v/c.excalidraw'
+const D = '/v/d.excalidraw'
 
 const nav = (s: TabsState, path: string): TabsState => tabsReducer(s, { type: 'open-current', path })
 const fresh = (): TabsState => nav({ tabs: [], active: null, mounted: [], history: {} }, A)
 /** A → B → C in one tab. */
 const abc = (): TabsState => nav(nav(fresh(), B), C)
+/** A second tab on `path`, appended and activated — ⌘-click, then the tab strip. */
+const secondTab = (s: TabsState, path: string): TabsState => tabsReducer(tabsReducer(s, { type: 'open-background', path }), { type: 'activate', path })
 
 describe('history recording', () => {
   it('same-tab navigation pushes and re-keys the record under the new path', () => {
@@ -37,7 +39,7 @@ describe('history recording', () => {
   })
 
   it('a tab opened without navigating has no record until it navigates', () => {
-    const s = tabsReducer(fresh(), { type: 'open-new', path: B })
+    const s = secondTab(fresh(), B)
     expect(s.history).toEqual({})
     const moved = nav(s, C)
     expect(moved.history).toEqual({ [C]: { entries: [B, C], index: 1 } })
@@ -82,7 +84,7 @@ describe('back / forward', () => {
   })
 
   it('operates on the active tab only: the other tab keeps its own record', () => {
-    const s = nav(tabsReducer(abc(), { type: 'open-new', path: D }), B)
+    const s = nav(secondTab(abc(), D), B)
     // tab 1: [A,B,C] at C · tab 2: [D,B] at B
     const back = tabsReducer(s, { type: 'back' })
     expect(back.tabs).toEqual([C, D])
@@ -100,7 +102,7 @@ describe('history consistency through rename, delete, close', () => {
 
   it('rename-dir remaps by prefix inside entries', () => {
     const s = tabsReducer(abc(), { type: 'rename-dir', oldPath: '/v', newPath: '/w' })
-    expect(s.history).toEqual({ '/w/c.md': { entries: ['/w/a.md', '/w/b.md', '/w/c.md'], index: 2 } })
+    expect(s.history).toEqual({ '/w/c.excalidraw': { entries: ['/w/a.excalidraw', '/w/b.excalidraw', '/w/c.excalidraw'], index: 2 } })
   })
 
   it('delete prunes the path from every surviving record and clamps the index', () => {
@@ -114,21 +116,21 @@ describe('history consistency through rename, delete, close', () => {
   })
 
   it('deleting the active page drops its record; the heir keeps its own', () => {
-    const two = nav(tabsReducer(abc(), { type: 'open-new', path: D }), B) // tab2 [D,B] at B
+    const two = nav(secondTab(abc(), D), B) // tab2 [D,B] at B
     const s = tabsReducer(two, { type: 'delete', path: B })
     expect(s.active).toBe(C)
     expect(s.history).toEqual({ [C]: { entries: [A, C], index: 1 } })
   })
 
   it('delete-dir prunes every path under the folder from a surviving tab that is NOT under it', () => {
-    const s = nav(abc(), '/x/z.md') // [A,B,C,/x/z.md] at z
+    const s = nav(abc(), '/x/z.excalidraw') // [A,B,C,/x/z.excalidraw] at z
     const pruned = tabsReducer(s, { type: 'delete-dir', path: '/v' })
-    expect(pruned.tabs).toEqual(['/x/z.md'])
-    expect(pruned.history).toEqual({ '/x/z.md': { entries: ['/x/z.md'], index: 0 } })
+    expect(pruned.tabs).toEqual(['/x/z.excalidraw'])
+    expect(pruned.history).toEqual({ '/x/z.excalidraw': { entries: ['/x/z.excalidraw'], index: 0 } })
   })
 
   it('close drops the record of the closed tab only', () => {
-    const two = nav(tabsReducer(abc(), { type: 'open-new', path: D }), B)
+    const two = nav(secondTab(abc(), D), B)
     const s = tabsReducer(two, { type: 'close', path: B })
     expect(s.history).toEqual({ [C]: { entries: [A, B, C], index: 2 } })
   })

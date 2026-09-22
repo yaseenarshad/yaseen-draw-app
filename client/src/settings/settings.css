@@ -1,8 +1,8 @@
 /*
  * The settings dialog (YAZ-1679) — classes applied by SettingsDialog.tsx, SettingRow.tsx and the
  * registry's controls. Obsidian's shape: a centred sheet, page nav + search down the left, the
- * page's rows on the right. The overlay repeats the drawing modal's (drawingModal.css): fixed,
- * centred, the same scrim, the same z-index — one modal is open at a time, and this is it.
+ * page's rows on the right. Fixed, centred, its own scrim — one modal is open at a time, and
+ * this is it.
  *
  * Everything is themed through app.css's tokens, so the `[data-theme='dark']` block there covers
  * this file without a dark rule of its own.

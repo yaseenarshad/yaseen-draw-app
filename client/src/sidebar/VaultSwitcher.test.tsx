@@ -13,7 +13,6 @@ import type { RecentRoots } from '@shared/types'
 import { storage } from '../lib/storage'
 import { MISSING_TEXT, NO_MATCH_TEXT, OPEN_FOLDER_TEXT, VaultSwitcher, defaultHighlight, rankVaultRows } from './VaultSwitcher'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const ROOT = '/v/Notes'
 const NOW = 1_700_000_000_000

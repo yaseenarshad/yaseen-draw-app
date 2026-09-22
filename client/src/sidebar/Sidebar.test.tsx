@@ -11,14 +11,12 @@ import { StrictMode, act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { DEFAULT_SETTINGS, defaultAppState, type AppState, type FileClipRequest, type FileClipState, type PasteResponse, type TreeNode, type WatchEvent, type WindowIdentity } from '@shared/types'
 import { EMPTY_SCENE_JSON } from '../drawings/drawingScene'
-import { EMPTY_SELECTION } from '../lib/selection'
 // Focus Mode's persistence is the REAL storage module (no mock in this file): a spy on its read is
 // how a test hands the Sidebar a focus restored from an earlier session (YAZ-1605).
 import { storage } from '../lib/storage'
 import { BridgeRequestError } from '../api'
 import { countChildren, Sidebar, type SidebarClipboard } from './Sidebar'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const TREE: TreeNode[] = [
   { type: 'dir', name: 'sub', path: '/v/sub', children: [] },
@@ -111,7 +109,6 @@ async function mount(over: Partial<SidebarProps> = {}, tweakBridge?: (bridge: Re
     onSearchFocusHandled: vi.fn(),
     // The selection box (🔒 D4, YAZ-1338): App's in production, the harness's here — every mount gets a
     // fresh one, and the "hands its selection up" case reads it back.
-    selectionRef: { current: EMPTY_SELECTION },
     // ⌘C / ⌘X / ⌘V's handle (D6 amended, YAZ-1674): App's listener asks it; the chord tests hold their own box.
     clipboardRef: { current: null },
     ...over,
@@ -124,7 +121,7 @@ async function mount(over: Partial<SidebarProps> = {}, tweakBridge?: (bridge: Re
 }
 
 const fileRow = (el: HTMLElement) => el.querySelector<HTMLButtonElement>('.tree__row--file')
-const searchInput = (el: HTMLElement) => el.querySelector<HTMLInputElement>('input[aria-label="Search notes"]')
+const searchInput = (el: HTMLElement) => el.querySelector<HTMLInputElement>('input[aria-label="Search drawings"]')
 /**
  * Drive the CONTROLLED search input like a user: native value setter + input event (SettingsDialog
  * idiom). Async so the re-render it triggers has settled before the assertions read the body.
@@ -838,7 +835,7 @@ describe('persistent search bar (YAZ-801)', () => {
 
   it('renders in an empty vault', async () => {
     const { el } = await mount({}, (b) => b.tree.mockImplementation(async (r: string) => ({ root: r, tree: [], generatedAt: 1 })))
-    expect(el.textContent).toContain('No notes here.')
+    expect(el.textContent).toContain('No drawings here.')
     expect(searchInput(el)).not.toBeNull()
   })
 
@@ -2307,10 +2304,9 @@ describe('Sidebar multi-select context menu: the copy failure (YAZ-1337)', () =>
 /**
  * ⚡ Fable's ruling on YAZ-1338, at the panel: THE SELECTION IS THE TRUTH, THE DOM IS ONLY THE
  * ORDER. Folding a folder over a selected drawing hides its ROW; it stays picked, so N keeps
- * counting it and the copy keeps carrying it — after the paths still on screen. The `selectionRef`
- * window App reads is the same fact, handed up.
+ * counting it and the copy keeps carrying it — after the paths still on screen.
  */
-describe('Sidebar multi-select: folded rows and the selection window (YAZ-1338)', () => {
+describe('Sidebar multi-select: folded rows (YAZ-1338)', () => {
   const NESTED: TreeNode[] = [
     { type: 'dir', name: 'sub', path: '/v/sub', children: [{ type: 'file', name: 'b.excalidraw', path: '/v/sub/b.excalidraw', size: 1, mtime: 1, kind: 'drawing' }] },
     { type: 'file', name: 'a.excalidraw', path: '/v/a.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
@@ -2346,21 +2342,6 @@ describe('Sidebar multi-select: folded rows and the selection window (YAZ-1338)'
     expect(writeText).toHaveBeenCalledExactlyOnceWith('/v/a.excalidraw\n/v/sub/b.excalidraw')
   })
 
-  it('hands its selection up through selectionRef and empties it on the way out (🔒 D4)', async () => {
-    const selectionRef = { current: EMPTY_SELECTION }
-    const { el } = await mount({ selectionRef }, withNested)
-    expect(selectionRef.current.size).toBe(0)
-    shiftClickRow(rowByPath(el, '/v/a.excalidraw'))
-    expect([...selectionRef.current]).toEqual(['/v/a.excalidraw'])
-    // D9: a PLAIN click is a one-row selection, so "Copy path" copies the clicked row's path.
-    act(() => rowByPath(el, '/v/sub/b.excalidraw')?.click() ?? el.querySelector<HTMLButtonElement>('.tree__row--dir')?.click())
-    expect(selectionRef.current.size).toBe(1)
-    // The sidebar collapsing IS this component unmounting (App renders it conditionally), and a
-    // chord must never copy a selection nobody can see any more.
-    act(() => root?.unmount())
-    root = null
-    expect(selectionRef.current).toBe(EMPTY_SELECTION)
-  })
 })
 
 describe('settings cog (YAZ-1679)', () => {
@@ -2572,13 +2553,11 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
     expect(clipboardRef.current).toBeNull()
   })
 
-  it('D9: a plain click on a file, then copy, clips exactly that file; the selection box sees the same one row', async () => {
+  it('D9: a plain click on a file, then copy, clips exactly that file', async () => {
     const clipboardRef = box()
-    const selectionRef = { current: EMPTY_SELECTION }
-    const { el, bridge, props } = await mount({ selectionRef, clipboardRef }, withClipboard)
+    const { el, bridge, props } = await mount({ clipboardRef }, withClipboard)
     act(() => rowByPath(el, '/v/a.excalidraw')?.click())
     expect(props.onOpenFile).toHaveBeenCalledExactlyOnceWith('/v/a.excalidraw')
-    expect([...selectionRef.current]).toEqual(['/v/a.excalidraw'])
     expect(verb(clipboardRef, 'copy')).toBe(true)
     expect(bridge.file.clip).toHaveBeenCalledExactlyOnceWith({ paths: ['/v/a.excalidraw'], op: 'copy' })
   })

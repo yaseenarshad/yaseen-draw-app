@@ -9,7 +9,6 @@ import { createRoot, type Root } from 'react-dom/client'
 import type { GithubSyncStatus } from '@shared/types'
 import { SyncIndicator } from './SyncIndicator'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 let root: Root | null = null
 let container: HTMLElement | null = null

@@ -1,10 +1,10 @@
 /**
- * The renderer's ownership boundary for WINDOW-level chords (YAZ-1280's ⌘B, YAZ-1338's ⌘⇧C,
- * YAZ-1674's ⌘X / ⌘C / ⌘V).
+ * The renderer's ownership boundary for WINDOW-level chords (YAZ-1280's ⌘B, YAZ-1674's
+ * ⌘X / ⌘C / ⌘V).
  *
- * App installs its listeners in bubble phase, so editors and modal tools get first refusal; this
- * is the SECOND boundary, and it accepts only ordinary, non-editing app chrome. It lives in one
- * place on purpose: the three predicates differ by exactly a key and a Shift, and a rule about what
+ * App installs its listeners in bubble phase, so the canvas and modal tools get first refusal;
+ * this is the SECOND boundary, and it accepts only ordinary, non-editing app chrome. It lives in
+ * one place on purpose: the predicates differ by exactly a key and a Shift, and a rule about what
  * counts as "editing" that drifted between them would be a bug nobody could see — a chord that
  * fires inside a field the other one respects.
  */

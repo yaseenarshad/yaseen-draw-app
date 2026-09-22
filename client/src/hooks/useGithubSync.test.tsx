@@ -38,7 +38,6 @@ const statusFn = vi.mocked(api.github.status)
 const syncNowFn = vi.mocked(api.github.syncNow)
 const setEnabledFn = vi.mocked(api.github.setEnabled)
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const status = (root: string, extra: Partial<GithubSyncStatus> = {}): GithubSyncStatus => ({ root, state: 'off', ...extra })
 

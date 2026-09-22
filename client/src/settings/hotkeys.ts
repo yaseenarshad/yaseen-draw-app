@@ -27,9 +27,6 @@ export const WINDOW_HOTKEYS: readonly HotkeyEntry[] = [
   // clipboard for every window, so a copy here pastes into another vault's window.
   { keys: '⌘X / ⌘C', label: 'Cut / copy the selected files and folders — pastes in any window, on any vault' },
   { keys: '⌘V', label: 'Paste beside the first selected row — into a folder, next to a file, or into the vault root with none' },
-  // The drawing's own save gesture (🔒 YAZ-1810): autosave already runs on a 500 ms timer, so
-  // this is "write it NOW", caught on the canvas host's element rather than on `window`.
-  { keys: '⌘S', label: 'Save the drawing in front now — it autosaves anyway' },
   { keys: '⌘W', label: 'Close tab — on the last tab it empties the window, then closes it' },
   { keys: '⌘⇧W', label: 'Close window' },
   { keys: '⌃Tab / ⌃⇧Tab', label: 'Next / previous tab' },
@@ -38,13 +35,16 @@ export const WINDOW_HOTKEYS: readonly HotkeyEntry[] = [
 ]
 
 /**
- * The shortcuts that only mean something with a DRAWING in front (YAZ-1812). ⌘⇧E is the
- * application menu's (🔒 D10) and greys out on any other tab; ⌘F and ⌘C are the canvas panel's
- * own, bound on the drawing's element in the capture phase and suppressed whenever the keystroke
- * could have meant something else — which is why ⌘C still copies a selection.
+ * The shortcuts that only mean something with a DRAWING in front (YAZ-1812). ⌘⇧E and ⌘⇧S are
+ * the application menu's (🔒 YAZ-1775 D10, 🔒 YAZ-1775 D3) and grey out on any other tab;
+ * ⌘S, ⌘F and ⌘C are bound on the drawing's own element in the capture phase and suppressed
+ * whenever the keystroke could have meant something else — which is why ⌘C still copies a selection.
  */
 export const CANVAS_HOTKEYS: readonly HotkeyEntry[] = [
-  { keys: '⌘⇧E', label: 'Export image… — the engine`s own PNG / SVG dialog' },
+  { keys: '⌘⇧E', label: "Export image… — the engine's own PNG / SVG dialog" },
+  { keys: '⌘⇧S', label: 'Export drawing… — write a standalone .excalidraw with its images embedded' },
+  // Autosave already runs on a 500 ms timer, so this is "write it NOW" (🔒 YAZ-1810).
+  { keys: '⌘S', label: 'Save the drawing in front now — it autosaves anyway' },
   { keys: '⌘F', label: 'Open the Images tab of the canvas panel' },
   { keys: '⌘C', label: 'Open the Components tab of the canvas panel — when nothing is selected and no text is being edited' },
 ]
