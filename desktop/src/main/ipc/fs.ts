@@ -4,11 +4,9 @@ import * as favorites from '../favorites'
 import { fileClip } from '../fileClip'
 import { copyEntry, pasteEntries } from '../fs/copy'
 import { createDir, createFile } from '../fs/create'
-import { readFile, writeFile } from '../fs/file'
 import { BridgeFailure } from '../fs/fsUtils'
 import { openInDefaultApp } from '../fs/openDefault'
 import { openInVsCode } from '../fs/openInVsCode'
-import { openLink } from '../fs/openLink'
 import { renameFile } from '../fs/rename'
 import { removeEntry } from '../fs/remove'
 import { revealItem } from '../fs/reveal'
@@ -40,8 +38,6 @@ export function registerFsIpc(store: Store, windows: WindowLookup): void {
     sweepVaultOnce(res.root, e.sender)
     return res
   })
-  handle(CH.fsRead, readFile)
-  handle(CH.fsWrite, writeFile)
   handle(CH.fsCreateDir, createDir)
   handle(CH.fsCreateFile, createFile)
   // Reveal in Finder (GRO-2274): read-only, so no store repair and no broadcast — but still
@@ -53,13 +49,11 @@ export function registerFsIpc(store: Store, windows: WindowLookup): void {
   handle(CH.shellOpenVsCode, openInVsCode)
   // Open in default app (YAZ-1577): third of the read-only OS verbs — same envelope, same NOT_FOUND notice.
   handle(CH.shellOpenDefault, openInDefaultApp)
-  // External links from the canvas: main owns protocol/path validation and the Electron shell boundary.
-  handle(CH.shellOpenLink, openLink)
   // In-app rename/move (Links E1 GRO-2194, E1b GRO-2241). The SAME handler repairs the
   // store — every stored path at or under the renamed entry follows (window roots/files/
   // tabs, recents, folder state) — and then pushes `file:renamed` to EVERY window so open
-  // tabs remap in place (a `dir` event remaps by prefix). The vault index needs no push:
-  // the shared watcher's unlink+add echo already heals it (no double-processing).
+  // tabs remap in place (a `dir` event remaps by prefix). The tree needs no push: the shared
+  // watcher's unlink+add echo already heals it (no double-processing).
   handleWithEvent(CH.fsRename, async (e, req: unknown) => {
     // E1b: the calling window's own vault ROOT cannot be renamed — root identity is a
     // recents/vault-management question (which recents entry follows, what this window's
@@ -82,11 +76,10 @@ export function registerFsIpc(store: Store, windows: WindowLookup): void {
   // differences that are the point of the feature:
   //  - it REMOVES rather than remaps, so a window whose active file went is left on an heir
   //    tab (store.removePath picks it with the workspace's own ladder);
-  //  - there is NO link rewriting anywhere downstream (LOCKED decision C): notes referencing
-  //    the deleted page stay byte-identical and their [[links]] simply go unresolved.
-  // Like rename, the vault index needs no push: the watcher's unlink / unlinkDir echo heals
-  // it (verified empirically in the GRO-2275 scope pass — trashItem is a MOVE at the fs
-  // layer, so chokidar reports it exactly like any other move out of the root).
+  //  - nothing downstream rewrites references to the deleted file; other drawings keep theirs.
+  // Like rename, the tree needs no push: the watcher's unlink / unlinkDir echo heals it
+  // (verified empirically in the GRO-2275 scope pass — trashItem is a MOVE at the fs layer,
+  // so chokidar reports it exactly like any other move out of the root).
   handleWithEvent(CH.fsDelete, async (e, req: unknown) => {
     // The calling window's own vault ROOT cannot be deleted — same reasoning and the same
     // sender lookup as rename: root identity is a recents/vault-management question. ANOTHER

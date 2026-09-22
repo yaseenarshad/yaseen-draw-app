@@ -11,7 +11,6 @@ import { registerMediaIpc } from './media'
 import { registerMediaStudioIpc } from './mediaStudio'
 import { registerSecretsIpc } from './secrets'
 import { registerStateIpc } from './state'
-import { registerVaultConfigIpc } from './vaultConfig'
 import { registerWatchIpc } from './watch'
 import { registerWindowIpc } from './window'
 
@@ -31,7 +30,6 @@ export function registerIpc(store: Store, windows: WindowManagerIpc, userData: s
   registerDialogIpc()
   registerWatchIpc()
   registerStateIpc(store)
-  registerVaultConfigIpc(store)
   registerFavoritesIpc(store)
   registerMediaIpc(store, userData)
   registerComponentsIpc(store, userData)

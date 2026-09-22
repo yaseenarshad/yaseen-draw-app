@@ -3,8 +3,6 @@ import type { BridgeError } from '@shared/types'
 /** IPC channel names shared by main and preload. One place, so a typo cannot split them. */
 export const CH = {
   fsTree: 'fs:tree',
-  fsRead: 'fs:read',
-  fsWrite: 'fs:write',
   fsCreateDir: 'fs:create-dir',
   fsCreateFile: 'fs:create-file',
   // The drawing DOCUMENT's two doors (🔒 YAZ-1810) — one per direction, because a scene and the
@@ -25,7 +23,6 @@ export const CH = {
   shellReveal: 'shell:reveal',
   shellOpenVsCode: 'shell:openVsCode',
   shellOpenDefault: 'shell:openDefault',
-  shellOpenLink: 'shell:open-link',
   dialogPickFolder: 'dialog:pick-folder',
   // The native OPEN-FILE dialog, filtered to `.excalidraw` (YAZ-1833): the Components tab's
   // Import JSON. It answers the picked file's BYTES, because that file lives outside the vault
@@ -47,10 +44,8 @@ export const CH = {
   windowIdentity: 'window:identity',
   windowSetIdentity: 'window:set-identity',
   windowOpen: 'window:open',
-  windowDuplicate: 'window:duplicate',
   windowOpenRecent: 'window:open-recent',
   windowCloseSelf: 'window:close-self',
-  windowZoom: 'window:zoom',
   menuOpenFolder: 'menu:open-folder',
   menuOpenRoot: 'menu:open-root',
   menuSearch: 'menu:search',
@@ -68,9 +63,6 @@ export const CH = {
   menuCanvasBackground: 'menu:canvas-background',
   linkOpenFile: 'link:open-file',
   linkNotice: 'link:notice',
-  vaultConfigRead: 'vaultConfig:read',
-  vaultConfigWrite: 'vaultConfig:write',
-  vaultConfigChanged: 'vaultConfig:changed',
   favoritesGet: 'favorites:get',
   favoritesSet: 'favorites:set',
   favoritesChanged: 'favorites:changed',
