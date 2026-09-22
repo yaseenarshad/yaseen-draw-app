@@ -1,5 +1,5 @@
 /**
- * WHAT THE MEDIA CACHE KEEPS, UNDER WHAT NAME, AND FOR HOW LONG (🔒 D4, YAZ-1818).
+ * WHAT THE MEDIA CACHE KEEPS, UNDER WHAT NAME, AND FOR HOW LONG (🔒 YAZ-1775 D4, YAZ-1818).
  *
  * The web app had Cloudflare's `caches.default` and a `Request` for a key. A desktop app has a
  * folder, so the KEY SCHEME is ported and then hashed into a filename: same strings, same
@@ -14,8 +14,8 @@
  * sidecar timestamp to drift out of step with the bytes it describes. That makes the 24 h read
  * guard and the startup sweep the SAME rule, which is why both live here.
  *
- * WHAT IS NEVER CACHED: an import (🔒 D4). Those bytes are on their way into `assets/` — the
- * content-addressed store that already de-duplicates them (🔒 D3) — so a second copy under a
+ * WHAT IS NEVER CACHED: an import (🔒 YAZ-1775 D4). Those bytes are on their way into `assets/` — the
+ * content-addressed store that already de-duplicates them (🔒 YAZ-1775 D3) — so a second copy under a
  * second naming scheme would be pure cost.
  *
  * THE KEY-PRESENCE BIT IS PART OF THE SEARCH KEY. The Worker cached a search only when a Pixabay

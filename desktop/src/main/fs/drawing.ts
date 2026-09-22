@@ -20,7 +20,7 @@
  * Requests cross IPC from a sandboxed renderer, so their shape is checked like a request body,
  * never trusted from the type.
  *
- * 🔒 D3 ON DISK: the scene carries `files: {}`; image elements keep only their `fileId`; the
+ * 🔒 YAZ-1775 D3 ON DISK: the scene carries `files: {}`; image elements keep only their `fileId`; the
  * bytes sit at `<root>/assets/<fileId>.<ext>` (the engine's own SHA-1 id, the mime's extension).
  * An asset is IMMUTABLE — the same bytes always get the same name — so a save never rewrites one
  * (`wx`; EEXIST means it is already exactly these bytes). A LEGACY export that still embeds

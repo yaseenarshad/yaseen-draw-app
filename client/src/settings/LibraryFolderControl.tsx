@@ -1,5 +1,5 @@
 /**
- * "Library folder" (Settings › Files, 🔒 D5): the one folder every vault shares, where media
+ * "Library folder" (Settings › Files, 🔒 YAZ-1775 D5): the one folder every vault shares, where media
  * favorites and saved components will live (3A / 3B / 3C fill it).
  *
  * A component rather than an inline `render` because the row shows the RESOLVED path, and only

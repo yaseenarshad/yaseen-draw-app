@@ -37,11 +37,11 @@ afterEach(async () => {
 })
 
 describe('drawing IPC', () => {
-  it('registers the two document doors plus the library-folder read (🔒 D5)', () => {
+  it('registers the two document doors plus the library-folder read (🔒 YAZ-1775 D5)', () => {
     expect(vi.mocked(ipcMain.handle).mock.calls.map(([ch]) => ch)).toEqual([CH.drawingLoad, CH.drawingSave, CH.drawingLibraryFolder])
   })
 
-  it('drawing:library-folder answers the default under userData, and the setting once it is set (🔒 D5)', async () => {
+  it('drawing:library-folder answers the default under userData, and the setting once it is set (🔒 YAZ-1775 D5)', async () => {
     const answer = async () => ((await registered(CH.drawingLibraryFolder)({})) as Envelope<string>)
     expect(await answer()).toEqual({ ok: true, value: path.join(userData, 'library') })
     const chosen = path.join(root, 'My Library')
@@ -76,7 +76,7 @@ describe('drawing IPC', () => {
 })
 
 /**
- * The once-per-session sweep trigger (🔒 D3). The runner itself is `orphanSweep.test.ts`'s; what
+ * The once-per-session sweep trigger (🔒 YAZ-1775 D3). The runner itself is `orphanSweep.test.ts`'s; what
  * is pinned here is WHEN it runs, HOW OFTEN, and what the window is told.
  */
 describe('sweepVaultOnce', () => {

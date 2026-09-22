@@ -10,7 +10,7 @@
  *
  * Two settings are NOT in `SettingsState`. GitHub sync (YAZ-1081 3B) lives per-vault in
  * `.yaseendraw/github.json`, read and written through the engine, so its section is `available`
- * only when App hands the engine's status + setter over. The Pixabay API key (🔒 D4) lives in
+ * only when App hands the engine's status + setter over. The Pixabay API key (🔒 YAZ-1775 D4) lives in
  * main's encrypted `secrets.json` and is never in any renderer's state at all — its row writes
  * through `secrets:set` and reads back only "set" / "not set".
  */
@@ -94,7 +94,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
       },
     ],
   },
-  // 🔒 D9: the user-level canvas preferences, declared in their own module because there are
+  // 🔒 YAZ-1775 D9: the user-level canvas preferences, declared in their own module because there are
   // fourteen of them and they are the one section with a mapping behind it (`shared/canvasPrefs.ts`).
   CANVAS_SECTION,
   {
@@ -115,7 +115,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
             ),
           },
           {
-            // 🔒 D5: ONE library folder for every vault. `wide` because the row's real content is
+            // 🔒 YAZ-1775 D5: ONE library folder for every vault. `wide` because the row's real content is
             // the resolved path, which is long, and the two buttons belong under it rather than
             // squeezed beside it. The hint is a component: only main can resolve the default.
             id: 'libraryFolder',
@@ -143,7 +143,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
       {
         items: [
           {
-            // 🔒 D4: the key is typed here once, encrypted by main, and never shown again. Its id is
+            // 🔒 YAZ-1775 D4: the key is typed here once, encrypted by main, and never shown again. Its id is
             // not a `SettingsState` field — the state file is broadcast to every window, and a key
             // in it would be a key in every devtools console.
             id: 'pixabayApiKey',

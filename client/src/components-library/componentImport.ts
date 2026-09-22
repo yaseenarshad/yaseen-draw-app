@@ -5,7 +5,7 @@
  *
  * IMAGES ARE KEPT. The web app imported with `allowImages: false`, because a pasted payload had no
  * bytes to point at; a picked FILE carries its own `files` map, so the bytes travel into the
- * fragment exactly as a captured selection's do (🔒 D5). An image whose bytes are NOT in the file
+ * fragment exactly as a captured selection's do (🔒 YAZ-1775 D5). An image whose bytes are NOT in the file
  * is still a refusal: a component that cannot insert is worse than no component.
  *
  * NOTHING IS WRITTEN BY A FAILURE: every refusal throws before `components:save` is called.
@@ -54,7 +54,7 @@ export function importedElements(payload: unknown): unknown[] {
 
 /**
  * The picked file as a component, ready for `componentFragmentJson()` and the preview: its live
- * elements plus the image bytes they name. A component embeds its pictures (🔒 D5), so the bytes
+ * elements plus the image bytes they name. A component embeds its pictures (🔒 YAZ-1775 D5), so the bytes
  * must be in the file that carried the elements — an id with nothing behind it is a refusal.
  */
 export function parseImportedComponentJson(engine: ComponentEngine, source: string): CapturedComponent {

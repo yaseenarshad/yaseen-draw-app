@@ -1,7 +1,7 @@
 /**
  * The search bar's results (YAZ-803; 2H/YAZ-1814): the tree the Sidebar ALREADY holds, turned into
  * the ⌘K catalog and ranked per keystroke — no index read, no watch subscription, nothing to fail.
- * The catalog carries the tree's FOLDERS as well as its drawings (🔒 D1), folders first; it is
+ * The catalog carries the tree's FOLDERS as well as its drawings (🔒 YAZ-1491 D1), folders first; it is
  * built LAZILY, on the first non-empty query, and stays live from then on.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'

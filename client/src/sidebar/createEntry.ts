@@ -26,7 +26,7 @@ export function entryPath(parentDir: string, name: string, kind: EntryKind): str
   return `${parentDir}/${final}`
 }
 
-/** The name a new drawing is born with (🔒 R1 on YAZ-1775), before the user renames it. */
+/** The name a new drawing is born with (🔒 YAZ-1775 R1), before the user renames it. */
 export const UNTITLED_DRAWING = 'Untitled'
 
 /**

@@ -78,7 +78,7 @@ export interface PresentationPlayerProps {
   /** Leave the presentation (the ✕ button, or the deck emptying under the presenter). */
   onExit: () => void
   /**
-   * Put the frame outlines back the way the USER's preference has them (🔒 D9:
+   * Put the frame outlines back the way the USER's preference has them (🔒 YAZ-1775 D9:
    * `SettingsState.canvas.framesVisible`, where the web app read a localStorage key). Called
    * whether the presenter left on purpose or the component was simply unmounted.
    */

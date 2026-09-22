@@ -792,7 +792,7 @@ button {
   text-align: left;
 }
 
-/* Groups (🔒 D7): a rule between ADJACENT groups only — the component skips empty ones, so a
+/* Groups (🔒 YAZ-1674 D7): a rule between ADJACENT groups only — the component skips empty ones, so a
    blank-space menu never ends in a stray separator. */
 .ctx-menu__group + .ctx-menu__group {
   border-top: 1px solid var(--border);

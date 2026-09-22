@@ -51,7 +51,7 @@ export const CANVAS_HOTKEYS: readonly HotkeyEntry[] = [
 
 export const MOUSE_TIPS: readonly HotkeyEntry[] = [
   { keys: '⌘-click file', label: 'Open it in a background tab' },
-  // The multi-select gesture (YAZ-1336 🔒 D2, folders too since YAZ-1578) and what it is FOR
+  // The multi-select gesture (YAZ-1336 🔒 YAZ-1775 D2, folders too since YAZ-1578) and what it is FOR
   // (YAZ-1337): the two plural menu items. Shift toggles one row at a time — it never opens
   // anything and never folds a folder.
   { keys: '⇧-click file or folder', label: 'Add or remove it from a multi-selection — right-click for Copy N paths / Open N in new tabs' },

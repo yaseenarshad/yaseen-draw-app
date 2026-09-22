@@ -32,7 +32,7 @@
  *
  * SHAPE ON DISK: `serializeAsJSON(…, 'local')` is the library's OWN writer — the same one its
  * "Save to disk" uses — so element cleanup is its rules, not ours. Two things are ours: the
- * `files` argument is deliberately EMPTY (🔒 D3: bytes live in `<vault>/assets/`, the scene
+ * `files` argument is deliberately EMPTY (🔒 YAZ-1775 D3: bytes live in `<vault>/assets/`, the scene
  * carries ids only) and a trailing newline, so a file this app creates and this app saves differ
  * only in what was drawn. A snapshot hands the host the engine's LIVE files and the ids the
  * scene still references alongside the lean JSON, so the host can work out what the store is
@@ -45,17 +45,17 @@
  * ref-backed callbacks, the once-only `initialData`, the launcher STORE the rail subscribes to
  * rather than props, and the host memoizing what it passes in.
  *
- * THE CHROME INSIDE THE ENGINE (🔒 D10). No `<MainMenu>` at all: the engine's own trigger is
+ * THE CHROME INSIDE THE ENGINE (🔒 YAZ-1775 D10). No `<MainMenu>` at all: the engine's own trigger is
  * hidden (`drawingEditor.css`, the web app's own rule) and its items moved out — File › Export
  * Image… ⌘⇧E and View › Canvas Background to the application menu (`drawingCommand.ts` routes
- * them to the visible drawing), Preferences to Settings › Canvas (🔒 D9). `renderTopLeftUI` is the
+ * them to the visible drawing), Preferences to Settings › Canvas (🔒 YAZ-1775 D9). `renderTopLeftUI` is the
  * rail (`LauncherRail.tsx`: the panel hamburger plus the Writing / Frames toggles);
  * `renderTopRightUI` is the host's status chips, the slot the web app's CloudStatus sat in, so
  * they can never cover the tool island; the engine's one child is the docked workspace panel
- * (`CanvasSidebar.tsx`, ⚡ D8 amended). ⌘F / ⌘C open the Images / Components tabs with the web
+ * (`CanvasSidebar.tsx`, ⚡ YAZ-1775 D8 amended). ⌘F / ⌘C open the Images / Components tabs with the web
  * app's guards, bound on THIS component's own element in the capture phase — never `window`.
  *
- * CANVAS PREFS BOTH WAYS (🔒 D9). `canvasPrefs` is the shell's copy, and `appliedRef` is what the
+ * CANVAS PREFS BOTH WAYS (🔒 YAZ-1775 D9). `canvasPrefs` is the shell's copy, and `appliedRef` is what the
  * engine is believed to hold. Engine → shell: every `onChange` reads the prefs slice off the
  * engine's appState (`appStateToPrefs`) and, ONLY when it differs from `appliedRef`, records it
  * and reports it 300 ms later. Shell → engine: a `canvasPrefs` prop that differs from `appliedRef`
@@ -68,30 +68,30 @@
  * imperative call, startup default and editor CSS rule at fork `e72242f8`, each with its reason —
  * is the "1A · Engine parity checklist" comment on YAZ-1805. This block is the short true list.
  *
- * PORTED: `onChange` · `initialData` (the scene off disk + 🔒 D3 assets + 🔒 D9 prefs) · `theme`
+ * PORTED: `onChange` · `initialData` (the scene off disk + 🔒 YAZ-1775 D3 assets + 🔒 YAZ-1775 D9 prefs) · `theme`
  *   (live) · `detectScroll: false` · `autoFocus` · `excalidrawAPI` (the fork calls it
- *   `onExcalidrawAPI`) · `renderTopLeftUI` as the 🔒 D10 rail · `renderTopRightUI` as a slot for the
+ *   `onExcalidrawAPI`) · `renderTopLeftUI` as the 🔒 YAZ-1775 D10 rail · `renderTopRightUI` as a slot for the
  *   shell's chips · `UIOptions.canvasActions.clearCanvas: false` · the sidebar as `CanvasSidebar`
  *   (Images / Components / Present) with the web app's ⌘F / ⌘C shortcuts and their suppression
  *   gates, its last-tab and dock memory (in the shell store), and the writing-mode and frames
  *   toggles · the Assistant-font, architect-roughness and centred-text startup defaults, as plain
- *   🔒 D9 prefs with no migration stamps.
- * ADDED (ours): `UIOptions.getFormFactor` — phone or desktop, never tablet (⚡ R5) ·
+ *   🔒 YAZ-1775 D9 prefs with no migration stamps.
+ * ADDED (ours): `UIOptions.getFormFactor` — phone or desktop, never tablet (⚡ YAZ-1775 R5) ·
  *   `canvasActions.loadScene` and `saveToActiveFile` forced false, because autosave is the one door
- *   to the file · `excalidraw.desktopUIMode = 'full'` written before every mount (⚡ R4/R5).
+ *   to the file · `excalidraw.desktopUIMode = 'full'` written before every mount (⚡ YAZ-1775 R4/R5).
  * DROPPED: everything cloud, collab, share-link, AI, Excalidraw+ and Boards/Docs · `<MainMenu>`
- *   entirely (🔒 D10 moved Export Image…, Export Drawing… and Canvas Background to the application
+ *   entirely (🔒 YAZ-1775 D10 moved Export Image…, Export Drawing… and Canvas Background to the application
  *   menu, Preferences and Theme to Settings) · `langCode`, `viewModeEnabled`,
  *   `viewModeSelectionEnabled`, `renderCustomStats`, `onExport`, `onThemeChange`, `onLinkOpen`,
- *   the embeddable trio · `onImageBackgroundRemoval` (🔒 D6) · `AppWelcomeScreen`,
+ *   the embeddable trio · `onImageBackgroundRemoval` (🔒 YAZ-1775 D6) · `AppWelcomeScreen`,
  *   `OverwriteConfirmDialog`, `AppFooter`, `ErrorDialog`, `DebugCanvas` and the palette's custom
- *   items · every `excalidraw-app/` localStorage key (🔒 D9).
+ *   items · every `excalidraw-app/` localStorage key (🔒 YAZ-1775 D9).
  *   `handleKeyboardGlobally` is THE ONE DELIBERATE DROP: several tabs each mount an engine, and
  *   every one of them would answer a single global key.
  *
  * THE IMPERATIVE DOORS THIS APP USES: `updateScene` (the prefs push, the dock pref, image export,
  * canvas background, `replaceScene`) · `refresh` · `getAppState` / `getSceneElements` / `getFiles` /
- * `addFiles` (the 🔒 D3 hydrate/extract path) · `updateFrameRendering` (the frames pref's one
+ * `addFiles` (the 🔒 YAZ-1775 D3 hydrate/extract path) · `updateFrameRendering` (the frames pref's one
  * application path) · `setViewport` and `setActiveTool` (the Present tab) · `toggleSidebar` (the
  * hamburger and the two shortcuts). `focusContainer` is RE-IMPLEMENTED here: the engine keeps it
  * on its App class rather than on the imperative API, so the seam focuses `.excalidraw-container`
@@ -120,7 +120,7 @@ export interface DrawingSnapshot {
   /** Cheap identity of the drawn content: equal to the baseline's = nothing to save. */
   readonly version: number
   /**
-   * Everything a save needs, computed once when the save timer fires: the scene in the 🔒 D3
+   * Everything a save needs, computed once when the save timer fires: the scene in the 🔒 YAZ-1775 D3
    * form (`files: {}`), the engine's live image map, and the ids the scene still references.
    */
   serialize(): { json: string; files: Record<string, DrawingFileData>; referenced: Set<string> }
@@ -137,17 +137,17 @@ export interface DrawingSurfaceApi {
    */
   focus(): void
   /**
-   * File › Export Image… (🔒 D10): the engine's OWN export dialog, opened through its own
+   * File › Export Image… (🔒 YAZ-1775 D10): the engine's OWN export dialog, opened through its own
    * `appState.openDialog` door — the clean way in, found in demo round 4, with no keyboard-event hack.
    */
   openImageExport(): void
   /**
-   * View › Canvas Background (🔒 D10): `appState.viewBackgroundColor`, which the engine then
+   * View › Canvas Background (🔒 YAZ-1775 D10): `appState.viewBackgroundColor`, which the engine then
    * writes into the file. The one canvas value that is per BOARD rather than per user.
    */
   setCanvasBackground(color: string): void
   /**
-   * File › Export Drawing… (🔒 D3, YAZ-1821): the canvas as a STANDALONE `.excalidraw` — the whole
+   * File › Export Drawing… (🔒 YAZ-1775 D3, YAZ-1821): the canvas as a STANDALONE `.excalidraw` — the whole
    * live files map, minus what only deleted elements name, embedded in the JSON. This is the one
    * place this app embeds; `serialize()` above is the lean vault form and is untouched by it.
    */
@@ -168,7 +168,7 @@ export interface DrawingSurfaceProps {
   /** The app's resolved appearance, handed to the engine as-is (a prop change re-themes live). */
   theme: 'light' | 'dark'
   /**
-   * The shell's canvas preferences (🔒 D9). Seeded into `initialData.appState` at mount — layered
+   * The shell's canvas preferences (🔒 YAZ-1775 D9). Seeded into `initialData.appState` at mount — layered
    * OVER the file's own appState, which overrides nothing of the drawing because none of these
    * keys are ones the engine exports into a file — and applied live whenever they differ from
    * what the engine is believed to hold.
@@ -176,7 +176,7 @@ export interface DrawingSurfaceProps {
   canvasPrefs?: CanvasPrefs
   /** A pref the ENGINE or the rail changed. Reported only when a value actually moved, 300 ms debounced. */
   onCanvasPrefsChange?: (next: CanvasPrefs) => void
-  /** What the canvas panel remembers: the tab the hamburger opens on, and the dock preference (🔒 D10). */
+  /** What the canvas panel remembers: the tab the hamburger opens on, and the dock preference (🔒 YAZ-1775 D10). */
   canvasPanel?: CanvasPanelState
   onCanvasPanelChange?: (next: CanvasPanelState) => void
   /** Mount, then every engine change. The first call is the host's clean baseline. */
@@ -192,14 +192,14 @@ export interface DrawingSurfaceProps {
 /** The one failure this seam can raise on its own (the file's own failures are the host's). */
 export const ENGINE_LOAD_FAILED = "Can't open the drawing editor."
 
-/** How long the engine's own toggles settle before the shell hears about them (🔒 D9). */
+/** How long the engine's own toggles settle before the shell hears about them (🔒 YAZ-1775 D9). */
 const PREFS_DEBOUNCE_MS = 300
 
 /**
  * The file IS the document: the app's autosave is the ONE door to its bytes, so the engine's own
  * open and save-to-file doors stay shut — a second writer would race the first. `clearCanvas` is
  * off for the web app's own reason (a destructive action with no undo affordance in this shell).
- * Image export is untouched: it writes somewhere else entirely. `getFormFactor` is ours (⚡ R5):
+ * Image export is untouched: it writes somewhere else entirely. `getFormFactor` is ours (⚡ YAZ-1775 R5):
  * the pane is a desktop editor whatever width the shell sidebar leaves it.
  */
 const UI_OPTIONS = {
@@ -300,7 +300,7 @@ export function ExcalidrawSurface({
     [],
   )
 
-  /** Remember a panel choice (🔒 D10); a value that did not move is not a write. */
+  /** Remember a panel choice (🔒 YAZ-1775 D10); a value that did not move is not a write. */
   const rememberPanel = useCallback((patch: Partial<CanvasPanelState>) => {
     const next = { ...panelRef.current, ...patch }
     if (next.tab === panelRef.current.tab && next.docked === panelRef.current.docked) return
@@ -318,7 +318,7 @@ export function ExcalidrawSurface({
     const flip = (key: 'writingMode' | 'framesVisible') => prefsOutRef.current?.({ ...appliedRef.current, [key]: !appliedRef.current[key] })
     const store = createLauncherStore(
       {
-        // 🔒 D10: open on the last-used tab (Components until then); pressing again closes.
+        // 🔒 YAZ-1775 D10: open on the last-used tab (Components until then); pressing again closes.
         togglePanel: () => {
           if (store.getState().activeTab !== null) closePanel()
           else rawApiRef.current?.toggleSidebar({ name: CANVAS_SIDEBAR, tab: panelRef.current.tab, force: true })
@@ -347,7 +347,7 @@ export function ExcalidrawSurface({
   const endPresentation = useCallback(() => setPresenting(null), [])
   /**
    * The player hid the frame outlines to present; this puts back what the USER's preference says
-   * (🔒 D9: `SettingsState.canvas.framesVisible`, read off the one ref that knows what the engine
+   * (🔒 YAZ-1775 D9: `SettingsState.canvas.framesVisible`, read off the one ref that knows what the engine
    * is believed to hold — where the web app read a localStorage key).
    */
   const restoreFrames = useCallback(() => {
@@ -365,7 +365,7 @@ export function ExcalidrawSurface({
    * why ⌘C still copies a selection.
    *
    * Bound on THIS element in the CAPTURE phase, never `window`: the shell keeps several tabs
-   * mounted, each with its own engine, and only the focused canvas may answer (🔒 R3).
+   * mounted, each with its own engine, and only the focused canvas may answer (🔒 YAZ-1775 R3).
    */
   const onKeyDownCapture = useCallback(
     (event: ReactKeyboardEvent) => {
@@ -392,7 +392,7 @@ export function ExcalidrawSurface({
     [rail],
   )
 
-  // Shell → engine (🔒 D9): a prop that differs from what was last applied is pushed, changed keys
+  // Shell → engine (🔒 YAZ-1775 D9): a prop that differs from what was last applied is pushed, changed keys
   // only. `framesVisible` goes through `updateFrameRendering`; `toolLock` is merged into the tool
   // the engine is HOLDING, because a partial `activeTool` would wipe it.
   useEffect(() => {
@@ -419,7 +419,7 @@ export function ExcalidrawSurface({
     let live = true
     // The stylesheet is the canvas's, and arrives with it.
     void import('@excalidraw/excalidraw/index.css')
-    // ⚡ R4/R5: the engine reads its styles-panel mode out of localStorage at mount, so the one
+    // ⚡ YAZ-1775 R4/R5: the engine reads its styles-panel mode out of localStorage at mount, so the one
     // mode this app ships lands there before every mount — the guard against a stray stored value.
     applyToolbarMode()
     loadExcalidraw().then(
@@ -456,7 +456,7 @@ export function ExcalidrawSurface({
       const activeTab = openCanvasTab((appState as unknown as { openSidebar?: { name?: string; tab?: string } | null }).openSidebar)
       if (activeTab !== null) rememberPanel({ tab: activeTab })
       rail.set({ activeTab })
-      // Engine → shell (🔒 D9): the prefs slice, compared before anything is written.
+      // Engine → shell (🔒 YAZ-1775 D9): the prefs slice, compared before anything is written.
       const seen = appStateToPrefs(appState as unknown as EngineAppStateSlice, appliedRef.current)
       if (prefsEqual(seen, appliedRef.current)) return
       appliedRef.current = seen
@@ -475,7 +475,7 @@ export function ExcalidrawSurface({
       const mod = engineRef.current
       rawApiRef.current = api
       setImperativeApi(api)
-      // Frames are never appState (🔒 D9): applied the moment the engine can take them.
+      // Frames are never appState (🔒 YAZ-1775 D9): applied the moment the engine can take them.
       applyFramesVisibility(api, appliedRef.current.framesVisible)
       // The dock preference the web app kept per cloud username, kept in the shell store here.
       const docked = panelRef.current.docked
@@ -606,7 +606,7 @@ function snapshotOf(engine: ExcalidrawModule, elements: ChangeArgs[0], appState:
         if (typeof entry?.dataURL === 'string' && typeof entry.mimeType === 'string') live[id] = { mimeType: entry.mimeType, dataURL: entry.dataURL }
       }
       return {
-        // 🔒 D3: an EMPTY files map on purpose — the scene names its images and never carries
+        // 🔒 YAZ-1775 D3: an EMPTY files map on purpose — the scene names its images and never carries
         // them. A text file in a git vault ends with a newline, as a new drawing is written.
         json: `${engine.serializeAsJSON(elements, appState, {}, 'local')}\n`,
         files: live,

@@ -64,7 +64,7 @@ describe('preload bridge', () => {
     for (const k of SECRETS) expect(typeof api.secrets[k], `secrets.${k}`).toBe('function')
   })
 
-  it('media.favorites / media.recent invoke their channels with the request; media:changed reaches the listener (🔒 D5)', async () => {
+  it('media.favorites / media.recent invoke their channels with the request; media:changed reaches the listener (🔒 YAZ-1775 D5)', async () => {
     const { ipcRenderer } = await import('electron')
     const { bridge } = await import('./index')
     vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: [] })
@@ -83,7 +83,7 @@ describe('preload bridge', () => {
     expect(vi.mocked(ipcRenderer.removeListener).mock.calls.some(([ch, l]) => ch === CH.mediaChanged && l === emit)).toBe(true)
   })
 
-  it('components.* invoke their channels with the request; components:changed reaches the listener (🔒 D5)', async () => {
+  it('components.* invoke their channels with the request; components:changed reaches the listener (🔒 YAZ-1775 D5)', async () => {
     const { ipcRenderer } = await import('electron')
     const { bridge } = await import('./index')
     vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: [] })
@@ -105,7 +105,7 @@ describe('preload bridge', () => {
     expect(vi.mocked(ipcRenderer.removeListener).mock.calls.some(([ch, l]) => ch === CH.componentsChanged && l === emit)).toBe(true)
   })
 
-  it('secrets.set / secrets.has invoke secrets:set and secrets:has — and there is no secrets.get (🔒 D4)', async () => {
+  it('secrets.set / secrets.has invoke secrets:set and secrets:has — and there is no secrets.get (🔒 YAZ-1775 D4)', async () => {
     const { ipcRenderer } = await import('electron')
     const { bridge } = await import('./index')
     vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: undefined })

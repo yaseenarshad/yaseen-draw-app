@@ -1,5 +1,5 @@
 /**
- * THE CANVAS PREFS ↔ ENGINE appState MAPPING (YAZ-1775 🔒 D9).
+ * THE CANVAS PREFS ↔ ENGINE appState MAPPING (YAZ-1775 🔒 YAZ-1775 D9).
  *
  * `SettingsState.canvas` holds the engine's `browser: true, export: false` appState — grid,
  * snapping, binding, selection mode, tool lock, zen, writing mode, the two pen widths, the three
@@ -22,7 +22,7 @@
  *   `updateFrameRendering` (`client/src/drawings/framesVisibility.ts`, the web app's rule), so
  *   `prefsToAppState` deliberately emits nothing for it.
  *
- * TWO GUARDS, ON PURPOSE (🔒 D9): `isCanvasPrefs` is STRICT — every field present and valid — and
+ * TWO GUARDS, ON PURPOSE (🔒 YAZ-1775 D9): `isCanvasPrefs` is STRICT — every field present and valid — and
  * is what the IPC boundary demands of a sandboxed renderer. `sanitizeCanvasPrefs` is LENIENT,
  * field by field over the defaults, and is what the state FILE gets: a store written before a key
  * existed must still load, keeping every key it does have.

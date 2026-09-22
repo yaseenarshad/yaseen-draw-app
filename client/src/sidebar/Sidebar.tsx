@@ -292,7 +292,7 @@ export function Sidebar({
   const [reorderDragging, setReorderDragging] = useState<string | null>(null)
   const [reorderOver, setReorderOver] = useState<{ path: string; edge: 'before' | 'after' } | null>(null)
   // Multi-select (YAZ-1336, 🔒 D1): the selected PATHS — files and, since YAZ-1578, folders —
-  // shared by BOTH lenses, one entry per path however many rows draw it (🔒 D3). It lives HERE
+  // shared by BOTH lenses, one entry per path however many rows draw it (🔒 YAZ-1336 D3). It lives HERE
   // and nowhere else on purpose: this component is mounted `key={root}` and only while the
   // sidebar is open, so a selection is honestly about rows currently on screen and cannot
   // outlive them (a collapse ends it).
@@ -593,7 +593,7 @@ export function Sidebar({
       // root, and a right-click into the empty space below the tree must not throw a selection away.
       if (node !== null && !selectedPaths.has(node.path)) dispatchSelection({ type: 'set', path: node.path })
       // The plural gesture exists only when the right-clicked row — file or folder (YAZ-1578) — is
-      // ITSELF in a selection of two or more (🔒 D5): a selection of one already IS the singular
+      // ITSELF in a selection of two or more (🔒 YAZ-1337 D5): a selection of one already IS the singular
       // menu, and a row outside the selection just ended it above. Read once, here, like every
       // other target this menu pins.
       const plural = node !== null && selectedPaths.has(node.path) && selectedPaths.size >= 2 ? orderedSelectedPaths() : null
@@ -639,7 +639,7 @@ export function Sidebar({
   // ---- Cut / Copy / Paste (YAZ-1674) ----
 
   /**
-   * Main's ONE app-wide file clipboard (🔒 D1): `{ count, op }` or null, pushed to every window on
+   * Main's ONE app-wide file clipboard (🔒 YAZ-1674 D1): `{ count, op }` or null, pushed to every window on
    * every change, so a menu opened here can label "Paste N items" for a copy made in another
    * window on another vault. Session-only, never persisted. A window opened AFTER a clip reads the
    * current state ONCE on mount (`clipState`), so its Paste is labelled from the start.
@@ -667,7 +667,7 @@ export function Sidebar({
   }, [])
 
   /**
-   * Cut / Copy: hand the ordered paths to main (🔒 D1) and SAY SO — every clipboard write confirms
+   * Cut / Copy: hand the ordered paths to main (🔒 YAZ-1674 D1) and SAY SO — every clipboard write confirms
    * (YAZ-1341), and a refusal is reported, never swallowed. The selection stands: acting on it is
    * not the same as ending it (YAZ-1337).
    */
@@ -683,7 +683,7 @@ export function Sidebar({
   )
 
   /**
-   * Paste into `dir` (🔒 D2–D4): PER-ENTRY results, so one bad entry never hides the rest — the
+   * Paste into `dir` (🔒 YAZ-1674 D2–D4): PER-ENTRY results, so one bad entry never hides the rest — the
    * notice counts both halves and names the first failure. The target opens (the synthetic-child
    * idiom `startCreate` uses) and the tree refreshes EXPLICITLY: a copy moves nothing, so no
    * `fileRenamed` broadcast repairs it, and the watcher's add echo is a courtesy, not a contract
@@ -1071,7 +1071,7 @@ export function Sidebar({
       </div>
       {/* Lens tabs (🔒 D4/D5, YAZ-847; ⚡ D8 amended) — chrome v2 ROW 1, above the search bar:
           Files (the file explorer) ⇄ Favorites. The row stays VISIBLE and clickable during a
-          search, and switching lenses never touches the query (🔒 D5). `role="tab"` +
+          search, and switching lenses never touches the query (🔒 YAZ-847 D5). `role="tab"` +
           `aria-selected` only — no `aria-controls`/`tabpanel`, because the body below is shared
           with the flat search results and belongs to neither lens while a query is typed. */}
       <div className="sidebar__lenses" role="tablist" aria-label="Sidebar lens">
@@ -1191,7 +1191,7 @@ export function Sidebar({
         }}
       >
         {searching ? (
-          // A typed query replaces the ACTIVE TAB's body, whichever lens that is (🔒 D5).
+          // A typed query replaces the ACTIVE TAB's body, whichever lens that is (🔒 YAZ-847 D5).
           results.length > 0 ? (
             <SearchResults results={results} selected={sel} onSelect={setSelected} onActivate={activate} />
           ) : (

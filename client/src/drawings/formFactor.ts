@@ -1,5 +1,5 @@
 /**
- * WHAT THE ENGINE IS TOLD ABOUT ITS OWN SIZE (YAZ-1775 ⚡ R5).
+ * WHAT THE ENGINE IS TOLD ABOUT ITS OWN SIZE (YAZ-1775 ⚡ YAZ-1775 R5).
  *
  * Left to itself the engine calls any editor whose LARGER side is ≤ 1180 px a "tablet"
  * (`isTabletBreakpoint`, `packages/common/src/editorInterface.ts:72-79`), and a tablet is forced

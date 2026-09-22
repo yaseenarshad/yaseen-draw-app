@@ -1,5 +1,5 @@
 /**
- * The media cache's policy (🔒 D4, YAZ-1818): the key scheme the Worker used, the 24 h that
+ * The media cache's policy (🔒 YAZ-1775 D4, YAZ-1818): the key scheme the Worker used, the 24 h that
  * bounds both a read and the startup sweep, and the hashing that turns a user's query into a
  * filename nothing can be surprised by.
  */

@@ -1,5 +1,5 @@
 /**
- * THE IMAGE STUDIO'S CURATION (🔒 D4, YAZ-1818): `worker/imageStudio.ts` from the web app
+ * THE IMAGE STUDIO'S CURATION (🔒 YAZ-1775 D4, YAZ-1818): `worker/imageStudio.ts` from the web app
  * (`yaseen-excalidraw` @ `e72242f8`), ported rather than re-invented. This is the valuable part
  * of the Worker — the ranking, the interleave, the two-phase Iconify walk and the cursor that
  * makes an infinite scroll possible over two providers with incompatible paging — and it is the
@@ -26,7 +26,7 @@ export const PIXABAY_ALL_RESULT_LIMIT = SEARCH_LIMIT - ICONIFY_ALL_RESULT_LIMIT
 export const ICONIFY_COLOR_BATCH_LIMIT = 6
 /** Pixabay is paged four at a time, alternating vector and illustration. */
 export const PIXABAY_PAGE_SIZE = 4
-/** The import ceiling (🔒 D4): 20 MB, enforced in main, never in the renderer. */
+/** The import ceiling (🔒 YAZ-1775 D4): 20 MB, enforced in main, never in the renderer. */
 export const MAX_IMPORT_BYTES = 20 * 1024 * 1024
 /** Search JSON and previews live this long on disk; bump `SEARCH_CACHE_VERSION` to orphan them early. */
 export const CACHE_SECONDS = 24 * 60 * 60
@@ -141,7 +141,7 @@ const titleFromTags = (tags?: string) => {
 }
 
 /**
- * Pixabay hits → items. `vector` and `illustration` ONLY (🔒 D4): photographs are not what this
+ * Pixabay hits → items. `vector` and `illustration` ONLY (🔒 YAZ-1775 D4): photographs are not what this
  * studio is for, and the API answers with them freely if you let it. A hit with no id or no
  * preview is not an item at all.
  */

@@ -83,7 +83,7 @@ const clampSidebarWidth = (w: number): number => Math.min(SIDEBAR_MAX_W, Math.ma
 export const isRecentRoots = (v: unknown): v is RecentRoots =>
   Array.isArray(v) && v.every((x) => isRecord(x) && typeof x.path === 'string' && isFiniteNumber(x.lastOpened))
 
-/** The canvas panel's memory (🔒 D10): both halves guarded, an unknown tab reads as the default. */
+/** The canvas panel's memory (🔒 YAZ-1775 D10): both halves guarded, an unknown tab reads as the default. */
 export const isCanvasPanel = (v: unknown): v is CanvasPanelState => isRecord(v) && isCanvasPanelTab(v.tab) && typeof v.docked === 'boolean'
 const sanitizeCanvasPanel = (raw: unknown): CanvasPanelState => {
   const src = isRecord(raw) ? raw : {}
@@ -93,18 +93,18 @@ const sanitizeCanvasPanel = (raw: unknown): CanvasPanelState => {
 /** Per-field guards shared by the loader, `sanitizeSettings` and the IPC boundary (`isSettings`). */
 const SETTINGS_FIELD_OK: { [K in keyof SettingsState]: (v: unknown) => v is SettingsState[K] } = {
   theme: (v): v is Theme => typeof v === 'string' && (THEMES as readonly string[]).includes(v),
-  // 🔒 D5: an absolute path the user picked, or null for `<userData>/library`. Never `''` — an
+  // 🔒 YAZ-1775 D5: an absolute path the user picked, or null for `<userData>/library`. Never `''` — an
   // empty string would resolve to the process cwd, which is not a place to put a user's library.
   libraryFolder: (v): v is string | null => v === null || (typeof v === 'string' && isAbsolute(v)),
   confirmDelete: (v): v is boolean => typeof v === 'boolean',
-  // 🔒 D9: STRICT at the bridge — a sandboxed renderer hands over a whole `CanvasPrefs` or nothing.
+  // 🔒 YAZ-1775 D9: STRICT at the bridge — a sandboxed renderer hands over a whole `CanvasPrefs` or nothing.
   canvas: isCanvasPrefs,
   canvasPanel: isCanvasPanel,
 }
 const SETTINGS_KEYS = Object.keys(SETTINGS_FIELD_OK) as Array<keyof SettingsState>
 
 /**
- * The LENIENT half of 🔒 D9's "strict guard at IPC, lenient sanitize on load": the two composite
+ * The LENIENT half of 🔒 YAZ-1775 D9's "strict guard at IPC, lenient sanitize on load": the two composite
  * fields are repaired key by key rather than thrown away whole, so a state file written before a
  * canvas pref existed keeps every pref it does have instead of resetting the lot.
  */

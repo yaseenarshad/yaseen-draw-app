@@ -1,5 +1,5 @@
 /**
- * The providers (🔒 D4, YAZ-1818), with `fetch` injected — there is not one real request in this
+ * The providers (🔒 YAZ-1775 D4, YAZ-1818), with `fetch` injected — there is not one real request in this
  * file and not one global stubbed. The Worker's own integration tests are carried over
  * (exhaustion, de-duplication, retry-from-position, the 415 and the 413) and joined by the three
  * things only this port has: the key that lives in main, the disk cache that replaces
@@ -72,7 +72,7 @@ describe('the query guard', () => {
   })
 })
 
-describe('the Pixabay key, which never leaves main (🔒 D4)', () => {
+describe('the Pixabay key, which never leaves main (🔒 YAZ-1775 D4)', () => {
   it('skips the provider entirely and says pixabayAvailable: false — no error, no warning', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       expect(String(input)).toContain('iconify.design')
@@ -239,7 +239,7 @@ describe('when a provider is having a bad day', () => {
   })
 })
 
-describe('the 24 h disk cache (🔒 D4)', () => {
+describe('the 24 h disk cache (🔒 YAZ-1775 D4)', () => {
   it('serves an identical second search without one network call', async () => {
     const fetchMock = vi.fn(async () => json(iconifyPayload(['noto:money-bag'], { total: 1 })))
     const providers = build(fetchMock as unknown as typeof globalThis.fetch, null)
@@ -266,7 +266,7 @@ describe('the 24 h disk cache (🔒 D4)', () => {
     expect(after.items.some(({ provider }) => provider === 'pixabay')).toBe(true)
   })
 
-  it('caches a preview and re-serves it, but NEVER caches an import (🔒 D4)', async () => {
+  it('caches a preview and re-serves it, but NEVER caches an import (🔒 YAZ-1775 D4)', async () => {
     const svg = () => new Response('<svg/>', { headers: { 'Content-Type': 'image/svg+xml' } })
     const fetchMock = vi.fn(async () => svg())
     const providers = build(fetchMock as unknown as typeof globalThis.fetch, null)
@@ -310,7 +310,7 @@ describe('the 24 h disk cache (🔒 D4)', () => {
   })
 })
 
-describe('the bytes, and the guards 🔒 D4 put on them', () => {
+describe('the bytes, and the guards 🔒 YAZ-1775 D4 put on them', () => {
   const record = { hits: [{ id: 101, type: 'vector/svg', tags: 'money bag', previewURL: 'https://cdn.test/p.png', largeImageURL: 'https://cdn.test/big.png', user: 'Alex', imageWidth: 800, imageHeight: 600 }] }
 
   it('refuses an id that does not belong to the provider', async () => {

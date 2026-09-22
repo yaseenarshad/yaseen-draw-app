@@ -16,7 +16,7 @@ interface ContextMenuProps {
   onClose: () => void
 }
 
-/** Groups of items (🔒 D7): one `role="group"` per NON-EMPTY section — the root and every flyout share it. */
+/** Groups of items (🔒 YAZ-1674 D7): one `role="group"` per NON-EMPTY section — the root and every flyout share it. */
 function Groups<T extends MenuItem>({ sections, render }: { sections: readonly (readonly T[])[]; render: (item: T) => ReactNode }) {
   return (
     <>
@@ -31,7 +31,7 @@ function Groups<T extends MenuItem>({ sections, render }: { sections: readonly (
   )
 }
 
-/** A leaf: `onSelect()` then `onClose()` — every item closes the WHOLE menu (🔒 D8). */
+/** A leaf: `onSelect()` then `onClose()` — every item closes the WHOLE menu (🔒 YAZ-1674 D8). */
 function ActionButton({ item, onClose, onMouseEnter }: { item: MenuAction; onClose: () => void; onMouseEnter?: () => void }) {
   return (
     <button

@@ -1,5 +1,5 @@
 /**
- * The curation rules ported from `worker/imageStudio.ts` (🔒 D4, YAZ-1818). The web app's own
+ * The curation rules ported from `worker/imageStudio.ts` (🔒 YAZ-1775 D4, YAZ-1818). The web app's own
  * four unit tests are here field for field — Pixabay type filtering, the search URL's shape,
  * colour-collection ranking, the three-to-one interleave — plus the cursor, which the Worker only
  * ever exercised through a live `Request` and which is the piece an infinite scroll rests on.
@@ -38,7 +38,7 @@ const iconItem = (providerId: string, over: Partial<{ kind: 'icon' | 'logo'; tit
   title: over.title ?? providerId,
 })
 
-describe('the numbers 🔒 D4 locked', () => {
+describe('the numbers 🔒 YAZ-1775 D4 locked', () => {
   it('is 18 results, 14 icons and 4 graphics in "all", cache version 2, 20 MB imports', () => {
     expect(SEARCH_LIMIT).toBe(18)
     expect(ICONIFY_ALL_RESULT_LIMIT).toBe(14)

@@ -1,5 +1,5 @@
 /**
- * THE LIBRARY'S COMPONENT STORE (🔒 D5, YAZ-1819): `<library>/components/<slug>.excalidraw` +
+ * THE LIBRARY'S COMPONENT STORE (🔒 YAZ-1775 D5, YAZ-1819): `<library>/components/<slug>.excalidraw` +
  * `<slug>.png`, indexed by `<library>/components.json`, shared by every vault's windows. The rules
  * live in `@shared/savedComponents`; this module is the disk half — read lazily, write atomically,
  * trash through the OS, watch for the other writers.
@@ -64,7 +64,7 @@ import { parseDataUrl } from '@shared/drawingAssets'
 import { BridgeFailure, atomicWrite, fsCall } from '../fs/fsUtils'
 import { createChain, createWatchedFolder, readOrQuarantine } from '../watchedFolder'
 
-/** The one preview format (🔒 D5): the renderer exports PNG, and nothing else is stored. */
+/** The one preview format (🔒 YAZ-1775 D5): the renderer exports PNG, and nothing else is stored. */
 const PREVIEW_MIME = 'image/png'
 
 export interface ComponentStore {

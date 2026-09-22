@@ -21,7 +21,7 @@ import { registerWindowIpc } from './window'
  * can send (window focus, OS wake, the last flush before quit), which `main/index.ts` owns.
  *
  * `userData` is passed in rather than read from `app`: it is the library folder's default root
- * (🔒 D5) and where `secrets.json` lives (🔒 D4), and every module under `main/` that touches it
+ * (🔒 YAZ-1775 D5) and where `secrets.json` lives (🔒 YAZ-1775 D4), and every module under `main/` that touches it
  * stays Electron-free and testable.
  */
 export function registerIpc(store: Store, windows: WindowManagerIpc, userData: string): GitSyncManager {
@@ -33,7 +33,7 @@ export function registerIpc(store: Store, windows: WindowManagerIpc, userData: s
   registerFavoritesIpc(store)
   registerMediaLibraryIpc(store, userData)
   registerComponentsIpc(store, userData)
-  // 🔒 D4: the secrets instance is THREADED into the studio's providers — that is how a Pixabay
+  // 🔒 YAZ-1775 D4: the secrets instance is THREADED into the studio's providers — that is how a Pixabay
   // request gets its key without the key ever leaving main.
   registerMediaStudioIpc(userData, registerSecretsIpc(userData))
   registerWindowIpc(store, windows)

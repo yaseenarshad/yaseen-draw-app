@@ -1,5 +1,5 @@
 /**
- * THE SAVED-COMPONENT RULES (🔒 D5, YAZ-1819): what a slug is, what `<library>/components.json`
+ * THE SAVED-COMPONENT RULES (🔒 YAZ-1775 D5, YAZ-1819): what a slug is, what `<library>/components.json`
  * holds, and what a component fragment has to be before it is written or inserted. Pure and
  * Electron-free — the main-process store around it (`desktop/src/main/library/componentStore.ts`)
  * only reads, writes, watches and trashes, so every rule here unit-tests with no disk.
@@ -23,7 +23,7 @@ export { COMPONENTS_INDEX_FILE, LIBRARY_COMPONENTS_DIR }
 
 /** The fragment's extension — a component IS an Excalidraw document, openable by anything. */
 export const COMPONENT_EXT = '.excalidraw'
-/** The preview's extension (🔒 D5). PNG, not the web app's WebP: every reader has one. */
+/** The preview's extension (🔒 YAZ-1775 D5). PNG, not the web app's WebP: every reader has one. */
 export const COMPONENT_PREVIEW_EXT = '.png'
 
 /**
@@ -135,7 +135,7 @@ export interface ComponentOnDisk {
 }
 
 /**
- * The index the FOLDER implies (🔒 D5's "rebuilt from the folder"). A slug the old index still
+ * The index the FOLDER implies (🔒 YAZ-1775 D5's "rebuilt from the folder"). A slug the old index still
  * knows keeps everything it said — its name above all, which is the one thing the folder cannot
  * tell us — and a slug it does not know is named after itself. A row whose file has gone drops
  * out: the folder is the truth and the index is the cache. Newest-updated first, which is the
@@ -178,7 +178,7 @@ export interface ComponentFragment {
 }
 
 /**
- * A fragment's bytes → what may be inserted. Validation is the OUTLINE plus the ONE promise 🔒 D5
+ * A fragment's bytes → what may be inserted. Validation is the OUTLINE plus the ONE promise 🔒 YAZ-1775 D5
  * makes about a component — that it is SELF-CONTAINED: every image element's bytes are in the
  * fragment's own `files`, so a component saved in one vault inserts in another. Deciding whether
  * those elements really are Excalidraw elements is the engine's `restore()`, a moment later.

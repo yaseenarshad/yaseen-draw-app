@@ -409,7 +409,7 @@ git(['commit', '-q', '-m', 'seed demo vault'])
 git(['init', '-q', '--bare', '-b', 'main', ORIGIN], path.dirname(ORIGIN))
 git(['remote', 'add', 'origin', ORIGIN])
 git(['push', '-q', '-u', 'origin', 'main'])
-// The per-vault sync switch (🔒 D1: the dotfolder is `.yaseendraw/`, not the docs app's name).
+// The per-vault sync switch (🔒 YAZ-1775 D1: the dotfolder is `.yaseendraw/`, not the docs app's name).
 writeFile('.yaseendraw/github.json', JSON.stringify({ enabled: true }, null, 2) + '\n')
 git(['add', '-A'])
 git(['commit', '-q', '-m', 'enable github sync'])

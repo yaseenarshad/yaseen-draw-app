@@ -1,8 +1,8 @@
 /**
- * SETTINGS › CANVAS (YAZ-1775 🔒 D9): one row per `CanvasPrefs` key, writing the whole
+ * SETTINGS › CANVAS (YAZ-1775 🔒 YAZ-1775 D9): one row per `CanvasPrefs` key, writing the whole
  * `SettingsState` with only `canvas` changed — the same store the rail's Writing / Frames toggles
  * and the engine's own read-back write, so the three can never disagree about a value. There is
- * no second door: 🔒 D10 removed the canvas hamburger's Preferences submenu, and this is the only
+ * no second door: 🔒 YAZ-1775 D10 removed the canvas hamburger's Preferences submenu, and this is the only
  * UI these preferences have.
  *
  * Row ids are `canvas.<key>` — the registry's "the id names the field" rule, one level down, so a
@@ -16,7 +16,7 @@
  * NOT HERE, ON PURPOSE: the properties-toolbar pref, removed by the round-4 amendment — the
  * toolbar mode is a constant (`YASEEN_FULL_TOOLBAR_MODE`), not a choice. Canvas background is not
  * here either: it is per BOARD, written into the file by the engine, so it lives in View ›
- * Canvas Background (🔒 D10). Theme is Appearance's only row.
+ * Canvas Background (🔒 YAZ-1775 D10). Theme is Appearance's only row.
  */
 import type { ReactNode } from 'react'
 import { DEFAULT_CANVAS_PREFS, FONT_FAMILY_OPTIONS, type CanvasPrefs, type Roughness, type SelectOn, type SettingsState, type TextAlign } from '@shared/types'

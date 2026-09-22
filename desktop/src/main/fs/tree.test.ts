@@ -38,7 +38,7 @@ describe('tree', () => {
     expect(all).toContain(path.join(root, 'notes.txt'))
     expect(all.some((p) => p.includes('.obsidian') || p.includes('.git') || p.includes('node_modules'))).toBe(false)
     expect(all).not.toContain(path.join(root, '.hidden.excalidraw'))
-    // 🔒 D3: the image store at the ROOT is invisible; a user's own `assets` folder deeper in
+    // 🔒 YAZ-1775 D3: the image store at the ROOT is invisible; a user's own `assets` folder deeper in
     // the vault is theirs and shows, contents and all.
     expect(all).not.toContain(path.join(root, 'assets', 'deadbeef.png'))
     expect(all).toContain(path.join(root, 'Zeta', 'assets', 'theirs.excalidraw'))

@@ -2,7 +2,7 @@
  * The flat result list (YAZ-803, 🔒 flat-list ruling on YAZ-739): rows in the ranking's order,
  * the folder as a secondary label only when there is one, and the tree's ⌘-click convention.
  * Since YAZ-1491 a click reports ONE activation with the ⌘ flag (🔒 D3) — the Sidebar decides
- * what a folder vs a note does — and a folder row looks like a folder (🔒 D4).
+ * what a folder vs a note does — and a folder row looks like a folder (🔒 YAZ-1491 D4).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { StrictMode, act } from 'react'

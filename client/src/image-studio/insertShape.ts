@@ -8,7 +8,7 @@
  *   placed. Nothing is fetched and nothing is written to disk — a shape is geometry.
  * - An IMAGE becomes a `File` handed to the engine's own `insertImages`, which is the door that
  *   knows how to make an image element, register its bytes and size it. The bytes then become an
- *   `assets/` file through the save path built in 2E (🔒 D3): the engine's files map grows an id
+ *   `assets/` file through the save path built in 2E (🔒 YAZ-1775 D3): the engine's files map grows an id
  *   the store does not hold, `unpersistedFiles` picks it up, and `drawing:save` writes it BEFORE
  *   the scene that names it. Nothing here touches the disk either.
  *
@@ -91,7 +91,7 @@ export function bytesFromDataUrl(dataURL: string): Uint8Array {
 /**
  * The imported bytes as the `File` the engine's image door takes. The name carries the provider id
  * with its colon flattened, so an icon lands on the board as `noto-money-bag.svg` rather than as
- * something the filesystem would argue with — and the engine's own content-addressing (🔒 D3)
+ * something the filesystem would argue with — and the engine's own content-addressing (🔒 YAZ-1775 D3)
  * means the same picture twice is still one `assets/` file whatever it was called.
  */
 export function fileFromImport(item: Pick<StudioItem, 'providerId'>, imported: Pick<MediaImportResponse, 'mimeType' | 'dataURL'>): File {

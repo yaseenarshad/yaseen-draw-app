@@ -11,8 +11,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { DEFAULT_SETTINGS, type GithubSyncStatus, type SettingsState } from '@shared/types'
 import { SettingsDialog } from './SettingsDialog'
 
-// Two rows ASK main something: the Library folder (🔒 D5 — only main knows what a null setting
-// resolves to) and the Pixabay key (🔒 D4 — only main knows whether one is set). The bridge is
+// Two rows ASK main something: the Library folder (🔒 YAZ-1775 D5 — only main knows what a null setting
+// resolves to) and the Pixabay key (🔒 YAZ-1775 D4 — only main knows whether one is set). The bridge is
 // stubbed at the client `api` seam, like every other test.
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),
@@ -163,7 +163,7 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
     expect(sections(el).map((s) => s.id)).toEqual(['settings-appearance', 'settings-canvas', 'settings-files', 'settings-images', 'settings-sync'])
     expect(rowIds(el)).toEqual([
       'theme',
-      // 🔒 D9's fourteen, in the order Settings › Canvas shows them.
+      // 🔒 YAZ-1775 D9's fourteen, in the order Settings › Canvas shows them.
       'canvas.gridModeEnabled',
       'canvas.objectsSnapModeEnabled',
       'canvas.snapToMidpoints',
@@ -384,7 +384,7 @@ describe('SettingsDialog search (D6)', () => {
   })
 })
 
-describe('Settings › Canvas (🔒 D9)', () => {
+describe('Settings › Canvas (🔒 YAZ-1775 D9)', () => {
   it('writes the whole SettingsState with only the one canvas key changed', () => {
     const { el, onChange } = mount()
     act(() => rowButtons(el, 'canvas.gridModeEnabled')[0].click()) // On
@@ -437,7 +437,7 @@ describe('Settings › Canvas (🔒 D9)', () => {
   })
 })
 
-describe('Settings › Files › Library folder (🔒 D5)', () => {
+describe('Settings › Files › Library folder (🔒 YAZ-1775 D5)', () => {
   it('shows the resolved default main answered, marked as the default, and both buttons', async () => {
     const { el } = mount()
     await act(async () => await Promise.resolve())
@@ -470,7 +470,7 @@ describe('Settings › Files › Library folder (🔒 D5)', () => {
   })
 })
 
-describe('Settings › Images › Pixabay API key (🔒 D4)', () => {
+describe('Settings › Images › Pixabay API key (🔒 YAZ-1775 D4)', () => {
   const statusText = (el: HTMLElement) => el.querySelector('[data-testid="pixabay-key-status"]')?.textContent
   const keyInput = (el: HTMLElement) => row(el, 'pixabayApiKey')?.querySelector<HTMLInputElement>('input') as HTMLInputElement
   const flush = () => act(async () => await Promise.resolve())

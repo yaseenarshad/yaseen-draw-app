@@ -1,5 +1,5 @@
 /**
- * THE SECRETS DOOR (🔒 D4, YAZ-1817): `userData/secrets.json` =
+ * THE SECRETS DOOR (🔒 YAZ-1775 D4, YAZ-1817): `userData/secrets.json` =
  * `{ version: 1, values: Record<name, base64(safeStorage.encryptString(value))> }`.
  *
  * THE RULE, and it has no exceptions: **the renderer never receives a value.** It may write one

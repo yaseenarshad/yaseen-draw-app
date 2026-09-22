@@ -23,9 +23,9 @@ describe('HOTKEYS source of truth', () => {
     const byKeys = (keys: string) => MOUSE_TIPS.find((t) => t.keys === keys)
     expect(byKeys('⌘-click file')?.label).toMatch(/background tab/i)
     expect(byKeys('Right-click file')?.label).toMatch(/new window/i)
-    // The context menu's create group leads on the one document birth (⚡ D8 amended).
+    // The context menu's create group leads on the one document birth (⚡ YAZ-1775 D8 amended).
     expect(byKeys('Right-click file')?.label).toMatch(/new drawing/i)
-    // Multi-select (YAZ-1336 🔒 D2 → YAZ-1337): ⇧-click toggles rows, and the tip has to say what
+    // Multi-select (YAZ-1336 🔒 YAZ-1775 D2 → YAZ-1337): ⇧-click toggles rows, and the tip has to say what
     // that is FOR — the two plural items a right-click then offers.
     expect(byKeys('⇧-click file or folder')?.label).toMatch(/multi-selection/i)
     expect(byKeys('⇧-click file or folder')?.label).toMatch(/Copy N paths/)

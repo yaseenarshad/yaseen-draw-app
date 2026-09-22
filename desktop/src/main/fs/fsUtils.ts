@@ -120,7 +120,7 @@ export async function buildTree(dir: string): Promise<TreeNode[]> {
 
 /**
  * Writes `content` to `<file>.tmp-<rand>` then renames over `file`. Parent dir must exist.
- * A string lands as UTF-8; bytes (a scene's images through `drawing:save`, 🔒 D3) land verbatim —
+ * A string lands as UTF-8; bytes (a scene's images through `drawing:save`, 🔒 YAZ-1775 D3) land verbatim —
  * `writeFile` ignores the encoding for a view, so one call serves both.
  */
 export async function atomicWrite(file: string, content: string | Uint8Array): Promise<{ mtime: number; size: number }> {

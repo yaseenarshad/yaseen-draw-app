@@ -113,7 +113,7 @@ describe('useMenuEvents', () => {
     expect(handlers.onNextTab).toHaveBeenCalledTimes(1)
     act(() => b.emitPrevTab())
     expect(handlers.onPrevTab).toHaveBeenCalledTimes(1)
-    // 🔒 D10: the items that left the canvas hamburger for the application menu, plus 🔒 D3's export.
+    // 🔒 YAZ-1775 D10: the items that left the canvas hamburger for the application menu, plus 🔒 YAZ-1775 D3's export.
     act(() => b.emitExportImage())
     expect(handlers.onExportImage).toHaveBeenCalledTimes(1)
     act(() => b.emitCanvasBackground('#fffce8'))

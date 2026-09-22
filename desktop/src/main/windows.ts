@@ -88,7 +88,7 @@ export interface WindowManager extends WindowLookup {
    * The ONE back-end door for "open a recent vault" (YAZ-1767 🔒 D1): the sidebar's vault
    * switcher (`window:open-recent`) and the menu's ⌥-click on Open Recent both land here. Probes
    * the directory FIRST (GRO-2211): a dead folder is pruned from the MRU and opens nothing →
-   * `false`. A live one is bumped to the top of the MRU, then (🔒 D9) every live window already
+   * `false`. A live one is bumped to the top of the MRU, then (🔒 YAZ-1767 D9) every live window already
    * on that vault is RAISED — most recently focused on top — and nothing new opens; with none
    * open, a new window opens on the vault's remembered `folders[root].lastFile` (D2). → `true`.
    */

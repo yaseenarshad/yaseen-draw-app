@@ -1,5 +1,5 @@
 /**
- * THE IN-CANVAS DOCKED PANEL (YAZ-1775 ⚡ D8 amended): the web app's `AppSidebar`
+ * THE IN-CANVAS DOCKED PANEL (YAZ-1775 ⚡ YAZ-1775 D8 amended): the web app's `AppSidebar`
  * (`excalidraw-app/components/AppSidebar.tsx`) minus its Boards and Docs tabs. The shell sidebar
  * is this app's file manager, so the canvas panel holds only what the canvas owns — **Images**
  * (3B), **Components** (3C), **Present** (3D) — each an icon with a small label, in the web app's
@@ -62,7 +62,7 @@ export interface CanvasSidebarProps {
   activeTab: CanvasPanelTab | null
   /** The header hamburger: close the panel (the engine's `toggleSidebar({ name: null })`). */
   onClose: () => void
-  /** The dock/pin gesture; the surface stores it in `SettingsState.canvasPanel` (🔒 D10). */
+  /** The dock/pin gesture; the surface stores it in `SettingsState.canvasPanel` (🔒 YAZ-1775 D10). */
   onDock: (docked: boolean) => void
   /** The engine's imperative handle, which each tab narrows to what it uses; null until it has mounted. */
   excalidrawAPI: ExcalidrawImperativeApi | null
@@ -78,7 +78,7 @@ export function CanvasSidebar({ engine, activeTab, onClose, onDock, excalidrawAP
   const { DefaultSidebar, Sidebar } = engine
   return (
     <>
-      {/* The engine's own floating trigger is not this app's door; the rail is (🔒 D10). */}
+      {/* The engine's own floating trigger is not this app's door; the rail is (🔒 YAZ-1775 D10). */}
       <DefaultSidebar.Trigger hidden />
       <DefaultSidebar
         hideLibrary

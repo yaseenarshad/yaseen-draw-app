@@ -29,7 +29,7 @@ const repairFavorites = (p: Promise<void>): Promise<void> => p.catch((err: unkno
 
 /** The fs half of `window.yaseenDraw` (`dialog:pick-folder` lives in `./dialog`). */
 export function registerFsIpc(store: Store, windows: WindowLookup): void {
-  // The tree, plus the one-per-session orphan sweep of this vault's image store (🔒 D3,
+  // The tree, plus the one-per-session orphan sweep of this vault's image store (🔒 YAZ-1775 D3,
   // YAZ-1811). The first `fs:tree` for a root IS "the vault was opened", and it is the only
   // moment that means that without inventing a second signal for it. The sweep is detached: the
   // tree answers immediately, and its own notice reaches the asking window later, if at all.

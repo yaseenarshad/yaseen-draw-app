@@ -10,7 +10,7 @@ import { broadcastAll } from './broadcast'
 import { handle } from './envelope'
 
 /**
- * The `media.*` half of `window.yaseenDraw` (🔒 D4 / D5, YAZ-1817): the library's media store
+ * The `media.*` half of `window.yaseenDraw` (🔒 YAZ-1775 D4 / D5, YAZ-1817): the library's media store
  * behind the envelope, plus the ONE push. `media:changed` carries no payload — every window
  * re-lists, whichever vault it is on, because the library is the same file for all of them.
  *

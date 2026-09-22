@@ -1,7 +1,7 @@
 /**
  * What a launch was asked to OPEN (2I, YAZ-1815).
  *
- * The app claims `.excalidraw` as an Owner file association (🔒 D1 on YAZ-1775), and the OS
+ * The app claims `.excalidraw` as an Owner file association (🔒 YAZ-1775 D1), and the OS
  * delivers a double-clicked file differently on each platform:
  *
  * - **macOS** fires `open-file` with the path — before `ready` on a cold start. `main/index.ts`

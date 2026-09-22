@@ -1,5 +1,5 @@
 /**
- * The media cache on disk (🔒 D4, YAZ-1818). The properties that matter are the ones that keep it
+ * The media cache on disk (🔒 YAZ-1775 D4, YAZ-1818). The properties that matter are the ones that keep it
  * a CACHE: a miss is never an error, a write that fails is never an error, and the folder cannot
  * grow past what the last 24 h of searching put in it.
  */

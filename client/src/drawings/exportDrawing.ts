@@ -1,9 +1,9 @@
 /**
- * EXPORT DRAWING… (🔒 D3, YAZ-1821): the board as a STANDALONE `.excalidraw` — every image it uses
+ * EXPORT DRAWING… (🔒 YAZ-1775 D3, YAZ-1821): the board as a STANDALONE `.excalidraw` — every image it uses
  * embedded in the file — so it opens in upstream Excalidraw, on excalidraw.com, or on anyone
  * else's machine with its pictures intact.
  *
- * 🔒 D3 SAYS THE VAULT FILE NEVER EMBEDS, AND THAT EXPORT IS THE ONE PLACE THAT DOES. A board in a
+ * 🔒 YAZ-1775 D3 SAYS THE VAULT FILE NEVER EMBEDS, AND THAT EXPORT IS THE ONE PLACE THAT DOES. A board in a
  * vault is a lean scene (`files: {}`) beside a shared `<vault>/assets/` folder, because embedding
  * base64 makes multi-MB files that git rewrites on every save. A file being sent to someone else
  * has no `assets/` folder to point at, so the bytes have to travel with it. This module is that
@@ -46,7 +46,7 @@ export function embeddedFiles(elements: readonly unknown[], files: Record<string
   for (const id of referenced) {
     const entry = files[id]
     // A missing byte is not an error: the board already draws the engine's placeholder for it
-    // (🔒 D3), and an export that refused because of one would be worse than one that is honest.
+    // (🔒 YAZ-1775 D3), and an export that refused because of one would be worse than one that is honest.
     if (entry !== undefined) embedded[id] = entry
   }
   return embedded

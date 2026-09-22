@@ -17,25 +17,25 @@ export type BridgeErrorCode =
   | 'UNSUPPORTED_EXTENSION' // file extension is not supported by the requested capability
   | 'ALREADY_EXISTS' // create target already exists
   | 'FORBIDDEN' // OS permission denied
-  | 'TOO_LARGE' // a drawing exceeds MAX_DRAWING_BYTES, or a media import exceeds MAX_IMPORT_BYTES (🔒 D4)
+  | 'TOO_LARGE' // a drawing exceeds MAX_DRAWING_BYTES, or a media import exceeds MAX_IMPORT_BYTES (🔒 YAZ-1775 D4)
   | 'IO_ERROR' // any other fs error
   | 'PICKER_FAILED' // native folder dialog could not be run
   | 'INVALID_CONFIG' // a vault config file (e.g. .yaseendraw/github.json) is unusable; the mutation is refused, the file never touched
-  | 'ENCRYPTION_UNAVAILABLE' // 🔒 D4: the OS keychain cannot encrypt on this machine, so no secret can be stored
-  | 'UNSUPPORTED_TYPE' // 🔒 D4: a media provider answered with something that is not an image (the worker's 415)
-  | 'PROVIDER_FAILED' // 🔒 D4: a media provider was REACHED and refused, or answered nonsense (the worker's 502)
-  | 'OFFLINE' // 🔒 D4: the provider could not be reached at all — a passive state in the UI, never an error banner
+  | 'ENCRYPTION_UNAVAILABLE' // 🔒 YAZ-1775 D4: the OS keychain cannot encrypt on this machine, so no secret can be stored
+  | 'UNSUPPORTED_TYPE' // 🔒 YAZ-1775 D4: a media provider answered with something that is not an image (the worker's 415)
+  | 'PROVIDER_FAILED' // 🔒 YAZ-1775 D4: a media provider was REACHED and refused, or answered nonsense (the worker's 502)
+  | 'OFFLINE' // 🔒 YAZ-1775 D4: the provider could not be reached at all — a passive state in the UI, never an error banner
 
-/** The one document extension the app opens, edits and creates (🔒 D1). */
+/** The one document extension the app opens, edits and creates (🔒 YAZ-1775 D1). */
 export const DRAWING_VIEW_EXTENSIONS = ['.excalidraw'] as const
 
 /** The file kinds the app can open in-app. A file of no kind still lists (YAZ-1577). */
 export type FileKind = 'drawing'
 /**
  * The ceiling on ONE drawing document read through `drawing:load` (🔒 YAZ-1810). A LEGACY
- * `.excalidraw` (an upstream export, or one this app wrote before 🔒 D3) embeds its images as
+ * `.excalidraw` (an upstream export, or one this app wrote before 🔒 YAZ-1775 D3) embeds its images as
  * base64 and is routinely past 10 MiB before it has been opened once. 200 MiB is the size at
- * which a scene has stopped being a document; the store (🔒 D3) keeps every saved file far below it.
+ * which a scene has stopped being a document; the store (🔒 YAZ-1775 D3) keeps every saved file far below it.
  */
 export const MAX_DRAWING_BYTES = 200 * 1024 * 1024
 
@@ -99,7 +99,7 @@ export interface DrawingLoadResponse {
   /**
    * Every image the scene still references and whose bytes were found, keyed by `fileId`. An id
    * with no bytes anywhere is simply absent — the engine draws its placeholder and the document
-   * still opens (🔒 D3).
+   * still opens (🔒 YAZ-1775 D3).
    */
   files: Record<string, DrawingFileEntry>
   /**
@@ -119,7 +119,7 @@ export interface DrawingNewFile extends DrawingFileEntry {
 export interface DrawingSaveRequest {
   root: string
   path: string
-  /** The serialized scene. Written verbatim but for the store's own `files: {}` rewrite (🔒 D3). */
+  /** The serialized scene. Written verbatim but for the store's own `files: {}` rewrite (🔒 YAZ-1775 D3). */
   json: string
   /** The mtime the renderer last read or wrote; a differing disk mtime rejects `CONFLICT` and writes NOTHING — assets included. */
   expectedMtime?: number
@@ -141,7 +141,7 @@ export interface DrawingApi {
   /** Write one `.excalidraw`: assets first, then the scene, atomically. */
   save(req: DrawingSaveRequest): Promise<DrawingSaveResponse>
   /**
-   * The RESOLVED library folder (🔒 D5): `SettingsState.libraryFolder`, or `<userData>/library`
+   * The RESOLVED library folder (🔒 YAZ-1775 D5): `SettingsState.libraryFolder`, or `<userData>/library`
    * when that is null. Only main knows where userData is, so only main can answer — the Settings
    * row shows what comes back. Main also makes sure the folder exists at startup, so the answer
    * always names a real directory. Its CONTENTS (`media.json`, `components/`) are 3A/3B/3C's.
@@ -287,7 +287,7 @@ export type OpenDrawingResponse =
     }
 
 /**
- * The native SAVE dialog and the write behind it (🔒 D3, YAZ-1821): File › Export Drawing… writes
+ * The native SAVE dialog and the write behind it (🔒 YAZ-1775 D3, YAZ-1821): File › Export Drawing… writes
  * a standalone `.excalidraw` — every image embedded — somewhere the user picks, which is by
  * definition outside the vault. It is one door rather than "pick a path, then write it", because a
  * renderer holding an arbitrary absolute path it may write to is exactly what the fs layer's
@@ -315,7 +315,7 @@ export type SaveDrawingResponse =
 export interface DialogApi {
   /** Pick one `.excalidraw` and get its bytes back; `{ cancelled: true }` when dismissed (YAZ-1833). */
   openDrawing(): Promise<OpenDrawingResponse>
-  /** Pick a destination and write a standalone `.excalidraw` there (🔒 D3, YAZ-1821). */
+  /** Pick a destination and write a standalone `.excalidraw` there (🔒 YAZ-1775 D3, YAZ-1821). */
   saveDrawing(req: SaveDrawingRequest): Promise<SaveDrawingResponse>
 }
 
@@ -334,7 +334,7 @@ export type WatchEvent =
   | { type: 'unlinkDir'; path: string }
   | { type: 'error'; message: string }
 
-// ---------- Canvas prefs and the canvas panel (YAZ-1775 🔒 D9 / 🔒 D10) ----------
+// ---------- Canvas prefs and the canvas panel (🔒 YAZ-1775 D9 / D10) ----------
 
 /**
  * The user-level canvas preferences held in `SettingsState.canvas`: the engine's
@@ -358,7 +358,7 @@ export type TextAlign = (typeof TEXT_ALIGNS)[number]
 /**
  * The fork's `FONT_FAMILY` ids the Default font row offers (`packages/common/src/constants.ts`),
  * Assistant first because it is the value the web app forced through a one-shot localStorage
- * migration — carried here as a plain preference instead, with no migration stamp (🔒 D9).
+ * migration — carried here as a plain preference instead, with no migration stamp (🔒 YAZ-1775 D9).
  * Id 4 is deliberately absent: the fork leaves it unused for historical reasons.
  */
 export const FONT_FAMILY_OPTIONS: ReadonlyArray<{ id: number; label: string }> = [
@@ -427,7 +427,7 @@ export const DEFAULT_CANVAS_PREFS: CanvasPrefs = {
 }
 
 /**
- * The in-canvas docked panel's tabs (⚡ D8 amended), in the order its strip shows them. The web
+ * The in-canvas docked panel's tabs (⚡ YAZ-1775 D8 amended), in the order its strip shows them. The web
  * app's `boards` and `docs` tabs are not here: the shell sidebar IS the boards list, and there is
  * no Docs subsystem. The tab NAMES are the engine's sidebar tab names, kept as the web app spelled
  * them so the engine's own sidebar state reads the same on both sides.
@@ -437,9 +437,9 @@ export type CanvasPanelTab = (typeof CANVAS_PANEL_TABS)[number]
 export const isCanvasPanelTab = (v: unknown): v is CanvasPanelTab => (CANVAS_PANEL_TABS as readonly string[]).includes(v as string)
 
 /**
- * What the canvas panel remembers between mounts (🔒 D10, and the parity checklist's §5): the tab
+ * What the canvas panel remembers between mounts (🔒 YAZ-1775 D10, and the parity checklist's §5): the tab
  * the hamburger opens on, and whether the panel is docked. The web app kept both in localStorage
- * (`yaseen-whiteboard-last-sidebar-section`, `yaseen-whiteboard-sidebar-docked:<username>`); 🔒 D9
+ * (`yaseen-whiteboard-last-sidebar-section`, `yaseen-whiteboard-sidebar-docked:<username>`); 🔒 YAZ-1775 D9
  * carries over the BEHAVIOUR and not the keys, so they live in `SettingsState` — app-global, which
  * is exactly what one browser profile's localStorage was, and every window follows a change live.
  * Whether the panel is OPEN is not remembered: it starts closed on every mount, as the web app's
@@ -467,7 +467,7 @@ export function addRecentRoot(list: RecentRoots, path: string, now: number): Rec
 export const MAX_FAVORITES = 500
 
 /**
- * `WindowEntry.sidebarLens` — which lens the sidebar's chrome-v2 ROW 1 tabs show (⚡ D8 amended):
+ * `WindowEntry.sidebarLens` — which lens the sidebar's chrome-v2 ROW 1 tabs show (⚡ YAZ-1775 D8 amended):
  * `files` (the file explorer) or `favorites` (the pinned files and folders, YAZ-1766 D1).
  * Window identity like `sidebarCollapsed` since YAZ-1628: the tabs are not per-folder view
  * state, so there is no per-root keying and no `FolderState` entry. Any unrecognised stored
@@ -490,7 +490,7 @@ export interface SettingsState {
   /** Appearance (Desktop K, GRO-2218): explicit values win; `system` tracks the OS live. */
   theme: Theme
   /**
-   * The one library folder every vault shares (🔒 D5): an absolute path the user chose, or null
+   * The one library folder every vault shares (🔒 YAZ-1775 D5): an absolute path the user chose, or null
    * for the default `<userData>/library`. Media favorites and saved components were per cloud
    * account in the web app; per-vault storage would mean re-favouriting in every vault, and app
    * userData alone would never be backed up. A folder the user can point inside a synced vault is
@@ -507,12 +507,12 @@ export interface SettingsState {
    */
   confirmDelete: boolean
   /**
-   * The canvas preferences every board, every window and every relaunch share (🔒 D9). Seeded
+   * The canvas preferences every board, every window and every relaunch share (🔒 YAZ-1775 D9). Seeded
    * into the engine at mount and kept in step both ways, diff-before-write in each direction so
    * two windows can never ping-pong. See `CanvasPrefs`.
    */
   canvas: CanvasPrefs
-  /** What the in-canvas docked panel remembers: its last-used tab and its dock preference (🔒 D10). */
+  /** What the in-canvas docked panel remembers: its last-used tab and its dock preference (🔒 YAZ-1775 D10). */
   canvasPanel: CanvasPanelState
 }
 
@@ -728,7 +728,7 @@ export interface FavoritesApi {
   onChanged(listener: (change: { root: string }) => void): () => void
 }
 
-// ---------- Media library (`<library>/media.json` — 🔒 D4 / D5, YAZ-1817) ----------
+// ---------- Media library (`<library>/media.json` — 🔒 YAZ-1775 D4 / D5, YAZ-1817) ----------
 
 /**
  * Where the media a board can reach comes from (the web app's `ImageStudioProvider`, ported
@@ -781,7 +781,7 @@ export interface MediaItem {
 export type StoredMediaItem = MediaItem & { updatedAt: number }
 
 /**
- * `<library>/media.json` (🔒 D5): the cross-vault media library, ONE file for the whole account.
+ * `<library>/media.json` (🔒 YAZ-1775 D5): the cross-vault media library, ONE file for the whole account.
  * Both lists are newest-first and de-duplicated by `itemKey`; `favorites` is the user's pinned
  * set, `recent` is an MRU of what they actually placed on a board.
  */
@@ -794,11 +794,11 @@ export interface MediaLibraryFile {
 /** The library file's name inside the library folder. */
 export const MEDIA_LIBRARY_FILE = 'media.json'
 /**
- * `<library>/components/` (🔒 D5): where 3C writes a saved component's `.excalidraw` + `.png`.
+ * `<library>/components/` (🔒 YAZ-1775 D5): where 3C writes a saved component's `.excalidraw` + `.png`.
  * Named here so nothing else claims it; 3A creates NOTHING — the folder appears on 3C's first write.
  */
 export const LIBRARY_COMPONENTS_DIR = 'components'
-/** The components index beside that folder: `<library>/components.json` (🔒 D5, YAZ-1819). */
+/** The components index beside that folder: `<library>/components.json` (🔒 YAZ-1775 D5, YAZ-1819). */
 export const COMPONENTS_INDEX_FILE = 'components.json'
 /** Favorites are capped at the web app's `listFavorites` ceiling; the oldest fall off the end. */
 export const MAX_MEDIA_FAVORITES = 500
@@ -811,7 +811,7 @@ export type MediaFavoritesRequest = { op: 'list' } | { op: 'add'; item: MediaIte
 export type MediaRecentRequest = { op: 'list' } | { op: 'record'; item: MediaItem }
 
 /**
- * The media library as `window.yaseenDraw.media` (🔒 D4 / D5, YAZ-1817). Pointers only: the
+ * The media library as `window.yaseenDraw.media` (🔒 YAZ-1775 D4 / D5, YAZ-1817). Pointers only: the
  * BYTES never travel through here (3B's `media:import` writes them into the vault's `assets/`).
  * Every mutation answers the list it produced, so a caller that just wrote does not have to read
  * back — and `onChanged` still fires in every window, so the OTHER vaults' windows follow too.
@@ -823,15 +823,15 @@ export interface MediaApi {
   recent(req: MediaRecentRequest): Promise<StoredMediaItem[]>
   /** Fired in EVERY window whenever `media.json` changes, this app's write or an external one. Returns an unsubscribe. */
   onChanged(listener: () => void): () => void
-  /** Federated provider search (🔒 D4, YAZ-1818) — main fetches, curates and caches; the renderer never reaches a provider. */
+  /** Federated provider search (🔒 YAZ-1775 D4, YAZ-1818) — main fetches, curates and caches; the renderer never reaches a provider. */
   search(req: MediaSearchRequest): Promise<MediaSearchResponse>
   /** One tile's picture as a dataURL, disk-cached 24 h. The ONLY way a preview reaches the renderer. */
   preview(req: MediaPreviewRequest): Promise<MediaPreviewResponse>
-  /** The full-size bytes, NEVER cached: they are about to become an `assets/` file (🔒 D3). */
+  /** The full-size bytes, NEVER cached: they are about to become an `assets/` file (🔒 YAZ-1775 D3). */
   import(req: MediaImportRequest): Promise<MediaImportResponse>
 }
 
-// ---------- Image Studio: the provider doors (🔒 D4, YAZ-1818) ----------
+// ---------- Image Studio: the provider doors (🔒 YAZ-1775 D4, YAZ-1818) ----------
 
 /**
  * Which providers a search asks. The web app's `ImageStudioSearchSource` exactly: `all` is the
@@ -865,7 +865,7 @@ export interface MediaSearchRequest {
 /**
  * `media:search`'s answer. `nextCursor` is null when the providers are exhausted — that is what
  * stops the infinite scroll. `pixabayAvailable` is the ONE thing the renderer learns about the
- * key (🔒 D4: never the value): false hides the Pixabay section instead of showing an error.
+ * key (🔒 YAZ-1775 D4: never the value): false hides the Pixabay section instead of showing an error.
  */
 export interface MediaSearchResponse {
   items: StudioItem[]
@@ -899,10 +899,10 @@ export interface MediaImportResponse extends MediaPreviewResponse {
 }
 
 
-// ---------- Saved components (`<library>/components/` — 🔒 D5, YAZ-1819) ----------
+// ---------- Saved components (`<library>/components/` — 🔒 YAZ-1775 D5, YAZ-1819) ----------
 
 /**
- * ONE saved component as the index names it (🔒 D5). The SLUG is the identity: it is the file's
+ * ONE saved component as the index names it (🔒 YAZ-1775 D5). The SLUG is the identity: it is the file's
  * own basename (`<library>/components/<slug>.excalidraw` + `<slug>.png`), so the folder can be
  * read back into an index with nothing else on hand. The NAME is only the label, which is why a
  * rename never moves a file — a component inserted into a board is not addressed by either.
@@ -924,7 +924,7 @@ export interface ComponentsIndexFile {
 /**
  * `components:save` — the fragment and its picture, both already made by the renderer (only it has
  * an engine). `fragmentJson` is a whole `.excalidraw` document with the component's image bytes
- * EMBEDDED (🔒 D5: a component is small and self-contained, so it inserts into any vault);
+ * EMBEDDED (🔒 YAZ-1775 D5: a component is small and self-contained, so it inserts into any vault);
  * `previewPng` is a `data:image/png;base64,…` dataURL, which is the only way bytes cross the bridge.
  */
 export interface ComponentSaveRequest {
@@ -953,7 +953,7 @@ export interface ComponentReadResponse {
 export const MAX_COMPONENT_NAME_LENGTH = 120
 
 /**
- * The saved-component library as `window.yaseenDraw.components` (🔒 D5, YAZ-1819). The same shape
+ * The saved-component library as `window.yaseenDraw.components` (🔒 YAZ-1775 D5, YAZ-1819). The same shape
  * as `media`: every mutation answers what it produced, and ONE payload-free push tells every
  * window in every vault to re-list, because the library is one folder for all of them.
  */
@@ -974,7 +974,7 @@ export interface ComponentsApi {
   onChanged(listener: () => void): () => void
 }
 
-// ---------- Secrets (`userData/secrets.json` — 🔒 D4) ----------
+// ---------- Secrets (`userData/secrets.json` — 🔒 YAZ-1775 D4) ----------
 
 /** `secrets:set` — a value to store, or null to clear the name entirely. */
 export interface SecretSetRequest {
@@ -987,11 +987,11 @@ export interface SecretHasRequest {
   name: string
 }
 
-/** The name the Pixabay API key is stored under (🔒 D4); 3B reads it in main, never here. */
+/** The name the Pixabay API key is stored under (🔒 YAZ-1775 D4); 3B reads it in main, never here. */
 export const PIXABAY_SECRET = 'pixabayApiKey'
 
 /**
- * The secrets door (🔒 D4). THE RULE, and it has no exceptions: **the renderer never receives a
+ * The secrets door (🔒 YAZ-1775 D4). THE RULE, and it has no exceptions: **the renderer never receives a
  * value.** It may write one and it may ask whether one is there; reading is main's alone
  * (`readSecret` in `desktop/src/main/secrets.ts`), so a key cannot leak through `state:get`, a
  * devtools console or a crash dump of the renderer.
@@ -1096,9 +1096,9 @@ export interface WindowApi {
   setIdentity(patch: Partial<Pick<WindowIdentity, 'root' | 'file' | 'tabs' | 'sidebarCollapsed' | 'sidebarLens' | 'focusDirs' | 'focusFavorites'>>): Promise<void>
   open(opts: OpenWindowOptions): Promise<void>
   /**
-   * The vault switcher's one door (YAZ-1767 🔒 D1): bring a recent vault to the front and bump it
+   * The vault switcher's one door (🔒 YAZ-1767 D1): bring a recent vault to the front and bump it
    * to the top of the MRU. Already open in some window(s) → those are RAISED, most recently
-   * focused on top, and nothing new opens (🔒 D9); not open → a NEW window on that vault's
+   * focused on top, and nothing new opens (🔒 YAZ-1767 D9); not open → a NEW window on that vault's
    * `folders[root].lastFile` (D2). A folder that no longer exists on disk is pruned from the MRU
    * instead and NOTHING opens — the result is `false`, so the row can say "Folder not found" the
    * way Welcome does. The menu's ⌥-click on Open Recent goes through the same door in main.
@@ -1144,20 +1144,20 @@ export interface MenuApi {
   /** Window › Previous Tab (⌃⇧Tab / ⌘⇧[) targeted this window: activate the tab to the left (GRO-2232). Returns an unsubscribe. */
   onPrevTab(listener: () => void): () => void
   /**
-   * File › Export Image… (⌘⇧E, 🔒 D10) targeted this window: the VISIBLE drawing opens the
+   * File › Export Image… (⌘⇧E, 🔒 YAZ-1775 D10) targeted this window: the VISIBLE drawing opens the
    * engine's own image-export dialog. There is no canvas main menu to reach it from any more, so
    * it is the application menu's; main enables the item only while the focused window's active
    * tab is a drawing. Returns an unsubscribe.
    */
   onExportImage(listener: () => void): () => void
   /**
-   * View › Canvas Background › a pick (🔒 D10) targeted this window: the VISIBLE drawing takes
+   * View › Canvas Background › a pick (🔒 YAZ-1775 D10) targeted this window: the VISIBLE drawing takes
    * `color` as its `viewBackgroundColor`, which the engine then writes into the file — the one
    * canvas value that IS per board. Same enablement rule as Export Image…. Returns an unsubscribe.
    */
   onCanvasBackground(listener: (color: string) => void): () => void
   /**
-   * File › Export Drawing… (⌘⇧S, 🔒 D3, YAZ-1821) targeted this window: the VISIBLE drawing
+   * File › Export Drawing… (⌘⇧S, 🔒 YAZ-1775 D3, YAZ-1821) targeted this window: the VISIBLE drawing
    * assembles a standalone `.excalidraw` with every image embedded and offers it to a save sheet.
    * Same enablement rule as Export Image…. Returns an unsubscribe.
    */
@@ -1291,11 +1291,11 @@ export interface YaseenDrawApi {
   shell: ShellApi
   /** The Favorites list over `.yaseendraw/favorites.json` (YAZ-1766 6A) — absolute paths in, relative on disk. */
   favorites: FavoritesApi
-  /** The cross-vault media library over `<library>/media.json` (🔒 D4 / D5, YAZ-1817). */
+  /** The cross-vault media library over `<library>/media.json` (🔒 YAZ-1775 D4 / D5, YAZ-1817). */
   media: MediaApi
-  /** The cross-vault saved-component library over `<library>/components/` (🔒 D5, YAZ-1819). */
+  /** The cross-vault saved-component library over `<library>/components/` (🔒 YAZ-1775 D5, YAZ-1819). */
   components: ComponentsApi
-  /** Encrypted secrets in `userData/secrets.json` (🔒 D4) — write and ask, never read. */
+  /** Encrypted secrets in `userData/secrets.json` (🔒 YAZ-1775 D4) — write and ask, never read. */
   secrets: SecretsApi
   /** Per-vault GitHub sync, off by default (YAZ-1081). */
   github: GithubApi
