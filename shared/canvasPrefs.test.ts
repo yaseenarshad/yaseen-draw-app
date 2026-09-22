@@ -5,7 +5,7 @@ import { appStateToPrefs, CANVAS_PREF_KEYS, changedPrefKeys, isCanvasPrefs, pref
 const prefs = (over: Partial<CanvasPrefs> = {}): CanvasPrefs => ({ ...DEFAULT_CANVAS_PREFS, ...over })
 
 describe('DEFAULT_CANVAS_PREFS', () => {
-  it('is the engine`s own defaults (🔒 D9: the fork`s appState.ts / constants.ts)', () => {
+  it('is the engine`s own defaults (🔒 YAZ-1775 D9: the fork`s appState.ts / constants.ts)', () => {
     expect(DEFAULT_CANVAS_PREFS).toEqual({
       gridModeEnabled: false,
       objectsSnapModeEnabled: false,

@@ -14,7 +14,7 @@ describe('isPhoneSized (the engine`s own isMobileBreakpoint)', () => {
   })
 })
 
-describe('yaseenFormFactor (⚡ R5)', () => {
+describe('yaseenFormFactor (⚡ YAZ-1775 R5)', () => {
   it('NEVER answers tablet — the whole reason this override exists', () => {
     // Every one of these sits inside the engine's ≤1180px tablet band, which is what a canvas
     // pane beside the open shell sidebar looks like.

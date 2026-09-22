@@ -1,15 +1,11 @@
 /**
- * The search bar's results (YAZ-803, rebuilt for the catalog in 2H/YAZ-1814): the tree the Sidebar
- * already holds, turned into the ⌘K catalog and ranked per keystroke by `searchTitles`.
+ * The search bar's results (YAZ-803, rebuilt for the catalog in YAZ-1814): the tree the Sidebar
+ * already holds, ranked per keystroke by `searchTitles`. No debounce — the scan is synchronous
+ * over title-scale data.
  *
- * No debounce — the ranking scan is synchronous over title-scale data and the tripwire test in
- * `searchCandidates.test.ts` keeps it that way.
- *
- * The feed is LAZY, and latches: the catalog is not built at all until the first non-empty query
- * of this mount, and from that moment on it is rebuilt with every new tree the watcher brings in,
- * so a drawing created seconds ago is findable without a restart. Lazy because a vault is opened
- * far more often than it is searched, and there is no point walking 5,000 rows for a session that
- * never types; latched because the SECOND query must not pay for the walk again.
+ * LAZY, AND LATCHED: the catalog is not built until the first non-empty query of this mount, and
+ * is then rebuilt with every tree the watcher brings in. Lazy because a vault is opened far more
+ * often than it is searched; latched because the SECOND query must not pay for the walk again.
  */
 import { useMemo, useRef } from 'react'
 import type { TreeNode } from '@shared/types'

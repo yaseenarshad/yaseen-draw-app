@@ -25,6 +25,7 @@
  * `unknown` and are narrowed here, for the same reason: the file is user data.
  */
 import type { ExcalidrawElementModule } from '../engine'
+import { isRecord } from '@shared/guards'
 
 /** The one element-package value these rules need. */
 export type SlideElementApi = Pick<ExcalidrawElementModule, 'newElementWith'>
@@ -49,7 +50,6 @@ export interface OrderedPresentationFrame {
 }
 
 type JsonRecord = Record<string, unknown>
-const isRecord = (v: unknown): v is JsonRecord => typeof v === 'object' && v !== null && !Array.isArray(v)
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
 
 /** The two ordering keys, root first — see the module doc. `null` means "no claim". */
@@ -107,15 +107,14 @@ export function getOrderedPresentationFrames(elements: readonly unknown[]): Orde
     else unresolved.push(entry)
   })
 
+  // `unresolved` holds exactly as many entries as `slots` has gaps, so every slot is filled and
+  // the deck is always `frames.length` long. `Array.from` rather than `slots.map`: `slots` is
+  // sparse, and `map` would skip the very holes this fills.
   let unresolvedIndex = 0
-  for (let index = 0; index < slots.length; index += 1) {
-    if (!slots[index]) {
-      slots[index] = unresolved[unresolvedIndex]
-      unresolvedIndex += 1
-    }
-  }
-
-  return slots.flatMap((entry, index) => (entry ? [{ frame: entry.frame, sceneIndex: entry.sceneIndex, order: index + 1 }] : []))
+  return Array.from(slots, (slot, index) => {
+    const entry = slot ?? unresolved[unresolvedIndex++]
+    return { frame: entry.frame, sceneIndex: entry.sceneIndex, order: index + 1 }
+  })
 }
 
 /**

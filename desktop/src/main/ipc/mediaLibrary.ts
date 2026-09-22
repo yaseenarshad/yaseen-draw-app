@@ -4,12 +4,13 @@ import { CH } from '../../channels'
 import { BridgeFailure } from '../fs/fsUtils'
 import { resolveLibraryFolder } from '../library/folder'
 import { createMediaStore, type MediaStore } from '../library/mediaStore'
-import { isRecord, type Store } from '../store'
+import { isRecord } from '@shared/guards'
+import type { Store } from '../store'
 import { broadcastAll } from './broadcast'
 import { handle } from './envelope'
 
 /**
- * The `media.*` half of `window.yaseenDraw` (🔒 D4 / D5, YAZ-1817): the library's media store
+ * The `media.*` half of `window.yaseenDraw` (🔒 YAZ-1775 D4 / D5, YAZ-1817): the library's media store
  * behind the envelope, plus the ONE push. `media:changed` carries no payload — every window
  * re-lists, whichever vault it is on, because the library is the same file for all of them.
  *
@@ -52,7 +53,7 @@ function requireRecentRequest(v: unknown): MediaRecentRequest {
 }
 
 /** Returns the store so a test can close its watcher; `main/index.ts` lets the process end take it. */
-export function registerMediaIpc(store: Store, userData: string): MediaStore {
+export function registerMediaLibraryIpc(store: Store, userData: string): MediaStore {
   const folderFor = (state: AppState): string => resolveLibraryFolder(state.settings.libraryFolder, userData)
   let folder = folderFor(store.get())
   const media = createMediaStore(folder)

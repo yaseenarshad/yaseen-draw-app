@@ -11,14 +11,12 @@ import { StrictMode, act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { DEFAULT_SETTINGS, defaultAppState, type AppState, type FileClipRequest, type FileClipState, type PasteResponse, type TreeNode, type WatchEvent, type WindowIdentity } from '@shared/types'
 import { EMPTY_SCENE_JSON } from '../drawings/drawingScene'
-import { EMPTY_SELECTION } from '../lib/selection'
 // Focus Mode's persistence is the REAL storage module (no mock in this file): a spy on its read is
 // how a test hands the Sidebar a focus restored from an earlier session (YAZ-1605).
 import { storage } from '../lib/storage'
 import { BridgeRequestError } from '../api'
 import { countChildren, Sidebar, type SidebarClipboard } from './Sidebar'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const TREE: TreeNode[] = [
   { type: 'dir', name: 'sub', path: '/v/sub', children: [] },
@@ -111,7 +109,6 @@ async function mount(over: Partial<SidebarProps> = {}, tweakBridge?: (bridge: Re
     onSearchFocusHandled: vi.fn(),
     // The selection box (🔒 D4, YAZ-1338): App's in production, the harness's here — every mount gets a
     // fresh one, and the "hands its selection up" case reads it back.
-    selectionRef: { current: EMPTY_SELECTION },
     // ⌘C / ⌘X / ⌘V's handle (D6 amended, YAZ-1674): App's listener asks it; the chord tests hold their own box.
     clipboardRef: { current: null },
     ...over,
@@ -124,7 +121,7 @@ async function mount(over: Partial<SidebarProps> = {}, tweakBridge?: (bridge: Re
 }
 
 const fileRow = (el: HTMLElement) => el.querySelector<HTMLButtonElement>('.tree__row--file')
-const searchInput = (el: HTMLElement) => el.querySelector<HTMLInputElement>('input[aria-label="Search notes"]')
+const searchInput = (el: HTMLElement) => el.querySelector<HTMLInputElement>('input[aria-label="Search drawings"]')
 /**
  * Drive the CONTROLLED search input like a user: native value setter + input event (SettingsDialog
  * idiom). Async so the re-render it triggers has settled before the assertions read the body.
@@ -264,10 +261,10 @@ describe('Sidebar file-row open gestures (D2 GRO-2168, I3 GRO-2235)', () => {
   })
 
   /**
-   * "New drawing" (🔒 R1 on YAZ-1775, 2I): the app's ONE file-creation door, and it never asks for
+   * "New drawing" (🔒 R1 on YAZ-1775, YAZ-1815): the app's ONE file-creation door, and it never asks for
    * a name — the board is born `Untitled`, opens in the current tab, and offers the inline rename.
    */
-  describe('"New drawing" (2I)', () => {
+  describe('"New drawing" (YAZ-1815)', () => {
     /** Right-click blank space and take the item; the whole birth settles inside one act. */
     const newDrawing = async (el: HTMLElement) => {
       act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
@@ -838,7 +835,7 @@ describe('persistent search bar (YAZ-801)', () => {
 
   it('renders in an empty vault', async () => {
     const { el } = await mount({}, (b) => b.tree.mockImplementation(async (r: string) => ({ root: r, tree: [], generatedAt: 1 })))
-    expect(el.textContent).toContain('No notes here.')
+    expect(el.textContent).toContain('No drawings here.')
     expect(searchInput(el)).not.toBeNull()
   })
 
@@ -953,7 +950,7 @@ describe('search results (YAZ-803)', () => {
     expect(el.querySelector('.search-results__folder')?.textContent).toBe('Docs')
   })
 
-  it('a NON-drawing file is never a result row (2H, YAZ-1814) — it still lists in the tree', async () => {
+  it('a NON-drawing file is never a result row (YAZ-1814) — it still lists in the tree', async () => {
     const withPng: TreeNode[] = [...SEARCH_TREE, { type: 'file', name: 'alpaca.png', path: '/v/alpaca.png', size: 1, mtime: 1, kind: null }]
     const m = await mount({}, (b) => b.tree.mockResolvedValue({ root: '/v', tree: withPng, generatedAt: 1 }))
     expect(m.el.querySelector('.tree__row--file[title="/v/alpaca.png"]')).not.toBeNull()
@@ -961,7 +958,7 @@ describe('search results (YAZ-803)', () => {
     expect(rowLabels(m.el)).toEqual(['Alpha'])
   })
 
-  it('a drawing created after the search opened turns up on the next tree — no restart (2H)', async () => {
+  it('a drawing created after the search opened turns up on the next tree — no restart (YAZ-1814)', async () => {
     // The feed is the tree the STRUCTURAL WATCHER refreshes: fire the watch event the main process
     // would send for a new file and the result list follows, with the query still standing.
     let notify: ((ev: WatchEvent) => void) | null = null
@@ -975,7 +972,7 @@ describe('search results (YAZ-803)', () => {
     expect(rowLabels(el)).toEqual(['Alpha', 'Anchor', 'Abacus'])
   })
 
-  it('the top row starts selected; ArrowDown/ArrowUp WRAP at both ends (2H, YAZ-1814)', async () => {
+  it('the top row starts selected; ArrowDown/ArrowUp WRAP at both ends (YAZ-1814)', async () => {
     const { el, input } = await search('a')
     expect(activeLabel(el)).toBe('Alpha')
     await press(input, 'ArrowUp')
@@ -1044,11 +1041,11 @@ describe('search results (YAZ-803)', () => {
 
 /**
  * Folders in the search list (YAZ-1491). 🔒 D1: the rows come from the tree the Sidebar already
- * holds (`dirs`), never a second read of the vault. 🔒 D2: one flat list, the same matcher — a
- * folder is one row, a file still never matches on its folder. 🔒 D3: choosing a folder row REVEALS it in
+ * holds (`dirs`), never a second read of the vault. 🔒 YAZ-1491 D2: one flat list, the same matcher — a
+ * folder is one row, a file still never matches on its folder. 🔒 YAZ-1491 D3: choosing a folder row REVEALS it in
  * Files — `onRevealInFiles`, never `onOpenFile` — from EITHER lens and by keyboard OR click, and
  * the Files reveal path accepts a DIR: ancestors AND the dir itself open, the dir row flashes.
- * 🔒 D4: the row looks like a folder.
+ * 🔒 YAZ-1491 D4: the row looks like a folder.
  */
 describe('folder rows in search (YAZ-1491)', () => {
   const rowLabels = (el: HTMLElement) => [...el.querySelectorAll('.search-results__row .search-results__label')].map((n) => n.textContent)
@@ -1071,7 +1068,7 @@ describe('folder rows in search (YAZ-1491)', () => {
     return { ...m, input }
   }
 
-  it('a folder of the loaded tree is a row — above the same-named drawing — marked as a folder (🔒 D1/D2/D4)', async () => {
+  it('a folder of the loaded tree is a row — above the same-named drawing — marked as a folder (🔒 YAZ-1491 D1/D2/D4)', async () => {
     const { el } = await search('sub')
     expect(rowLabels(el)).toEqual(['sub', 'sub'])
     const [folder, file] = [...el.querySelectorAll('.search-results__row')]
@@ -1081,7 +1078,7 @@ describe('folder rows in search (YAZ-1491)', () => {
     expect(file.classList.contains('search-results__row--dir')).toBe(false)
   })
 
-  it('Enter on a folder row asks App to reveal it in Files and opens nothing (🔒 D3)', async () => {
+  it('Enter on a folder row asks App to reveal it in Files and opens nothing (🔒 YAZ-1491 D3)', async () => {
     const { el, input, props } = await search('sub')
     expect(dirResult(el)?.classList.contains('search-results__row--active')).toBe(true)
     await press(input, 'Enter')
@@ -1112,7 +1109,7 @@ describe('folder rows in search (YAZ-1491)', () => {
     expect(props.onRevealInFiles).not.toHaveBeenCalled()
   })
 
-  it('from the FAVORITES lens a folder row still reveals in Files (🔒 D3: whichever tab was showing)', async () => {
+  it('from the FAVORITES lens a folder row still reveals in Files (🔒 YAZ-1491 D3: whichever tab was showing)', async () => {
     const { el, input, props } = await search('sub', { lens: 'favorites' })
     expect(dirResult(el)).not.toBeNull()
     await press(input, 'Enter')
@@ -1168,7 +1165,7 @@ describe('folder rows in search (YAZ-1491)', () => {
  * the heart. The VALUE is App's (window identity, `WindowEntry.sidebarLens`, since YAZ-1628): the
  * sidebar renders the row and reports clicks, and App hands the new lens back down. Switching is
  * a conditional render, never a teardown — the search wave's rule, re-proved here on the tree's
- * expansion. Search keeps working from both lenses and the query survives a lens switch (🔒 D5).
+ * expansion. Search keeps working from both lenses and the query survives a lens switch (🔒 YAZ-847 D5).
  */
 describe('lens tabs (🔒 D4/D5, YAZ-847)', () => {
   const tabs = (el: HTMLElement) => [...el.querySelectorAll<HTMLButtonElement>('.sidebar__lenses[role="tablist"] [role="tab"]')]
@@ -1242,7 +1239,7 @@ describe('lens tabs (🔒 D4/D5, YAZ-847)', () => {
     expect(bodyMsg(el)).toBe('No favorites yet. Right-click a file or folder → Add to favorites.')
   })
 
-  it('the tabs row stays visible and clickable DURING a search, and a lens switch keeps the query (🔒 D5)', async () => {
+  it('the tabs row stays visible and clickable DURING a search, and a lens switch keeps the query (🔒 YAZ-847 D5)', async () => {
     const { el, props, rerender } = await mount({ lens: 'favorites' })
     const input = searchInput(el)!
     await type(input, 'a')
@@ -1897,7 +1894,7 @@ describe('context menu order (GRO-2272 C1a)', () => {
       // The Open group (🔒 D7 amended, YAZ-1674) is EMPTY on one file row — the OS verbs fold into
       // the "Open in ▸" flyout, which stands in its own group before Delete — so the clipboard leads.
       // The clipboard group: the file clipboard first (Paste is DISABLED, not hidden, while it is
-      // empty — 🔒 D5), then the text clipboard. Hints are `data-hint`, so the text stays bare.
+      // empty — 🔒 YAZ-1674 D5), then the text clipboard. Hints are `data-hint`, so the text stays bare.
       'Cut',
       'Copy',
       'Paste',
@@ -1928,8 +1925,8 @@ describe('context menu order (GRO-2272 C1a)', () => {
 
 /**
  * Multi-select (YAZ-1334 → YAZ-1336). Shift+click TOGGLES a file row in/out of a path-keyed
- * selection (🔒 D2 amended: toggle-accumulate, range is out of v1) — it never opens, never
- * previews. Selection is Sidebar-owned view state (🔒 D1): Escape and a lens switch clear it;
+ * selection (🔒 YAZ-1336 D2 amended: toggle-accumulate, range is out of v1) — it never opens, never
+ * previews. Selection is Sidebar-owned view state (🔒 YAZ-1336 D1): Escape and a lens switch clear it;
  * since D9 (YAZ-1674) a plain click — and ⌘-click's LOCKED background-open gesture (I3) — makes
  * it EXACTLY the clicked row, so every clipboard chord has a target the moment a row is clicked.
  */
@@ -2307,10 +2304,9 @@ describe('Sidebar multi-select context menu: the copy failure (YAZ-1337)', () =>
 /**
  * ⚡ Fable's ruling on YAZ-1338, at the panel: THE SELECTION IS THE TRUTH, THE DOM IS ONLY THE
  * ORDER. Folding a folder over a selected drawing hides its ROW; it stays picked, so N keeps
- * counting it and the copy keeps carrying it — after the paths still on screen. The `selectionRef`
- * window App reads is the same fact, handed up.
+ * counting it and the copy keeps carrying it — after the paths still on screen.
  */
-describe('Sidebar multi-select: folded rows and the selection window (YAZ-1338)', () => {
+describe('Sidebar multi-select: folded rows (YAZ-1338)', () => {
   const NESTED: TreeNode[] = [
     { type: 'dir', name: 'sub', path: '/v/sub', children: [{ type: 'file', name: 'b.excalidraw', path: '/v/sub/b.excalidraw', size: 1, mtime: 1, kind: 'drawing' }] },
     { type: 'file', name: 'a.excalidraw', path: '/v/a.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
@@ -2346,21 +2342,6 @@ describe('Sidebar multi-select: folded rows and the selection window (YAZ-1338)'
     expect(writeText).toHaveBeenCalledExactlyOnceWith('/v/a.excalidraw\n/v/sub/b.excalidraw')
   })
 
-  it('hands its selection up through selectionRef and empties it on the way out (🔒 D4)', async () => {
-    const selectionRef = { current: EMPTY_SELECTION }
-    const { el } = await mount({ selectionRef }, withNested)
-    expect(selectionRef.current.size).toBe(0)
-    shiftClickRow(rowByPath(el, '/v/a.excalidraw'))
-    expect([...selectionRef.current]).toEqual(['/v/a.excalidraw'])
-    // D9: a PLAIN click is a one-row selection, so "Copy path" copies the clicked row's path.
-    act(() => rowByPath(el, '/v/sub/b.excalidraw')?.click() ?? el.querySelector<HTMLButtonElement>('.tree__row--dir')?.click())
-    expect(selectionRef.current.size).toBe(1)
-    // The sidebar collapsing IS this component unmounting (App renders it conditionally), and a
-    // chord must never copy a selection nobody can see any more.
-    act(() => root?.unmount())
-    root = null
-    expect(selectionRef.current).toBe(EMPTY_SELECTION)
-  })
 })
 
 describe('settings cog (YAZ-1679)', () => {
@@ -2374,7 +2355,7 @@ describe('settings cog (YAZ-1679)', () => {
 
 /**
  * Cut / Copy / Paste (YAZ-1674): the menu items (🔒 D5) and the chords (D6) both hand the ORDERED
- * selection to main's one app-wide clipboard (🔒 D1) over `file.clip`, and Paste goes to the menu's
+ * selection to main's one app-wide clipboard (🔒 YAZ-1674 D1) over `file.clip`, and Paste goes to the menu's
  * `targetDir` — or, from ⌘V, beside the first selected row — over `file.paste`. "Paste N items"
  * reads the `clip:changed` push, so a copy in ANOTHER window labels this one's menu.
  */
@@ -2403,7 +2384,7 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
     pushClip = null
   })
 
-  it('a row offers Cut and Copy with their hints, and a DISABLED Paste while the clipboard is empty (🔒 D5)', async () => {
+  it('a row offers Cut and Copy with their hints, and a DISABLED Paste while the clipboard is empty (🔒 YAZ-1674 D5)', async () => {
     const { el } = await mount({}, withClipboard)
     rightClick(rowByPath(el, '/v/a.excalidraw'))
     expect(itemByLabel(el, 'Cut')?.getAttribute('data-hint')).toBe('⌘X')
@@ -2572,13 +2553,11 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
     expect(clipboardRef.current).toBeNull()
   })
 
-  it('D9: a plain click on a file, then copy, clips exactly that file; the selection box sees the same one row', async () => {
+  it('D9: a plain click on a file, then copy, clips exactly that file', async () => {
     const clipboardRef = box()
-    const selectionRef = { current: EMPTY_SELECTION }
-    const { el, bridge, props } = await mount({ selectionRef, clipboardRef }, withClipboard)
+    const { el, bridge, props } = await mount({ clipboardRef }, withClipboard)
     act(() => rowByPath(el, '/v/a.excalidraw')?.click())
     expect(props.onOpenFile).toHaveBeenCalledExactlyOnceWith('/v/a.excalidraw')
-    expect([...selectionRef.current]).toEqual(['/v/a.excalidraw'])
     expect(verb(clipboardRef, 'copy')).toBe(true)
     expect(bridge.file.clip).toHaveBeenCalledExactlyOnceWith({ paths: ['/v/a.excalidraw'], op: 'copy' })
   })

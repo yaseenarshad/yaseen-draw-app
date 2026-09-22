@@ -8,9 +8,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { RecentRoots } from '@shared/types'
-import { relativeLastOpened, Welcome } from './Welcome'
+import { relativeTime, Welcome } from './Welcome'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const HOUR = 3_600_000
 const DAY = 24 * HOUR
@@ -38,17 +37,17 @@ afterEach(() => {
   container = null
 })
 
-describe('relativeLastOpened', () => {
+describe('relativeTime', () => {
   it('formats the largest whole unit, "just now" under a minute', () => {
     const now = 10 * 365 * DAY
-    expect(relativeLastOpened(now - 30_000, now)).toBe('just now')
-    expect(relativeLastOpened(now - 5 * 60_000, now)).toBe('5 minutes ago')
-    expect(relativeLastOpened(now - 3 * HOUR, now)).toBe('3 hours ago')
-    expect(relativeLastOpened(now - DAY, now)).toBe('yesterday')
-    expect(relativeLastOpened(now - 2 * DAY, now)).toBe('2 days ago')
-    expect(relativeLastOpened(now - 8 * DAY, now)).toBe('last week')
-    expect(relativeLastOpened(now - 40 * DAY, now)).toBe('last month')
-    expect(relativeLastOpened(now - 800 * DAY, now)).toBe('2 years ago')
+    expect(relativeTime(now - 30_000, now)).toBe('just now')
+    expect(relativeTime(now - 5 * 60_000, now)).toBe('5 minutes ago')
+    expect(relativeTime(now - 3 * HOUR, now)).toBe('3 hours ago')
+    expect(relativeTime(now - DAY, now)).toBe('yesterday')
+    expect(relativeTime(now - 2 * DAY, now)).toBe('2 days ago')
+    expect(relativeTime(now - 8 * DAY, now)).toBe('last week')
+    expect(relativeTime(now - 40 * DAY, now)).toBe('last month')
+    expect(relativeTime(now - 800 * DAY, now)).toBe('2 years ago')
   })
 })
 

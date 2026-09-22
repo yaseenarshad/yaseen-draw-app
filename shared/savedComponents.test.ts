@@ -1,11 +1,12 @@
 /**
- * The saved-component RULES (🔒 D5, YAZ-1819), with no disk and no engine: slugging, the index's
+ * The saved-component RULES (🔒 YAZ-1775 D5, YAZ-1819), with no disk and no engine: slugging, the index's
  * shape, and what a fragment has to look like before it may be written or inserted.
  */
 import { describe, expect, it } from 'vitest'
 import { MAX_COMPONENT_NAME_LENGTH, type ComponentItem } from './types'
 import {
   EMPTY_COMPONENTS_INDEX,
+  MAX_COMPONENT_SLUG_LENGTH,
   componentFileName,
   componentPreviewName,
   indexFromSlugs,
@@ -18,6 +19,7 @@ import {
   sanitizeComponentsIndex,
   slugForComponentName,
   slugOfComponentFile,
+  slugOfComponentPreview,
   uniqueComponentSlug,
 } from './savedComponents'
 
@@ -53,7 +55,7 @@ describe('slugForComponentName — kebab of the name', () => {
   })
 
   it('is bounded, so a pasted paragraph cannot become a filename the OS refuses', () => {
-    expect(slugForComponentName('word '.repeat(80)).length).toBeLessThanOrEqual(80)
+    expect(slugForComponentName('word '.repeat(80)).length).toBeLessThanOrEqual(MAX_COMPONENT_SLUG_LENGTH)
   })
 })
 
@@ -67,8 +69,33 @@ describe('uniqueComponentSlug — -2, -3 (never -1)', () => {
     expect(uniqueComponentSlug('card', new Set(['card', 'card-2', 'card-3']))).toBe('card-4')
   })
 
-  it('the suffixed slug is still a valid one', () => {
+  it('the suffixed slug is still a valid one, however long the base and however high the count', () => {
     expect(isValidComponentSlug(uniqueComponentSlug('card', new Set(['card'])))).toBe(true)
+    // A maximum-length stem plus `-100`: the reserve has to grow with the number, or the slug
+    // overflows and every later read, preview and delete of that component is refused.
+    const long = 'a'.repeat(MAX_COMPONENT_SLUG_LENGTH)
+    const taken = new Set([long])
+    for (let n = 2; n <= 101; n++) {
+      const slug = uniqueComponentSlug(long, taken)
+      expect(slug.length, slug).toBeLessThanOrEqual(MAX_COMPONENT_SLUG_LENGTH)
+      expect(isValidComponentSlug(slug), slug).toBe(true)
+      taken.add(slug)
+    }
+  })
+})
+
+describe('slugOfComponentPreview — half the watcher’s relevance filter', () => {
+  it('reads a slug back off a preview name, and nothing else', () => {
+    expect(slugOfComponentPreview('a-card.png')).toBe('a-card')
+    expect(slugOfComponentPreview(componentPreviewName('long-one-2'))).toBe('long-one-2')
+  })
+
+  it('refuses a fragment, a tmp file, a bad slug and a bare extension', () => {
+    expect(slugOfComponentPreview(componentFileName('a-card'))).toBeNull()
+    expect(slugOfComponentPreview('a-card.png.tmp-1')).toBeNull()
+    expect(slugOfComponentPreview('..png')).toBeNull()
+    expect(slugOfComponentPreview('.png')).toBeNull()
+    expect(slugOfComponentPreview('A-Card.png')).toBeNull()
   })
 })
 
@@ -142,7 +169,7 @@ describe('sanitizeComponentsIndex — lenient file, strict row', () => {
   })
 })
 
-describe('indexFromSlugs — the index REBUILT from the folder (🔒 D5)', () => {
+describe('indexFromSlugs — the index REBUILT from the folder (🔒 YAZ-1775 D5)', () => {
   const seen = [
     { slug: 'beta', elementCount: 3, createdAt: 20, updatedAt: 20 },
     { slug: 'alpha', elementCount: 1, createdAt: 10, updatedAt: 30 },
@@ -226,7 +253,7 @@ describe('parseComponentFragment — what may be written, and what may be insert
     expect(parseComponentFragment(json).elements).toEqual([{ id: 'e1', type: 'rectangle' }])
   })
 
-  it('throws when an image element names bytes the fragment does not carry — 🔒 D5 says self-contained', () => {
+  it('throws when an image element names bytes the fragment does not carry — 🔒 YAZ-1775 D5 says self-contained', () => {
     const json = fragment({ elements: [{ id: 'e1', type: 'image', fileId: 'missing' }] })
     expect(() => parseComponentFragment(json)).toThrow(/missing/)
   })

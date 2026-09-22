@@ -10,7 +10,6 @@ import { createRoot, type Root } from 'react-dom/client'
 import { PRESENTATION_ACTIVE_CLASS, PRESENTATION_TOOLS_CLASS, PRESENTATION_TRANSITION_DURATION, PresentationPlayer, type PresentationPlayerEngine, type PresentationPlayerTarget } from './PresentationPlayer'
 import { PRESENTATION_CAMERA_RESERVE } from './camera'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const frame = (id: string, order: number, over: Record<string, unknown> = {}) => ({
   id,
@@ -184,6 +183,14 @@ describe('the keyboard', () => {
     await key('T', { shiftKey: true })
     expect(el.classList.contains(PRESENTATION_TOOLS_CLASS)).toBe(false)
     expect(canvas.setActiveTool).toHaveBeenLastCalledWith({ type: 'hand' })
+  })
+
+  it('leaves ⌘ / ⌃ combinations to the app — ⌘→ is a window chord, not a slide step', async () => {
+    const { canvas } = await mount()
+    canvas.setViewport.mockClear()
+    await key('ArrowRight', { metaKey: true })
+    await key('ArrowRight', { ctrlKey: true })
+    expect(canvas.setViewport).not.toHaveBeenCalled()
   })
 
   it('stands down inside a text field, so the engine’s own editing keeps the keys', async () => {

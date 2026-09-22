@@ -74,7 +74,7 @@ describe('drawing:load', () => {
     expect((await failure(loadDrawing({ root, path: 'gone.excalidraw' }))).code).toBe('NOT_FOUND')
   })
 
-  it('reports an EMPTY and a CORRUPT file as one readable IO_ERROR naming the path (2D acceptance)', async () => {
+  it('reports an EMPTY and a CORRUPT file as one readable IO_ERROR naming the path (YAZ-1810 acceptance)', async () => {
     const empty = await seed('Empty.excalidraw', '')
     const corrupt = await seed('Corrupt.excalidraw', '{ not json')
     const noElements = await seed('NoElements.excalidraw', '{"type":"excalidraw"}')
@@ -164,7 +164,7 @@ describe('drawing:save', () => {
 })
 
 
-describe('🔒 D3 — the image store on load', () => {
+describe('🔒 YAZ-1775 D3 — the image store on load', () => {
   it('hydrates a referenced id from assets/ and reports it as STORED', async () => {
     await seedAsset('abc.png')
     await seed('Board.excalidraw', scene([imageEl('abc')]))
@@ -212,7 +212,7 @@ describe('🔒 D3 — the image store on load', () => {
   })
 })
 
-describe('🔒 D3 — the image store on save', () => {
+describe('🔒 YAZ-1775 D3 — the image store on save', () => {
   it('writes the assets BEFORE the scene, names them `<id>.<ext>`, and reports them persisted', async () => {
     await seed('Board.excalidraw', scene())
     const res = await saveDrawing({

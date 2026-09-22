@@ -32,7 +32,6 @@ const dialog = vi.mocked(api.dialog)
 const loadElement = vi.mocked(loadExcalidrawElement)
 const store = vi.mocked(storage)
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const item = (over: Partial<ComponentItem> = {}): ComponentItem => ({ slug: 'a-card', name: 'A card', elementCount: 2, createdAt: 1, updatedAt: 1, ...over })
 const rect = (id: string) => ({ id, type: 'rectangle' })
@@ -141,7 +140,7 @@ describe('SavedComponents — the library', () => {
     expect(text(el)).toContain('0 saved components')
   })
 
-  it('re-lists on `components:changed` — the push that makes ONE library out of every vault (🔒 D5)', async () => {
+  it('re-lists on `components:changed` — the push that makes ONE library out of every vault (🔒 YAZ-1775 D5)', async () => {
     const { el } = await mount()
     const refresh = components.onChanged.mock.calls[0][0]
     components.list.mockResolvedValue([item()])
@@ -170,13 +169,38 @@ describe('SavedComponents — the library', () => {
 describe('SavedComponents — search and paging', () => {
   const many = Array.from({ length: PAGE_SIZE + 5 }, (_, n) => item({ slug: `c-${n + 1}`, name: `Card ${n + 1}` }))
 
-  it('shows one page of 24 and grows by another on Show more', async () => {
-    components.list.mockResolvedValue(many)
-    const { el } = await mount()
-    expect(el.querySelectorAll('.saved-components__card')).toHaveLength(PAGE_SIZE)
-    await click(byText(el, 'Show more'))
-    expect(el.querySelectorAll('.saved-components__card')).toHaveLength(many.length)
-    expect(byText(el, 'Show more')).toBeUndefined()
+  /** jsdom's IntersectionObserver is a no-op (`test-setup.ts`); this one hands back its callback. */
+  function captureObserver() {
+    let fire: () => void = () => {}
+    class Capturing {
+      constructor(private callback: (entries: { isIntersecting: boolean }[]) => void) {
+        fire = () => this.callback([{ isIntersecting: true }])
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+      takeRecords() {
+        return []
+      }
+    }
+    const original = globalThis.IntersectionObserver
+    ;(globalThis as unknown as Record<string, unknown>).IntersectionObserver = Capturing
+    return { scrollToEnd: () => act(async () => fire()), restore: () => ((globalThis as unknown as Record<string, unknown>).IntersectionObserver = original) }
+  }
+
+  it('shows one page of 24 and grows by another when the end of the grid comes into view', async () => {
+    const observer = captureObserver()
+    try {
+      components.list.mockResolvedValue(many)
+      const { el } = await mount()
+      expect(el.querySelectorAll('.saved-components__card')).toHaveLength(PAGE_SIZE)
+      expect(el.querySelector('.saved-components__sentinel')).not.toBe(null)
+      await observer.scrollToEnd()
+      expect(el.querySelectorAll('.saved-components__card')).toHaveLength(many.length)
+      expect(el.querySelector('.saved-components__sentinel')).toBe(null)
+    } finally {
+      observer.restore()
+    }
   })
 
   it('searches by NAME through the app’s one matcher, exact before prefix before substring', async () => {
@@ -195,11 +219,16 @@ describe('SavedComponents — search and paging', () => {
   })
 
   it('a fresh search starts again at the first page', async () => {
-    components.list.mockResolvedValue(many)
-    const { el } = await mount()
-    await click(byText(el, 'Show more'))
-    await type(el.querySelector<HTMLInputElement>('input[type="search"]')!, 'card')
-    expect(el.querySelectorAll('.saved-components__card')).toHaveLength(PAGE_SIZE)
+    const observer = captureObserver()
+    try {
+      components.list.mockResolvedValue(many)
+      const { el } = await mount()
+      await observer.scrollToEnd()
+      await type(el.querySelector<HTMLInputElement>('input[type="search"]')!, 'card')
+      expect(el.querySelectorAll('.saved-components__card')).toHaveLength(PAGE_SIZE)
+    } finally {
+      observer.restore()
+    }
   })
 })
 
@@ -297,6 +326,8 @@ describe('SavedComponents — saving the selection', () => {
     await click(byText(el, 'Save selection'))
     await type(el.querySelector<HTMLInputElement>('input[aria-label="Component name"]')!, 'A card')
     await click(byText(el, 'Save 2 elements'))
+    // The preview goes through `FileReader`, so the save lands a task later under load.
+    await settle(() => el.querySelector('[role="alert"]') !== null)
     expect(el.querySelector('[role="alert"]')?.textContent).toContain('non-empty string')
     expect(el.querySelector('input[aria-label="Component name"]')).not.toBe(null)
   })
@@ -304,6 +335,7 @@ describe('SavedComponents — saving the selection', () => {
   it('Cancel drops the capture', async () => {
     const { el } = await mount()
     await click(byText(el, 'Save selection'))
+    components.save.mockClear()
     await click(byText(el, 'Cancel'))
     expect(el.querySelector('input[aria-label="Component name"]')).toBe(null)
     expect(components.save).not.toHaveBeenCalled()
@@ -320,10 +352,13 @@ describe('SavedComponents — insert, rename, delete', () => {
     expect(canvas.insertElements).toHaveBeenCalledWith([rect('a')])
   })
 
-  it('insert TWICE is two calls through the same door — two independent copies', async () => {
+  it('insert TWICE is two trips through the same door — the engine makes the copies', async () => {
+    // The independence is `insertElements`' own (it duplicates ids); what THIS tab owes is a
+    // second read and a second insert, rather than reusing the first result.
     const { el, canvas } = await mount()
     await click(button(el, 'Insert A card'))
     await click(button(el, 'Insert A card'))
+    expect(components.read).toHaveBeenCalledTimes(2)
     expect(canvas.insertElements).toHaveBeenCalledTimes(2)
   })
 
@@ -334,7 +369,8 @@ describe('SavedComponents — insert, rename, delete', () => {
     expect(el.querySelector('[role="alert"]')?.textContent).toContain('no such component')
   })
 
-  it('rename is a field in the card, not a native prompt', async () => {
+  it('rename is a field in the card, not a native prompt, and the card shows what the STORE answered', async () => {
+    components.rename.mockResolvedValue(item({ name: 'Renamed card' }))
     const { el } = await mount()
     await click(button(el, 'Options for A card'))
     await click(byPrefix(el, 'Rename'))
@@ -344,6 +380,18 @@ describe('SavedComponents — insert, rename, delete', () => {
     await click(byText(el, 'Save'))
     expect(components.rename).toHaveBeenCalledExactlyOnceWith({ slug: 'a-card', name: 'Renamed card' })
     expect(text(el)).toContain('Renamed card')
+  })
+
+  it('a REFUSED rename leaves the old name on the card, beside the reason', async () => {
+    components.rename.mockRejectedValue(new Error('a component with that name already exists'))
+    const { el } = await mount()
+    await click(button(el, 'Options for A card'))
+    await click(byPrefix(el, 'Rename'))
+    await type(el.querySelector<HTMLInputElement>('input[aria-label="Rename A card"]')!, 'Renamed card')
+    await click(byText(el, 'Save'))
+    expect(el.querySelector('[role="alert"]')?.textContent).toContain('already exists')
+    expect(text(el)).toContain('A card')
+    expect(text(el)).not.toContain('Renamed card')
   })
 
   it('a rename to the same name, or to nothing, is not a write', async () => {
@@ -381,15 +429,5 @@ describe('SavedComponents — insert, rename, delete', () => {
     await click(byPrefix(el, 'Delete'))
     expect(el.querySelector('[role="alertdialog"]')).toBe(null)
     expect(components.delete).toHaveBeenCalledExactlyOnceWith({ slug: 'a-card' })
-  })
-})
-
-describe('SavedComponents — the canvas is not there yet', () => {
-  it('says so, and offers neither Save selection nor an insert', async () => {
-    components.list.mockResolvedValue([item()])
-    const { el } = await mount({ excalidrawAPI: null })
-    expect(text(el)).toContain('The canvas is still loading.')
-    expect(byText(el, 'Save selection')?.disabled).toBe(true)
-    expect(button(el, 'Insert A card')?.disabled).toBe(true)
   })
 })

@@ -25,6 +25,7 @@ import {
 } from '@shared/types'
 import { isCanvasPrefs, sanitizeCanvasPrefs } from '@shared/canvasPrefs'
 import { atomicWrite } from './fs/fsUtils'
+import { isFiniteNumber, isRecord } from '@shared/guards'
 
 /**
  * The app state store (D9, GRO-2159): one user-global JSON file owned by the main process.
@@ -75,16 +76,14 @@ export const WRITE_DEBOUNCE_MS = 150
 // ---------- validation (field by field; anything off falls back to its default) ----------
 
 /** Shared with the IPC boundary (`ipc/state.ts` / `ipc/window.ts`) — one guard, three call sites. */
-export const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 export const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string')
-const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
 const isStringOrNull = (v: unknown): v is string | null => v === null || typeof v === 'string'
 const clampSidebarWidth = (w: number): number => Math.min(SIDEBAR_MAX_W, Math.max(SIDEBAR_MIN_W, w))
 
 export const isRecentRoots = (v: unknown): v is RecentRoots =>
   Array.isArray(v) && v.every((x) => isRecord(x) && typeof x.path === 'string' && isFiniteNumber(x.lastOpened))
 
-/** The canvas panel's memory (🔒 D10): both halves guarded, an unknown tab reads as the default. */
+/** The canvas panel's memory (🔒 YAZ-1775 D10): both halves guarded, an unknown tab reads as the default. */
 export const isCanvasPanel = (v: unknown): v is CanvasPanelState => isRecord(v) && isCanvasPanelTab(v.tab) && typeof v.docked === 'boolean'
 const sanitizeCanvasPanel = (raw: unknown): CanvasPanelState => {
   const src = isRecord(raw) ? raw : {}
@@ -94,18 +93,18 @@ const sanitizeCanvasPanel = (raw: unknown): CanvasPanelState => {
 /** Per-field guards shared by the loader, `sanitizeSettings` and the IPC boundary (`isSettings`). */
 const SETTINGS_FIELD_OK: { [K in keyof SettingsState]: (v: unknown) => v is SettingsState[K] } = {
   theme: (v): v is Theme => typeof v === 'string' && (THEMES as readonly string[]).includes(v),
-  // 🔒 D5: an absolute path the user picked, or null for `<userData>/library`. Never `''` — an
+  // 🔒 YAZ-1775 D5: an absolute path the user picked, or null for `<userData>/library`. Never `''` — an
   // empty string would resolve to the process cwd, which is not a place to put a user's library.
   libraryFolder: (v): v is string | null => v === null || (typeof v === 'string' && isAbsolute(v)),
   confirmDelete: (v): v is boolean => typeof v === 'boolean',
-  // 🔒 D9: STRICT at the bridge — a sandboxed renderer hands over a whole `CanvasPrefs` or nothing.
+  // 🔒 YAZ-1775 D9: STRICT at the bridge — a sandboxed renderer hands over a whole `CanvasPrefs` or nothing.
   canvas: isCanvasPrefs,
   canvasPanel: isCanvasPanel,
 }
 const SETTINGS_KEYS = Object.keys(SETTINGS_FIELD_OK) as Array<keyof SettingsState>
 
 /**
- * The LENIENT half of 🔒 D9's "strict guard at IPC, lenient sanitize on load": the two composite
+ * The LENIENT half of 🔒 YAZ-1775 D9's "strict guard at IPC, lenient sanitize on load": the two composite
  * fields are repaired key by key rather than thrown away whole, so a state file written before a
  * canvas pref existed keeps every pref it does have instead of resetting the lot.
  */
@@ -200,13 +199,13 @@ function sanitizeFolders(raw: unknown): Record<string, FolderState> {
   return out
 }
 
-/** Null when the document is not a version-1 state object at all (→ treated as corrupt). */
 /** The file's shape: each folder bucket minus its session fields (YAZ-1642) — what a relaunch restores, nothing more. */
 function toDisk(state: AppState): unknown {
   const folders = Object.fromEntries(Object.entries(state.folders).map(([root, { expanded: _e, ...kept }]) => [root, kept]))
   return { ...state, folders }
 }
 
+/** Null when the document is not a version-1 state object at all (→ treated as corrupt). */
 function sanitizeState(raw: unknown): AppState | null {
   if (!isRecord(raw) || raw.version !== 1) return null
   // YAZ-1280 migration: a v1 file's retired global value seeds only windows that do not yet
@@ -414,6 +413,12 @@ export function createStore(filePath: string): Store {
       })
       const recents = state.recents.filter((r) => !gone(r.path))
       if (recents.length !== state.recents.length) changed = true
+      /** A `lastFile` that went is forgotten, and that counts as a change worth committing. */
+      const keepLastFile = (lastFile: string | null): string | null => {
+        if (lastFile === null || !gone(lastFile)) return lastFile
+        changed = true
+        return null
+      }
       const folders = Object.fromEntries(
         Object.entries(state.folders)
           .filter(([root]) => {
@@ -426,7 +431,7 @@ export function createStore(filePath: string): Store {
             {
               ...folder,
               expanded: drop(folder.expanded),
-              lastFile: folder.lastFile !== null && gone(folder.lastFile) ? ((changed = true), null) : folder.lastFile,
+              lastFile: keepLastFile(folder.lastFile),
             },
           ]),
       )

@@ -1,24 +1,8 @@
 /*
- * The Components tab's styling (YAZ-1819): `excalidraw-app/components/SavedComponents.scss`
- * ported. The file was already flat CSS, so it travels close to as-is, with four differences: the
- * `saved-components-dialog` block is gone with the modal (the name prompt is a form inside the
- * panel), `__inline` is new (the rename field and the delete confirm live in the card), the
- * element-SVG preview rules are gone with the fallback that drew them, and `__placeholder` is new
- * — a card whose picture could not be read draws the same chequerboard the Images tab does rather
- * than a broken image. The custom properties are the ENGINE's: this panel renders inside the
- * engine's sidebar and follows its light/dark theme, not the shell's.
+ * The Components tab's own styling (YAZ-1819). What it SHARES with the other two tabs — the panel
+ * shell, the card chequerboard, the placeholder and the message boxes — is
+ * `drawings/canvasPanel.css`; the custom properties are the ENGINE's, for the reason stated there.
  */
-
-.saved-components {
-  box-sizing: border-box;
-  color: var(--text-primary-color);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  height: 100%;
-  min-height: 0;
-  padding: 12px;
-}
 
 .saved-components__header {
   align-items: center;
@@ -53,7 +37,7 @@
   background: var(--color-primary);
   border: 0;
   border-radius: 8px;
-  color: white;
+  color: var(--island-bg-color);
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
@@ -317,31 +301,10 @@
 .saved-components__notice {
   background: var(--island-bg-color);
   border: 1px solid var(--default-border-color);
-  border-radius: 8px;
-  color: var(--text-secondary-color);
-  font-size: 11px;
-  line-height: 1.4;
-  padding: 8px;
 }
 
-.saved-components__error {
-  background: var(--color-danger-light);
-  border: 1px solid var(--color-danger);
-  border-radius: 8px;
-  color: var(--text-primary-color);
-  font-size: 11px;
-  padding: 8px;
-}
-
-.saved-components__more {
-  background: var(--button-gray-1);
-  border: 0;
-  border-radius: 8px;
-  color: var(--text-primary-color);
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  padding: 8px;
+.saved-components__sentinel {
+  height: 1px;
 }
 
 .saved-components__footer {

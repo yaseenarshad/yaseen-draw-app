@@ -19,7 +19,6 @@ import { api, BridgeRequestError } from '../api'
 const reveal = vi.mocked(api.reveal)
 const openVsCode = vi.mocked(api.openVsCode)
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 let root: Root | null = null
 let container: HTMLElement | null = null

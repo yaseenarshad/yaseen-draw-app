@@ -63,6 +63,7 @@ const box = (type: 'rectangle' | 'ellipse' | 'diamond', x: number, y: number): E
   { type, x: x - 80, y: y - 55, width: 160, height: 110, ...common },
 ]
 
+/** A closed outline: the ring is shut HERE, so no caller has to repeat its first point as its last. */
 const polygon = (x: number, y: number, points: readonly (readonly [number, number])[]): ExcalidrawElementSkeleton[] => [
   {
     type: 'line',
@@ -70,7 +71,7 @@ const polygon = (x: number, y: number, points: readonly (readonly [number, numbe
     y: y - 70,
     width: 160,
     height: 140,
-    points: points.map(([pointX, pointY]) => localPoint(pointX, pointY)),
+    points: [...points, points[0]].map(([pointX, pointY]) => localPoint(pointX, pointY)),
     ...common,
   },
 ]
@@ -101,7 +102,6 @@ export const BASIC_SHAPES: readonly ShapeCatalogItem[] = [
         [80, 0],
         [160, 140],
         [0, 140],
-        [80, 0],
       ]),
   },
   {
@@ -118,7 +118,6 @@ export const BASIC_SHAPES: readonly ShapeCatalogItem[] = [
         [120, 140],
         [40, 140],
         [0, 70],
-        [40, 0],
       ]),
   },
   {
@@ -139,7 +138,6 @@ export const BASIC_SHAPES: readonly ShapeCatalogItem[] = [
         [49, 88],
         [4, 54],
         [61, 52],
-        [80, 0],
       ]),
   },
 ]

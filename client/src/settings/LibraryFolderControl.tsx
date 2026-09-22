@@ -1,6 +1,6 @@
 /**
- * "Library folder" (Settings › Files, 🔒 D5): the one folder every vault shares, where media
- * favorites and saved components will live (3A / 3B / 3C fill it).
+ * "Library folder" (Settings › Files, 🔒 YAZ-1775 D5): the one folder every vault shares, where media
+ * favorites and saved components will live (YAZ-1817 / YAZ-1818 / YAZ-1819 fill it).
  *
  * A component rather than an inline `render` because the row shows the RESOLVED path, and only
  * main knows what null resolves to (`<userData>/library`) — so it asks, once per value.

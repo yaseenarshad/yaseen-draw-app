@@ -1,5 +1,5 @@
 /**
- * The media library's RULES (🔒 D4 / D5, YAZ-1817): what a valid item is, and what add / remove /
+ * The media library's RULES (🔒 YAZ-1775 D4 / D5, YAZ-1817): what a valid item is, and what add / remove /
  * record do to the two lists in `<library>/media.json`. Pure and Electron-free — the main-process
  * store around it (`desktop/src/main/library/mediaStore.ts`) only reads, writes and watches the
  * file, so every rule here is unit-tested with no disk.
@@ -12,11 +12,10 @@
  * `by_ownerId_and_updatedAt` index answered in.
  */
 import { MAX_MEDIA_FAVORITES, RECENT_LIMIT, isMediaItemKind, isMediaProvider, type MediaItem, type MediaLibraryFile, type StoredMediaItem } from './types'
+import { cleanList, isFiniteNumber, isRecord } from './guards'
 
 export const EMPTY_MEDIA_LIBRARY: MediaLibraryFile = { version: 1, favorites: [], recent: [] }
 
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
-const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
 
 /** The optional fields and their one type each — `mediaItemValidator`'s `v.optional(...)` rows. */
 const OPTIONAL_STRINGS = ['previewUrl', 'creator', 'creatorUrl', 'collectionName', 'sourceUrl', 'licenseName', 'licenseUrl', 'attribution'] as const
@@ -56,25 +55,12 @@ export function normalizeStoredMediaItem(v: unknown): StoredMediaItem | null {
 /** How an incoming item gets its stamp: main's clock, never the renderer's. */
 export const stamp = (item: MediaItem, now: number): StoredMediaItem => ({ ...item, updatedAt: now })
 
-/** Newest-first, one row per `itemKey` (the first wins), no longer than `cap`. */
-function cleanList(raw: unknown, cap: number): StoredMediaItem[] {
-  if (!Array.isArray(raw)) return []
-  const seen = new Set<string>()
-  const out: StoredMediaItem[] = []
-  for (const row of raw) {
-    const item = normalizeStoredMediaItem(row)
-    if (item === null || seen.has(item.itemKey)) continue
-    seen.add(item.itemKey)
-    out.push(item)
-    if (out.length === cap) break
-  }
-  return out
-}
-
 /** Null when the document is not a version-1 library at all (→ corrupt, moved aside); otherwise every readable row. */
 export function sanitizeMediaLibrary(raw: unknown): MediaLibraryFile | null {
   if (!isRecord(raw) || raw.version !== 1) return null
-  return { version: 1, favorites: cleanList(raw.favorites, MAX_MEDIA_FAVORITES), recent: cleanList(raw.recent, RECENT_LIMIT) }
+  // Newest-first, one row per `itemKey` (the first wins), capped — `guards.ts`'s one list rule.
+  const list = (rows: unknown, cap: number) => cleanList(rows, normalizeStoredMediaItem, (item) => item.itemKey, cap)
+  return { version: 1, favorites: list(raw.favorites, MAX_MEDIA_FAVORITES), recent: list(raw.recent, RECENT_LIMIT) }
 }
 
 /** The web app's `addFavorite`: a new key goes to the head, an existing one changes nothing. */

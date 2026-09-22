@@ -1,5 +1,5 @@
 /**
- * THE MEDIA CACHE ON DISK (🔒 D4, YAZ-1818): `<userData>/media-cache/`, one flat folder of JSON
+ * THE MEDIA CACHE ON DISK (🔒 YAZ-1775 D4, YAZ-1818): `<userData>/media-cache/`, one flat folder of JSON
  * files named by the hash of their key. `cachePolicy.ts` decides every name and every deadline;
  * this file only reads, writes and deletes.
  *

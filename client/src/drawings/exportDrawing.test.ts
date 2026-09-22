@@ -1,5 +1,5 @@
 /**
- * The standalone export's assembly (🔒 D3, YAZ-1821). `serializeAsJSON` is a stub — the engine's
+ * The standalone export's assembly (🔒 YAZ-1775 D3, YAZ-1821). `serializeAsJSON` is a stub — the engine's
  * own writer, which this module deliberately does not reimplement — so what is pinned here is
  * WHICH FILES are handed to it, which is the whole of what an export decides.
  */

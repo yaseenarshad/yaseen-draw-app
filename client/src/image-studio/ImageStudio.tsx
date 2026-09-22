@@ -1,54 +1,48 @@
 /**
- * THE IMAGES TAB (🔒 D4 / ⚡ D8 amended, YAZ-1818): the web app's
- * `excalidraw-app/image-studio/ImageStudio.tsx`, ported into the canvas panel's first tab. Four
- * views — Search, Shapes, Favorites, Recent — over the providers main owns.
+ * THE IMAGES TAB (🔒 YAZ-1775 D4, YAZ-1818): four views — Search, Shapes, Favorites, Recent —
+ * over the providers MAIN owns. The renderer never holds an API key and never reaches a provider.
  *
- * WHAT THE PORT CHANGED, AND WHY
- * - **Convex became the bridge.** `useQuery`/`useMutation` on `api.mediaLibrary.*` are
- *   `api.media.favorites` / `api.media.recent` plus the `media:changed` push (🔒 D5, 3A): one
- *   file, every window, every vault. The lists are re-listed on that push rather than polled.
- * - **A preview is asked for, not linked to.** The web app put a Worker route in `previewUrl` and
- *   let `<img>` fetch it. There are no routes here and the renderer may not reach a provider, so
- *   every tile asks `media:preview` for its bytes as a dataURL — including a favorite whose
- *   stored `previewUrl` is a dead Worker path from the web app. That field is never read.
- * - **No key is not an error.** `pixabayAvailable` false hides the Pixabay source and says
- *   nothing at all (🔒 D4). The web app's "Pixabay graphics need an API key" warning is gone with
- *   the Worker that produced it; the Settings › Images row is where a key is entered (3A).
- * - **Offline is a state, not a banner.** A search that could not reach a provider renders a
- *   passive line; Shapes keeps working entirely, and Favorites and Recent keep working with
- *   whatever previews main still has cached — which is the whole of 🔒 D4's offline half.
- * - **The favorites kebab is gone.** Its menu had exactly one item, "Remove from favorites", and
- *   the lit star beside it already means that. One click, and no menu primitive to vendor.
+ * A PREVIEW IS ASKED FOR, NOT LINKED TO. Every tile asks `media:preview` for its bytes as a
+ * dataURL, because the renderer may not fetch from a provider; a favorite's stored `previewUrl`
+ * is never read. The cache behind it is `lib/previewCache.ts`.
+ *
+ * NO KEY IS NOT AN ERROR (🔒 YAZ-1775 D4). `pixabayAvailable` false simply hides the Pixabay source and
+ * says nothing; Settings › Images is where a key is entered.
+ *
+ * OFFLINE IS A STATE, NOT A BANNER. A search that could not reach a provider renders a passive
+ * line; Shapes keeps working entirely, and Favorites and Recent keep working with whatever
+ * previews main still has cached.
  *
  * THE SMART SHAPES ARRIVE LATE ON PURPOSE. `@excalidraw/element` is a second ~300 kB download
  * (`engine.ts`'s lazy rule), so the seven basic shapes render immediately and the twelve Smart
  * Shapes join when it lands. Nothing waits on it.
  *
- * WHAT AN INSERT COSTS ON DISK: nothing, here. The bytes go to the engine, the engine's files map
- * grows an id the store does not hold, and the SAVE path built in 2E writes it into `assets/`
- * before the scene names it (🔒 D3).
+ * WHAT AN INSERT COSTS ON DISK: nothing, here. The bytes go to the engine, its files map grows an
+ * id the store does not hold, and `drawing:save` writes it into `assets/` before the scene names
+ * it (🔒 YAZ-1775 D3).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PIXABAY_SECRET, type MediaSearchSource, type StoredMediaItem, type StudioItem } from '@shared/types'
+import { PIXABAY_SECRET, type MediaBytesProvider, type MediaSearchSource, type StoredMediaItem, type StudioItem } from '@shared/types'
 import { api, BridgeRequestError } from '../api'
+import { createPreviewCache } from '../lib/previewCache'
 import { loadExcalidrawElement } from '../drawings/engine'
 import { insertImage, insertShape, fileFromImport, type InsertEngine, type InsertTarget } from './insertShape'
 import { buildShapeCatalog, filterShapeCatalog, getShape, type ShapeCatalogItem, type ShapePreview, type SmartShapeApi } from './shapes'
 import './imageStudio.css'
 
-export type StudioView = 'search' | 'shapes' | 'favorites' | 'recent'
-export const STUDIO_VIEWS: readonly StudioView[] = ['search', 'shapes', 'favorites', 'recent']
+type StudioView = 'search' | 'shapes' | 'favorites' | 'recent'
+const STUDIO_VIEWS: readonly StudioView[] = ['search', 'shapes', 'favorites', 'recent']
 
 const VIEW_LABELS: Record<StudioView, string> = { search: 'Search', shapes: 'Shapes', favorites: 'Favorites', recent: 'Recent' }
 
-/** What the Search view says when the machine could not reach a provider (🔒 D4's offline half). */
+/** What the Search view says when the machine could not reach a provider (🔒 YAZ-1775 D4's offline half). */
 export const OFFLINE_NOTICE = "You're offline. Shapes, Favorites and Recent still work."
 
 export interface ImageStudioProps {
   /** The two engine values an insert needs; the panel only exists once the engine has loaded. */
   engine: InsertEngine
-  /** The engine's imperative handle, or null while it is still mounting — inserting is off until then. */
-  excalidrawAPI: InsertTarget | null
+  /** The engine's imperative handle; `CanvasSidebar` does not render a tab without one. */
+  excalidrawAPI: InsertTarget
   /** Bumped by ⌘F: switch to Search and put the caret in the field (the web app's own pattern). */
   searchFocusRequest?: number
 }
@@ -65,64 +59,21 @@ const shapeItem = (shape: ShapeCatalogItem): StudioItem => ({
 
 const dedupeItems = (items: StudioItem[]) => [...new Map(items.map((item) => [item.itemKey, item])).values()]
 
+const getErrorMessage = (error: unknown, fallback: string): string => (error instanceof Error && error.message ? error.message : fallback)
+
 /**
- * THE PREVIEW MEMO. `media:preview` is already cached on disk for 24 h, but a tile re-mounts every
- * time a view is switched and an IPC round trip per tile per switch is a visible stutter. One
- * module-level map of settled dataURLs and in-flight promises makes the second look free, and it
- * is keyed by provider+id — the same key main caches under, so the two never disagree.
+ * The tile pictures. Keyed `provider:id` — the same key main's 24 h disk cache uses, so the two
+ * can never disagree about what a tile is showing. Exported so a test starts with an empty one.
  */
-const previewMemo = new Map<string, string>()
-const previewInFlight = new Map<string, Promise<string | null>>()
-
-export function previewKey(provider: string, providerId: string): string {
-  return `${provider}:${providerId}`
-}
-
-/** Exported for the tests, which must not inherit another test's memo. */
-export function clearPreviewMemo(): void {
-  previewMemo.clear()
-  previewInFlight.clear()
-}
-
-async function loadPreview(item: StudioItem): Promise<string | null> {
-  if (item.provider === 'shape') return null
-  const key = previewKey(item.provider, item.providerId)
-  const settled = previewMemo.get(key)
-  if (settled !== undefined) return settled
-  const existing = previewInFlight.get(key)
-  if (existing !== undefined) return existing
-  const request = api.media
-    .preview({ provider: item.provider, id: item.providerId })
-    .then(({ dataURL }) => {
-      previewMemo.set(key, dataURL)
-      return dataURL
-    })
-    // A preview that cannot be had is a PLACEHOLDER, never an error: offline, no key for a
-    // favorited graphic, an icon set that has since dropped the name. The tile still inserts.
-    .catch(() => null)
-    .finally(() => previewInFlight.delete(key))
-  previewInFlight.set(key, request)
-  return request
-}
-
-/** One provider tile's picture, asked for by id and drawn when it arrives. */
-function RemotePreview({ item }: { item: StudioItem }) {
-  const [src, setSrc] = useState<string | null>(() => previewMemo.get(previewKey(item.provider, item.providerId)) ?? null)
-  useEffect(() => {
-    let live = true
-    void loadPreview(item).then((dataURL) => {
-      if (live) setSrc(dataURL)
-    })
-    return () => {
-      live = false
-    }
-  }, [item])
-  if (src === null) return <span className="image-studio__placeholder" aria-hidden="true" />
-  return <img src={src} alt="" loading="lazy" />
-}
+const previews = createPreviewCache(async (key) => {
+  const [provider, ...rest] = key.split(':')
+  const { dataURL } = await api.media.preview({ provider: provider as MediaBytesProvider, id: rest.join(':') })
+  return dataURL
+})
+export const clearPreviewMemo = previews.clear
 
 /** A shape tile's picture: one of six stock outlines, or the engine's own generated path. */
-function ShapePreview({ preview }: { preview: ShapePreview }) {
+function ShapeTile({ preview }: { preview: ShapePreview }) {
   if (preview.type === 'smart') {
     return (
       <svg viewBox={preview.viewBox} aria-hidden="true">
@@ -184,14 +135,15 @@ export function ImageStudio({ engine, excalidrawAPI, searchFocusRequest = 0 }: I
   const [smart, setSmart] = useState<SmartShapeApi | null>(null)
 
   const searchRequestId = useRef(0)
-  const searchRequestInFlight = useRef(false)
+  /** The cursors already asked for this search; a page is never requested twice. */
   const requestedCursors = useRef(new Set<string>())
+  /** The same fact as `isSearching`, readable synchronously inside `runSearch`'s own guard. */
+  const isSearchingRef = useRef(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const searchGridRef = useRef<HTMLDivElement>(null)
   const searchSentinelRef = useRef<HTMLDivElement>(null)
   const loadNextPageRef = useRef<() => void>(() => {})
 
-  const canInsert = excalidrawAPI !== null
 
   // The library lists, and the ONE push that keeps them true in every window and every vault.
   useEffect(() => {
@@ -209,7 +161,7 @@ export function ImageStudio({ engine, excalidrawAPI, searchFocusRequest = 0 }: I
   }, [])
 
   // Whether a key is set, before the first search has said so — so the Pixabay source is never
-  // offered to someone who has not entered one (🔒 D4: the renderer learns yes/no, never a value).
+  // offered to someone who has not entered one (🔒 YAZ-1775 D4: the renderer learns yes/no, never a value).
   useEffect(() => {
     let live = true
     void api.secrets.has({ name: PIXABAY_SECRET }).then(
@@ -271,9 +223,9 @@ export function ImageStudio({ engine, excalidrawAPI, searchFocusRequest = 0 }: I
         return
       }
       const requestedCursor = append ? cursor : null
-      if (append && (!requestedCursor || searchRequestInFlight.current || (!retry && requestedCursors.current.has(requestedCursor)))) return
+      if (append && (requestedCursor === null || isSearchingRef.current || (!retry && requestedCursors.current.has(requestedCursor)))) return
       const requestId = append ? searchRequestId.current : ++searchRequestId.current
-      searchRequestInFlight.current = true
+      isSearchingRef.current = true
       setIsSearching(true)
       if (requestedCursor !== null) {
         requestedCursors.current.add(requestedCursor)
@@ -299,13 +251,13 @@ export function ImageStudio({ engine, excalidrawAPI, searchFocusRequest = 0 }: I
       } catch (cause) {
         if (requestId !== searchRequestId.current) return
         const isOffline = cause instanceof BridgeRequestError && cause.code === 'OFFLINE'
-        const message = cause instanceof Error ? cause.message : 'Image search failed'
+        const message = getErrorMessage(cause, 'Image search failed')
         if (isOffline) setOffline(true)
         if (append) setPageError(isOffline ? OFFLINE_NOTICE : message)
         else if (!isOffline) setError(message)
       } finally {
         if (requestId === searchRequestId.current) {
-          searchRequestInFlight.current = false
+          isSearchingRef.current = false
           setIsSearching(false)
         }
       }
@@ -313,9 +265,9 @@ export function ImageStudio({ engine, excalidrawAPI, searchFocusRequest = 0 }: I
     [cursor, query, searchedQuery, source],
   )
 
-  loadNextPageRef.current = () => {
-    void runSearch({ append: true })
-  }
+  useEffect(() => {
+    loadNextPageRef.current = () => void runSearch({ append: true })
+  }, [runSearch])
 
   // The infinite scroll: one observer on a sentinel at the end of the grid, re-armed whenever the
   // cursor moves. It is never armed for a cursor already asked for, so a page cannot load twice.
@@ -332,8 +284,10 @@ export function ImageStudio({ engine, excalidrawAPI, searchFocusRequest = 0 }: I
     return () => observer.disconnect()
   }, [cursor, isSearching, pageError, view])
 
+  // Both tiles' buttons are disabled while one is in flight; these re-check the same fact, because
+  // a keyboard activation can land in the frame before React has re-rendered them.
   const addItem = async (item: StudioItem) => {
-    if (excalidrawAPI === null || insertingKey) return
+    if (insertingKey !== null) return
     setInsertingKey(item.itemKey)
     setError(null)
     try {
@@ -351,20 +305,20 @@ export function ImageStudio({ engine, excalidrawAPI, searchFocusRequest = 0 }: I
       }
       setRecent(await api.media.recent({ op: 'record', item: recorded }))
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not add item')
+      setError(getErrorMessage(cause, 'Could not add item'))
     } finally {
       setInsertingKey(null)
     }
   }
 
   const toggleFavorite = async (item: StudioItem) => {
-    if (busyFavoriteKey) return
+    if (busyFavoriteKey !== null) return
     setBusyFavoriteKey(item.itemKey)
     setError(null)
     try {
       setFavorites(favoriteKeys.has(item.itemKey) ? await api.media.favorites({ op: 'remove', itemKey: item.itemKey }) : await api.media.favorites({ op: 'add', item }))
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not change favorites')
+      setError(getErrorMessage(cause, 'Could not change favorites'))
     } finally {
       setBusyFavoriteKey(null)
     }
@@ -405,7 +359,7 @@ export function ImageStudio({ engine, excalidrawAPI, searchFocusRequest = 0 }: I
           >
             <option value="all">All</option>
             <option value="iconify">Iconify</option>
-            {/* 🔒 D4: with no key there is no Pixabay to offer, and nothing to explain here. */}
+            {/* 🔒 YAZ-1775 D4: with no key there is no Pixabay to offer, and nothing to explain here. */}
             {pixabayAvailable && <option value="pixabay">Pixabay</option>}
           </select>
           <input
@@ -427,7 +381,6 @@ export function ImageStudio({ engine, excalidrawAPI, searchFocusRequest = 0 }: I
         </div>
       )}
 
-      {!canInsert && <div className="image-studio__notice">The canvas is still loading.</div>}
       {view === 'search' && offline && (
         <div className="image-studio__notice" role="status">
           {OFFLINE_NOTICE}
@@ -445,20 +398,17 @@ export function ImageStudio({ engine, excalidrawAPI, searchFocusRequest = 0 }: I
               <button
                 type="button"
                 className="image-studio__add"
-                disabled={!canInsert || insertingKey !== null}
+                disabled={insertingKey !== null}
                 onClick={() => void addItem(item)}
                 aria-label={`Add ${item.title}`}
               >
                 <span className="image-studio__preview">
-                  {catalogShape ? <ShapePreview preview={catalogShape.preview} /> : <RemotePreview item={item} />}
+                  {catalogShape ? <ShapeTile preview={catalogShape.preview} /> : <previews.Preview cacheKey={`${item.provider}:${item.providerId}`} placeholderClass="image-studio__placeholder" />}
                   {insertingKey === item.itemKey && <span className="image-studio__adding">Adding…</span>}
                 </span>
                 <span className="image-studio__meta">
                   <strong>{item.title}</strong>
-                  <small>
-                    {item.kind}
-                    {item.collectionName ? ` · ${item.collectionName}` : ''}
-                  </small>
+                  <small>{item.provider === 'shape' ? 'Shape' : `${item.kind}${item.collectionName ? ` · ${item.collectionName}` : ''}`}</small>
                 </span>
               </button>
               <button
@@ -480,7 +430,9 @@ export function ImageStudio({ engine, excalidrawAPI, searchFocusRequest = 0 }: I
       {displayedItems.length === 0 && (
         <div className="image-studio__empty">
           {view === 'search'
-            ? 'Search once, then add anything from the mixed results.'
+            ? searchedQuery === ''
+              ? 'Search once, then add anything from the mixed results.'
+              : `No graphics match “${searchedQuery}”`
             : view === 'favorites'
               ? 'Star an item and it will stay available in every board.'
               : view === 'recent'
@@ -505,7 +457,7 @@ export function ImageStudio({ engine, excalidrawAPI, searchFocusRequest = 0 }: I
           Loading more…
         </div>
       )}
-      <footer className="image-studio__footer">Graphics via Pixabay · icons via Iconify. Check source details and trademarks before publishing.</footer>
+      <footer className="image-studio__footer">Graphics via Pixabay · icons via Iconify.</footer>
     </div>
   )
 }

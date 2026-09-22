@@ -1,8 +1,8 @@
 import { defineConfig } from 'vitest/config'
 
 /**
- * The `tools/` project. `tools/packEngine.mjs` is plain ESM run straight by node, so its suite is
- * `.mjs` too and drives the real script against real temp dirs — no alias, no jsdom, nothing mocked.
+ * The `tools/` project. Both scripts are plain ESM run straight by node, so their suites are
+ * `.mjs` too and drive the real code against real temp dirs — no alias, no jsdom, nothing mocked.
  */
 export default defineConfig({
   test: {

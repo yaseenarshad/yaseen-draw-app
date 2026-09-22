@@ -1,7 +1,7 @@
 /**
  * What an Image Studio click does to the scene (YAZ-1818). The engine is a stand-in with the four
- * methods an insert uses, so the shape path, the image path and the `assets/` handover (🔒 D3, the
- * 2E save path) are all provable without mounting a canvas.
+ * methods an insert uses, so the shape path, the image path and the `assets/` handover (🔒 YAZ-1775 D3, the
+ * YAZ-1811 save path) are all provable without mounting a canvas.
  */
 import { describe, expect, it, vi } from 'vitest'
 import { referencedFileIds, unpersistedFiles, type DrawingFileData } from '@shared/drawingAssets'
@@ -110,7 +110,7 @@ describe('inserting an image', () => {
   })
 
   /**
-   * 🔒 D3 / 2E: the studio never writes to disk. What it does is leave the engine holding bytes the
+   * 🔒 YAZ-1775 D3 / YAZ-1811: the studio never writes to disk. What it does is leave the engine holding bytes the
    * store has not got — and THAT is what the save path picks up. This is the handover, asserted
    * with the very function `DrawingEditor` uses (`unpersistedFiles`) over the state the insert left.
    */

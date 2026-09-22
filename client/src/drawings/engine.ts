@@ -28,7 +28,7 @@
  * module scope next to it: module scope would run them when THIS file is first imported, and
  * nothing guarantees that happens before some other module imports the package.
  *
- * THE THIRD PIN IS NOT A GLOBAL BUT A localStorage KEY (⚡ R4/R5, YAZ-1812), and it is the ONE
+ * THE THIRD PIN IS NOT A GLOBAL BUT A localStorage KEY (⚡ YAZ-1775 R4/R5, YAZ-1812), and it is the ONE
  * engine localStorage key this app touches — WRITTEN, never read. See `YASEEN_FULL_TOOLBAR_MODE`.
  */
 import type { ComponentProps } from 'react'
@@ -47,7 +47,7 @@ declare global {
 }
 
 /**
- * THE CONTEXTUAL PROPERTIES TOOLBAR'S GATE (⚡ R4/R5). The engine's `deriveStylesPanelMode`
+ * THE CONTEXTUAL PROPERTIES TOOLBAR'S GATE (⚡ YAZ-1775 R4/R5). The engine's `deriveStylesPanelMode`
  * (`packages/common/src/editorInterface.ts:152-164`) answers `mobile` for a phone, `compact` for a
  * tablet, and otherwise whatever it finds under this localStorage key — read at mount and on
  * resize. `LayerUI.tsx:575` renders the fork's `<ContextualPropertiesToolbar>` (`Actions.tsx:377`)
@@ -67,17 +67,16 @@ export const DESKTOP_UI_MODE_STORAGE_KEY = 'excalidraw.desktopUIMode'
 export const YASEEN_FULL_TOOLBAR_MODE = 'full' as const
 
 /**
- * Writes the toolbar mode where the engine reads it; true when it landed. A storage that throws
- * or is absent is NOT an error — the engine then measures its own way, and `getFormFactor` still
- * keeps it out of `compact`.
+ * Writes the toolbar mode where the engine reads it, overwriting a stray stored value. A storage
+ * that throws or is absent is silently skipped — the engine then measures its own way, and
+ * `getFormFactor` still keeps it out of `compact`.
  */
-export function applyToolbarMode(mode: string = YASEEN_FULL_TOOLBAR_MODE, storage: Pick<Storage, 'getItem' | 'setItem'> | null = safeLocalStorage()): boolean {
+export function applyToolbarMode(storage: Pick<Storage, 'getItem' | 'setItem'> | null = safeLocalStorage()): void {
   try {
-    if (storage === null) return false
-    if (storage.getItem(DESKTOP_UI_MODE_STORAGE_KEY) !== mode) storage.setItem(DESKTOP_UI_MODE_STORAGE_KEY, mode)
-    return true
+    if (storage === null) return
+    if (storage.getItem(DESKTOP_UI_MODE_STORAGE_KEY) !== YASEEN_FULL_TOOLBAR_MODE) storage.setItem(DESKTOP_UI_MODE_STORAGE_KEY, YASEEN_FULL_TOOLBAR_MODE)
   } catch {
-    return false
+    // The engine measures its own way; `getFormFactor` is the other half of the guarantee.
   }
 }
 

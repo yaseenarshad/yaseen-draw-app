@@ -10,7 +10,7 @@ beforeEach(async () => {
 })
 afterEach(() => rm(dir, { recursive: true, force: true }))
 
-describe('resolveLibraryFolder (🔒 D5)', () => {
+describe('resolveLibraryFolder (🔒 YAZ-1775 D5)', () => {
   it('null means `<userData>/library` — the default no vault has to know about', () => {
     expect(resolveLibraryFolder(null, '/Users/x/Application Support/Yaseen Draw')).toBe(path.join('/Users/x/Application Support/Yaseen Draw', DEFAULT_LIBRARY_DIR))
   })

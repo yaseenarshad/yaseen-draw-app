@@ -1,5 +1,5 @@
 /**
- * The rail (🔒 D10) and the tiny store behind it. The store is the interesting half: it exists so
+ * The rail (🔒 YAZ-1775 D10) and the tiny store behind it. The store is the interesting half: it exists so
  * `renderTopLeftUI` never changes identity (the #185 rule in `ExcalidrawSurface.tsx`), which means
  * a re-render here must never be a re-render of the engine.
  */
@@ -8,7 +8,6 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { createLauncherStore, LauncherRail, type LauncherActions, type LauncherState } from './LauncherRail'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const actions = (): LauncherActions & { [K in keyof LauncherActions]: ReturnType<typeof vi.fn> } => ({
   togglePanel: vi.fn(),
@@ -69,7 +68,7 @@ function render(state: Partial<LauncherState> = {}) {
 }
 
 describe('LauncherRail', () => {
-  it('is the hamburger plus the two toggles, and NOTHING else (🔒 D10: the tabs are the panel`s own strip)', () => {
+  it('is the hamburger plus the two toggles, and NOTHING else (🔒 YAZ-1775 D10: the tabs are the panel`s own strip)', () => {
     const { container: _c, button } = { ...render(), container }
     expect(container.querySelectorAll('button')).toHaveLength(3)
     expect(button('Open workspace panel')).not.toBeNull()
@@ -97,7 +96,7 @@ describe('LauncherRail', () => {
     act(() => button('Show frames')?.click())
     expect(acts.toggleWriting).toHaveBeenCalledTimes(1)
     expect(acts.toggleFrames).toHaveBeenCalledTimes(1)
-    // The value comes back down through the store, never from the click (🔒 D9's round trip).
+    // The value comes back down through the store, never from the click (🔒 YAZ-1775 D9's round trip).
     act(() => store.set({ writingMode: false }))
     expect(button('Writing mode')?.title).toBe('Writing: off')
   })

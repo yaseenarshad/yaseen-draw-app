@@ -14,7 +14,7 @@ and the canvas is Yasin's own Excalidraw fork.
 
 ## Requirements
 
-Node.js 20.19 or newer (22+ recommended), npm, macOS (the packaged app targets macOS arm64; the dev build runs wherever Electron does).
+Node.js 22 or newer (`package.json` `engines`, and what CI runs), npm, macOS (the packaged app targets macOS arm64; the dev build runs wherever Electron does).
 
 ## Run
 
@@ -68,7 +68,7 @@ silently losing either side.
 
 - **Two lenses**: the sidebar shows your vault two ways, switched by the tabs at the top. **Files** is the ordinary folder tree on disk — every file, not just the drawings: a file the app cannot open is listed muted and a click hands it to the OS default app, as does right-click → Open in ▸ "Default app" on any row. The **♥** tab is your favorites (below). Same vault, two readings; both offer the same right-click menu.
 - **Create**: right-click a folder, a file, or the blank space under the tree → "New drawing" / "New folder" / "New dated folder" (a folder pre-named with today's `MM_DD- `, cursor ready for the title); name it inline (Enter confirms, Esc cancels). Drawings get `.excalidraw` automatically and open at once; nothing is ever overwritten.
-- **Rename and delete**: both are in the same right-click menu, in both lenses. Renaming edits the name inline (a changed name asks first); deleting moves the file to the system Trash — never a permanent delete — and closes its tabs.
+- **Rename and delete**: both are in the same right-click menu, in both lenses. Renaming edits the name inline and commits on Enter; deleting moves the file to the system Trash — never a permanent delete — and closes its tabs.
 - **Cut, copy, paste**: right-click a row (or a selection) → **Cut** / **Copy**, then right-click a folder → **Paste** (`⌘X` / `⌘C` / `⌘V` do the same on the selected rows; `⌘V` pastes into the selected folder, beside the selected file, or into the vault root when nothing is selected). One clipboard for the whole app, so you can copy in one window and paste into another vault's window. A copy that lands on an existing name becomes "Board copy.excalidraw", then "Board copy 2.excalidraw" — pasting into the same folder is how you duplicate; a cut never overwrites, moves tabs along like drag-drop, and pastes once. Folders copy whole. The menu itself is five groups: open, clipboard, new, this row, favorites + **Open in ▸** (new window, VS Code, default app, Finder), delete.
 - **Search**: `⌘K` searches file and folder names across the vault from the sidebar; ↑/↓ pick, Enter opens, ⌘-Enter opens in a background tab.
 - **Tabs and windows**: drawings open in tabs (`⌃Tab` / `⌃⇧Tab` or `⌘⇧]` / `⌘⇧[` to switch, `⌘W` closes the **tab** — on the last one it empties the window and then closes it). `⌘⇧N` duplicates the window (same folder, same file), `⌘O` opens the vault switcher in the sidebar header (type to filter, `⏎` brings that vault to the front or opens it in a new window), `⌘⇧O` opens a folder, `⌘⇧W` closes the window; File › Open Recent lists the last folders (⌥-click an entry to open it beside the current window). ⌘-click a sidebar file — or right-click → Open in ▸ "New window" — to open it in its own window. Open windows and their tabs are restored on relaunch.
@@ -79,11 +79,38 @@ silently losing either side.
 - **Focus**: right-click a folder → "Focus on folder" and the tree shows only that — shift-select several first for "Focus on N folders". An eye appears beside the collapse button while you are focused; click it to see everything again. Each lens keeps its own focus, and it survives a restart.
 - **Favorites**: right-click any file or folder → "Add to favorites" (shift-select several for "Add N to favorites"); a heart toast confirms. The **♥** tab lists them in the order you added them — drag a row up or down to reorder — and a favorited folder opens in place, so a drawing can show both on its own and inside its folder. Every row keeps the full right-click menu, including Focus, which narrows the ♥ tab on its own. Favorites live in the vault's own `.yaseendraw/favorites.json` and sync with it — turn on GitHub sync and the same list shows up on your other machine. Every window sees the same list, it survives a restart, follows renames and drops out when deleted.
 
+## The canvas panel
+
+The hamburger at the top-left of a drawing opens the canvas's own docked panel, three tabs wide.
+
+- **Images** (`⌘F`): search icons and graphics from Iconify and Pixabay, insert a shape from the
+  built-in catalog, or pick from Favorites and Recent. The app fetches them for you — the canvas
+  never reaches a provider itself — and an inserted picture becomes an ordinary `assets/` file.
+  Pixabay needs a free API key (Settings › Images); without one, Iconify and the shapes still work,
+  and so does everything else while you are offline.
+- **Components** (`⌘C`): save the current selection as a named, reusable component, then insert
+  independent copies of it into any board, in any vault. **Import JSON** turns a `.excalidraw` file
+  on disk into one. Components live in your Library folder, not in a vault, so they follow you.
+- **Present**: every top-level frame on the board is a slide. Reorder them by dragging or
+  `⌥↑` / `⌥↓`, rename them, and press Play for a full-pane player — `→` / `←`, `Space`,
+  `Home` / `End`, `Esc` for the whole deck, and a strip of the canvas kept clear on the right for a
+  camera. The order is stored in the board, so it travels with the file.
+
+**File › Export Image…** (`⌘⇧E`) opens the engine's own PNG / SVG dialog, and **File › Export
+Drawing…** (`⌘⇧S`) writes a standalone `.excalidraw` anywhere on disk with its images embedded —
+the one file this app writes that is not lean, because it has no `assets/` folder to point at.
+**View › Canvas Background** sets the board's own colour.
+
 ## Settings
 
 The cog bottom-left, or `⌘,`. **Appearance › Theme** (System / Light / Dark — System follows the
-OS live). **Files › Confirm before deleting** (on by default: the sheet is the only guard, because
-the system Trash has no programmatic undo). **Sync** for this vault's GitHub switch.
+OS live). **Canvas** holds the fourteen drawing preferences the engine used to keep to itself —
+grid, snapping, binding, zen and writing modes, tool lock, frame visibility, the pen widths and
+what a new element looks like — and they apply to every board, every window and every relaunch.
+**Files › Confirm before deleting** (on by default: the sheet is the only guard, because the
+system Trash has no programmatic undo) and **Files › Library folder** (where components and image
+favorites live — point it inside a synced vault and they sync too). **Images › Pixabay API key**
+(stored encrypted by the OS keychain; never shown again). **Sync** for this vault's GitHub switch.
 **Hotkeys** lists every shortcut. Settings are global — one file, every window follows a change
 live — and never written into a vault.
 

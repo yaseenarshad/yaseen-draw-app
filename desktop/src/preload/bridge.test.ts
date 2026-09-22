@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { ComponentsApi, DialogApi, DrawingApi, FavoritesApi, FileApi, FileClipState, GithubApi, GithubSyncStatus, LinkApi, MediaApi, MenuApi, SecretsApi, ShellApi, StateApi, VaultConfigApi, WatchEvent, WindowApi, YaseenDrawApi } from '@shared/types'
+import type { ComponentsApi, DialogApi, DrawingApi, FavoritesApi, FileApi, FileClipState, GithubApi, GithubSyncStatus, LinkApi, MediaApi, MenuApi, SecretsApi, ShellApi, StateApi, WatchEvent, WindowApi, YaseenDrawApi } from '@shared/types'
 import { CH } from '../channels'
 
 const exposed: Record<string, unknown> = {}
@@ -13,14 +13,13 @@ vi.mock('electron', () => ({
  * typecheck. `as const satisfies` keeps each tuple's literal type (a plain `readonly (keyof T)[]`
  * annotation would widen it and make `Exhaustive<>` vacuous) while still rejecting typos.
  */
-const TOP = ['tree', 'readFile', 'writeFile', 'createDir', 'createFile', 'drawing', 'pickFolder', 'dialog', 'watch', 'state', 'window', 'menu', 'link', 'file', 'shell', 'vaultConfig', 'favorites', 'media', 'components', 'secrets', 'github'] as const satisfies readonly (keyof YaseenDrawApi)[]
+const TOP = ['tree', 'createDir', 'createFile', 'drawing', 'pickFolder', 'dialog', 'watch', 'state', 'window', 'menu', 'link', 'file', 'shell', 'favorites', 'media', 'components', 'secrets', 'github'] as const satisfies readonly (keyof YaseenDrawApi)[]
 const STATE = ['get', 'setSettings', 'setSidebarWidth', 'pushRecent', 'removeRecent', 'setFolder', 'onChange'] as const satisfies readonly (keyof StateApi)[]
-const WINDOW = ['identity', 'setIdentity', 'open', 'duplicate', 'openRecent', 'closeSelf', 'zoom', 'onFlush'] as const satisfies readonly (keyof WindowApi)[]
+const WINDOW = ['identity', 'setIdentity', 'open', 'openRecent', 'closeSelf', 'onFlush'] as const satisfies readonly (keyof WindowApi)[]
 const MENU = ['onOpenFolder', 'onOpenRoot', 'onSearch', 'onSwitchVault', 'onSettings', 'onToggleSidebar', 'onCloseTab', 'onNextTab', 'onPrevTab', 'onExportImage', 'onCanvasBackground', 'onExportDrawing'] as const satisfies readonly (keyof MenuApi)[]
 const LINK = ['onOpenFile', 'onNotice'] as const satisfies readonly (keyof LinkApi)[]
 const FILE = ['rename', 'onRenamed', 'delete', 'onDeleted', 'clip', 'paste', 'clipState', 'onClipChanged'] as const satisfies readonly (keyof FileApi)[]
-const SHELL = ['reveal', 'openVsCode', 'openDefault', 'openLink'] as const satisfies readonly (keyof ShellApi)[]
-const VAULT_CONFIG = ['read', 'write', 'onChange'] as const satisfies readonly (keyof VaultConfigApi)[]
+const SHELL = ['reveal', 'openVsCode', 'openDefault'] as const satisfies readonly (keyof ShellApi)[]
 const FAVORITES = ['get', 'set', 'onChanged'] as const satisfies readonly (keyof FavoritesApi)[]
 const DRAWING = ['load', 'save', 'libraryFolder'] as const satisfies readonly (keyof DrawingApi)[]
 const DIALOG = ['openDrawing', 'saveDrawing'] as const satisfies readonly (keyof DialogApi)[]
@@ -36,7 +35,6 @@ const _menu: Exhaustive<MenuApi, typeof MENU> = true
 const _link: Exhaustive<LinkApi, typeof LINK> = true
 const _file: Exhaustive<FileApi, typeof FILE> = true
 const _shell: Exhaustive<ShellApi, typeof SHELL> = true
-const _vaultConfig: Exhaustive<VaultConfigApi, typeof VAULT_CONFIG> = true
 const _favorites: Exhaustive<FavoritesApi, typeof FAVORITES> = true
 const _drawing: Exhaustive<DrawingApi, typeof DRAWING> = true
 const _dialog: Exhaustive<DialogApi, typeof DIALOG> = true
@@ -44,7 +42,7 @@ const _github: Exhaustive<GithubApi, typeof GITHUB> = true
 const _media: Exhaustive<MediaApi, typeof MEDIA> = true
 const _components: Exhaustive<ComponentsApi, typeof COMPONENTS> = true
 const _secrets: Exhaustive<SecretsApi, typeof SECRETS> = true
-void [_top, _state, _window, _menu, _link, _file, _shell, _vaultConfig, _favorites, _drawing, _dialog, _github, _media, _components, _secrets]
+void [_top, _state, _window, _menu, _link, _file, _shell, _favorites, _drawing, _dialog, _github, _media, _components, _secrets]
 
 describe('preload bridge', () => {
   it('installs window.yaseenDraw with every contract method', async () => {
@@ -58,7 +56,6 @@ describe('preload bridge', () => {
     for (const k of LINK) expect(typeof api.link[k], `link.${k}`).toBe('function')
     for (const k of FILE) expect(typeof api.file[k], `file.${k}`).toBe('function')
     for (const k of SHELL) expect(typeof api.shell[k], `shell.${k}`).toBe('function')
-    for (const k of VAULT_CONFIG) expect(typeof api.vaultConfig[k], `vaultConfig.${k}`).toBe('function')
     for (const k of FAVORITES) expect(typeof api.favorites[k], `favorites.${k}`).toBe('function')
     for (const k of GITHUB) expect(typeof api.github[k], `github.${k}`).toBe('function')
     for (const k of MEDIA) expect(typeof api.media[k], `media.${k}`).toBe('function')
@@ -67,7 +64,7 @@ describe('preload bridge', () => {
     for (const k of SECRETS) expect(typeof api.secrets[k], `secrets.${k}`).toBe('function')
   })
 
-  it('media.favorites / media.recent invoke their channels with the request; media:changed reaches the listener (🔒 D5)', async () => {
+  it('media.favorites / media.recent invoke their channels with the request; media:changed reaches the listener (🔒 YAZ-1775 D5)', async () => {
     const { ipcRenderer } = await import('electron')
     const { bridge } = await import('./index')
     vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: [] })
@@ -86,7 +83,7 @@ describe('preload bridge', () => {
     expect(vi.mocked(ipcRenderer.removeListener).mock.calls.some(([ch, l]) => ch === CH.mediaChanged && l === emit)).toBe(true)
   })
 
-  it('components.* invoke their channels with the request; components:changed reaches the listener (🔒 D5)', async () => {
+  it('components.* invoke their channels with the request; components:changed reaches the listener (🔒 YAZ-1775 D5)', async () => {
     const { ipcRenderer } = await import('electron')
     const { bridge } = await import('./index')
     vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: [] })
@@ -108,7 +105,7 @@ describe('preload bridge', () => {
     expect(vi.mocked(ipcRenderer.removeListener).mock.calls.some(([ch, l]) => ch === CH.componentsChanged && l === emit)).toBe(true)
   })
 
-  it('secrets.set / secrets.has invoke secrets:set and secrets:has — and there is no secrets.get (🔒 D4)', async () => {
+  it('secrets.set / secrets.has invoke secrets:set and secrets:has — and there is no secrets.get (🔒 YAZ-1775 D4)', async () => {
     const { ipcRenderer } = await import('electron')
     const { bridge } = await import('./index')
     vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: undefined })
@@ -179,16 +176,6 @@ describe('preload bridge', () => {
     const { bridge } = await import('./index')
     await expect(bridge.file.rename({ oldPath: '/v/a.excalidraw', newPath: '/v/b.excalidraw' })).resolves.toEqual({ oldPath: '/v/a.excalidraw', newPath: '/v/b.excalidraw' })
     expect(ipcRenderer.invoke).toHaveBeenCalledWith(CH.fsRename, { oldPath: '/v/a.excalidraw', newPath: '/v/b.excalidraw' })
-  })
-
-  it('shell.openLink invokes shell:open-link with href and source note', async () => {
-    const { ipcRenderer } = await import('electron')
-    vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: undefined })
-    const { bridge } = await import('./index')
-    const req = { href: 'JSONs/example.json', sourcePath: '/vault/Note.excalidraw' }
-
-    await expect(bridge.shell.openLink(req)).resolves.toBeUndefined()
-    expect(ipcRenderer.invoke).toHaveBeenCalledWith(CH.shellOpenLink, req)
   })
 
   it('file.clip / file.paste invoke fs:clip and fs:paste with the request (YAZ-1674)', async () => {
@@ -308,14 +295,6 @@ describe('preload bridge', () => {
     expect(vi.mocked(ipcRenderer.removeListener).mock.calls.some(([ch, l]) => ch === CH.menuToggleSidebar && l === emit)).toBe(true)
   })
 
-  it('window.zoom invokes window:zoom (YAZ-1710)', async () => {
-    const { ipcRenderer } = await import('electron')
-    const { bridge } = await import('./index')
-    vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: undefined })
-    await bridge.window.zoom(1)
-    expect(ipcRenderer.invoke).toHaveBeenCalledWith(CH.windowZoom, 1)
-  })
-
   it('forwards menu:open-root paths to the listener and unsubscribes cleanly (GRO-2161)', async () => {
     const { ipcRenderer } = await import('electron')
     const { bridge } = await import('./index')
@@ -377,7 +356,7 @@ describe('preload bridge', () => {
     const { ipcRenderer } = await import('electron')
     vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: false, error: { code: 'CONFLICT', message: 'newer on disk', mtime: 42 } })
     const { bridge } = await import('./index')
-    await expect(bridge.writeFile({ path: '/x.excalidraw', content: '' })).rejects.toEqual({ code: 'CONFLICT', message: 'newer on disk', mtime: 42 })
+    await expect(bridge.tree('/x')).rejects.toEqual({ code: 'CONFLICT', message: 'newer on disk', mtime: 42 })
   })
 
   it('acks app:flush only after every onFlush listener settled (GRO-2160 close handshake)', async () => {

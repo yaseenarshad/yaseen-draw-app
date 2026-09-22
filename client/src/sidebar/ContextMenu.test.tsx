@@ -1,7 +1,7 @@
 /**
  * Context-menu MECHANICS only (🔒 D8, YAZ-1674): the items arrive as data from `buildMenuSections`
  * — its gating rules are `menuSections.test.ts`'s subject — and this file pins what the component
- * itself does with them: viewport clamping (GRO-2204), one group per NON-EMPTY section (🔒 D7),
+ * itself does with them: viewport clamping (GRO-2204), one group per NON-EMPTY section (🔒 YAZ-1674 D7),
  * disabled / danger / hint rendering, the select-then-close order, the ways out (Escape,
  * click-away, a stray right-click), and the "Open in ▸" flyout (D7 amended): how it opens, stays,
  * switches, positions and flips. Sizes come from mocked `getBoundingClientRect` (jsdom has no
@@ -13,7 +13,6 @@ import { createRoot, type Root } from 'react-dom/client'
 import { ContextMenu } from './ContextMenu'
 import type { MenuAction, MenuParent, MenuSection } from './menuSections'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 type Box = { width?: number; height?: number; left?: number; top?: number }
 
@@ -87,7 +86,7 @@ describe('menu clamping (GRO-2204)', () => {
 })
 
 /**
- * Groups (🔒 D7): one `role="group"` per NON-EMPTY section, in the order given — the separator is
+ * Groups (🔒 YAZ-1674 D7): one `role="group"` per NON-EMPTY section, in the order given — the separator is
  * CSS between adjacent groups, so skipping the empty ones is what keeps a short menu from ending
  * in a stray rule. The items inside keep their section's order.
  */
@@ -137,7 +136,7 @@ describe('item rendering', () => {
 })
 
 describe('selecting and closing', () => {
-  it('a click runs onSelect THEN onClose, once each (🔒 D8)', () => {
+  it('a click runs onSelect THEN onClose, once each (🔒 YAZ-1674 D8)', () => {
     const calls: string[] = []
     const onClose = vi.fn(() => calls.push('close'))
     const el = mount(0, 0, [[item('Reveal', { onSelect: () => calls.push('select') })]], onClose)

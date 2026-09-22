@@ -1,18 +1,16 @@
 /**
- * THE ONE ranking matcher (GRO-2197): both search surfaces — ⌘K title search (`searchCandidates.ts`)
- * and the settings dialog's own search (`settings/searchSettings.ts`) — rank through here, so the
- * app has one answer to "which of these names does this query mean", not two. Matching is
+ * THE ONE ranking matcher (GRO-2197). Every surface that ranks names by a query — ⌘K title search
+ * (`searchCandidates.ts`), the settings dialog's search (`settings/searchSettings.ts`), the vault
+ * switcher (`sidebar/VaultSwitcher.tsx`) and the Components tab — ranks through here, so the app
+ * has one answer to "which of these names does this query mean", not four. Matching is
  * case-insensitive over the candidate NAME, ranked exact → prefix → substring, capped after
  * ranking. Structurally typed on `{ name, lower? }` so any row shape can match through it.
  */
-
-/** Default cap; a caller with a scrollable list (title search) passes its own. */
-export const MAX_SUGGESTIONS = 8
-
 export function matchCandidates<T extends { name: string; lower?: string }>(
   candidates: readonly T[],
   fragment: string,
-  cap: number = MAX_SUGGESTIONS,
+  /** Every caller states its own; there is no sensible default across four different lists. */
+  cap: number,
 ): T[] {
   const needle = fragment.trim().toLowerCase()
   const exact: T[] = []

@@ -4,7 +4,6 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { ConfirmDelete, deleteConfirmMessage, type DeleteTarget } from './ConfirmDelete'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 describe('deleteConfirmMessage', () => {
   it('a file says only what happens', () => {
@@ -19,7 +18,7 @@ describe('deleteConfirmMessage', () => {
   it('a folder reports its contents, pluralised on each half', () => {
     expect(deleteConfirmMessage({ path: '/v/Docs', kind: 'dir', children: { files: 12, folders: 2 } })).toBe('Delete "Docs"? 12 files and 2 folders move to the Trash.')
     expect(deleteConfirmMessage({ path: '/v/Docs', kind: 'dir', children: { files: 1, folders: 1 } })).toBe('Delete "Docs"? 1 file and 1 folder move to the Trash.')
-    // A single item takes a singular verb: "1 note moves", not "1 note move".
+    // A single item takes a singular verb: "1 file moves", not "1 file move".
     expect(deleteConfirmMessage({ path: '/v/Docs', kind: 'dir', children: { files: 1, folders: 0 } })).toBe('Delete "Docs"? 1 file moves to the Trash.')
     expect(deleteConfirmMessage({ path: '/v/Docs', kind: 'dir', children: { files: 0, folders: 1 } })).toBe('Delete "Docs"? 1 folder moves to the Trash.')
   })

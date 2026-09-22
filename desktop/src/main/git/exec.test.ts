@@ -12,7 +12,7 @@ afterEach(async () => {
 
 /** A temp dir that is NOT a repo — `os.tmpdir()` is never inside one, so git calls in it fail predictably. */
 async function tempDir(): Promise<string> {
-  const dir = await mkdtemp(path.join(tmpdir(), 'mdapp-exec-'))
+  const dir = await mkdtemp(path.join(tmpdir(), 'yaseendraw-exec-'))
   cleanups.push(() => rm(dir, { recursive: true, force: true }))
   return dir
 }

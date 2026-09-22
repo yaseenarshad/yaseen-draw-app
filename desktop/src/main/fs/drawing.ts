@@ -2,17 +2,15 @@
  * THE DRAWING DOCUMENT'S TWO DOORS (🔒 YAZ-1810).
  *
  * `drawing:load` and `drawing:save` are the ONLY way a `.excalidraw` opened AS A DOCUMENT reads
- * and writes — not `fs:read`/`fs:write` (a 10 MiB text buffer, and a scene is not text the user
- * types), not the asset pipe (`fs:read-asset` resolves a bare name by walking the vault, and a
- * document is never fuzzy). One door per DIRECTION, not one per artefact, because a scene and
- * the image bytes it names are ONE thing: a load is "the scene, then its images", a save is "the
- * images, then the scene", and splitting either across two calls would let a renderer land half
- * of it — a scene on disk naming bytes that are not there.
+ * and writes. One door per DIRECTION, not one per artefact, because a scene and the image bytes
+ * it names are ONE thing: a load is "the scene, then its images", a save is "the images, then the
+ * scene", and splitting either across two calls would let a renderer land half of it — a scene on
+ * disk naming bytes that are not there.
  *
- * The read ceiling is `MAX_DRAWING_BYTES` (200 MiB), not `MAX_FILE_BYTES`: a LEGACY scene — an
- * upstream export, or one an older build wrote — embeds its images as base64 and is routinely
- * past 10 MiB before it has been opened once. The cap exists to refuse a file that has stopped
- * being a document, not to police normal ones.
+ * The read ceiling is `MAX_DRAWING_BYTES` (200 MiB): a LEGACY scene — an upstream export, or one
+ * an older build wrote — embeds its images as base64 and is routinely past 10 MiB before it has
+ * been opened once. The cap exists to refuse a file that has stopped being a document, not to
+ * police normal ones.
  *
  * THE SCENE IS VALIDATED HERE, not only in the renderer: a corrupt or empty `.excalidraw` comes
  * back as one `IO_ERROR` naming the path, which the editor shows as a readable error pane. The
@@ -22,7 +20,7 @@
  * Requests cross IPC from a sandboxed renderer, so their shape is checked like a request body,
  * never trusted from the type.
  *
- * 🔒 D3 ON DISK: the scene carries `files: {}`; image elements keep only their `fileId`; the
+ * 🔒 YAZ-1775 D3 ON DISK: the scene carries `files: {}`; image elements keep only their `fileId`; the
  * bytes sit at `<root>/assets/<fileId>.<ext>` (the engine's own SHA-1 id, the mime's extension).
  * An asset is IMMUTABLE — the same bytes always get the same name — so a save never rewrites one
  * (`wx`; EEXIST means it is already exactly these bytes). A LEGACY export that still embeds

@@ -1,5 +1,5 @@
 /**
- * A COMPONENT'S PICTURE (🔒 D5, YAZ-1819): `excalidraw-app/components/SavedComponentPreview.ts`
+ * A COMPONENT'S PICTURE (🔒 YAZ-1775 D5, YAZ-1819): `excalidraw-app/components/SavedComponentPreview.ts`
  * ported, one format later. The web app encoded WebP and threw when the browser could not; this
  * writes PNG, because `<library>/components/<slug>.png` is a file in the user's own folder that
  * Finder, Quick Look and every other reader has to be able to open.
@@ -15,7 +15,7 @@ import type { ExcalidrawModule } from '../drawings/engine'
 export const PREVIEW_MAX_WIDTH = 800
 export const PREVIEW_MAX_HEIGHT = 600
 export const PREVIEW_PADDING = 12
-export const PREVIEW_MIME_TYPE = 'image/png'
+const PREVIEW_MIME_TYPE = 'image/png'
 
 /** The engine value a preview needs. */
 export type PreviewEngine = Pick<ExcalidrawModule, 'exportToBlob'>

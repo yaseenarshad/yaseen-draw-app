@@ -1,5 +1,5 @@
 /**
- * THE SAVED-COMPONENT RULES (🔒 D5, YAZ-1819): what a slug is, what `<library>/components.json`
+ * THE SAVED-COMPONENT RULES (🔒 YAZ-1775 D5, YAZ-1819): what a slug is, what `<library>/components.json`
  * holds, and what a component fragment has to be before it is written or inserted. Pure and
  * Electron-free — the main-process store around it (`desktop/src/main/library/componentStore.ts`)
  * only reads, writes, watches and trashes, so every rule here unit-tests with no disk.
@@ -17,13 +17,12 @@
  * file outside the components folder (`drawingAssets.ts`'s `isValidFileId` posture, same reason).
  */
 import { COMPONENTS_INDEX_FILE, LIBRARY_COMPONENTS_DIR, MAX_COMPONENT_NAME_LENGTH, type ComponentItem, type ComponentsIndexFile } from './types'
-
-export { COMPONENTS_INDEX_FILE, LIBRARY_COMPONENTS_DIR }
+import { cleanList, isFiniteNumber, isRecord } from './guards'
 
 /** The fragment's extension — a component IS an Excalidraw document, openable by anything. */
-export const COMPONENT_EXT = '.excalidraw'
-/** The preview's extension (🔒 D5). PNG, not the web app's WebP: every reader has one. */
-export const COMPONENT_PREVIEW_EXT = '.png'
+const COMPONENT_EXT = '.excalidraw'
+/** The preview's extension (🔒 YAZ-1775 D5). PNG, not the web app's WebP: every reader has one. */
+const COMPONENT_PREVIEW_EXT = '.png'
 
 /**
  * The longest slug a name may produce. A component name is free text — someone will paste a
@@ -32,12 +31,10 @@ export const COMPONENT_PREVIEW_EXT = '.png'
 export const MAX_COMPONENT_SLUG_LENGTH = 60
 
 /** What a name with nothing sluggable in it (non-latin, punctuation only, empty) becomes. */
-export const FALLBACK_COMPONENT_SLUG = 'component'
+const FALLBACK_COMPONENT_SLUG = 'component'
 
 export const EMPTY_COMPONENTS_INDEX: ComponentsIndexFile = { version: 1, items: [] }
 
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
-const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
 
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
@@ -59,14 +56,17 @@ export function slugForComponentName(name: string): string {
 
 /**
  * The first free slug: the base, then `-2`, `-3`, … — Finder's own counting, and never `-1`,
- * because "the second one" is what a duplicate name means.
+ * because "the second one" is what a duplicate name means. The stem is re-trimmed for EVERY
+ * candidate, because the suffix grows: reserving a fixed three characters made `-100` overflow
+ * `MAX_COMPONENT_SLUG_LENGTH` and produced a slug `isValidComponentSlug` then rejected.
  */
 export function uniqueComponentSlug(base: string, taken: ReadonlySet<string>): string {
   if (!taken.has(base)) return base
-  const room = MAX_COMPONENT_SLUG_LENGTH - 3
-  const stem = base.length > room ? base.slice(0, room).replace(/-+$/g, '') : base
   for (let n = 2; ; n++) {
-    const candidate = `${stem}-${n}`
+    const suffix = `-${n}`
+    const room = MAX_COMPONENT_SLUG_LENGTH - suffix.length
+    const stem = base.length > room ? base.slice(0, room).replace(/-+$/g, '') : base
+    const candidate = `${stem}${suffix}`
     if (!taken.has(candidate)) return candidate
   }
 }
@@ -98,7 +98,7 @@ export function normalizeComponentName(v: unknown): string | null {
 }
 
 /** One index row, whole or not at all — a half-read row would be a tile that cannot be opened. */
-export function normalizeComponentItem(v: unknown): ComponentItem | null {
+function normalizeComponentItem(v: unknown): ComponentItem | null {
   if (!isRecord(v)) return null
   const { slug, name, elementCount, createdAt, updatedAt } = v
   if (!isValidComponentSlug(slug) || typeof name !== 'string' || name === '') return null
@@ -113,15 +113,8 @@ export function normalizeComponentItem(v: unknown): ComponentItem | null {
  */
 export function sanitizeComponentsIndex(v: unknown): ComponentsIndexFile | null {
   if (!isRecord(v) || v.version !== 1 || !Array.isArray(v.items)) return null
-  const items: ComponentItem[] = []
-  const seen = new Set<string>()
-  for (const raw of v.items) {
-    const item = normalizeComponentItem(raw)
-    if (item === null || seen.has(item.slug)) continue
-    seen.add(item.slug)
-    items.push(item)
-  }
-  return { version: 1, items }
+  // One row per slug, the first wins — `guards.ts`'s one list rule; the index has no cap.
+  return { version: 1, items: cleanList(v.items, normalizeComponentItem, (item) => item.slug) }
 }
 
 /** What the folder itself says about one component, before the index has had its say. */
@@ -133,7 +126,7 @@ export interface ComponentOnDisk {
 }
 
 /**
- * The index the FOLDER implies (🔒 D5's "rebuilt from the folder"). A slug the old index still
+ * The index the FOLDER implies (🔒 YAZ-1775 D5's "rebuilt from the folder"). A slug the old index still
  * knows keeps everything it said — its name above all, which is the one thing the folder cannot
  * tell us — and a slug it does not know is named after itself. A row whose file has gone drops
  * out: the folder is the truth and the index is the cache. Newest-updated first, which is the
@@ -176,7 +169,7 @@ export interface ComponentFragment {
 }
 
 /**
- * A fragment's bytes → what may be inserted. Validation is the OUTLINE plus the ONE promise 🔒 D5
+ * A fragment's bytes → what may be inserted. Validation is the OUTLINE plus the ONE promise 🔒 YAZ-1775 D5
  * makes about a component — that it is SELF-CONTAINED: every image element's bytes are in the
  * fragment's own `files`, so a component saved in one vault inserts in another. Deciding whether
  * those elements really are Excalidraw elements is the engine's `restore()`, a moment later.

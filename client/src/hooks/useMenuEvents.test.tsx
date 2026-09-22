@@ -8,7 +8,6 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { useMenuEvents } from './useMenuEvents'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 function installBridge() {
   const openFolderListeners = new Set<() => void>()
@@ -114,7 +113,7 @@ describe('useMenuEvents', () => {
     expect(handlers.onNextTab).toHaveBeenCalledTimes(1)
     act(() => b.emitPrevTab())
     expect(handlers.onPrevTab).toHaveBeenCalledTimes(1)
-    // 🔒 D10: the items that left the canvas hamburger for the application menu, plus 🔒 D3's export.
+    // 🔒 YAZ-1775 D10: the items that left the canvas hamburger for the application menu, plus 🔒 YAZ-1775 D3's export.
     act(() => b.emitExportImage())
     expect(handlers.onExportImage).toHaveBeenCalledTimes(1)
     act(() => b.emitCanvasBackground('#fffce8'))

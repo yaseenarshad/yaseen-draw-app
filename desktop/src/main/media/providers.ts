@@ -1,10 +1,10 @@
 /**
- * THE IMAGE STUDIO'S PROVIDERS, IN THE MAIN PROCESS (🔒 D4, YAZ-1818). The half of
+ * THE IMAGE STUDIO'S PROVIDERS, IN THE MAIN PROCESS (🔒 YAZ-1775 D4, YAZ-1818). The half of
  * `worker/imageStudio.ts` that TALKS: the two-phase Iconify walk, the alternating Pixabay pages,
  * the refill pass, and the image proxy that turns a provider's bytes into something a sandboxed
  * renderer can draw. `curation.ts` holds every decision it makes; `cache.ts` holds what it keeps.
  *
- * WHY MAIN AND NOT THE RENDERER (🔒 D4): the Pixabay key. It is stored encrypted and read HERE
+ * WHY MAIN AND NOT THE RENDERER (🔒 YAZ-1775 D4): the Pixabay key. It is stored encrypted and read HERE
  * (`secrets.read`), so it never crosses the bridge, never lands in a devtools console and never
  * reaches a crash dump. The renderer learns exactly one thing about it — `pixabayAvailable` — and
  * when it is false the provider is simply skipped: no error, no empty section, no mention of keys.
@@ -45,6 +45,7 @@ import {
   normalizeIconifyResults,
   normalizePixabayResults,
   oppositePixabayType,
+  PIXABAY_API,
   PIXABAY_PAGE_SIZE,
   pixabaySearchUrl,
   providerLimits,
@@ -145,7 +146,9 @@ export function createMediaProviders({ fetch, readPixabayKey, cache }: MediaProv
       const start = cursor.colorStart
       const page = await fetchIconifyPage(query, start, Math.min(ICONIFY_COLOR_BATCH_LIMIT, limit), COLOR_COLLECTION_PRIORITY)
       const returnedItems = page.items.slice(0, limit)
-      const consumedCount = returnedItems.length || page.fetchedCount === 0 ? returnedItems.length : page.fetchedCount
+      // A page that yielded nothing usable still consumed what it fetched — otherwise the cursor
+      // never advances and the next request asks for the same window again.
+      const consumedCount = returnedItems.length > 0 || page.fetchedCount === 0 ? returnedItems.length : page.fetchedCount
       cursor.colorStart += consumedCount
       cursor.colorExhausted = iconifyPageExhausted(start, consumedCount, page)
       items.push(...returnedItems)
@@ -225,7 +228,7 @@ export function createMediaProviders({ fetch, readPixabayKey, cache }: MediaProv
         throw new BridgeFailure('BAD_REQUEST', 'invalid search cursor')
       }
     })()
-    // No key is not a failure and not a warning: the provider is simply not there (🔒 D4). Marking
+    // No key is not a failure and not a warning: the provider is simply not there (🔒 YAZ-1775 D4). Marking
     // it exhausted keeps `nextCursor` honest — there is no further Pixabay page to ask for.
     if (!pixabayAvailable) {
       cursor.pixabay.vectorExhausted = true
@@ -304,7 +307,7 @@ export function createMediaProviders({ fetch, readPixabayKey, cache }: MediaProv
   async function pixabayRecord(id: string, key: string | null): Promise<PixabayHit> {
     if (key === null) throw new BridgeFailure('PROVIDER_FAILED', 'Pixabay needs an API key')
     if (!/^\d+$/.test(id)) throw new BridgeFailure('BAD_REQUEST', "'id' is not a Pixabay id")
-    const url = new URL('https://pixabay.com/api/')
+    const url = new URL(PIXABAY_API)
     url.searchParams.set('key', key)
     url.searchParams.set('id', id)
     const payload = await cachedJson<{ hits?: PixabayHit[] }>(pixabayItemCacheKey(id), url.toString())
@@ -329,7 +332,7 @@ export function createMediaProviders({ fetch, readPixabayKey, cache }: MediaProv
     return { url: source, item }
   }
 
-  /** Fetch one picture and hand it back as a dataURL, with the type and size guards 🔒 D4 names. */
+  /** Fetch one picture and hand it back as a dataURL, with the type and size guards 🔒 YAZ-1775 D4 names. */
   async function fetchImage(url: string): Promise<MediaPreviewResponse> {
     const response = await request(url)
     if (!response.ok) throw new BridgeFailure('PROVIDER_FAILED', `provider returned ${response.status}`)
@@ -354,7 +357,7 @@ export function createMediaProviders({ fetch, readPixabayKey, cache }: MediaProv
       const response = await searchUncached(query, { ...req, q: query }, key)
       // A page that is only half the providers' work is still cached: the cursor it carries names
       // the position the failed provider is still at, so replaying it retries exactly as the live
-      // call would have. Which is what makes a second identical search free (🔒 D4's 24 h).
+      // call would have. Which is what makes a second identical search free (🔒 YAZ-1775 D4's 24 h).
       await cache.write(cacheKey, response)
       return response
     },
@@ -363,7 +366,7 @@ export function createMediaProviders({ fetch, readPixabayKey, cache }: MediaProv
       const cacheKey = previewCacheKey(req.provider, req.id)
       const hit = await cache.read<MediaPreviewResponse>(cacheKey)
       // The cache first, always: it is what keeps a favorited tile visible with no network and,
-      // for Pixabay, with no key (🔒 D4's offline half).
+      // for Pixabay, with no key (🔒 YAZ-1775 D4's offline half).
       if (hit !== null) return hit
       const { url } = await sourceUrl(req, true, await readPixabayKey())
       const image = await fetchImage(url)
@@ -372,8 +375,8 @@ export function createMediaProviders({ fetch, readPixabayKey, cache }: MediaProv
     },
 
     async import(req) {
-      // NEVER cached (🔒 D4): these bytes are on their way to `assets/`, which content-addresses
-      // and de-duplicates them already (🔒 D3).
+      // NEVER cached (🔒 YAZ-1775 D4): these bytes are on their way to `assets/`, which content-addresses
+      // and de-duplicates them already (🔒 YAZ-1775 D3).
       const { url, item } = await sourceUrl(req, false, await readPixabayKey())
       return { ...(await fetchImage(url)), item }
     },

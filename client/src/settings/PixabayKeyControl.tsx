@@ -1,5 +1,5 @@
 /**
- * "Pixabay API key" (Settings › Images, 🔒 D4): the one place the key is ever typed. It goes
+ * "Pixabay API key" (Settings › Images, 🔒 YAZ-1775 D4): the one place the key is ever typed. It goes
  * straight to main through `secrets:set` and is never shown again — the row's whole read-back is
  * `secrets:has`, "Key set" or "No key". A component rather than an inline `render` because the
  * row owns state no `SettingsState` field holds: the draft being typed, and main's yes/no.

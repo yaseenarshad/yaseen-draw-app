@@ -41,7 +41,6 @@ export interface TabHistory {
 
 export type TabsAction =
   | { type: 'open-current'; path: string } // sidebar click & friends: replace the active tab (activate instead when already open)
-  | { type: 'open-new'; path: string } // append at the end + activate (activate instead when already open)
   | { type: 'open-background'; path: string } // append at the end, do NOT activate (no-op when already open)
   | { type: 'activate'; path: string } // tab-strip click
   | { type: 'close'; path: string } // ✕ / ⌘W: the active tab closes to its right neighbour, else left
@@ -102,11 +101,6 @@ export function tabsReducer(s: TabsState, a: TabsAction): TabsState {
         mounted: [...s.mounted.filter((t) => t !== s.active), a.path],
         history: { ...history, [a.path]: { entries: [...h.entries.slice(0, h.index + 1), a.path], index: h.index + 1 } },
       }
-    }
-    case 'open-new': {
-      if (a.path === s.active) return s
-      if (s.tabs.includes(a.path)) return withActive(s, a.path)
-      return { tabs: [...s.tabs, a.path], active: a.path, mounted: [...s.mounted, a.path], history: s.history }
     }
     case 'open-background': {
       if (s.tabs.includes(a.path)) return s // already open: stay where we are, steal nothing
@@ -202,8 +196,8 @@ export function tabsReducer(s: TabsState, a: TabsAction): TabsState {
     case 'delete': {
       // Deleting a tab IS closing it, from the user's point of view — so reuse the `close`
       // case rather than re-implementing the heir ladder. Divergence between the two would
-      // show up as "deleting the active note picks a different tab than ⌘W does", which is
-      // the kind of inconsistency nobody reports but everybody feels. The page also leaves
+      // show up as "deleting the active drawing picks a different tab than ⌘W does", which is
+      // the kind of inconsistency nobody reports but everybody feels. The tab also leaves
       // every OTHER tab's stack first: back must never step onto a file that is gone.
       const base = Object.values(s.history).some((r) => r.entries.includes(a.path))
         ? { ...s, history: rekey(s.history, (p) => (p === a.path ? null : p)) }
@@ -266,11 +260,9 @@ export function bootTabs(root: string | null): TabsState {
 }
 
 export interface UseWorkspace extends TabsState {
-  /** Rule 11: sidebar single-click, inline-create, Bases row links, base embeds, deep links. */
+  /** Rule 11: replace the active tab — sidebar single-click, search, inline-create, deep links. */
   openCurrent: (path: string) => void
-  /** Rule 5: append at the end + activate. No shipped gesture yet — I3's ⌘-click ruling landed on openBackground. */
-  openNew: (path: string) => void
-  /** Rule 5: append at the end without activating (and so without stealing focus). */
+  /** Rule 5: append at the end without activating (and so without stealing focus) — I3's ⌘-click. */
   openBackground: (path: string) => void
   activate: (path: string) => void
   close: (path: string) => void
@@ -322,7 +314,6 @@ export function useWorkspace(root: string | null): UseWorkspace {
   }, [])
 
   const openCurrent = useCallback((path: string) => dispatch({ type: 'open-current', path }), [dispatch])
-  const openNew = useCallback((path: string) => dispatch({ type: 'open-new', path }), [dispatch])
   const openBackground = useCallback((path: string) => dispatch({ type: 'open-background', path }), [dispatch])
   const activate = useCallback((path: string) => dispatch({ type: 'activate', path }), [dispatch])
   const close = useCallback((path: string) => dispatch({ type: 'close', path }), [dispatch])
@@ -358,7 +349,7 @@ export function useWorkspace(root: string | null): UseWorkspace {
   const h: TabHistory | undefined = state.history[state.active ?? '']
   return {
     ...state,
-    openCurrent, openNew, openBackground, activate, close, move, closeActive, next, prev, back, forward, reset, renamePath, renameDirPath, deletePath, deleteDirPath,
+    openCurrent, openBackground, activate, close, move, closeActive, next, prev, back, forward, reset, renamePath, renameDirPath, deletePath, deleteDirPath,
     canBack: h !== undefined && h.index > 0,
     canForward: h !== undefined && h.index < h.entries.length - 1,
   }

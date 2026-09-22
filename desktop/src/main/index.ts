@@ -27,7 +27,7 @@ const isPrimaryInstance = app.requestSingleInstanceLock()
 if (!isPrimaryInstance) app.quit()
 app.on('second-instance', (_event, argv) => {
   // Windows/Linux deliver a clicked yaseendraw:// link as an argv entry of the second launch —
-  // and a double-clicked `.excalidraw` as a bare PATH in the same place (2I): off macOS there is
+  // and a double-clicked `.excalidraw` as a bare PATH in the same place (YAZ-1815): off macOS there is
   // no `open-file` event, so argv is the only door the file association has.
   const urls = [...argv.filter((arg) => arg.startsWith('yaseendraw://')), ...openableFileArgs(argv, argsSkip()).map(fileLink)]
   if (urls.length > 0) {
@@ -64,7 +64,7 @@ app.on('open-url', (event, url) => {
 // absolute path — also before `ready` on a cold start. Encoding it as a yaseendraw:// link reuses
 // the whole E1 pipeline (queue, parse, routing, kind/exists guards); fileLink ↔ parseFileLink is
 // lossless (links.test.ts round trips). The bundle claims `.excalidraw` as an Owner association
-// in `desktop/package.json`, which is what makes the event fire at all (🔒 D1, YAZ-1775).
+// in `desktop/package.json`, which is what makes the event fire at all (🔒 YAZ-1775 D1, YAZ-1775).
 app.on('open-file', (event, path) => {
   event.preventDefault()
   links.push(fileLink(path))
@@ -81,8 +81,6 @@ const RENDERER_DIR = join(__dirname, '../renderer')
 
 /** One user-global state file (D9, GRO-2159): `~/Library/Application Support/Yaseen Draw/yaseendraw.json`. */
 const store = createStore(join(app.getPath('userData'), 'yaseendraw.json'))
-
-/** Persistent vault-index cache (GRO-2223 D1): one JSON per vault under userData, never in the vault. */
 
 /** Window lifecycle (GRO-2160) lives in windows.ts; this host is its Electron-only half. */
 const manager = createWindowManager(store, {
@@ -140,7 +138,7 @@ let lastFocusedWcId: number | undefined
 let gitSync: GitSyncManager | undefined
 
 /**
- * Set once the menu exists (🔒 D10): focusing another window changes which window a menu action
+ * Set once the menu exists (🔒 YAZ-1775 D10): focusing another window changes which window a menu action
  * targets, and therefore whether the two canvas items are enabled — but nothing in the STORE
  * moved, so `subscribeMenuRebuildOnActiveFile` cannot see it. The focus hook says so directly.
  */
@@ -181,7 +179,7 @@ app.whenReady().then(() => {
     },
     openExternal: (url) => void shell.openExternal(url),
   })
-  // 🔒 D10: the two canvas items are enabled only while the window a menu action would target has
+  // 🔒 YAZ-1775 D10: the two canvas items are enabled only while the window a menu action would target has
   // a DRAWING in front. Read at build time from the same entry `focusedEntry` uses, so the answer
   // and the send target can never disagree.
   const activeFileIsDrawing = (): boolean => {
@@ -194,22 +192,21 @@ app.whenReady().then(() => {
     Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenuTemplate({ recents: store.get().recents, isDev: !app.isPackaged, activeIsDrawing: activeFileIsDrawing() }, handlers)))
   applyMenu()
   subscribeMenuRebuild(store, applyMenu)
-  // A tab switch changes which file is in front (🔒 D10); focus changes which window is asked.
+  // A tab switch changes which file is in front (🔒 YAZ-1775 D10); focus changes which window is asked.
   subscribeMenuRebuildOnActiveFile(store, applyMenu)
   rebuildMenuOnFocus = applyMenu
-  const sync = registerIpc(store, manager, app.getPath('userData'))
-  gitSync = sync
-  // 🔒 D5: the one library folder every vault shares. Made at startup, detached — a launch must
+  gitSync = registerIpc(store, manager, app.getPath('userData'))
+  // 🔒 YAZ-1775 D5: the one library folder every vault shares. Made at startup, detached — a launch must
   // not wait on a disk, and a path that cannot be created is still what the Settings row names.
   void ensureLibraryFolder(store.get().settings.libraryFolder, app.getPath('userData'))
   // YAZ-1081 D3: a lid that just opened is the other "the world moved on while you were away"
   // moment, and the machine that edited the vault meanwhile is usually the other one. Wired here
   // rather than at module scope because powerMonitor is only safe to touch after `ready`.
-  powerMonitor.on('resume', () => sync.notifyWake())
-  powerMonitor.on('unlock-screen', () => sync.notifyWake())
+  powerMonitor.on('resume', () => gitSync?.notifyWake())
+  powerMonitor.on('unlock-screen', () => gitSync?.notifyWake())
   manager.restoreAll()
   // A COLD launch from a Finder / Explorer double-click: macOS has already queued its `open-file`
-  // path above, Windows and Linux put it in this process's own argv and fire nothing (2I).
+  // path above, Windows and Linux put it in this process's own argv and fire nothing (YAZ-1815).
   for (const path of openableFileArgs(process.argv, argsSkip())) links.push(fileLink(path))
   links.flush()
 })

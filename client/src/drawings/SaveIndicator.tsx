@@ -1,3 +1,8 @@
+/**
+ * The per-tab save chip (🔒 YAZ-1810): the dot-plus-label idiom `SyncIndicator` shares, in the
+ * engine's own top-right slot. A `role="status"` region, because "Saving… → Saved" is news the
+ * user did not ask for; both chips are styled in `statusChips.css`.
+ */
 import type { SaveStatus } from '../lib/autosave'
 
 const LABEL: Record<SaveStatus, string> = {

@@ -166,7 +166,7 @@ describe('buildMenuTemplate', () => {
     expect(vi.mocked(handlers.zoom).mock.calls).toEqual([[0], [1], [1], [-1]])
   })
 
-  it('File › Export Image… is ⌘⇧E, enabled only on a drawing tab, and calls exportImage (🔒 D10)', () => {
+  it('File › Export Image… is ⌘⇧E, enabled only on a drawing tab, and calls exportImage (🔒 YAZ-1775 D10)', () => {
     const handlers = noopHandlers()
     const item = menuOf(build(RECENTS, false, handlers, true), 'File').find((i) => i.id === 'menu.file.export-image')
     expect(item?.label).toBe('Export Image…')
@@ -178,7 +178,7 @@ describe('buildMenuTemplate', () => {
     expect(menuOf(build(RECENTS, false, handlers, false), 'File').find((i) => i.id === 'menu.file.export-image')?.enabled).toBe(false)
   })
 
-  it('File › Export Drawing… is ⌘⇧S, gated the same way, and calls exportDrawing (🔒 D3, YAZ-1821)', () => {
+  it('File › Export Drawing… is ⌘⇧S, gated the same way, and calls exportDrawing (🔒 YAZ-1775 D3, YAZ-1821)', () => {
     const handlers = noopHandlers()
     const file = menuOf(build(RECENTS, false, handlers, true), 'File')
     const item = file.find((i) => i.id === 'menu.file.export-drawing')
@@ -201,7 +201,7 @@ describe('buildMenuTemplate', () => {
     expect(accelerators.filter((a) => a === 'CmdOrCtrl+Shift+S')).toEqual(['CmdOrCtrl+Shift+S'])
   })
 
-  it('View › Canvas Background carries the engine`s five picks, gated the same way (🔒 D10)', () => {
+  it('View › Canvas Background carries the engine`s five picks, gated the same way (🔒 YAZ-1775 D10)', () => {
     const handlers = noopHandlers()
     const item = menuOf(build(RECENTS, false, handlers, true), 'View').find((i) => i.id === 'menu.view.canvas-background')
     expect(item?.label).toBe('Canvas Background')
@@ -274,6 +274,14 @@ describe('buildMenuTemplate', () => {
     const github = (top?.submenu as MenuItemConstructorOptions[]).find((i) => i.label === 'Yaseen Draw on GitHub')
     click(github)
     expect(handlers.openHelp).toHaveBeenCalledTimes(1)
+  })
+
+  it('⌘⇧N is the ONE duplicate-window door: the File item clicks straight through to newWindow', () => {
+    const handlers = noopHandlers()
+    const item = menuOf(build(RECENTS, false, handlers), 'File').find((i) => i.id === 'menu.file.new-window')
+    expect(item?.accelerator).toBe('CmdOrCtrl+Shift+N')
+    click(item)
+    expect(handlers.newWindow).toHaveBeenCalledTimes(1)
   })
 
   it('actionable items carry stable ids so a live check can drive them', () => {
@@ -519,7 +527,7 @@ describe('createMenuHandlers', () => {
 
 // ---------- subscribeMenuRebuild ----------
 
-describe('createMenuHandlers — the three canvas gestures (🔒 D10, 🔒 D3)', () => {
+describe('createMenuHandlers — the three canvas gestures (🔒 YAZ-1775 D10, 🔒 YAZ-1775 D3)', () => {
   it('exportImage, exportDrawing and canvasBackground push to the focused renderer, colour and all', () => {
     const wc = { id: 7, send: vi.fn() }
     const { handlers } = makeHandlers(wc)
@@ -544,7 +552,7 @@ describe('createMenuHandlers — the three canvas gestures (🔒 D10, 🔒 D3)',
   })
 })
 
-describe('subscribeMenuRebuildOnActiveFile (🔒 D10)', () => {
+describe('subscribeMenuRebuildOnActiveFile (🔒 YAZ-1775 D10)', () => {
   it('rebuilds when a window`s active file changes, and not for other writes', () => {
     store.upsertWindow(ENTRY)
     const rebuild = vi.fn()

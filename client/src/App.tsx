@@ -13,7 +13,7 @@ import { fileClipboardVerb } from './lib/fileClipboardHotkey'
 import { LINK_NOTICE_MS, type Notice, type NoticeKind } from './lib/notice'
 import { NoticeIcon } from './components/NoticeIcon'
 import { basename } from './lib/paths'
-import { carryEditorAcrossRename, carryEditorsAcrossDirRename, flushRenamedDir, flushRenamedPath, retireDeletedDir, retireDeletedPath } from './lib/renameContinuity'
+import { flushRenamedDir, flushRenamedPath, retireDir, retirePath } from './lib/renameContinuity'
 import { EMPTY_SELECTION } from './lib/selection'
 import { storage } from './lib/storage'
 import { ownsSidebarHotkey } from './lib/sidebarHotkey'
@@ -36,7 +36,7 @@ function syncHash(path: string | null): void {
 export function App() {
   const [root, setRoot] = useState<string | null>(storage.getRoot)
   // Workspace (Tabs I2 + YAZ-966): one renderer-owned model, seeded from the boot identity snapshot
-  // (a pasted `#/abs/path.md` URL wins as the active tab — bootTabs). The ACTIVE tab is this
+  // (a pasted `#/abs/path.excalidraw` URL wins as the active tab — bootTabs). The ACTIVE tab is this
   // window's `file`: title, URL hash and the sidebar highlight all follow it.
   const {
     tabs, active: file, mounted, openCurrent, openBackground, activate, close: closeTab, move: moveTab,
@@ -46,17 +46,11 @@ export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(storage.getSidebarCollapsed)
   const sidebarCollapsedRef = useRef(sidebarCollapsed)
   const [sidebarWidth, setSidebarWidth] = useState(storage.getSidebarWidth)
-  // The sidebar's active LENS (🔒 D4, YAZ-847): App-owned and persisted because the Sidebar is
+  // The sidebar's active LENS (🔒 YAZ-1775 D4, YAZ-847): App-owned and persisted because the Sidebar is
   // mounted `key={root}` and only while open; sidebar-local view state would reset on every
   // collapse/reopen and root switch. Window identity like visibility since YAZ-1628 — one
   // `WindowEntry.sidebarLens`; never a second flag.
   const [sidebarLens, setSidebarLens] = useState(storage.getSidebarLens)
-  // ⌘⇧C's read-only window onto the sidebar's multi-selection (🔒 D4, YAZ-1338). App owns the
-  // BOX and the chord; the Sidebar owns the selection (🔒 D1) and writes it in here, emptying it
-  // when it unmounts. A ref rather than state on purpose: App needs the answer only at the
-  // moment the key is pressed, and re-rendering this whole window on every shift+click would be
-  // a real cost for a fact nothing on screen up here shows.
-  const sidebarSelection = useRef<ReadonlySet<string>>(EMPTY_SELECTION)
   // ⌘C / ⌘X / ⌘V's handle (D6 amended, YAZ-1674): the mounted Sidebar's two verbs, null while collapsed.
   const sidebarClipboard = useRef<SidebarClipboard | null>(null)
   const sidebarRevealId = useRef(0)
@@ -64,11 +58,11 @@ export function App() {
   const [resizing, setResizing] = useState(false)
   const [settings, setSettings] = useState(storage.getSettings)
   const watch = useWatch(root)
-  // GitHub sync (YAZ-1081 3A/3B), owned here for the same reason: ONE per window. Two surfaces
+  // GitHub sync (YAZ-1081 YAZ-1817/YAZ-1818), owned here for the same reason: ONE per window. Two surfaces
   // read it — the editor's chip (every mounted tab) and the settings cog's section — and they
   // must never disagree, which two hooks watching the same root eventually would.
   const githubSync = useGithubSync(root)
-  // The attention banner (3B): passive — `role="status"`, explicit buttons, never a modal. Sync
+  // The attention banner (YAZ-1818): passive — `role="status"`, explicit buttons, never a modal. Sync
   // failing is not worth stealing focus over; the vault still works, and the drawing in front of
   // the user is untouched.
   //
@@ -154,7 +148,7 @@ export function App() {
     setSettings(next)
   }, [])
 
-  // 🔒 D9: the canvas prefs are ONE value in the shell store, and every mounted canvas in every
+  // 🔒 YAZ-1775 D9: the canvas prefs are ONE value in the shell store, and every mounted canvas in every
   // window reads it. The engine (or the rail) reports a change up here; the store broadcasts it;
   // the surfaces apply what actually moved. A ref carries the current settings so the callback
   // identity never changes — a new one would re-render the memoized `<Excalidraw>`.
@@ -169,7 +163,7 @@ export function App() {
     },
     [changeSettings],
   )
-  /** 🔒 D10: the canvas panel's last-used tab and dock preference, remembered app-wide. */
+  /** 🔒 YAZ-1775 D10: the canvas panel's last-used tab and dock preference, remembered app-wide. */
   const changeCanvasPanel = useCallback(
     (canvasPanel: CanvasPanelState) => {
       const current = settingsRef.current.canvasPanel
@@ -266,7 +260,7 @@ export function App() {
     setSidebarRevealRequest({ id: ++sidebarRevealId.current, path, lens })
   }, [sidebarCollapsed, sidebarLens, toggleSidebar, changeLens])
 
-  // A folder search row (🔒 D3, YAZ-1491): always the FILES lens, whichever tab was showing. The
+  // A folder search row (🔒 YAZ-1775 D3, YAZ-1491): always the FILES lens, whichever tab was showing. The
   // sidebar is necessarily open (the row was clicked in it), so no un-collapse step here.
   const revealInFiles = useCallback((path: string) => {
     changeLens('files')
@@ -286,7 +280,7 @@ export function App() {
 
   // File › Open Folder… / Open Recent (GRO-2161) reuse the same flows as the in-app buttons;
   // File › Close Tab and Window › Next/Previous Tab (GRO-2232) drive the tab model.
-  // 🔒 D10: File › Export Image… and View › Canvas Background act on the VISIBLE drawing layer,
+  // 🔒 YAZ-1775 D10: File › Export Image… and View › Canvas Background act on the VISIBLE drawing layer,
   // which `requestDrawingCommand` finds by DOM — several tabs are mounted at once and only one is
   // in front. Main greys both items out off a drawing tab, so a miss here is already impossible.
   const exportImage = useCallback(() => void requestDrawingCommand({ kind: 'export-image' }), [])
@@ -322,13 +316,12 @@ export function App() {
   useLinkEvents({ onOpenFile: openCurrent, onNotice: notify })
 
   /**
-   * ⌘C / ⌘X / ⌘V for the sidebar's FILE clipboard (D6 amended, YAZ-1674) — ⌘⇧C's sibling in every
-   * way: a window listener (a panel listener needs focus inside the panel, and after a click on
-   * the open file focus sits in the editor — YAZ-961's handoff — while blank space is not
-   * focusable at all), the same ownership boundary (`ownsWindowChord`: a field, the ProseMirror
-   * editor or a modal keeps the key, so text copy/paste is untouched), and a handle the Sidebar
-   * fills and empties. The RULES are the Sidebar's — target, order, the clipboard gate — so
-   * this only asks, and swallows the key exactly when a verb says it acted.
+   * ⌘C / ⌘X / ⌘V for the sidebar's FILE clipboard (D6 amended, YAZ-1674). A WINDOW listener: a
+   * panel listener needs focus inside the panel, and after a click on the open file focus sits in
+   * the canvas (YAZ-961's handoff) while blank space is not focusable at all. `ownsWindowChord`
+   * draws the boundary — a text field, the canvas or a modal keeps the key, so text copy/paste is
+   * untouched. The RULES are the Sidebar's — target, order, the clipboard gate — behind a handle
+   * it fills and empties; this only asks, and swallows the key exactly when a verb says it acted.
    */
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -346,25 +339,25 @@ export function App() {
   }, [])
 
   // In-app rename (Links E1 GRO-2194, folders E1b GRO-2241). `file:renamed` reaches EVERY
-  // window (originator included): BEFORE the workspace remap unmounts the old-path editor(s), a
-  // dirty buffer is carried into the new path and the old controller retired (no flush to
-  // the old path — see lib/renameContinuity.ts); then its main/right owner follows in place,
-  // and title/URL-hash track the active main tab through the existing effects above. A `dir`
-  // event is a PREFIX remap: every open editor and workspace path under the folder follows, and a window
-  // ROOTED at (or under) the folder — a subfolder opened as a vault — follows too (main's
-  // store repair already moved its WindowEntry.root; setRoot only mirrors it locally, so
-  // no identity write that could clobber the repaired file/tabs).
+  // window (originator included): BEFORE the workspace remap unmounts the old-path editor(s),
+  // the old controller is retired so nothing can flush to the old path (see
+  // lib/renameContinuity.ts); then its tab follows in place, and title/URL-hash track the
+  // active tab through the existing effects above. A `dir` event is a PREFIX remap: every open
+  // editor and workspace path under the folder follows, and a window ROOTED at (or under) the
+  // folder — a subfolder opened as a vault — follows too (main's store repair already moved
+  // its WindowEntry.root; setRoot only mirrors it locally, so no identity write that could
+  // clobber the repaired file/tabs).
   useEffect(
     () =>
       window.yaseenDraw.file.onRenamed(({ oldPath, newPath, kind }) => {
         if (kind === 'dir') {
-          carryEditorsAcrossDirRename(oldPath, newPath)
+          retireDir(oldPath)
           const movedRoot = root !== null && (root === oldPath || root.startsWith(`${oldPath}/`)) ? newPath + root.slice(oldPath.length) : undefined
           renameWorkspaceDir(oldPath, newPath, movedRoot)
           if (movedRoot !== undefined) setRoot(movedRoot)
           return
         }
-        carryEditorAcrossRename(oldPath, newPath)
+        retirePath(oldPath)
         renameWorkspacePath(oldPath, newPath)
       }),
     [renameWorkspacePath, renameWorkspaceDir, root],
@@ -393,16 +386,16 @@ export function App() {
         notify(exists ? `Can't rename: "${basename(newPath)}" already exists` : `Can't rename: ${err instanceof Error ? err.message : String(err)}`)
       }
     },
-    [root],
+    [root, notify],
   )
 
   /**
    * In-app delete landed (GRO-2272). Reaches EVERY window, originator included.
    *
-   * ORDER IS NOT NEGOTIABLE: retire the editor, THEN remap the workspace. Removing a page owner unmounts its
-   * editor, and `useAutosave`'s unmount cleanup flushes the live buffer to disk — which would
-   * recreate the file that was just trashed. Retiring first makes that flush a no-op. Reverse
-   * these two lines and the delete silently fails a second later.
+   * ORDER IS NOT NEGOTIABLE: retire the editor, THEN remap the workspace. Removing a tab
+   * unmounts its editor, and `DrawingEditor`'s unmount cleanup flushes the live scene to disk
+   * — which would recreate the file that was just trashed. Retiring first makes that flush a
+   * no-op. Reverse these two lines and the delete silently fails a second later.
    *
    * A window ROOTED at (or under) a deleted folder is deliberately not repaired here: the
    * sidebar's existing `onRootMissing` probe owns that, and it also drops the dead MRU entry.
@@ -411,11 +404,11 @@ export function App() {
     () =>
       window.yaseenDraw.file.onDeleted(({ path, kind }) => {
         if (kind === 'dir') {
-          retireDeletedDir(path)
+          retireDir(path)
           deleteWorkspaceDir(path)
           return
         }
-        retireDeletedPath(path)
+        retirePath(path)
         deleteWorkspacePath(path)
       }),
     [deleteWorkspacePath, deleteWorkspaceDir],
@@ -442,7 +435,7 @@ export function App() {
           : `Can't delete "${name}": ${err instanceof Error ? err.message : String(err)}`,
       )
     }
-  }, [])
+  }, [notify])
 
   const onRootMissing = useCallback(() => {
     storage.setRoot(null) // one identity write: { root: null, file: null, tabs: [] }
@@ -466,7 +459,7 @@ export function App() {
           dialog's Sync page and the editor's chip read the same status, so they can never
           disagree about what this vault is doing. */}
       {settingsOpen && <SettingsDialog ctx={{ settings, onChange: changeSettings, sync: { status: githubSync.status, setEnabled: githubSync.setEnabled } }} onClose={closeSettings} />}
-      {/* 3B: sync needs attention. Two of the five reasons are things this app cannot fix from
+      {/* YAZ-1818: sync needs attention. Two of the five reasons are things this app cannot fix from
           inside itself (git missing, credentials rejected), so the offer is a prompt to paste
           into any LLM — an assistant that CAN drive the terminal — rather than a wizard. */}
       {syncCopy !== null && !syncDismissed && root !== null && githubSync.status !== null && (
@@ -509,8 +502,6 @@ export function App() {
           onRenameFile={renameFile}
           onDeleteFile={deleteFile}
           onNotice={notify}
-          // The multi-selection box (🔒 D4): the panel keeps it current, the context menu reads it.
-          selectionRef={sidebarSelection}
           // ⌘C / ⌘X / ⌘V's handle (D6 amended, YAZ-1674): the panel fills it, the listener above asks it.
           clipboardRef={sidebarClipboard}
           pendingSearchFocus={pendingSearchFocus}

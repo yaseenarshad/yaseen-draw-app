@@ -1,5 +1,5 @@
 /**
- * THE IMAGE STUDIO'S CURATION (🔒 D4, YAZ-1818): `worker/imageStudio.ts` from the web app
+ * THE IMAGE STUDIO'S CURATION (🔒 YAZ-1775 D4, YAZ-1818): `worker/imageStudio.ts` from the web app
  * (`yaseen-excalidraw` @ `e72242f8`), ported rather than re-invented. This is the valuable part
  * of the Worker — the ranking, the interleave, the two-phase Iconify walk and the cursor that
  * makes an infinite scroll possible over two providers with incompatible paging — and it is the
@@ -14,11 +14,6 @@
  *   route that would serve the picture; this app has no routes and asks over `media:preview`.
  * - The cursor's base64url is `Buffer.from(...).toString('base64url')` instead of `btoa` plus
  *   three `replace`s. Same bytes, same alphabet, same stripped padding — Node has the encoder.
- * - `curateIconifyResults` / `iconPriority` are ported although the Worker's own search never
- *   calls them (it exports and tests them, nothing more). 🔒 D4 names `LOW_PRIORITY_COLLECTIONS`
- *   as part of the curation to port, and the rule it encodes — colour sets first, logos only for
- *   a logo-shaped query, Material/FontAwesome last — is the one anybody adding ranking here would
- *   otherwise write again, worse.
  */
 import type { MediaItemKind, MediaSearchSource, StudioItem } from '@shared/types'
 
@@ -31,7 +26,7 @@ export const PIXABAY_ALL_RESULT_LIMIT = SEARCH_LIMIT - ICONIFY_ALL_RESULT_LIMIT
 export const ICONIFY_COLOR_BATCH_LIMIT = 6
 /** Pixabay is paged four at a time, alternating vector and illustration. */
 export const PIXABAY_PAGE_SIZE = 4
-/** The import ceiling (🔒 D4): 20 MB, enforced in main, never in the renderer. */
+/** The import ceiling (🔒 YAZ-1775 D4): 20 MB, enforced in main, never in the renderer. */
 export const MAX_IMPORT_BYTES = 20 * 1024 * 1024
 /** Search JSON and previews live this long on disk; bump `SEARCH_CACHE_VERSION` to orphan them early. */
 export const CACHE_SECONDS = 24 * 60 * 60
@@ -56,9 +51,6 @@ export const COLOR_COLLECTION_PRIORITY = [
   'icon-park',
   'icon-park-twotone',
 ]
-
-/** The sets that answer EVERY query, so they go last when anything else fits. */
-export const LOW_PRIORITY_COLLECTIONS = ['material-symbols', 'material-icons', 'mdi', 'ic', 'fa', 'fa6-solid', 'fa6-regular']
 
 const colorCollectionSet = new Set(COLOR_COLLECTION_PRIORITY)
 /** Whether `prefix` is one of the colour sets the first Iconify pass claims. */
@@ -85,7 +77,6 @@ export interface PixabayHit {
 export interface IconifyCollection {
   name?: string
   category?: string
-  palette?: boolean
   license?: { title?: string; url?: string; spdx?: string }
 }
 
@@ -93,7 +84,6 @@ export interface IconifySearchPayload {
   icons?: string[]
   collections?: Record<string, IconifyCollection>
   total?: number
-  start?: number
   limit?: number
 }
 
@@ -138,9 +128,8 @@ export interface ProviderSearchResult<Provider extends SearchProvider> {
 export type AnyProviderSearchResult = ProviderSearchResult<'iconify'> | ProviderSearchResult<'pixabay'>
 
 const stringValue = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : undefined)
-const numberValue = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : undefined)
-
-export { numberValue as finiteNumber }
+/** A finite number, or undefined — the Pixabay payload's own looseness, narrowed once. */
+export const finiteNumber = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : undefined)
 
 /** A Pixabay hit's first tag, title-cased — the closest thing the API gives to a name. */
 const titleFromTags = (tags?: string) => {
@@ -152,13 +141,13 @@ const titleFromTags = (tags?: string) => {
 }
 
 /**
- * Pixabay hits → items. `vector` and `illustration` ONLY (🔒 D4): photographs are not what this
+ * Pixabay hits → items. `vector` and `illustration` ONLY (🔒 YAZ-1775 D4): photographs are not what this
  * studio is for, and the API answers with them freely if you let it. A hit with no id or no
  * preview is not an item at all.
  */
 export function normalizePixabayResults(payload: { hits?: PixabayHit[] }): StudioItem[] {
   return (payload.hits ?? []).flatMap((raw) => {
-    const id = numberValue(raw.id)
+    const id = finiteNumber(raw.id)
     const preview = stringValue(raw.previewURL)
     const type = stringValue(raw.type)?.toLowerCase()
     if (id === undefined || !preview || (!type?.startsWith('vector') && !type?.startsWith('illustration'))) return []
@@ -178,9 +167,9 @@ export function normalizePixabayResults(payload: { hits?: PixabayHit[] }): Studi
     if (creator !== undefined) item.creator = creator
     const sourceUrl = stringValue(raw.pageURL)
     if (sourceUrl !== undefined) item.sourceUrl = sourceUrl
-    const width = numberValue(raw.imageWidth)
+    const width = finiteNumber(raw.imageWidth)
     if (width !== undefined) item.width = width
-    const height = numberValue(raw.imageHeight)
+    const height = finiteNumber(raw.imageHeight)
     if (height !== undefined) item.height = height
     return [item]
   })
@@ -214,32 +203,6 @@ export function normalizeIconifyResults(payload: { icons?: string[]; collections
     if (kind === 'logo') item.trademarkNotice = true
     return [item]
   })
-}
-
-/** Lower sorts first: colour sets by their own order, then plain icons, then logos, then the everything-sets. */
-export function iconPriority(item: StudioItem, query: string): number {
-  const prefix = item.providerId.split(':')[0]
-  const colorIndex = COLOR_COLLECTION_PRIORITY.indexOf(prefix)
-  if (colorIndex >= 0) return colorIndex
-  if (item.kind === 'logo') {
-    const logoQuery = /\b(logo|brand)\b/i.test(query) || item.title.toLowerCase().includes(query.toLowerCase())
-    return logoQuery ? 20 : 80
-  }
-  const lowPriorityIndex = LOW_PRIORITY_COLLECTIONS.indexOf(prefix)
-  return lowPriorityIndex >= 0 ? 100 + lowPriorityIndex : 40
-}
-
-/** Rank, de-duplicate by `itemKey`, cut to `limit`. Ties break on the title so the order is stable. */
-export function curateIconifyResults(items: StudioItem[], query: string, limit = SEARCH_LIMIT): StudioItem[] {
-  const itemKeys = new Set<string>()
-  return [...items]
-    .sort((left, right) => iconPriority(left, query) - iconPriority(right, query) || left.title.localeCompare(right.title))
-    .filter((item) => {
-      if (itemKeys.has(item.itemKey)) return false
-      itemKeys.add(item.itemKey)
-      return true
-    })
-    .slice(0, limit)
 }
 
 /** Three icons, one graphic, repeat — the grid's rhythm, capped at `SEARCH_LIMIT`. */
@@ -344,7 +307,7 @@ export function hasMorePages(cursor: SearchCursor, source: MediaSearchSource): b
 }
 
 /** The Pixabay search URL the Worker built, field for field (`colors=transparent`, `safesearch`, `order=popular`). */
-export function pixabaySearchUrl(query: string, page: number, imageType: PixabayImageType, key: string, perPage = 20): URL {
+export function pixabaySearchUrl(query: string, page: number, imageType: PixabayImageType, key: string, perPage: number): URL {
   const url = new URL(PIXABAY_API)
   url.searchParams.set('key', key)
   url.searchParams.set('q', query)
@@ -355,11 +318,6 @@ export function pixabaySearchUrl(query: string, page: number, imageType: Pixabay
   url.searchParams.set('safesearch', 'true')
   url.searchParams.set('order', 'popular')
   return url
-}
-
-/** Both of a page's URLs, vector then illustration — the shape the Worker's own test pins. */
-export function buildPixabaySearchUrls(query: string, page: number, key: string, perPage = 20): URL[] {
-  return [pixabaySearchUrl(query, page, 'vector', key, perPage), pixabaySearchUrl(query, page, 'illustration', key, perPage)]
 }
 
 /** Iconify's search URL; `prefixes` is what makes the colour pass a colour pass. */

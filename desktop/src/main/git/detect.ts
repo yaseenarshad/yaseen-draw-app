@@ -3,7 +3,7 @@ import path from 'node:path'
 import { git } from './exec'
 
 /**
- * Repo detection (YAZ-1081, 2A): everything the sync layer needs to know about a vault root
+ * Repo detection (YAZ-1081 2A): everything the sync layer needs to know about a vault root
  * before it decides to do anything, gathered in one pass of read-only git calls.
  *
  * Every question here has a "no" answer that is NORMAL — a vault that isn't a repo, a repo with
@@ -83,9 +83,9 @@ export async function detectRepo(bin: string, root: string): Promise<RepoFacts> 
     branch = sym.code === 0 ? sym.stdout.trim() || null : null
   }
 
-  // Untracked files included (porcelain's default), since an unsynced new note is exactly the
+  // Untracked files included (porcelain's default), since an unsynced new drawing is exactly the
   // state this flag exists to catch. Untracked DIRECTORIES collapse to a single `dir/` entry —
-  // fine for "is there anything to commit", and 2B stages with `add -A` regardless.
+  // fine for "is there anything to commit", and `syncPass` stages with `add -A` regardless.
   const status = await git(bin, root, ['status', '--porcelain=v1'])
   const dirtyFiles =
     status.code === 0

@@ -1,19 +1,14 @@
 /**
- * The focus-handoff gate (🔒 YAZ-1812, built in 2I): a drawing tab that becomes visible takes the
+ * The focus-handoff gate (🔒 YAZ-1812, built in YAZ-1815): a drawing tab that becomes visible takes the
  * keyboard so tool hotkeys work without a click — but only when nothing else is holding it.
  */
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { mayTakeFocus } from './focusHandoff'
 
 const layer = document.createElement('div')
 const canvas = document.createElement('div')
 layer.appendChild(canvas)
 const elsewhere = document.createElement('input')
-
-afterEach(() => {
-  layer.remove()
-  elsewhere.remove()
-})
 
 describe('mayTakeFocus', () => {
   it('takes it when NOTHING holds the keyboard', () => {

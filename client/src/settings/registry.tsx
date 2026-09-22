@@ -8,9 +8,9 @@
  * `id` doubles as the row's `data-setting` address — for the `SettingsState` rows it IS the field
  * name, so a test or spec that knows the field knows the row.
  *
- * Two settings are NOT in `SettingsState`. GitHub sync (YAZ-1081 3B) lives per-vault in
+ * Two settings are NOT in `SettingsState`. GitHub sync (YAZ-1081 YAZ-1818) lives per-vault in
  * `.yaseendraw/github.json`, read and written through the engine, so its section is `available`
- * only when App hands the engine's status + setter over. The Pixabay API key (🔒 D4) lives in
+ * only when App hands the engine's status + setter over. The Pixabay API key (🔒 YAZ-1775 D4) lives in
  * main's encrypted `secrets.json` and is never in any renderer's state at all — its row writes
  * through `secrets:set` and reads back only "set" / "not set".
  */
@@ -35,8 +35,8 @@ export interface SettingDef {
   /** Shown under the label; a hint written as a function reads live state (the sync repo facts). */
   hint?: string | ((ctx: SettingsCtx) => string)
   keywords?: readonly string[]
-  /** The control stacks full-width under the text instead of sitting beside it (D7); a function reads live state (the folder input shows only for `folder`). */
-  wide?: boolean | ((ctx: SettingsCtx) => boolean)
+  /** The control stacks full-width under the text instead of sitting beside it (D7). */
+  wide?: boolean
   render: (ctx: SettingsCtx) => ReactNode
 }
 
@@ -94,7 +94,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
       },
     ],
   },
-  // 🔒 D9: the user-level canvas preferences, declared in their own module because there are
+  // 🔒 YAZ-1775 D9: the user-level canvas preferences, declared in their own module because there are
   // fourteen of them and they are the one section with a mapping behind it (`shared/canvasPrefs.ts`).
   CANVAS_SECTION,
   {
@@ -109,13 +109,13 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
             // actually means rather than being a bare switch.
             id: 'confirmDelete',
             label: 'Confirm before deleting',
-            hint: 'Deleted notes and folders move to the Trash either way.',
+            hint: 'Deleted drawings and folders move to the Trash either way.',
             render: ({ settings, onChange }) => (
               <Segmented options={ON_OFF_OPTIONS} value={settings.confirmDelete} onChange={(confirmDelete) => onChange({ ...settings, confirmDelete })} ariaLabel="Confirm before deleting" />
             ),
           },
           {
-            // 🔒 D5: ONE library folder for every vault. `wide` because the row's real content is
+            // 🔒 YAZ-1775 D5: ONE library folder for every vault. `wide` because the row's real content is
             // the resolved path, which is long, and the two buttons belong under it rather than
             // squeezed beside it. The hint is a component: only main can resolve the default.
             id: 'libraryFolder',
@@ -143,7 +143,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
       {
         items: [
           {
-            // 🔒 D4: the key is typed here once, encrypted by main, and never shown again. Its id is
+            // 🔒 YAZ-1775 D4: the key is typed here once, encrypted by main, and never shown again. Its id is
             // not a `SettingsState` field — the state file is broadcast to every window, and a key
             // in it would be a key in every devtools console.
             id: 'pixabayApiKey',
@@ -186,15 +186,14 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     standalone: true,
     // One group per table, so "Window" is a heading search knows. The id is the table's title
     // lower-cased (`hotkeys-window`); every key and label of the table is a keyword, so "close
-    // tab" or "⌘W" finds it, and "keyboard shortcuts" reaches every table (the Keyboard one is
-    // already labelled that).
+    // tab" or "⌘W" finds it, and "keyboard shortcuts" reaches every table.
     groups: HOTKEY_GROUPS.map(({ title, entries }) => ({
       title,
       items: [
         {
           id: `hotkeys-${title.toLowerCase()}`,
           label: `${title} shortcuts`,
-          keywords: [...(title === 'Keyboard' ? [] : ['keyboard shortcuts']), ...entries.flatMap((entry) => [entry.keys, entry.label])],
+          keywords: ['keyboard shortcuts', ...entries.flatMap((entry) => [entry.keys, entry.label])],
           wide: true,
           render: () => hotkeyTable(entries),
         },
@@ -209,5 +208,5 @@ export const availableSections = (ctx: SettingsCtx): SettingsSection[] => SETTIN
 /** A hint resolved against the context: plain text, or the live-state kind. */
 export const resolveHint = (item: SettingDef, ctx: SettingsCtx): string | undefined => (typeof item.hint === 'function' ? item.hint(ctx) : item.hint)
 
-/** Whether the row stacks its control, resolved the same way. */
-export const resolveWide = (item: SettingDef, ctx: SettingsCtx): boolean => (typeof item.wide === 'function' ? item.wide(ctx) : item.wide === true)
+/** Whether the row stacks its control. */
+export const resolveWide = (item: SettingDef): boolean => item.wide === true

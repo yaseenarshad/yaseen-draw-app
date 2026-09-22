@@ -7,7 +7,7 @@ import { MEDIA_LIBRARY_FILE, type MediaItem } from '@shared/types'
 import { CH, type Envelope } from '../../channels'
 import type { MediaStore } from '../library/mediaStore'
 import { createStore, type Store } from '../store'
-import { registerMediaIpc } from './media'
+import { registerMediaLibraryIpc } from './mediaLibrary'
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), on: vi.fn() },
@@ -51,7 +51,7 @@ beforeEach(async () => {
   userData = path.join(dir, 'userData')
   await mkdir(path.join(userData, 'library'), { recursive: true })
   store = createStore(path.join(userData, 'yaseendraw.json'))
-  media = registerMediaIpc(store, userData)
+  media = registerMediaLibraryIpc(store, userData)
 })
 afterEach(async () => {
   await media.close()
@@ -62,12 +62,12 @@ afterEach(async () => {
 const favorites = (req: unknown) => registered(CH.mediaFavorites)({ sender }, req)
 const recent = (req: unknown) => registered(CH.mediaRecent)({ sender }, req)
 
-describe('registerMediaIpc (🔒 D4 / D5, YAZ-1817)', () => {
+describe('registerMediaLibraryIpc (🔒 YAZ-1775 D4 / D5, YAZ-1817)', () => {
   it('registers exactly the two media channels', () => {
     expect(vi.mocked(ipcMain.handle).mock.calls.map(([ch]) => ch).sort()).toEqual([CH.mediaFavorites, CH.mediaRecent].sort())
   })
 
-  it('reads and writes `<userData>/library/media.json` by default (🔒 D5), every verb answering its list', async () => {
+  it('reads and writes `<userData>/library/media.json` by default (🔒 YAZ-1775 D5), every verb answering its list', async () => {
     expect(await favorites({ op: 'list' })).toEqual(ok([]))
     const added = await favorites({ op: 'add', item: item() })
     expect(added).toEqual(ok([expect.objectContaining({ itemKey: 'pixabay:1', updatedAt: expect.any(Number) })]))

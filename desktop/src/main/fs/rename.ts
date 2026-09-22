@@ -25,8 +25,8 @@ export async function hasExactDirectoryEntry(
  *
  * E1b refusals: the target's parent must already EXIST (`NOT_FOUND`, attributed to the
  * parent — never a mkdir here; the sidebar gesture only offers existing folders);
- * dot-directories (`.yaseendraw`, `.obsidian`, …) are invisible infrastructure — never in
- * the tree, index or watcher — so renaming one, or renaming INTO a dot-name, is refused
+ * dot-directories (`.yaseendraw`, `.obsidian`, …) are invisible infrastructure — never in the
+ * tree and never watched — so renaming one, or renaming INTO a dot-name, is refused
  * (`BAD_REQUEST`); a folder cannot move inside itself. The calling window's own vault ROOT
  * is refused upstream (ipc/fs.ts): root identity is a recents/vault-management question
  * (which recents entry follows, what the window identity means), out of E1b's scope.

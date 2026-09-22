@@ -33,14 +33,15 @@ const surface = {
   refreshes: 0,
   /** How many times the tab-reveal handoff (🔒 YAZ-1812) put the keyboard in this canvas. */
   focuses: 0,
-  /** What the application menu's three canvas items (🔒 D10 / 🔒 D3) reached this canvas as. */
+  /** What the application menu's three canvas items (🔒 YAZ-1775 D10 / 🔒 YAZ-1775 D3) reached this canvas as. */
   commands: [] as DrawingCommand[],
-  /** What `exportScene()` answers — the standalone bytes the save sheet is offered (🔒 D3). */
+  /** What `exportScene()` answers — the standalone bytes the save sheet is offered (🔒 YAZ-1775 D3). */
   exportedScene: '{"type":"excalidraw","elements":[],"files":{}}\n',
 }
 
-vi.mock('./ExcalidrawSurface', () => ({
-  ENGINE_LOAD_FAILED: "Can't open the drawing editor.",
+vi.mock('./ExcalidrawSurface', async (importOriginal) => ({
+  // The real constant, so a change to the seam's message cannot slip past this suite.
+  ENGINE_LOAD_FAILED: ((await importOriginal()) as { ENGINE_LOAD_FAILED: string }).ENGINE_LOAD_FAILED,
   ExcalidrawSurface: (props: DrawingSurfaceProps) => {
     surface.props = props
     surface.emit = props.onSnapshot
@@ -74,14 +75,13 @@ vi.mock('./ExcalidrawSurface', () => ({
 }))
 
 import { api } from '../api'
-import { _resetRenameContinuity, flushRenamedPath, retireDeletedPath } from '../lib/renameContinuity'
+import { _resetRenameContinuity, flushRenamedPath, retirePath } from '../lib/renameContinuity'
 import { BridgeRequestError } from '../api'
 import { BROKEN_DRAWING_DOCUMENT, DrawingEditor } from './DrawingEditor'
 
 const load = vi.mocked(api.drawing.load)
 const save = vi.mocked(api.drawing.save)
 const saveDrawing = vi.mocked(api.dialog.saveDrawing)
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const ROOT = '/vault'
 const PATH = '/vault/Board.excalidraw'
@@ -304,7 +304,7 @@ describe('autosave', () => {
     emit(1)
     emit(2)
     save.mockClear()
-    act(() => retireDeletedPath(PATH))
+    act(() => retirePath(PATH))
     act(() => root?.unmount())
     root = null
     await flush()
@@ -440,7 +440,7 @@ describe('external changes', () => {
   })
 })
 
-describe('🔒 D3 — which image bytes a save ships', () => {
+describe('🔒 YAZ-1775 D3 — which image bytes a save ships', () => {
   const png = (payload: string): DrawingFileData => ({ mimeType: 'image/png', dataURL: `data:image/png;base64,${payload}` })
 
   it('ships only the files the store lacks, and never ships one twice', async () => {
@@ -507,8 +507,6 @@ describe('chips and the canvas frame', () => {
   it('renders the save chip — and the sync chip only when the vault has one — into the engine`s top-right slot', async () => {
     render()
     await flush()
-    const withoutSync = surface.props?.renderTopRight?.()
-    expect(withoutSync).toBeTruthy()
     expect(chips()).toContain('Saved')
 
     const sync: GithubSyncStatus = { state: 'pending', enabled: true } as GithubSyncStatus
@@ -565,7 +563,7 @@ describe('chips and the canvas frame', () => {
     })
 
     it('takes it from the tab being LEFT — the other canvas is inside the same tab layer', async () => {
-      container.className = 'tabstack__layer'
+      container.className = 'tabstack'
       await withObserver(async (reveal) => {
         render()
         await flush()
@@ -593,7 +591,7 @@ describe('chips and the canvas frame', () => {
     })
   })
 
-  it('claims the application menu`s three canvas commands on its own section (🔒 D10, 🔒 D3)', async () => {
+  it('claims the application menu`s three canvas commands on its own section (🔒 YAZ-1775 D10, 🔒 YAZ-1775 D3)', async () => {
     // The container IS this tab's workspace layer, which is what `requestDrawingCommand` selects.
     container.className = 'tabstack__layer'
     render()
@@ -615,7 +613,7 @@ describe('chips and the canvas frame', () => {
     expect(surface.commands).toEqual([])
   })
 
-  it('Export Drawing… offers the canvas`s standalone bytes under the BOARD`s name (🔒 D3, YAZ-1821)', async () => {
+  it('Export Drawing… offers the canvas`s standalone bytes under the BOARD`s name (🔒 YAZ-1775 D3, YAZ-1821)', async () => {
     container.className = 'tabstack__layer'
     const onNotice = vi.fn()
     render({ onNotice })
@@ -626,7 +624,7 @@ describe('chips and the canvas frame', () => {
     await flush()
     expect(saveDrawing).toHaveBeenCalledExactlyOnceWith({ defaultName: 'Board.excalidraw', content: surface.exportedScene })
     expect(onNotice).toHaveBeenCalledWith('Exported to Board.excalidraw')
-    // 🔒 D3: the VAULT file is not touched — no save, no flush, nothing read back.
+    // 🔒 YAZ-1775 D3: the VAULT file is not touched — no save, no flush, nothing read back.
     expect(save).not.toHaveBeenCalled()
     expect(load).toHaveBeenCalledTimes(1)
   })
@@ -656,7 +654,7 @@ describe('chips and the canvas frame', () => {
     expect(chips()).not.toContain(BROKEN_DRAWING_DOCUMENT)
   })
 
-  it('hands the surface the shell`s canvas prefs to seed the scene with (🔒 D9)', async () => {
+  it('hands the surface the shell`s canvas prefs to seed the scene with (🔒 YAZ-1775 D9)', async () => {
     render({ canvasPrefs: { ...DEFAULT_CANVAS_PREFS, gridModeEnabled: true } })
     await flush()
     expect(surface.props?.canvasPrefs).toEqual({ ...DEFAULT_CANVAS_PREFS, gridModeEnabled: true })

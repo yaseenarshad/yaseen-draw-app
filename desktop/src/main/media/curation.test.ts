@@ -1,14 +1,12 @@
 /**
- * The curation rules ported from `worker/imageStudio.ts` (🔒 D4, YAZ-1818). The web app's own
+ * The curation rules ported from `worker/imageStudio.ts` (🔒 YAZ-1775 D4, YAZ-1818). The web app's own
  * four unit tests are here field for field — Pixabay type filtering, the search URL's shape,
  * colour-collection ranking, the three-to-one interleave — plus the cursor, which the Worker only
  * ever exercised through a live `Request` and which is the piece an infinite scroll rests on.
  */
 import { describe, expect, it } from 'vitest'
 import {
-  buildPixabaySearchUrls,
   COLOR_COLLECTION_PRIORITY,
-  curateIconifyResults,
   decodeCursor,
   encodeCursor,
   hasMorePages,
@@ -16,11 +14,11 @@ import {
   iconifyItemFromId,
   iconifyPageExhausted,
   iconifySearchUrl,
+  pixabaySearchUrl,
   iconifySvgUrl,
   initialCursor,
   interleaveResults,
   isColorCollection,
-  LOW_PRIORITY_COLLECTIONS,
   MAX_IMPORT_BYTES,
   nextPixabayType,
   normalizeIconifyResults,
@@ -40,7 +38,7 @@ const iconItem = (providerId: string, over: Partial<{ kind: 'icon' | 'logo'; tit
   title: over.title ?? providerId,
 })
 
-describe('the numbers 🔒 D4 locked', () => {
+describe('the numbers 🔒 YAZ-1775 D4 locked', () => {
   it('is 18 results, 14 icons and 4 graphics in "all", cache version 2, 20 MB imports', () => {
     expect(SEARCH_LIMIT).toBe(18)
     expect(ICONIFY_ALL_RESULT_LIMIT).toBe(14)
@@ -56,11 +54,10 @@ describe('the numbers 🔒 D4 locked', () => {
     expect(providersFor('pixabay')).toEqual(['pixabay'])
   })
 
-  it('knows the colour sets by name and keeps the low-priority ones listed', () => {
+  it('knows the colour sets by name — the first Iconify pass is exactly these', () => {
     expect(isColorCollection('fluent-emoji-flat')).toBe(true)
     expect(isColorCollection('mdi')).toBe(false)
     expect(COLOR_COLLECTION_PRIORITY[0]).toBe('fluent-emoji-flat')
-    expect(LOW_PRIORITY_COLLECTIONS).toContain('material-symbols')
   })
 })
 
@@ -108,16 +105,14 @@ describe('Pixabay normalization', () => {
     expect(item.previewUrl).toBeUndefined()
   })
 
-  it('builds transparent, safe vector and illustration searches', () => {
-    const urls = buildPixabaySearchUrls('filing cabinet', 2, 'secret')
-    expect(urls.map((url) => url.searchParams.get('image_type'))).toEqual(['vector', 'illustration'])
-    for (const url of urls) {
-      expect(url.searchParams.get('colors')).toBe('transparent')
-      expect(url.searchParams.get('safesearch')).toBe('true')
-      expect(url.searchParams.get('order')).toBe('popular')
-      expect(url.searchParams.get('page')).toBe('2')
-      expect(url.searchParams.get('key')).toBe('secret')
-    }
+  it('builds a transparent, safe, popular-ordered search URL', () => {
+    const url = pixabaySearchUrl('filing cabinet', 2, 'vector', 'secret', 20)
+    expect(url.searchParams.get('image_type')).toBe('vector')
+    expect(url.searchParams.get('colors')).toBe('transparent')
+    expect(url.searchParams.get('safesearch')).toBe('true')
+    expect(url.searchParams.get('order')).toBe('popular')
+    expect(url.searchParams.get('page')).toBe('2')
+    expect(url.searchParams.get('key')).toBe('secret')
   })
 })
 
@@ -138,30 +133,7 @@ describe('Iconify normalization and ranking', () => {
     expect(normalizeIconifyResults({ icons: ['nocolon', ':leading', 'trailing:'] })).toEqual([])
   })
 
-  it('prioritizes colorful collections without collapsing valid variants', () => {
-    const results = normalizeIconifyResults({
-      icons: ['mdi:rocket', 'mdi:rocket-launch', 'mdi:rocket-outline', 'fluent-emoji-flat:rocket', 'fluent-color:rocket-24', 'tabler:rocket'],
-      collections: {
-        mdi: { name: 'Material Design Icons' },
-        'fluent-emoji-flat': { name: 'Fluent Emoji Flat', palette: true },
-        'fluent-color': { name: 'Fluent Color', palette: true },
-        tabler: { name: 'Tabler' },
-      },
-    })
 
-    const curated = curateIconifyResults(results, 'rocket', 10)
-    expect(curated[0].providerId).toBe('fluent-emoji-flat:rocket')
-    expect(curated[1].providerId).toBe('fluent-color:rocket-24')
-    expect(curated.filter(({ providerId }) => providerId.startsWith('mdi:'))).toHaveLength(3)
-    expect(new Set(curated.map(({ providerId }) => providerId)).size).toBe(curated.length)
-  })
-
-  it('sinks the everything-sets below a plain set, and a logo below both unless the query asked for one', () => {
-    const ranked = curateIconifyResults([iconItem('mdi:box'), iconItem('tabler:box'), iconItem('simple-icons:box', { kind: 'logo', title: 'zzz' })], 'box').map(({ providerId }) => providerId)
-    expect(ranked).toEqual(['tabler:box', 'simple-icons:box', 'mdi:box'])
-    const logoQuery = curateIconifyResults([iconItem('mdi:box'), iconItem('simple-icons:box', { kind: 'logo', title: 'zzz' })], 'box logo').map(({ providerId }) => providerId)
-    expect(logoQuery[0]).toBe('simple-icons:box')
-  })
 
   it('mixes three curated icons before each Pixabay graphic', () => {
     const item = (provider: 'pixabay' | 'iconify', providerId: string) => ({

@@ -1,6 +1,6 @@
 /**
  * The ⌘K catalog (YAZ-1814): ONE walk of the tree the Sidebar already holds gives one row per
- * drawing — named the way the tree and the tab strip spell it — and one row per folder (🔒 D1/D2,
+ * drawing — named the way the tree and the tab strip spell it — and one row per folder (🔒 YAZ-1491 D1/D2,
  * YAZ-1491), ranked through the shared matcher at SEARCH_CAP. Non-drawing files never appear, and
  * `assets/` is already gone from `fs:tree`, so the catalog inherits that rule.
  */
@@ -111,7 +111,7 @@ describe('searchTitles', () => {
     expect(searchTitles(rows, 'archive').map((c) => [c.kind, c.label])).toEqual([['dir', 'Archive']])
   })
 
-  it('a folder and a drawing of the same name both match exactly — the folder first (🔒 D1)', () => {
+  it('a folder and a drawing of the same name both match exactly — the folder first (🔒 YAZ-1491 D1)', () => {
     const rows = buildDrawingCatalog('/vault', [dir('/vault/CAC'), file('/vault/CAC.excalidraw')])
     expect(searchTitles(rows, 'cac').map((c) => [c.kind, c.path])).toEqual([
       ['dir', '/vault/CAC'],
@@ -149,7 +149,7 @@ describe('searchTitles', () => {
 })
 
 /**
- * The perf tripwire (2H): ⌘K has NO debounce, so every keystroke builds nothing and scans the whole
+ * The perf tripwire (YAZ-1814): ⌘K has NO debounce, so every keystroke builds nothing and scans the whole
  * catalog. These budgets are an order of magnitude above what the scan costs — they exist to fail
  * loudly if the matcher ever grows a per-row allocation, a regex or a sort, not to time a machine.
  */

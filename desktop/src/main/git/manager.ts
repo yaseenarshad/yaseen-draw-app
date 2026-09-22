@@ -1,7 +1,8 @@
-import type { GithubSyncStatus, VaultConfigChange, WatchEvent } from '@shared/types'
+import type { GithubSyncConfig, GithubSyncStatus, VaultConfigChange, WatchEvent } from '@shared/types'
+import { isRecord } from '@shared/guards'
 
 /**
- * Per-root sync orchestration (YAZ-1081, 2B): WHEN a pass runs, and what the app is told about it.
+ * Per-root sync orchestration (YAZ-1081 2B): WHEN a pass runs, and what the app is told about it.
  * `sync.ts` owns what a pass does; this module owns the clock, the serialisation and the adoption.
  *
  * Electron-free by construction — every edge (config store, vault watcher, status broadcast, the
@@ -84,7 +85,6 @@ interface Entry {
   dropped: boolean
 }
 
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
 /** Unref'd throughout: a sync timer must never hold the app open (the index cache's idiom). */
 function arm(ms: number, fn: () => void): ReturnType<typeof setTimeout> {
@@ -350,7 +350,7 @@ export function createGitSync(host: GitSyncHost): GitSyncManager {
     },
 
     async setEnabled(root, enabled) {
-      await host.writeConfig(root, GITHUB_SYNC_FILE, { enabled } satisfies { enabled: boolean })
+      await host.writeConfig(root, GITHUB_SYNC_FILE, { enabled } satisfies GithubSyncConfig)
       if (!enabled) {
         drop(root)
         const off: GithubSyncStatus = { root, state: 'off', enabled: false }

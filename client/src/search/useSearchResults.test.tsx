@@ -1,7 +1,7 @@
 /**
- * The search bar's results (YAZ-803; 2H/YAZ-1814): the tree the Sidebar ALREADY holds, turned into
+ * The search bar's results (YAZ-803; YAZ-1814): the tree the Sidebar ALREADY holds, turned into
  * the ⌘K catalog and ranked per keystroke — no index read, no watch subscription, nothing to fail.
- * The catalog carries the tree's FOLDERS as well as its drawings (🔒 D1), folders first; it is
+ * The catalog carries the tree's FOLDERS as well as its drawings (🔒 YAZ-1491 D1), folders first; it is
  * built LAZILY, on the first non-empty query, and stays live from then on.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -11,7 +11,6 @@ import type { TreeNode } from '@shared/types'
 import * as catalog from './searchCandidates'
 import { useSearchResults } from './useSearchResults'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const file = (name: string, folder = ''): TreeNode => ({
   type: 'file',
@@ -105,7 +104,7 @@ describe('useSearchResults', () => {
     expect(labels()).toEqual([])
   })
 
-  describe('the lazy, latching feed (2H)', () => {
+  describe('the lazy, latching feed (YAZ-1814)', () => {
     it('builds NOTHING until the first non-empty query', () => {
       const build = vi.spyOn(catalog, 'buildDrawingCatalog')
       const { rerender } = mount([file('Alpha')], '')

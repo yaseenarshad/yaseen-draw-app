@@ -64,13 +64,13 @@ const edgeOf = (e: React.DragEvent): 'before' | 'after' => {
 
 /**
  * Sidebar multi-select (YAZ-1336, 🔒 D1) as both trees take it: the selected PATHS plus the two
- * gestures that change them. The Sidebar owns the reducer behind it; keying by path is 🔒 D3, so
+ * gestures that change them. The Sidebar owns the reducer behind it; keying by path is 🔒 YAZ-1336 D3, so
  * a folder drawn on both lenses shows selected on BOTH of its rows. A path is a
  * file or a FOLDER (YAZ-1578): a selected folder is the folder itself, never its contents.
  */
 export interface TreeSelection {
   paths: ReadonlySet<string>
-  /** 🔒 D2: shift+click on a file or folder row toggles it in or out — no range, never an open, never a fold. */
+  /** 🔒 YAZ-1336 D2: shift+click on a file or folder row toggles it in or out — no range, never an open, never a fold. */
   toggle: (path: string) => void
   /** D9 (YAZ-1674): a plain click or ⌘-click makes the selection EXACTLY this row — then opens or folds as before. */
   set: (path: string) => void
@@ -146,7 +146,7 @@ export function Tree({
           <li key={node.path} role="treeitem" aria-expanded={expanded.has(node.path)} aria-selected={selection.paths.has(node.path)}>
             {renaming !== null && renaming.path === node.path ? (
               // Inline FOLDER rename (E1b, GRO-2241): same idiom as files, prefilled with the
-              // raw name — folders have no extension logic (one could be NAMED "Notes.md").
+              // raw name — folders have no extension logic (one could be NAMED "Plans.excalidraw").
               <RenameInline initial={node.name} indent={8 + depth * 14} onSubmit={renaming.onSubmit} onCancel={renaming.onCancel} />
             ) : (
               <button
