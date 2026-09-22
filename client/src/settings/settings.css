@@ -199,13 +199,8 @@
   color: var(--fg);
 }
 
-.settings-group__hint {
-  margin: 3px 0 0;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--fg-muted);
-}
-
+/* A group's hint and a row's hint are the same line of small grey type in two places. */
+.settings-group__hint,
 /* The card: 18px inset for the row text; the rows' own padding gives the vertical rhythm. */
 .settings-group__card {
   padding: 6px 18px;
@@ -258,13 +253,6 @@
 }
 
 /* Sub-label under a setting whose consequence is not obvious from the switch (GRO-2272). */
-.setting__hint {
-  margin: 3px 0 0;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--fg-muted);
-}
-
 .setting__control {
   flex: none;
   display: flex;

@@ -326,6 +326,8 @@ describe('SavedComponents — saving the selection', () => {
     await click(byText(el, 'Save selection'))
     await type(el.querySelector<HTMLInputElement>('input[aria-label="Component name"]')!, 'A card')
     await click(byText(el, 'Save 2 elements'))
+    // The preview goes through `FileReader`, so the save lands a task later under load.
+    await settle(() => el.querySelector('[role="alert"]') !== null)
     expect(el.querySelector('[role="alert"]')?.textContent).toContain('non-empty string')
     expect(el.querySelector('input[aria-label="Component name"]')).not.toBe(null)
   })
@@ -333,6 +335,7 @@ describe('SavedComponents — saving the selection', () => {
   it('Cancel drops the capture', async () => {
     const { el } = await mount()
     await click(byText(el, 'Save selection'))
+    components.save.mockClear()
     await click(byText(el, 'Cancel'))
     expect(el.querySelector('input[aria-label="Component name"]')).toBe(null)
     expect(components.save).not.toHaveBeenCalled()

@@ -284,6 +284,8 @@ export function ImageStudio({ engine, excalidrawAPI, searchFocusRequest = 0 }: I
     return () => observer.disconnect()
   }, [cursor, isSearching, pageError, view])
 
+  // Both tiles' buttons are disabled while one is in flight; these re-check the same fact, because
+  // a keyboard activation can land in the frame before React has re-rendered them.
   const addItem = async (item: StudioItem) => {
     if (insertingKey !== null) return
     setInsertingKey(item.itemKey)
@@ -310,7 +312,7 @@ export function ImageStudio({ engine, excalidrawAPI, searchFocusRequest = 0 }: I
   }
 
   const toggleFavorite = async (item: StudioItem) => {
-    if (busyFavoriteKey) return
+    if (busyFavoriteKey !== null) return
     setBusyFavoriteKey(item.itemKey)
     setError(null)
     try {
