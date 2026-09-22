@@ -25,7 +25,7 @@ import { loadExcalidrawElement } from '../drawings/engine'
 import { storage } from '../lib/storage'
 import { clearComponentPreviewMemo, EMPTY_LIBRARY, PAGE_SIZE, SavedComponents } from './SavedComponents'
 import type { ComponentElementApi, ComponentEngine, ComponentTarget } from './componentData'
-import type { PreviewEngine } from './componentPreview'
+import type { PreviewEngine } from '../lib/scenePreview'
 
 const components = vi.mocked(api.components)
 const dialog = vi.mocked(api.dialog)

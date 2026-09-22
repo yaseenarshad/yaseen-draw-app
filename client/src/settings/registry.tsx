@@ -115,6 +115,15 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
             ),
           },
           {
+            // YAZ-1800: the sidebar's hover preview; the picture button in the sidebar header toggles the same flag.
+            id: 'hoverPreview',
+            label: 'Preview on hover',
+            hint: 'Rest the mouse on a board in the sidebar to see the whole drawing.',
+            render: ({ settings, onChange }) => (
+              <Segmented options={ON_OFF_OPTIONS} value={settings.hoverPreview} onChange={(hoverPreview) => onChange({ ...settings, hoverPreview })} ariaLabel="Preview on hover" />
+            ),
+          },
+          {
             // 🔒 YAZ-1775 D5: ONE library folder for every vault. `wide` because the row's real content is
             // the resolved path, which is long, and the two buttons belong under it rather than
             // squeezed beside it. The hint is a component: only main can resolve the default.

@@ -30,7 +30,7 @@ import {
   type ComponentTarget,
 } from './componentData'
 import { createPreviewCache } from '../lib/previewCache'
-import { createComponentPreviewPng, type PreviewEngine } from './componentPreview'
+import { createScenePreviewPng, type PreviewEngine } from '../lib/scenePreview'
 import { importedComponentName, parseImportedComponentJson } from './componentImport'
 import './savedComponents.css'
 
@@ -169,7 +169,7 @@ export function SavedComponents({ engine, excalidrawAPI, hasSelection }: SavedCo
     setSaving(true)
     setError(null)
     try {
-      const previewPng = await createComponentPreviewPng(engine, {
+      const previewPng = await createScenePreviewPng(engine, {
         elements: captured.elements,
         appState: excalidrawAPI.getAppState() as unknown as Record<string, unknown>,
         files: captured.files,
@@ -199,7 +199,7 @@ export function SavedComponents({ engine, excalidrawAPI, hasSelection }: SavedCo
       const picked = await api.dialog.openDrawing()
       if ('cancelled' in picked) return
       const imported = parseImportedComponentJson(engine, picked.content)
-      const previewPng = await createComponentPreviewPng(engine, {
+      const previewPng = await createScenePreviewPng(engine, {
         elements: imported.elements,
         appState: excalidrawAPI.getAppState() as unknown as Record<string, unknown>,
         files: imported.files,

@@ -20,18 +20,28 @@ export interface PreviewCache {
   Preview(props: { cacheKey: string | null; placeholderClass: string }): ReactNode
 }
 
-/** One cache per kind of preview; `fetchPreview` is the door that answers a key with a dataURL. */
-export function createPreviewCache(fetchPreview: (key: string) => Promise<string>): PreviewCache {
+/**
+ * One cache per kind of preview; `fetchPreview` is the door that answers a key with a dataURL.
+ * `limit` bounds how many settled pictures are kept, least recently seen out first (YAZ-1800: a
+ * board's picture is ~1200 px and keyed per edit, so an unbounded map would only ever grow).
+ */
+export function createPreviewCache(fetchPreview: (key: string) => Promise<string>, { limit = Infinity }: { limit?: number } = {}): PreviewCache {
   const settledByKey = new Map<string, string>()
   const inFlight = new Map<string, Promise<string | null>>()
 
   const load = (key: string): Promise<string | null> => {
     const settled = settledByKey.get(key)
-    if (settled !== undefined) return Promise.resolve(settled)
+    if (settled !== undefined) {
+      // Map iterates in insertion order, so the front is least recently seen: re-set to move to the back.
+      settledByKey.delete(key)
+      settledByKey.set(key, settled)
+      return Promise.resolve(settled)
+    }
     const existing = inFlight.get(key)
     if (existing !== undefined) return existing
     const request = fetchPreview(key)
       .then((dataURL) => {
+        if (settledByKey.size >= limit) settledByKey.delete(settledByKey.keys().next().value as string)
         settledByKey.set(key, dataURL)
         return dataURL
       })
