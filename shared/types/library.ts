@@ -267,8 +267,8 @@ export const PIXABAY_SECRET = 'pixabayApiKey'
  * devtools console or a crash dump of the renderer.
  */
 export interface SecretsApi {
-  /** Store `value` encrypted, or clear the name with null. Rejects `ENCRYPTION_UNAVAILABLE` when the OS keychain is not there. */
+  /** Store `value`, or clear the name with null. */
   set(req: SecretSetRequest): Promise<void>
-  /** Whether a value is stored AND still decryptable on this machine. False whenever encryption is unavailable. */
+  /** Whether a value is stored. */
   has(req: SecretHasRequest): Promise<boolean>
 }

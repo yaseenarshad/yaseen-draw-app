@@ -182,7 +182,7 @@ describe('api', () => {
     expect(components.onChanged).toHaveBeenCalledWith(listener)
   })
 
-  it('secrets: set and has delegate, and ENCRYPTION_UNAVAILABLE arrives as a typed BridgeRequestError (🔒 YAZ-1775 D4)', async () => {
+  it('secrets: set and has delegate, and a bridge failure arrives as a typed BridgeRequestError (🔒 YAZ-1775 D4)', async () => {
     const secrets = { set: vi.fn(), has: vi.fn() }
     Object.defineProperty(window.yaseenDraw, 'secrets', { value: secrets, configurable: true })
     secrets.set.mockResolvedValue(undefined)
@@ -190,10 +190,10 @@ describe('api', () => {
     expect(secrets.set).toHaveBeenCalledWith({ name: 'pixabayApiKey', value: 'k' })
     secrets.has.mockResolvedValue(true)
     await expect(api.secrets.has({ name: 'pixabayApiKey' })).resolves.toBe(true)
-    secrets.set.mockRejectedValue({ code: 'ENCRYPTION_UNAVAILABLE', message: 'no keychain' })
+    secrets.set.mockRejectedValue({ code: 'IO_ERROR', message: 'disk went away' })
     const err = (await api.secrets.set({ name: 'pixabayApiKey', value: 'k' }).catch((e: unknown) => e)) as BridgeRequestError
     expect(err).toBeInstanceOf(BridgeRequestError)
-    expect(err.code).toBe('ENCRYPTION_UNAVAILABLE')
+    expect(err.code).toBe('IO_ERROR')
   })
 
   it('a BridgeError without path / mtime leaves those fields undefined', async () => {

@@ -110,7 +110,7 @@ what a new element looks like — and they apply to every board, every window an
 **Files › Confirm before deleting** (on by default: the sheet is the only guard, because the
 system Trash has no programmatic undo) and **Files › Library folder** (where components and image
 favorites live — point it inside a synced vault and they sync too). **Images › Pixabay API key**
-(stored encrypted by the OS keychain; never shown again). **Sync** for this vault's GitHub switch.
+(kept in the app's own data folder, readable only by your user; never shown again). **Sync** for this vault's GitHub switch.
 **Hotkeys** lists every shortcut. Settings are global — one file, every window follows a change
 live — and never written into a vault.
 

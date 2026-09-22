@@ -145,7 +145,7 @@ calls that go through it; `state`, `window`, `menu`, `link` and `watch` are call
 | `components.delete(req)` | `components:delete` | `{ slug }`; both files to the OS trash (`shell.trashItem`) and the row out of the index |
 | `components.preview(req)` | `components:preview` | `{ slug }` → the stored PNG as a dataURL |
 | `components.onChanged` | `components:changed` | pushed to EVERY window when the components library changes — any vault, any writer, no payload |
-| `secrets.set(req)` / `has(req)` | `secrets:set` / `secrets:has` | `{ name, value \| null }` writes or clears an encrypted secret; `{ name }` → boolean. NO channel answers a value (🔒 YAZ-1775 D4) |
+| `secrets.set(req)` / `has(req)` | `secrets:set` / `secrets:has` | `{ name, value \| null }` writes or clears a secret; `{ name }` → boolean. NO channel answers a value (🔒 YAZ-1775 D4, YAZ-1842 D1) |
 | `github.status` / `syncNow` / `setEnabled` / `onStatus` | `github:*` | per-vault GitHub sync |
 
 Rules that hold across the whole surface:
@@ -474,16 +474,16 @@ only subscriber to. What that event DROVE is kept, because it is the camera beha
 than an animation protocol: the transition token that stops a stale landing, and the rule that an
 in-flight transition must not land while the deck is zoomed out.
 
-### Secrets (🔒 YAZ-1775 D4)
+### Secrets (🔒 YAZ-1775 D4, ⚡ YAZ-1842 D1)
 
-`<userData>/secrets.json` = `{ version: 1, values: Record<name, base64(safeStorage.encryptString(value))> }`,
-owned by `desktop/src/main/secrets.ts`. It is NOT part of the app state file and never rides
-`state:changed`. `has` means "stored AND decryptable on this machine": a file copied from another
-Mac is full of blobs this keychain cannot open, and the honest answer is then no. Without an OS
-keychain at all (`safeStorage.isEncryptionAvailable()` false) `set` refuses with
-`ENCRYPTION_UNAVAILABLE` rather than falling back to plaintext, and `has` is false. The one name so
-far is `pixabayApiKey` (`PIXABAY_SECRET`), typed once in Settings › Images and read by main when it
-builds a Pixabay request.
+`<userData>/secrets.json` = `{ version: 2, values: Record<name, value> }`, plain text, file mode
+`0600`, owned by `desktop/src/main/secrets.ts`. It is NOT part of the app state file and never rides
+`state:changed`; the renderer can write and ask, never read. It is plain text on purpose: version 1
+encrypted values with Electron's `safeStorage`, which on macOS binds a Keychain item to the app's
+code identity — and an ad-hoc-signed app (locked: no Developer ID) is a new identity on every
+build, so a key saved by one release was unreadable by the next. A version-1 file is moved aside as
+corrupt and the next paste starts clean. The one name so far is `pixabayApiKey` (`PIXABAY_SECRET`),
+typed once in Settings › Images and read by main when it builds a Pixabay request.
 
 Two things live in the VAULT instead, because they are the user's own data:
 `<vault>/.yaseendraw/favorites.json` (YAZ-1794: vault-relative paths, so favorites travel with the
@@ -633,7 +633,7 @@ two that do not — the Pixabay key and the GitHub switch — are marked below.
 | Appearance | Theme (the only one — 🔒 YAZ-1775 D9 put everything else about the canvas in Canvas) |
 | Canvas | the fourteen `CanvasPrefs` (🔒 YAZ-1775 D9) in three groups: Drawing aids, Modes, New elements |
 | Files | Confirm before deleting · Library folder (🔒 YAZ-1775 D5: resolved path, Choose…, Reset to default) |
-| Images | Pixabay API key (🔒 YAZ-1775 D4: a password field, Save / Clear, "Key set" / "No key" from `secrets:has`, never echoed) — NOT in `SettingsState`, it lives in main's encrypted `secrets.json` |
+| Images | Pixabay API key (🔒 YAZ-1775 D4: a password field, Save / Clear, "Key set" / "No key" from `secrets:has`, never echoed) — NOT in `SettingsState`, it lives in main's owner-only `secrets.json` (YAZ-1842 D1) |
 | Sync | the per-vault GitHub switch — the other setting NOT in `SettingsState` (it lives in `.yaseendraw/github.json`) |
 | Hotkeys | its own page: the Window, Canvas and Mouse tables, from `hotkeys.ts` |
 
