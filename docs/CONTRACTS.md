@@ -4,12 +4,16 @@ The one document an agent should read before changing anything. It states what i
 app's shape — layout, bridge, state, menus, windows, links, packaging — not how any one feature is
 implemented. Prose here is normative; where it disagrees with the code, the code is a bug.
 
-**Convention.** 🔒 marks a decision that is LOCKED: it was argued once, on the Linear issue named
-beside it, and must not be re-litigated in passing — reopen it on the issue or leave it alone. ⚡
-marks an amendment to an earlier locked decision; the amendment wins.
+**Convention.** 🔒 marks a decision that is LOCKED: it was argued once, and must not be
+re-litigated in passing — reopen it on its issue or leave it alone. ⚡ marks an amendment to an
+earlier locked decision; the amendment wins.
+
+Every label NAMES ITS ISSUE, because the numbering restarts per issue: `🔒 YAZ-1775 D3` is the
+port's image-bytes decision, `🔒 YAZ-1674 D3` is the file clipboard's third, and the two have
+nothing to do with each other. A bare `D3` would be unresolvable, so there are none.
 
 > Yaseen Draw is the drawing sibling of Yaseen Docs. It was seeded from `yaseen-docs-app`
-> @ `66c9806` (🔒 D1 on YAZ-1775) and then stripped of every subsystem the canvas does not need
+> @ `66c9806` (🔒 YAZ-1775 D1) and then stripped of every subsystem the canvas does not need
 > (YAZ-1808).
 > Git history before the seed lives in that repo, not this one.
 
@@ -27,7 +31,7 @@ marks an amendment to an earlier locked decision; the amendment wins.
 | `client/src/workspace/` | the tab model (`tabsReducer`) and its per-tab history |
 | `client/src/settings/` | the settings dialog and its registry |
 | `client/src/search/` | ⌘K title search and the one ranking matcher |
-| `client/vendor/` | the five vendored `yaseendraw-*-<forkCommit>.tgz` engine tarballs (🔒 D2) |
+| `client/vendor/` | the five vendored `yaseendraw-*-<forkCommit>.tgz` engine tarballs (🔒 YAZ-1775 D2) |
 | `desktop/` | the Electron shell: `src/main` (files, state, windows, menu, git sync), `src/preload` (the bridge) |
 | `shared/` | types and pure helpers imported by BOTH sides (`@shared/*`) |
 | `tools/` | `packEngine.mjs` (bump the vendored engine), `packDesktop.mjs` (electron-builder), `seedDemoVault.mjs` (the stress-test vault the behaviour checks run against) |
@@ -64,15 +68,15 @@ One kind, one extension.
 - A file of no kind still LISTS in the tree (YAZ-1577) and opens in the OS default app; it is
   never read or written through the bridge (`UNSUPPORTED_EXTENSION`).
 - `.excalidraw` hides its extension wherever a name is shown — tree rows, tab labels, the window
-  title, the rename field (⚡ D8 amended on YAZ-1775). Every other file shows its full name.
+  title, the rename field (⚡ YAZ-1775 D8 amended). Every other file shows its full name.
 - Image bytes do NOT live in the scene JSON: they are content-addressed at
-  `<vault>/assets/<fileId>.<ext>` (🔒 D3 on YAZ-1775) and travel with the scene through
+  `<vault>/assets/<fileId>.<ext>` (🔒 YAZ-1775 D3) and travel with the scene through
   `drawing:load` / `drawing:save`. The id is Excalidraw's own — the SHA-1 of the bytes — so an
   asset is immutable, rename-proof and shared by every board that uses the picture. The scene is
   always written with `files: {}`; a legacy file that still embeds its images is extracted on its
   first save. `assets/` is hidden from the sidebar tree (the TOP-LEVEL one only: a folder the
   user called `assets` inside a subfolder is theirs and shows).
-- There is ONE door that makes a drawing, and it is the sidebar's context menu (🔒 R1 on
+- There is ONE door that makes a drawing, and it is the sidebar's context menu (🔒 YAZ-1775 R1 on
   YAZ-1775): the Create group is **New drawing**, New folder, New dated folder, in that order, on
   a row or on blank space. Nowhere else in the app creates a file.
   - "New drawing" does not ask for a name. The board is born `Untitled.excalidraw` — then
@@ -110,7 +114,7 @@ Electron flattens a thrown Error to its message, which is why failure travels as
 | `createFile(req)` | `fs:create-file` | `.excalidraw` only; content-at-create, `wx` flag |
 | `drawing.load(req)` | `drawing:load` | one `.excalidraw` AS A DOCUMENT: its bytes, its mtime, and the images it names |
 | `drawing.save(req)` | `drawing:save` | images first, then the scene, atomically; `expectedMtime` → `CONFLICT` with NOTHING written |
-| `drawing.libraryFolder()` | `drawing:library-folder` | the RESOLVED library folder — the setting, or `<userData>/library` (🔒 D5) |
+| `drawing.libraryFolder()` | `drawing:library-folder` | the RESOLVED library folder — the setting, or `<userData>/library` (🔒 YAZ-1775 D5) |
 | `pickFolder()` | `dialog:pick-folder` | the native open-directory dialog |
 | `dialog.openDrawing()` | `dialog:open-file` | the native OPEN-FILE dialog, `.excalidraw` filter → `{ path, name, content }` or `{ cancelled: true }`; the bytes come back because the picked file is outside the vault |
 | `dialog.saveDrawing(req)` | `dialog:save-file` | the native SAVE sheet AND the atomic write behind it → `{ path }` or `{ cancelled: true }`; the only path ever written is the one the user just typed |
@@ -128,20 +132,20 @@ Electron flattens a thrown Error to its message, which is why failure travels as
 | `menu.on*` | `menu:*` | Open Folder…, Open Recent, Search Vault, Switch Vault…, Settings…, Toggle Sidebar, Close Tab, Next/Previous Tab, Export Image…, Export Drawing…, Canvas Background |
 | `link.onOpenFile` / `onNotice` | `link:*` | a routed `yaseendraw://` link |
 | `favorites.get` / `set` / `onChanged` | `favorites:*` | `<vault>/.yaseendraw/favorites.json` |
-| `media.favorites(req)` | `media:favorites` | `{ op: 'list' }` · `{ op: 'add', item }` · `{ op: 'remove', itemKey }` over `<library>/media.json` (🔒 D5); every verb answers the resulting list |
+| `media.favorites(req)` | `media:favorites` | `{ op: 'list' }` · `{ op: 'add', item }` · `{ op: 'remove', itemKey }` over `<library>/media.json` (🔒 YAZ-1775 D5); every verb answers the resulting list |
 | `media.recent(req)` | `media:recent` | `{ op: 'list' }` · `{ op: 'record', item }` — the MRU, `RECENT_LIMIT` 60 |
 | `media.onChanged` | `media:changed` | pushed to EVERY window when `media.json` changes — any vault, any writer, no payload |
-| `media.search(req)` | `media:search` | `{ q, source: 'all' \| 'iconify' \| 'pixabay', cursor? }` → `{ items, nextCursor, pixabayAvailable, warnings }` (🔒 D4) |
+| `media.search(req)` | `media:search` | `{ q, source: 'all' \| 'iconify' \| 'pixabay', cursor? }` → `{ items, nextCursor, pixabayAvailable, warnings }` (🔒 YAZ-1775 D4) |
 | `media.preview(req)` | `media:preview` | `{ provider: 'pixabay' \| 'iconify', id }` → `{ mimeType, dataURL }`, from the 24 h disk cache when it is there |
 | `media.import(req)` | `media:import` | the same request → `{ mimeType, dataURL, item }`; NEVER cached, capped at `MAX_IMPORT_BYTES` 20 MB |
-| `components.list()` | `components:list` | the saved-component index over `<library>/components/` (🔒 D5); a missing or corrupt index is rebuilt from the folder |
+| `components.list()` | `components:list` | the saved-component index over `<library>/components/` (🔒 YAZ-1775 D5); a missing or corrupt index is rebuilt from the folder |
 | `components.save(req)` | `components:save` | `{ name, fragmentJson, previewPng }` → the `ComponentItem` it made; writes `<slug>.excalidraw` + `<slug>.png` |
 | `components.read(req)` | `components:read` | `{ slug }` → `{ fragmentJson }` — the bytes an insert needs |
 | `components.rename(req)` | `components:rename` | `{ slug, name }` → the row; the LABEL only, both files keep their names |
 | `components.delete(req)` | `components:delete` | `{ slug }`; both files to the OS trash (`shell.trashItem`) and the row out of the index |
 | `components.preview(req)` | `components:preview` | `{ slug }` → the stored PNG as a dataURL |
 | `components.onChanged` | `components:changed` | pushed to EVERY window when the components library changes — any vault, any writer, no payload |
-| `secrets.set(req)` / `has(req)` | `secrets:set` / `secrets:has` | `{ name, value \| null }` writes or clears an encrypted secret; `{ name }` → boolean. NO channel answers a value (🔒 D4) |
+| `secrets.set(req)` / `has(req)` | `secrets:set` / `secrets:has` | `{ name, value \| null }` writes or clears an encrypted secret; `{ name }` → boolean. NO channel answers a value (🔒 YAZ-1775 D4) |
 | `vaultConfig.read` / `write` / `onChanged` | `vaultConfig:*` | any file in `<vault>/.yaseendraw/` |
 | `github.status` / `syncNow` / `setEnabled` / `onStatus` | `github:*` | per-vault GitHub sync |
 
@@ -161,14 +165,14 @@ Rules that hold across the whole surface:
   embed their images as base64.
 - **Assets are immutable and append-only.** A save writes an asset with `wx` and treats EEXIST as
   success; nothing but the orphan sweep ever removes one.
-- **The renderer never reaches a provider** (🔒 D4). Iconify and Pixabay are fetched by MAIN, which
+- **The renderer never reaches a provider** (🔒 YAZ-1775 D4). Iconify and Pixabay are fetched by MAIN, which
   holds the key, does the curation, keeps the cache and enforces the import cap. The renderer's
   whole knowledge of the key is the boolean `pixabayAvailable`.
-- **A secret never crosses the bridge outward** (🔒 D4). The renderer may `set` one and ask `has`;
+- **A secret never crosses the bridge outward** (🔒 YAZ-1775 D4). The renderer may `set` one and ask `has`;
   there is no channel, no state field and no push that carries a value, so a key cannot reach a
   devtools console, a `state:get` answer or a renderer crash dump. Main reads it itself.
 
-### The orphan sweep (🔒 D3)
+### The orphan sweep (🔒 YAZ-1775 D3)
 
 The first `fs:tree` for a root in a session — the moment a vault is "opened" — also runs one
 sweep of `<vault>/assets/`, detached, so the tree answers immediately. A file goes to the OS
@@ -194,9 +198,9 @@ AppState {
   version: 1
   settings: {
     theme: 'system' | 'light' | 'dark'
-    libraryFolder: string | null         // 🔒 D5, null = `<userData>/library`
+    libraryFolder: string | null         // 🔒 YAZ-1775 D5, null = `<userData>/library`
     confirmDelete: boolean
-    canvas: CanvasPrefs                  // 🔒 D9, below
+    canvas: CanvasPrefs                  // 🔒 YAZ-1775 D9, below
     canvasPanel: { tab: 'image-studio' | 'components' | 'presentation'; docked: boolean }
   }
   sidebarWidth: number                     // clamped to [180, 520]
@@ -211,7 +215,7 @@ WindowEntry {
   file: string | null                      // doubles as the ACTIVE tab
   tabs: string[]                           // absolute, de-duplicated, left→right
   sidebarCollapsed: boolean
-  sidebarLens: 'files' | 'favorites'       // ⚡ D8 amended; an unknown value reads as 'files'
+  sidebarLens: 'files' | 'favorites'       // ⚡ YAZ-1775 D8 amended; an unknown value reads as 'files'
   focusDirs: string[]                      // Focus Mode, Files lens
   focusFavorites: string[]                 // Focus Mode, Favorites lens
   bounds: { x, y, width, height }
@@ -224,7 +228,7 @@ FolderState {
 ```
 
 `SettingsState.canvas` is `CanvasPrefs` (`shared/types.ts`, mapped by `shared/canvasPrefs.ts`) —
-the fourteen user-level canvas preferences 🔒 D9 took out of the engine's browser localStorage:
+the fourteen user-level canvas preferences 🔒 YAZ-1775 D9 took out of the engine's browser localStorage:
 
 ```ts
 CanvasPrefs {
@@ -253,21 +257,21 @@ ping-pong; the engine's own read-back is 300 ms debounced. The guard is STRICT a
 the defaults, so a state file written before a key existed keeps every key it does have). Per BOARD
 there is only what the engine writes into the file itself — `viewBackgroundColor`, `gridSize`,
 `gridStep`. None of the web app's localStorage keys are carried over; the one engine key this app
-touches is `excalidraw.desktopUIMode`, WRITTEN before every mount and never read (⚡ R4/R5).
+touches is `excalidraw.desktopUIMode`, WRITTEN before every mount and never read (⚡ YAZ-1775 R4/R5).
 
 Invariants: `file ∈ tabs` whenever `file` is non-null, and `tabs: []` ⇔ `file: null`.
 `sidebarCollapsed`, `sidebarLens` and both focus lists are WINDOW identity — a duplicate inherits
 them by value and then diverges; a global `state:changed` broadcast never moves another window's.
 Settings and `sidebarWidth` are global and every window follows a change live.
 
-`SettingsState.libraryFolder` (🔒 D5) is the ONE folder every vault shares, where media favorites
+`SettingsState.libraryFolder` (🔒 YAZ-1775 D5) is the ONE folder every vault shares, where media favorites
 and saved components live (3A / 3B filled it; 3C adds `components/`): an absolute path the user picked, or null
 for `<userData>/library`. Only main can resolve null, so Settings asks through
 `drawing:library-folder`; main also `mkdir -p`s the folder at startup, so the row always names a
 directory that exists. A folder that cannot be created is still the answer — a launch must not
 fail because a picked path has gone read-only.
 
-### The Library folder (🔒 D5)
+### The Library folder (🔒 YAZ-1775 D5)
 
 ```
 <library>/
@@ -300,7 +304,7 @@ dropped by mtime, an external write (the other machine, through a synced vault) 
 `media:changed` carries no payload because every window re-lists regardless of its vault — that is
 the cross-vault promise.
 
-### The Image Studio's providers (🔒 D4)
+### The Image Studio's providers (🔒 YAZ-1775 D4)
 
 The canvas panel's **Images** tab is the web app's Image Studio, and everything behind it is the
 main process. `worker/imageStudio.ts` — the Cloudflare Worker that used to serve
@@ -334,7 +338,7 @@ another search is `BAD_REQUEST`, never a silent restart.
 - **Previews travel as dataURLs.** No custom protocol, no renderer fetch. A stored `previewUrl` is
   never read: every tile asks `media:preview` by `provider` + `providerId`.
 - **An import is not cached and does not touch the disk here.** Its bytes go to the engine's
-  `insertImages`, and the SAVE path (🔒 D3, 2E) writes them into `<vault>/assets/` before the scene
+  `insertImages`, and the SAVE path (🔒 YAZ-1775 D3, 2E) writes them into `<vault>/assets/` before the scene
   names them.
 
 ```
@@ -358,7 +362,7 @@ viewport) and `imageStudio.css`. ⌘F opens the tab AND focuses its search field
 shows a passive line while Shapes, Favorites and Recent keep working — previews from the cache
 where main still has them, a placeholder where it does not.
 
-### Saved components (🔒 D5)
+### Saved components (🔒 YAZ-1775 D5)
 
 The canvas panel's **Components** tab is the web app's Saved Components, and the library is a
 folder rather than a Convex table. One component is TWO files named after its slug —
@@ -367,7 +371,7 @@ folder rather than a Convex table. One component is TWO files named after its sl
 `ComponentItem = { slug, name, elementCount, createdAt, updatedAt }`, newest-updated first.
 
 **The fragment embeds its images**, which is the one place this app deliberately does not follow
-🔒 D3: it is a whole `{ type: 'excalidraw', version: 2, source, elements, appState: {}, files }`
+🔒 YAZ-1775 D3: it is a whole `{ type: 'excalidraw', version: 2, source, elements, appState: {}, files }`
 document whose `files` map carries the component's bytes as dataURLs. A component is small and has
 to insert into ANY vault on ANY machine, so it cannot point at a `<vault>/assets/` file. On insert
 those bytes are handed to the canvas as files; the board's next save extracts them into THIS
@@ -468,7 +472,7 @@ only subscriber to. What that event DROVE is kept, because it is the camera beha
 than an animation protocol: the transition token that stops a stale landing, and the rule that an
 in-flight transition must not land while the deck is zoomed out.
 
-### Secrets (🔒 D4)
+### Secrets (🔒 YAZ-1775 D4)
 
 `<userData>/secrets.json` = `{ version: 1, values: Record<name, base64(safeStorage.encryptString(value))> }`,
 owned by `desktop/src/main/secrets.ts`. It is NOT part of the app state file and never rides
@@ -495,7 +499,7 @@ with a FLAT ranked list (🔒 the flat-list ruling on YAZ-739), never a filtered
 
 - **The catalog** (`client/src/search/searchCandidates.ts`, 🔒 2H on YAZ-1814) is one row per
   `.excalidraw` file — under the name the tree and the tab strip show, WITHOUT the extension — plus
-  one row per folder, matched by its own name (🔒 D2 on YAZ-1491) and labelled by its parent. A
+  one row per folder, matched by its own name (🔒 YAZ-1775 D2 on YAZ-1491) and labelled by its parent. A
   drawing never matches on its folder; the folder is its own row instead.
 - **It is derived, not indexed.** There is no vault index any more (it went with the markdown layer
   in YAZ-1808): the catalog is one walk of the tree the Sidebar already holds, which IS `fs:tree`
@@ -503,7 +507,7 @@ with a FLAT ranked list (🔒 the flat-list ruling on YAZ-739), never a filtered
   findable without a restart, and searching costs no second read of the vault.
 - **What never appears:** a file of no supported kind (it lists in the tree and opens in the OS app,
   but it is not a document this app can search for), and the image store `assets/`, which `fs:tree`
-  has already dropped (🔒 D3 on YAZ-1775). A folder the user called `assets` inside a subfolder is
+  has already dropped (🔒 YAZ-1775 D3). A folder the user called `assets` inside a subfolder is
   theirs and is searchable, exactly as the tree rule says.
 - **Ranking** is the ONE matcher every naming surface uses (`search/matchCandidates.ts`, GRO-2197):
   case-insensitive, exact → prefix → substring, input order inside a bucket, capped at `SEARCH_CAP`
@@ -514,7 +518,7 @@ with a FLAT ranked list (🔒 the flat-list ruling on YAZ-739), never a filtered
   a tripwire test over a 5,000-drawing catalog fails if it ever stops being cheap.
 - **Keys, in the bar** (it keeps focus throughout, so ↑/↓ carry on walking): ↑/↓ move and WRAP at
   both ends; Enter activates — a drawing OPENS in the current tab, a folder REVEALS itself in the
-  Files lens (🔒 D3 on YAZ-1491) — ⌘-Enter opens in a background tab; Escape clears a typed query
+  Files lens (🔒 YAZ-1775 D3 on YAZ-1491) — ⌘-Enter opens in a background tab; Escape clears a typed query
   and only gives up focus on a second press. A click does exactly what Enter does on that row.
 
 ## Menus and shortcuts
@@ -549,7 +553,7 @@ Zoom is deliberately NOT the stock roles: a registered accelerator never reaches
 macOS, so main applies the step to the focused window's `webContents` itself.
 
 Export Image…, Export Drawing… and Canvas Background are the canvas's own three items, moved out
-of the engine's main menu by 🔒 D10 (there is no `<MainMenu>` in a drawing and the engine's stock
+of the engine's main menu by 🔒 YAZ-1775 D10 (there is no `<MainMenu>` in a drawing and the engine's stock
 trigger is hidden). Main enables them only while the window a menu action would target has a
 `.excalidraw` in front, rebuilding the menu when any window's active file changes and when focus
 moves between windows. Each is pushed to that window's renderer, which dispatches it as a DOM
@@ -559,9 +563,9 @@ canvas. The drawing then calls the engine's own door: `openDialog: { name: 'imag
 engine's PNG / SVG export dialog), or `viewBackgroundColor`, which the engine writes into the
 file — or, for Export Drawing…, the assembly below.
 
-### Export Drawing… (🔒 D3, YAZ-1821)
+### Export Drawing… (🔒 YAZ-1775 D3, YAZ-1821)
 
-**🔒 D3 says the vault file never embeds, and that export is the one place that does.** A board in
+**🔒 YAZ-1775 D3 says the vault file never embeds, and that export is the one place that does.** A board in
 a vault is a lean scene (`files: {}`) beside a shared `<vault>/assets/` folder, because embedding
 base64 makes multi-MB files that git rewrites on every save. A file being handed to someone else
 has no `assets/` folder to point at, so Export Drawing… writes a STANDALONE `.excalidraw` with
@@ -624,10 +628,10 @@ knows the row.
 
 | Section | Rows |
 |---|---|
-| Appearance | Theme (the only one — 🔒 D9 put everything else about the canvas in Canvas) |
-| Canvas | the fourteen `CanvasPrefs` (🔒 D9) in three groups: Drawing aids, Modes, New elements |
-| Files | Confirm before deleting · Library folder (🔒 D5: resolved path, Choose…, Reset to default) |
-| Images | Pixabay API key (🔒 D4: a password field, Save / Clear, "Key set" / "No key" from `secrets:has`, never echoed) — NOT in `SettingsState`, it lives in main's encrypted `secrets.json` |
+| Appearance | Theme (the only one — 🔒 YAZ-1775 D9 put everything else about the canvas in Canvas) |
+| Canvas | the fourteen `CanvasPrefs` (🔒 YAZ-1775 D9) in three groups: Drawing aids, Modes, New elements |
+| Files | Confirm before deleting · Library folder (🔒 YAZ-1775 D5: resolved path, Choose…, Reset to default) |
+| Images | Pixabay API key (🔒 YAZ-1775 D4: a password field, Save / Clear, "Key set" / "No key" from `secrets:has`, never echoed) — NOT in `SettingsState`, it lives in main's encrypted `secrets.json` |
 | Sync | the per-vault GitHub switch — the other setting NOT in `SettingsState` (it lives in `.yaseendraw/github.json`) |
 | Hotkeys | its own page: the Window, Canvas and Mouse tables, from `hotkeys.ts` |
 
@@ -665,7 +669,7 @@ window's one passive notice; never a dialog. macOS delivers links through `open-
 before `ready` on a cold start, so they queue (`main/linkQueue.ts`) until the windows exist.
 
 The packaged app registers the scheme (`protocols` in `desktop/package.json`) and claims
-`.excalidraw` as an Owner file association (🔒 D1 on YAZ-1775).
+`.excalidraw` as an Owner file association (🔒 YAZ-1775 D1).
 
 **Opening a drawing from outside the app** — a Finder double-click, `open -a "Yaseen Draw"
 Board.excalidraw`, or a plain `open Board.excalidraw` once the association is registered — travels
@@ -703,7 +707,7 @@ unsupported or missing file shows the window's one passive notice, never a dialo
   below answers.
 - The bundle declares what it owns: `CFBundleURLSchemes` `yaseendraw`, and a `.excalidraw`
   document type named "Excalidraw Drawing" with role `Editor` and `LSHandlerRank` `Owner`, so
-  Finder hands `.excalidraw` files to this app (🔒 D1).
+  Finder hands `.excalidraw` files to this app (🔒 YAZ-1775 D1).
 - Windows: unsigned x64 NSIS installer.
 - `files: ["out/**"]` is the whole payload: the main bundle carries its dependencies (chokidar is
   pure JS and gets bundled), so the packaged app ships no `node_modules`. There are no

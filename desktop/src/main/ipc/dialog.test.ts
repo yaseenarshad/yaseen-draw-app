@@ -207,7 +207,7 @@ describe('dialog:open-file', () => {
 
 
 /**
- * The export sheet and the write behind it (🔒 D3, YAZ-1821). One door: the only path ever written
+ * The export sheet and the write behind it (🔒 YAZ-1775 D3, YAZ-1821). One door: the only path ever written
  * is the one the user has just typed into a native sheet, in the same call.
  */
 describe('dialog:save-file', () => {

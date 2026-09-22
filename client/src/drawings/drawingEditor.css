@@ -67,7 +67,7 @@
   height: 100%;
 }
 
-/* ---------- The rail (YAZ-1775 🔒 D10): `excalidraw-app/components/AppSidebar.scss`, ported ----------
+/* ---------- The rail (YAZ-1775 🔒 YAZ-1775 D10): `excalidraw-app/components/AppSidebar.scss`, ported ----------
    Scoped under the engine's root so its own tokens (island background, primary colour, button
    sizes) apply unchanged. The rail sits in the top-left row, where the engine's own menu trigger
    used to be. */
@@ -150,7 +150,7 @@
 }
 
 /* The hamburger (the web app's `app-sidebar-launchers__boards-menu`): a 2rem island button, first
-   in the row, and the icon-only toggles beside it — their labels are their tooltips (🔒 D10). */
+   in the row, and the icon-only toggles beside it — their labels are their tooltips (🔒 YAZ-1775 D10). */
 .editor--drawing .excalidraw .app-sidebar-launchers__boards-menu,
 .editor--drawing .excalidraw .app-sidebar-launcher--icon {
   height: 2rem;
@@ -159,13 +159,13 @@
   padding: 0;
 }
 
-/* 🔒 D10: the engine's own menu trigger is not this app's door — the rail's hamburger is. This is
+/* 🔒 YAZ-1775 D10: the engine's own menu trigger is not this app's door — the rail's hamburger is. This is
    the web app's own rule (`AppSidebar.scss:3-5`), and there is no <MainMenu> here to reach anyway. */
 .editor--drawing .excalidraw .main-menu-trigger {
   display: none;
 }
 
-/* ---------- The canvas panel (⚡ D8 amended): `AppSidebar.scss`'s `.default-sidebar` rules ---------- */
+/* ---------- The canvas panel (⚡ YAZ-1775 D8 amended): `AppSidebar.scss`'s `.default-sidebar` rules ---------- */
 
 .editor--drawing .excalidraw .default-sidebar .sidebar__header {
   padding-inline-end: 0.375rem;

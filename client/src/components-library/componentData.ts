@@ -11,7 +11,7 @@
  *
  * WHAT AN INSERT COSTS ON DISK: nothing, here. `insertElements` is the engine's own paste door —
  * it duplicates ids, so two inserts of one component are two independent copies. The files handed
- * to `addFiles` beside them become `assets/` files on the next save (🔒 D3): the engine's files
+ * to `addFiles` beside them become `assets/` files on the next save (🔒 YAZ-1775 D3): the engine's files
  * map grows ids the store does not hold, and `drawing:save` writes them BEFORE the scene names them.
  *
  * ENGINE-BOUND BY DESIGN: every engine value comes in as an argument rather than being imported
@@ -103,10 +103,10 @@ export function captureComponentSelection(element: ComponentElementApi, api: Com
 }
 
 /**
- * The bytes that become `<library>/components/<slug>.excalidraw` (🔒 D5): a whole Excalidraw
+ * The bytes that become `<library>/components/<slug>.excalidraw` (🔒 YAZ-1775 D5): a whole Excalidraw
  * document with `appState: {}` — the same envelope `drawingScene.ts` writes a board with, so a
  * component opens in this app, in the web app, and on excalidraw.com — and with its image bytes
- * EMBEDDED, which is the one place this app deliberately does not follow 🔒 D3.
+ * EMBEDDED, which is the one place this app deliberately does not follow 🔒 YAZ-1775 D3.
  */
 export function componentFragmentJson({ elements, files }: CapturedComponent): string {
   return `${JSON.stringify({ type: 'excalidraw', version: 2, source: DRAWING_SOURCE, elements, appState: {}, files }, null, 2)}\n`

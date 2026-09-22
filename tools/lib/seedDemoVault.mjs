@@ -12,7 +12,7 @@ export const defaultVault = () => path.join(homedir(), 'Desktop', 'Port to Elect
 /** The bare repo the vault's GitHub sync pushes to, beside it on the Desktop. */
 export const defaultOrigin = () => path.join(homedir(), 'Desktop', 'Port to Electron App - Local Version (origin).git')
 
-/** Mime → the extension `assets/<fileId>.<ext>` uses (🔒 D3). */
+/** Mime → the extension `assets/<fileId>.<ext>` uses (🔒 YAZ-1775 D3). */
 export const EXT = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
@@ -22,7 +22,7 @@ export const EXT = {
 
 /**
  * A drawing's `fileId`: the lowercase SHA-1 hex of the bytes. This is Excalidraw's own
- * `generateIdFromFile`, and 🔒 D3 makes it the asset's filename too, which is what dedupes the
+ * `generateIdFromFile`, and 🔒 YAZ-1775 D3 makes it the asset's filename too, which is what dedupes the
  * same image pasted into two boards down to one file.
  */
 export const fileIdFor = (bytes) => createHash('sha1').update(bytes).digest('hex')

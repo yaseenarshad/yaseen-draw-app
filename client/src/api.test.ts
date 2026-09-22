@@ -47,7 +47,7 @@ describe('api', () => {
     expect(bridge.createFile).toHaveBeenCalledWith('/v/n.excalidraw')
   })
 
-  it('the file dialogs delegate and answer what the user chose (YAZ-1833 / 🔒 D3 YAZ-1821)', async () => {
+  it('the file dialogs delegate and answer what the user chose (YAZ-1833 / 🔒 YAZ-1775 D3 YAZ-1821)', async () => {
     const dialog = { openDrawing: vi.fn(), saveDrawing: vi.fn() }
     Object.defineProperty(window.yaseenDraw, 'dialog', { value: dialog, configurable: true })
     const picked = { path: '/x/a.excalidraw', name: 'a', content: '{}' }
@@ -75,7 +75,7 @@ describe('api', () => {
     drawing.save.mockResolvedValue({ path: '/v/b.excalidraw', mtime: 2, size: 15, persisted: [] })
     await expect(api.drawing.save(req)).resolves.toEqual({ path: '/v/b.excalidraw', mtime: 2, size: 15, persisted: [] })
     expect(drawing.save).toHaveBeenCalledWith(req)
-    // 🔒 D5: read-only, and main owns the resolution (only it knows where userData is).
+    // 🔒 YAZ-1775 D5: read-only, and main owns the resolution (only it knows where userData is).
     drawing.libraryFolder.mockResolvedValue('/Users/x/Library/Application Support/Yaseen Draw/library')
     await expect(api.drawing.libraryFolder()).resolves.toBe('/Users/x/Library/Application Support/Yaseen Draw/library')
     // A CONFLICT rejection arrives as plain data and comes back as the class, mtime included.
@@ -130,7 +130,7 @@ describe('api', () => {
     expect(github.onStatus).toHaveBeenCalledWith(listener)
   })
 
-  it('media calls pass the request through and answer the list; onChanged is a pass-through (🔒 D5)', async () => {
+  it('media calls pass the request through and answer the list; onChanged is a pass-through (🔒 YAZ-1775 D5)', async () => {
     const media = { favorites: vi.fn(), recent: vi.fn(), onChanged: vi.fn() }
     Object.defineProperty(window.yaseenDraw, 'media', { value: media, configurable: true })
     const row = { itemKey: 'pixabay:1', provider: 'pixabay', providerId: '1', kind: 'photo', title: 'A tree', updatedAt: 1 }
@@ -146,7 +146,7 @@ describe('api', () => {
     expect(media.onChanged).toHaveBeenCalledWith(listener)
   })
 
-  it('the studio doors delegate, and a provider failure arrives with its typed code (🔒 D4)', async () => {
+  it('the studio doors delegate, and a provider failure arrives with its typed code (🔒 YAZ-1775 D4)', async () => {
     const media = { favorites: vi.fn(), recent: vi.fn(), onChanged: vi.fn(), search: vi.fn(), preview: vi.fn(), import: vi.fn() }
     Object.defineProperty(window.yaseenDraw, 'media', { value: media, configurable: true })
     media.search.mockResolvedValue({ items: [], nextCursor: null, pixabayAvailable: false, warnings: [] })
@@ -158,7 +158,7 @@ describe('api', () => {
     await expect(api.media.import({ provider: 'iconify', id: 'noto:money-bag' })).rejects.toMatchObject({ name: 'BridgeRequestError', code: 'OFFLINE' })
   })
 
-  it('components calls pass the request through and answer what main made; onChanged is a pass-through (🔒 D5)', async () => {
+  it('components calls pass the request through and answer what main made; onChanged is a pass-through (🔒 YAZ-1775 D5)', async () => {
     const components = { list: vi.fn(), save: vi.fn(), read: vi.fn(), rename: vi.fn(), delete: vi.fn(), preview: vi.fn(), onChanged: vi.fn() }
     Object.defineProperty(window.yaseenDraw, 'components', { value: components, configurable: true })
     const item = { slug: 'a-card', name: 'A card', elementCount: 2, createdAt: 1, updatedAt: 1 }
@@ -182,7 +182,7 @@ describe('api', () => {
     expect(components.onChanged).toHaveBeenCalledWith(listener)
   })
 
-  it('secrets: set and has delegate, and ENCRYPTION_UNAVAILABLE arrives as a typed BridgeRequestError (🔒 D4)', async () => {
+  it('secrets: set and has delegate, and ENCRYPTION_UNAVAILABLE arrives as a typed BridgeRequestError (🔒 YAZ-1775 D4)', async () => {
     const secrets = { set: vi.fn(), has: vi.fn() }
     Object.defineProperty(window.yaseenDraw, 'secrets', { value: secrets, configurable: true })
     secrets.set.mockResolvedValue(undefined)

@@ -16,7 +16,7 @@ const OPEN_FILE_OPTIONS: Electron.OpenDialogOptions = {
   filters: [{ name: 'Excalidraw', extensions: ['excalidraw'] }],
 }
 
-/** The export sheet (🔒 D3, YAZ-1821): one file, the extension it is getting, and no directory picking. */
+/** The export sheet (🔒 YAZ-1775 D3, YAZ-1821): one file, the extension it is getting, and no directory picking. */
 const SAVE_FILE_OPTIONS: Omit<Electron.SaveDialogOptions, 'defaultPath'> = {
   title: 'Export Drawing',
   filters: [{ name: 'Excalidraw', extensions: ['excalidraw'] }],
@@ -86,7 +86,7 @@ function requireSaveRequest(v: unknown): SaveDrawingRequest {
 }
 
 /**
- * `window.yaseenDraw.dialog.saveDrawing(req)` (🔒 D3, YAZ-1821): the export sheet, then the write.
+ * `window.yaseenDraw.dialog.saveDrawing(req)` (🔒 YAZ-1775 D3, YAZ-1821): the export sheet, then the write.
  *
  * ONE DOOR, not "pick a path, then write it". A renderer holding an arbitrary absolute path it may
  * write to is exactly what the fs layer's root-relative rules exist to prevent; here the only path

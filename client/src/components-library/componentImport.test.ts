@@ -62,7 +62,7 @@ describe('parseImportedComponentJson', () => {
     expect(imported.elements).toEqual([rect('a')])
   })
 
-  it('KEEPS images and carries their bytes — the whole point of importing a board (🔒 D5)', () => {
+  it('KEEPS images and carries their bytes — the whole point of importing a board (🔒 YAZ-1775 D5)', () => {
     const imported = parseImportedComponentJson(engine(), scene([image('i1', 'f1'), image('i2', 'f2')], { f1: png, f2: { ...png, id: 'f2' }, f3: png }))
     expect(imported.elements).toHaveLength(2)
     // Only what the elements NAME travels; an unreferenced file in the source is not the component's.

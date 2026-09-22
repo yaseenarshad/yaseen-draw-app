@@ -137,7 +137,7 @@ describe('renamedPath (Links E1, GRO-2194)', () => {
 })
 
 /**
- * "New drawing" names itself (🔒 R1 on YAZ-1775): the context menu no longer asks for a name, so
+ * "New drawing" names itself (🔒 YAZ-1775 R1): the context menu no longer asks for a name, so
  * the birth has to pick one the folder does not already hold — and never overwrite.
  */
 describe('untitledDrawingName', () => {

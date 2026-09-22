@@ -6,7 +6,7 @@
  * dataURL, because the renderer may not fetch from a provider; a favorite's stored `previewUrl`
  * is never read. The cache behind it is `lib/previewCache.ts`.
  *
- * NO KEY IS NOT AN ERROR (🔒 D4). `pixabayAvailable` false simply hides the Pixabay source and
+ * NO KEY IS NOT AN ERROR (🔒 YAZ-1775 D4). `pixabayAvailable` false simply hides the Pixabay source and
  * says nothing; Settings › Images is where a key is entered.
  *
  * OFFLINE IS A STATE, NOT A BANNER. A search that could not reach a provider renders a passive
@@ -19,7 +19,7 @@
  *
  * WHAT AN INSERT COSTS ON DISK: nothing, here. The bytes go to the engine, its files map grows an
  * id the store does not hold, and `drawing:save` writes it into `assets/` before the scene names
- * it (🔒 D3).
+ * it (🔒 YAZ-1775 D3).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PIXABAY_SECRET, type MediaBytesProvider, type MediaSearchSource, type StoredMediaItem, type StudioItem } from '@shared/types'
@@ -35,7 +35,7 @@ const STUDIO_VIEWS: readonly StudioView[] = ['search', 'shapes', 'favorites', 'r
 
 const VIEW_LABELS: Record<StudioView, string> = { search: 'Search', shapes: 'Shapes', favorites: 'Favorites', recent: 'Recent' }
 
-/** What the Search view says when the machine could not reach a provider (🔒 D4's offline half). */
+/** What the Search view says when the machine could not reach a provider (🔒 YAZ-1775 D4's offline half). */
 export const OFFLINE_NOTICE = "You're offline. Shapes, Favorites and Recent still work."
 
 export interface ImageStudioProps {
@@ -161,7 +161,7 @@ export function ImageStudio({ engine, excalidrawAPI, searchFocusRequest = 0 }: I
   }, [])
 
   // Whether a key is set, before the first search has said so — so the Pixabay source is never
-  // offered to someone who has not entered one (🔒 D4: the renderer learns yes/no, never a value).
+  // offered to someone who has not entered one (🔒 YAZ-1775 D4: the renderer learns yes/no, never a value).
   useEffect(() => {
     let live = true
     void api.secrets.has({ name: PIXABAY_SECRET }).then(
@@ -357,7 +357,7 @@ export function ImageStudio({ engine, excalidrawAPI, searchFocusRequest = 0 }: I
           >
             <option value="all">All</option>
             <option value="iconify">Iconify</option>
-            {/* 🔒 D4: with no key there is no Pixabay to offer, and nothing to explain here. */}
+            {/* 🔒 YAZ-1775 D4: with no key there is no Pixabay to offer, and nothing to explain here. */}
             {pixabayAvailable && <option value="pixabay">Pixabay</option>}
           </select>
           <input

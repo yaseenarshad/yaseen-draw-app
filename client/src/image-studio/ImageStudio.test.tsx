@@ -217,7 +217,7 @@ describe('searching', () => {
     expect(host.querySelector('.image-studio__warning')?.textContent).toContain('Pixabay graphics are temporarily unavailable.')
   })
 
-  it('is a passive offline state, not an error, when the machine cannot reach a provider (🔒 D4)', async () => {
+  it('is a passive offline state, not an error, when the machine cannot reach a provider (🔒 YAZ-1775 D4)', async () => {
     media.search.mockRejectedValue(new BridgeRequestError('OFFLINE', 'could not reach api.iconify.design'))
     const { container: host } = await mount()
     await search(host)
@@ -309,7 +309,7 @@ describe('the infinite scroll', () => {
   })
 })
 
-describe('the Pixabay key, which the renderer only ever learns yes or no about (🔒 D4)', () => {
+describe('the Pixabay key, which the renderer only ever learns yes or no about (🔒 YAZ-1775 D4)', () => {
   it('does not offer Pixabay as a source when no key is set', async () => {
     const { container: host } = await mount()
     expect([...(byLabel(host, 'Search source') as HTMLSelectElement).options].map((option) => option.value)).toEqual(['all', 'iconify'])

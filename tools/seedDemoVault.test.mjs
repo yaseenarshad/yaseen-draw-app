@@ -17,7 +17,7 @@ describe('asset naming', () => {
     expect(fileIdFor(bytes)).toMatch(/^[0-9a-f]{40}$/)
   })
 
-  it('gives the same id to the same bytes, so one image pasted twice is one file (🔒 D3)', () => {
+  it('gives the same id to the same bytes, so one image pasted twice is one file (🔒 YAZ-1775 D3)', () => {
     expect(fileIdFor(Buffer.from('same'))).toBe(fileIdFor(Buffer.from('same')))
     expect(fileIdFor(Buffer.from('same'))).not.toBe(fileIdFor(Buffer.from('other')))
   })

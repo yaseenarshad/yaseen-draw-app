@@ -1,5 +1,5 @@
 /**
- * THE ORPHAN SWEEP (🔒 D3 on YAZ-1775, built in YAZ-1811): once per vault per session — the
+ * THE ORPHAN SWEEP (🔒 YAZ-1775 D3 on YAZ-1775, built in YAZ-1811): once per vault per session — the
  * first time a window asks for that vault's tree — every file in `<root>/assets/` that no
  * `.excalidraw` in the vault references AND that is older than 24 h goes to the OS trash.
  *

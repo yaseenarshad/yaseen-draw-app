@@ -1,5 +1,5 @@
 /**
- * THE PRESENT TAB (⚡ D8 amended, YAZ-1820): the web app's
+ * THE PRESENT TAB (⚡ YAZ-1775 D8 amended, YAZ-1820): the web app's
  * `excalidraw-app/presentation/PresentationSidebar.tsx`, ported into the canvas panel's third tab.
  * Frames are slides; the list is their order; dragging a row, or Alt+↑ / Alt+↓, writes that order
  * back into the FILE.

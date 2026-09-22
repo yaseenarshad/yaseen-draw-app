@@ -1,5 +1,5 @@
 /**
- * The `components.*` half of `window.yaseenDraw` (🔒 D5, YAZ-1819): the library's component store
+ * The `components.*` half of `window.yaseenDraw` (🔒 YAZ-1775 D5, YAZ-1819): the library's component store
  * behind the envelope, plus the ONE push. `components:changed` carries no payload — every window
  * re-lists, whichever vault it is on, because the library is the same folder for all of them.
  *

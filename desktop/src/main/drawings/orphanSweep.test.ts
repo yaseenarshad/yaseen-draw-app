@@ -1,5 +1,5 @@
 /**
- * The orphan sweep on a real temp vault, with `shell.trashItem` injected (🔒 D3, YAZ-1811).
+ * The orphan sweep on a real temp vault, with `shell.trashItem` injected (🔒 YAZ-1775 D3, YAZ-1811).
  * No Electron import anywhere in the module under test, which is why this runs on plain Node —
  * and why a test never moves a file into the developer's own Trash.
  */

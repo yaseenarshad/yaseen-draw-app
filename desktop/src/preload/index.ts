@@ -87,7 +87,7 @@ const api: YaseenDrawApi = {
     onCloseTab: on<void>(CH.menuCloseTab),
     onNextTab: on<void>(CH.menuNextTab),
     onPrevTab: on<void>(CH.menuPrevTab),
-    // 🔒 D10: File › Export Image… and View › Canvas Background ▸, which main enables only while
+    // 🔒 YAZ-1775 D10: File › Export Image… and View › Canvas Background ▸, which main enables only while
     // the focused window's active tab is a drawing.
     onExportImage: on<void>(CH.menuExportImage),
     onCanvasBackground: on<string>(CH.menuCanvasBackground),
@@ -124,17 +124,17 @@ const api: YaseenDrawApi = {
     set: (root, paths) => call(CH.favoritesSet, root, paths),
     onChanged: on<{ root: string }>(CH.favoritesChanged),
   },
-  // The cross-vault media library over `<library>/media.json` (🔒 D4 / D5, YAZ-1817): pointers only, every window hears every change.
+  // The cross-vault media library over `<library>/media.json` (🔒 YAZ-1775 D4 / D5, YAZ-1817): pointers only, every window hears every change.
   media: {
     favorites: (req) => call(CH.mediaFavorites, req),
     recent: (req) => call(CH.mediaRecent, req),
     onChanged: on<void>(CH.mediaChanged),
-    // The provider doors (🔒 D4, YAZ-1818): main holds the key, does the fetching and caches.
+    // The provider doors (🔒 YAZ-1775 D4, YAZ-1818): main holds the key, does the fetching and caches.
     search: (req) => call(CH.mediaSearch, req),
     preview: (req) => call(CH.mediaPreview, req),
     import: (req) => call(CH.mediaImport, req),
   },
-  // The cross-vault saved-component library over `<library>/components/` (🔒 D5, YAZ-1819).
+  // The cross-vault saved-component library over `<library>/components/` (🔒 YAZ-1775 D5, YAZ-1819).
   components: {
     list: () => call(CH.componentsList),
     save: (req) => call(CH.componentsSave, req),
@@ -144,7 +144,7 @@ const api: YaseenDrawApi = {
     preview: (req) => call(CH.componentsPreview, req),
     onChanged: on<void>(CH.componentsChanged),
   },
-  // The secrets door (🔒 D4): write and ask, never read — there is no channel that answers a value.
+  // The secrets door (🔒 YAZ-1775 D4): write and ask, never read — there is no channel that answers a value.
   secrets: {
     set: (req) => call(CH.secretsSet, req),
     has: (req) => call(CH.secretsHas, req),

@@ -13,7 +13,7 @@ import type { NoticeKind } from './lib/notice'
  * Everything below is App's, handed through: the vault root (a drawing is read relative to it),
  * the window's single watcher subscription, the vault's sync status — one per window, so the chip
  * on every mounted tab tells the same story — and the user-level canvas preferences plus the
- * canvas panel's memory (🔒 D9 / 🔒 D10), which live in `SettingsState` and reach every mounted
+ * canvas panel's memory (🔒 YAZ-1775 D9 / 🔒 YAZ-1775 D10), which live in `SettingsState` and reach every mounted
  * canvas from the one place that owns them.
  */
 export interface EditorProps {
@@ -22,10 +22,10 @@ export interface EditorProps {
   watch: WatchSource
   sync?: GithubSyncStatus | null
   onSyncNow?: () => void
-  /** 🔒 D9: `SettingsState.canvas`, and the way back when the engine or the rail moves one. */
+  /** 🔒 YAZ-1775 D9: `SettingsState.canvas`, and the way back when the engine or the rail moves one. */
   canvasPrefs?: CanvasPrefs
   onCanvasPrefsChange?: (next: CanvasPrefs) => void
-  /** 🔒 D10: `SettingsState.canvasPanel` — the panel's last-used tab and its dock preference. */
+  /** 🔒 YAZ-1775 D10: `SettingsState.canvasPanel` — the panel's last-used tab and its dock preference. */
   canvasPanel?: CanvasPanelState
   onCanvasPanelChange?: (next: CanvasPanelState) => void
   /** The window's ONE passive notice: how an export says where it landed, or why it did not. */

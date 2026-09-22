@@ -41,7 +41,7 @@ afterEach(() => rm(userData, { recursive: true, force: true }))
 const set = (req: unknown) => registered(CH.secretsSet)({ sender }, req)
 const has = (req: unknown) => registered(CH.secretsHas)({ sender }, req)
 
-describe('registerSecretsIpc (🔒 D4, YAZ-1817)', () => {
+describe('registerSecretsIpc (🔒 YAZ-1775 D4, YAZ-1817)', () => {
   it('registers set and has — and NO channel that answers a value', () => {
     expect(vi.mocked(ipcMain.handle).mock.calls.map(([ch]) => ch).sort()).toEqual([CH.secretsHas, CH.secretsSet].sort())
   })

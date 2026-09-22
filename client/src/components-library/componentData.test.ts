@@ -1,5 +1,5 @@
 /**
- * What a component is made of, and what an insert does (🔒 D5, YAZ-1819). The engine comes in as a
+ * What a component is made of, and what an insert does (🔒 YAZ-1775 D5, YAZ-1819). The engine comes in as a
  * stub — the web app's rules are the thing under test, plus the one promise about an insert that
  * 2E has to be able to keep: the bytes arrive at the canvas UNPERSISTED, which is how they become
  * an `assets/` file.
@@ -62,7 +62,7 @@ describe('assertSupportedComponentElements — the web app’s four checks', () 
     expect(() => assertSupportedComponentElements([rect('a'), rect('a')])).toThrow('Duplicate element id: a')
   })
 
-  it('iframes and embeddables are still unsupported; an IMAGE is not (🔒 D5: it carries its bytes)', () => {
+  it('iframes and embeddables are still unsupported; an IMAGE is not (🔒 YAZ-1775 D5: it carries its bytes)', () => {
     expect(() => assertSupportedComponentElements([{ id: 'a', type: 'iframe' }])).toThrow(/do not support iframe/)
     expect(() => assertSupportedComponentElements([{ id: 'a', type: 'embeddable' }])).toThrow(/do not support embeddable/)
     expect(() => assertSupportedComponentElements([image('a', 'f1')])).not.toThrow()
@@ -112,7 +112,7 @@ describe('captureComponentSelection — the selection, deep-copied, with its byt
   })
 })
 
-describe('componentFragmentJson — the bytes that land in the library (🔒 D5)', () => {
+describe('componentFragmentJson — the bytes that land in the library (🔒 YAZ-1775 D5)', () => {
   it('is a whole Excalidraw document with an EMPTY appState and the bytes embedded', () => {
     const json = componentFragmentJson({ elements: [image('a', 'f1')], files: { f1: bytes() } })
     expect(JSON.parse(json)).toEqual({ type: 'excalidraw', version: 2, source: 'yaseen-draw', elements: [image('a', 'f1')], appState: {}, files: { f1: bytes() } })
@@ -148,14 +148,14 @@ describe('insertComponent — an INDEPENDENT copy, at the viewport centre', () =
     expect(canvas.addFiles).not.toHaveBeenCalled()
   })
 
-  it('leaves the inserted bytes reported as UNPERSISTED, which is how they become an `assets/` file (🔒 D3, through 2E)', () => {
+  it('leaves the inserted bytes reported as UNPERSISTED, which is how they become an `assets/` file (🔒 YAZ-1775 D3, through 2E)', () => {
     const canvas = fakeCanvas()
     insertComponent(engine, canvas.api, componentFragmentJson({ elements: [image('a', 'f1')], files: { f1: bytes() } }))
     // What the engine now holds, and what the scene references — 2E's own function on both.
     const files: Record<string, DrawingFileData> = Object.fromEntries((canvas.addFiles.mock.calls[0][0] as { id: string }[]).map((f) => [f.id, bytes()]))
     expect(unpersistedFiles(files, new Set(['f1']), new Set()).map((f) => f.fileId)).toEqual(['f1'])
     // …and nothing once the save has confirmed it: a second insert of the same component in the
-    // same vault writes no second asset (the store is content-addressed, 🔒 D3).
+    // same vault writes no second asset (the store is content-addressed, 🔒 YAZ-1775 D3).
     expect(unpersistedFiles(files, new Set(['f1']), new Set(['f1']))).toEqual([])
   })
 

@@ -46,7 +46,7 @@ export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(storage.getSidebarCollapsed)
   const sidebarCollapsedRef = useRef(sidebarCollapsed)
   const [sidebarWidth, setSidebarWidth] = useState(storage.getSidebarWidth)
-  // The sidebar's active LENS (🔒 D4, YAZ-847): App-owned and persisted because the Sidebar is
+  // The sidebar's active LENS (🔒 YAZ-1775 D4, YAZ-847): App-owned and persisted because the Sidebar is
   // mounted `key={root}` and only while open; sidebar-local view state would reset on every
   // collapse/reopen and root switch. Window identity like visibility since YAZ-1628 — one
   // `WindowEntry.sidebarLens`; never a second flag.
@@ -148,7 +148,7 @@ export function App() {
     setSettings(next)
   }, [])
 
-  // 🔒 D9: the canvas prefs are ONE value in the shell store, and every mounted canvas in every
+  // 🔒 YAZ-1775 D9: the canvas prefs are ONE value in the shell store, and every mounted canvas in every
   // window reads it. The engine (or the rail) reports a change up here; the store broadcasts it;
   // the surfaces apply what actually moved. A ref carries the current settings so the callback
   // identity never changes — a new one would re-render the memoized `<Excalidraw>`.
@@ -163,7 +163,7 @@ export function App() {
     },
     [changeSettings],
   )
-  /** 🔒 D10: the canvas panel's last-used tab and dock preference, remembered app-wide. */
+  /** 🔒 YAZ-1775 D10: the canvas panel's last-used tab and dock preference, remembered app-wide. */
   const changeCanvasPanel = useCallback(
     (canvasPanel: CanvasPanelState) => {
       const current = settingsRef.current.canvasPanel
@@ -260,7 +260,7 @@ export function App() {
     setSidebarRevealRequest({ id: ++sidebarRevealId.current, path, lens })
   }, [sidebarCollapsed, sidebarLens, toggleSidebar, changeLens])
 
-  // A folder search row (🔒 D3, YAZ-1491): always the FILES lens, whichever tab was showing. The
+  // A folder search row (🔒 YAZ-1775 D3, YAZ-1491): always the FILES lens, whichever tab was showing. The
   // sidebar is necessarily open (the row was clicked in it), so no un-collapse step here.
   const revealInFiles = useCallback((path: string) => {
     changeLens('files')
@@ -280,7 +280,7 @@ export function App() {
 
   // File › Open Folder… / Open Recent (GRO-2161) reuse the same flows as the in-app buttons;
   // File › Close Tab and Window › Next/Previous Tab (GRO-2232) drive the tab model.
-  // 🔒 D10: File › Export Image… and View › Canvas Background act on the VISIBLE drawing layer,
+  // 🔒 YAZ-1775 D10: File › Export Image… and View › Canvas Background act on the VISIBLE drawing layer,
   // which `requestDrawingCommand` finds by DOM — several tabs are mounted at once and only one is
   // in front. Main greys both items out off a drawing tab, so a miss here is already impossible.
   const exportImage = useCallback(() => void requestDrawingCommand({ kind: 'export-image' }), [])

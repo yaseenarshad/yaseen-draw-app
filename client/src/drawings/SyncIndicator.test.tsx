@@ -1,5 +1,5 @@
 /**
- * The GitHub sync chip (YAZ-1081 3A, 🔒 D5): SaveIndicator's dot-plus-label idiom, one state
+ * The GitHub sync chip (YAZ-1081 3A, 🔒 YAZ-1775 D5): SaveIndicator's dot-plus-label idiom, one state
  * class per state, and a real `<button>` — the chip IS the one-click sync, so every state
  * clicks, `off` included (the engine answers `off` and nothing happens).
  */

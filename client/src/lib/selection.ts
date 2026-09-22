@@ -2,7 +2,7 @@
  * The sidebar's multi-select, pure (YAZ-1336, 🔒 D1) — `treeState.ts`'s sibling: the Sidebar owns
  * the state, this owns the rules. A selection is a set of PATHS — files and, since YAZ-1578,
  * folders (a folder is itself, never its contents) — so ONE path is ONE entry however many rows
- * draw it (🔒 D3: a favorited folder's contents also show under Files, and all of those rows are
+ * draw it (🔒 YAZ-1336 D3: a favorited folder's contents also show under Files, and all of those rows are
  * the same selected thing).
  */
 
@@ -10,7 +10,7 @@
 export const EMPTY_SELECTION: ReadonlySet<string> = new Set<string>()
 
 export type SelectionAction =
-  /** 🔒 D2 as Yasin amended it: shift+click ADDS or REMOVES the one row. There is no range. */
+  /** 🔒 YAZ-1336 D2 as Yasin amended it: shift+click ADDS or REMOVES the one row. There is no range. */
   | { type: 'toggle'; path: string }
   /**
    * D9 (YAZ-1674, reversing YAZ-1336's plain-click-clears): a PLAIN click — and ⌘-click, and a
@@ -54,7 +54,7 @@ export function selectionReducer(sel: ReadonlySet<string>, action: SelectionActi
  * ⚡ Fable's ruling on YAZ-1338: THE SELECTION IS THE TRUTH, THE DOM IS ONLY THE ORDER. So this
  * walks the rows the panel is currently drawing (`flashTreeRows`' idiom, revealRow.ts) to put the
  * on-screen paths in the order the eye reads them — deduped, because one path may be drawn by
- * more than one row (🔒 D3) — and then APPENDS whatever the selection still
+ * more than one row (🔒 YAZ-1336 D3) — and then APPENDS whatever the selection still
  * holds that has no row: a path inside a folder the user collapsed after selecting it is still
  * selected, and dropping it would make "Copy N paths" copy fewer than N. The result therefore
  * always has exactly `selected.size` entries. A null host (the sidebar is collapsed, so there is

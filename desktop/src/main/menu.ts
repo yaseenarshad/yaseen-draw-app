@@ -37,11 +37,11 @@ export interface MenuHandlers {
   toggleSidebar(): void
   /** View › Zoom In / Out / Actual Size (⌘+ / ⌘− / ⌘0): app-wide zoom on the focused window (YAZ-1710). */
   zoom(step: ZoomStep): void
-  /** File › Export Image… (⌘⇧E, 🔒 D10): the focused renderer's visible drawing opens the engine's export dialog. */
+  /** File › Export Image… (⌘⇧E, 🔒 YAZ-1775 D10): the focused renderer's visible drawing opens the engine's export dialog. */
   exportImage(): void
-  /** File › Export Drawing… (⌘⇧S, 🔒 D3): the focused renderer's visible drawing writes a standalone `.excalidraw`. */
+  /** File › Export Drawing… (⌘⇧S, 🔒 YAZ-1775 D3): the focused renderer's visible drawing writes a standalone `.excalidraw`. */
   exportDrawing(): void
-  /** View › Canvas Background › a pick (🔒 D10): the focused renderer's visible drawing takes `color`. */
+  /** View › Canvas Background › a pick (🔒 YAZ-1775 D10): the focused renderer's visible drawing takes `color`. */
   canvasBackground(color: string): void
   openHelp(): void
 }
@@ -52,7 +52,7 @@ export interface MenuInputs {
   /** Dev builds get View › Toggle Developer Tools. */
   isDev: boolean
   /**
-   * Whether the focused window's ACTIVE TAB is a drawing (🔒 D10). The two canvas items are
+   * Whether the focused window's ACTIVE TAB is a drawing (🔒 YAZ-1775 D10). The two canvas items are
    * enabled only then — they act on a canvas, and a menu row that silently does nothing is worse
    * than a greyed-out one. `main/index.ts` recomputes it on every rebuild, and
    * `subscribeMenuRebuildOnActiveFile` plus the focus hook are what make a rebuild happen.
@@ -64,7 +64,7 @@ export interface MenuInputs {
  * The engine's own canvas-background picks (`DEFAULT_CANVAS_BACKGROUND_PICKS`,
  * `packages/common/src/colors.ts`): white, then radix slate2 / blue2 / yellow2 / bronze2. No
  * "Custom…" row — a colour dialog is not a menu item's job, and the engine's own picker is gone
- * with its main menu (🔒 D10).
+ * with its main menu (🔒 YAZ-1775 D10).
  */
 export const CANVAS_BACKGROUND_PICKS: ReadonlyArray<{ label: string; color: string }> = [
   { label: 'White', color: '#ffffff' },
@@ -122,11 +122,11 @@ export function buildMenuTemplate({ recents, isDev, activeIsDrawing }: MenuInput
         // so the gesture goes to the focused window's renderer — un-collapsing the sidebar first.
         { id: 'menu.file.search', label: 'Search Vault', accelerator: 'CmdOrCtrl+K', click: () => handlers.search() },
         { type: 'separator' },
-        // 🔒 D10: the drawing's image export left the canvas hamburger for the app menu bar. It
+        // 🔒 YAZ-1775 D10: the drawing's image export left the canvas hamburger for the app menu bar. It
         // opens the ENGINE's own export dialog (`openDialog: { name: 'imageExport' }`) — a
         // standalone `.excalidraw` export is 3E's.
         { id: 'menu.file.export-image', label: 'Export Image…', accelerator: 'CmdOrCtrl+Shift+E', enabled: activeIsDrawing, click: () => handlers.exportImage() },
-        // 🔒 D3: the ONE place a `.excalidraw` embeds its images, so a board can be handed to
+        // 🔒 YAZ-1775 D3: the ONE place a `.excalidraw` embeds its images, so a board can be handed to
         // someone with no vault and no `assets/` folder. ⌘⇧S is free in this menu — the engine's
         // own "Save as" is off (`saveToActiveFile: false`) and a registered accelerator never
         // reaches the page on macOS anyway — and it is the key the gesture means.
@@ -159,9 +159,9 @@ export function buildMenuTemplate({ recents, isDev, activeIsDrawing }: MenuInput
         { id: 'menu.view.zoom-in-eq', label: 'Zoom In', accelerator: 'CmdOrCtrl+=', visible: false, click: () => handlers.zoom(1) },
         { id: 'menu.view.zoom-out', label: 'Zoom Out', accelerator: 'CmdOrCtrl+-', click: () => handlers.zoom(-1) },
         { type: 'separator' },
-        // 🔒 D10: the engine's canvas-background picks, greyed out off a drawing tab. The value is
+        // 🔒 YAZ-1775 D10: the engine's canvas-background picks, greyed out off a drawing tab. The value is
         // per BOARD — the engine writes `viewBackgroundColor` into the file — which is why it is
-        // here and not in Settings › Canvas with the user-level prefs (🔒 D9).
+        // here and not in Settings › Canvas with the user-level prefs (🔒 YAZ-1775 D9).
         {
           id: 'menu.view.canvas-background',
           label: 'Canvas Background',
@@ -342,7 +342,7 @@ export function subscribeMenuRebuild(store: Store, rebuild: () => void): () => v
 const activeFilesKey = (state: { windows: ReadonlyArray<{ id: string; file: string | null }> }): string => state.windows.map((w) => `${w.id}=${w.file ?? ''}`).join('\n')
 
 /**
- * Rebuild when any window's ACTIVE FILE changes (🔒 D10): File › Export Image…, File › Export
+ * Rebuild when any window's ACTIVE FILE changes (🔒 YAZ-1775 D10): File › Export Image…, File › Export
  * Drawing… and View › Canvas Background are enabled only while the focused window's active tab is
  * a drawing, so a tab switch
  * has to re-evaluate them. A second subscription rather than a widening of `subscribeMenuRebuild`,

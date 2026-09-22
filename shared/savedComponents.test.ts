@@ -1,5 +1,5 @@
 /**
- * The saved-component RULES (🔒 D5, YAZ-1819), with no disk and no engine: slugging, the index's
+ * The saved-component RULES (🔒 YAZ-1775 D5, YAZ-1819), with no disk and no engine: slugging, the index's
  * shape, and what a fragment has to look like before it may be written or inserted.
  */
 import { describe, expect, it } from 'vitest'
@@ -169,7 +169,7 @@ describe('sanitizeComponentsIndex — lenient file, strict row', () => {
   })
 })
 
-describe('indexFromSlugs — the index REBUILT from the folder (🔒 D5)', () => {
+describe('indexFromSlugs — the index REBUILT from the folder (🔒 YAZ-1775 D5)', () => {
   const seen = [
     { slug: 'beta', elementCount: 3, createdAt: 20, updatedAt: 20 },
     { slug: 'alpha', elementCount: 1, createdAt: 10, updatedAt: 30 },
@@ -253,7 +253,7 @@ describe('parseComponentFragment — what may be written, and what may be insert
     expect(parseComponentFragment(json).elements).toEqual([{ id: 'e1', type: 'rectangle' }])
   })
 
-  it('throws when an image element names bytes the fragment does not carry — 🔒 D5 says self-contained', () => {
+  it('throws when an image element names bytes the fragment does not carry — 🔒 YAZ-1775 D5 says self-contained', () => {
     const json = fragment({ elements: [{ id: 'e1', type: 'image', fileId: 'missing' }] })
     expect(() => parseComponentFragment(json)).toThrow(/missing/)
   })

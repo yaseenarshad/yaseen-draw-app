@@ -1,11 +1,11 @@
 /**
- * THE IMAGE STUDIO'S THREE DOORS (🔒 D4, YAZ-1818): `media:search`, `media:preview`,
+ * THE IMAGE STUDIO'S THREE DOORS (🔒 YAZ-1775 D4, YAZ-1818): `media:search`, `media:preview`,
  * `media:import`. The guard layer only — every decision is `main/media/`'s, every request is
  * validated whole here first, because a sandboxed renderer's arguments are input.
  *
  * WHY THE SECRETS INSTANCE IS PASSED IN: `registerSecretsIpc` owns `userData/secrets.json` and
  * returns the one object that can `read` it. Threading it here is what lets the providers build a
- * Pixabay request without the key ever existing outside main (🔒 D4). A second `createSecrets`
+ * Pixabay request without the key ever existing outside main (🔒 YAZ-1775 D4). A second `createSecrets`
  * would be a second writer to the same file.
  *
  * THE CACHE IS SWEPT ONCE, AT REGISTRATION, DETACHED. `<userData>/media-cache/` is bounded by age
@@ -35,7 +35,7 @@ function requireSearchRequest(v: unknown): MediaSearchRequest {
 function requireBytesRequest(v: unknown): MediaBytesRequest {
   if (!isRecord(v)) throw new BridgeFailure('BAD_REQUEST', 'missing request')
   // `shape` is deliberately not one of these: a shape is drawn by the renderer from its own
-  // catalog and has no bytes to fetch (🔒 D4).
+  // catalog and has no bytes to fetch (🔒 YAZ-1775 D4).
   if (!isMediaBytesProvider(v.provider)) throw new BridgeFailure('BAD_REQUEST', "'provider' must be pixabay or iconify")
   if (typeof v.id !== 'string' || v.id === '') throw new BridgeFailure('BAD_REQUEST', "'id' must be a non-empty string")
   return { provider: v.provider, id: v.id }

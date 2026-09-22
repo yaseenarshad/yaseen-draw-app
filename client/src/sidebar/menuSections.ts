@@ -6,13 +6,13 @@ import type { MenuTargets } from './Sidebar'
  * conditional in `ContextMenu`'s JSX is one small function here returning an item or null, so the
  * component keeps only mechanics (overlay, clamp, Escape) and the rules test PURE — no DOM.
  *
- * SIX groups, in this order (🔒 D7, amended twice): Open/View · Clipboard · Create · This row ·
+ * SIX groups, in this order (🔒 YAZ-1674 D7, amended twice): Open/View · Clipboard · Create · This row ·
  * "Open in ▸" · Delete. The component draws a separator between NON-EMPTY groups only, so a
  * blank-space menu (no row to rename or delete) never ends in a stray rule. Labels are the bare
  * text — a shortcut hint rides on `hint` and is drawn by CSS from `data-hint`, so `textContent`
  * and the accessible name stay what every test pins.
  *
- * NOTE (🔒 D7): grouping moves "Copy N paths" below the Open group, which loosens 🔒 D5 of
+ * NOTE (🔒 YAZ-1674 D7): grouping moves "Copy N paths" below the Open group, which loosens 🔒 YAZ-1337 D5 of
  * YAZ-1337 ("the plural pair leads") — "Open N in new tabs" still leads the whole menu, and the
  * plural copy still leads its own group.
  *
@@ -78,7 +78,7 @@ export interface MenuHandlers {
    * `PageContextMenu` reports it — a copy that quietly did nothing is the worst kind of no-op.
    */
   onNotice: (message: string) => void
-  /** "New drawing" (⚡ D8 amended): the one document birth, and the first row of the create group. */
+  /** "New drawing" (⚡ YAZ-1674 D8 amended): the one document birth, and the first row of the create group. */
   onNewDrawing: () => void
   /** Create a DISK folder — null hides the item (YAZ-948). */
   onNewFolder: (() => void) | null
@@ -304,7 +304,7 @@ const DELETE_GROUP: readonly Item[] = [del]
 const build = <T extends MenuItem>(group: readonly ((t: MenuSectionTargets, h: MenuHandlers) => T | null)[], t: MenuSectionTargets, h: MenuHandlers): T[] =>
   group.map((rule) => rule(t, h)).filter((item): item is T => item !== null)
 
-/** The six groups of 🔒 D7 (as amended), in order, every null item dropped. An empty group is the component's to skip. */
+/** The six groups of 🔒 YAZ-1674 D7 (as amended), in order, every null item dropped. An empty group is the component's to skip. */
 export function buildMenuSections(targets: MenuSectionTargets, handlers: MenuHandlers): MenuSection[] {
   return [OPEN_GROUP, CLIPBOARD_GROUP, CREATE_GROUP, ROW_GROUP, OPEN_IN_GROUP, DELETE_GROUP].map((group) => build(group, targets, handlers))
 }

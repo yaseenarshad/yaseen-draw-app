@@ -1,7 +1,7 @@
 import type { GithubSyncStatus } from '@shared/types'
 
 /**
- * The GitHub sync chip (YAZ-1081 🔒 D4): sits immediately LEFT of the per-tab Saved
+ * The GitHub sync chip (YAZ-1081 🔒 YAZ-1775 D4): sits immediately LEFT of the per-tab Saved
  * indicator, top-right of the editor — SaveIndicator's exact dot-plus-label idiom, so two
  * chips read as one row rather than two competing widgets.
  *

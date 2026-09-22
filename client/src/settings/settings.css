@@ -380,7 +380,7 @@
 }
 
 /*
- * The number field (Settings › Canvas's two pen widths, 🔒 D9): the `Select` pill's geometry,
+ * The number field (Settings › Canvas's two pen widths, 🔒 YAZ-1775 D9): the `Select` pill's geometry,
  * narrow enough that "0.5" and "2" read as the small numbers they are. The spinner is left alone —
  * stepping by 0.1 is exactly the gesture these want.
  */
@@ -404,14 +404,14 @@
   width: 5.5rem;
 }
 
-/* The secret field (Settings › Images › Pixabay API key, 🔒 D4): a pasted key is long, and it sits in the button row. */
+/* The secret field (Settings › Images › Pixabay API key, 🔒 YAZ-1775 D4): a pasted key is long, and it sits in the button row. */
 .settings__input--secret {
   flex: 1 1 12rem;
   min-width: 0;
 }
 
 /*
- * The resolved path a row reports (Settings › Files › Library folder, 🔒 D5). It is the row's real
+ * The resolved path a row reports (Settings › Files › Library folder, 🔒 YAZ-1775 D5). It is the row's real
  * content, so it sits above the buttons in a `wide` row — long, monospaced, and allowed to wrap
  * anywhere rather than pushing the dialog sideways.
  */

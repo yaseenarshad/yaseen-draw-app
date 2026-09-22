@@ -5,7 +5,7 @@ import { buildTree, fsCall, requireAbsPath, requireDir } from './fsUtils'
 /**
  * `window.yaseenDraw.tree(root)`: recursive vault tree of `root` (see `buildTree`).
  *
- * The TOP-LEVEL `assets/` folder is hidden (🔒 D3): it is the image store, written and read by
+ * The TOP-LEVEL `assets/` folder is hidden (🔒 YAZ-1775 D3): it is the image store, written and read by
  * the app alone, and its contents are content-hash names no one would ever click. Only the one
  * at the root — a folder the user made and called `assets` inside a subfolder is theirs, and
  * hiding it by name anywhere would be the app deciding what the user may see in their own vault.

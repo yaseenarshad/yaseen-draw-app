@@ -140,7 +140,7 @@ describe('SavedComponents — the library', () => {
     expect(text(el)).toContain('0 saved components')
   })
 
-  it('re-lists on `components:changed` — the push that makes ONE library out of every vault (🔒 D5)', async () => {
+  it('re-lists on `components:changed` — the push that makes ONE library out of every vault (🔒 YAZ-1775 D5)', async () => {
     const { el } = await mount()
     const refresh = components.onChanged.mock.calls[0][0]
     components.list.mockResolvedValue([item()])

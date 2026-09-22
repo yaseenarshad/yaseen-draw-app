@@ -18,9 +18,9 @@ import { isRecord } from '@shared/guards'
 export interface DrawingScene {
   /** Excalidraw elements exactly as the file holds them; validated only as "an array". */
   readonly elements: readonly unknown[]
-  /** Missing in the file = the engine's own defaults; 🔒 D9 prefs are layered over this at mount. */
+  /** Missing in the file = the engine's own defaults; 🔒 YAZ-1775 D9 prefs are layered over this at mount. */
   readonly appState: Record<string, unknown>
-  /** The image map, keyed by `fileId`. Empty for every file this app writes (🔒 D3). */
+  /** The image map, keyed by `fileId`. Empty for every file this app writes (🔒 YAZ-1775 D3). */
   readonly files: Record<string, unknown>
 }
 

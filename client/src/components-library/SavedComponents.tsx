@@ -12,7 +12,7 @@
  * 🔒 `confirmDelete` (Settings › Files) decides whether that row appears at all.
  *
  * WHAT AN INSERT COSTS ON DISK: the component's images become `assets/` files in THIS vault the
- * first time the board is saved after it (🔒 D3) — see `componentData.ts`.
+ * first time the board is saved after it (🔒 YAZ-1775 D3) — see `componentData.ts`.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentItem } from '@shared/types'
@@ -80,7 +80,7 @@ export function SavedComponents({ engine, excalidrawAPI, hasSelection }: SavedCo
   const [notice, setNotice] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
 
-  // The library, and the ONE push that keeps it true in every window and every vault (🔒 D5).
+  // The library, and the ONE push that keeps it true in every window and every vault (🔒 YAZ-1775 D5).
   useEffect(() => {
     let live = true
     const refresh = () => {

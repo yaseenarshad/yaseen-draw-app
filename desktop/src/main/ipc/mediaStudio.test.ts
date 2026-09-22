@@ -1,5 +1,5 @@
 /**
- * The Image Studio's three channels (🔒 D4, YAZ-1818): the guard layer. What is pinned here is
+ * The Image Studio's three channels (🔒 YAZ-1775 D4, YAZ-1818): the guard layer. What is pinned here is
  * that a sandboxed renderer's arguments are checked BEFORE a provider is touched, that a typed
  * failure reaches the envelope with its code intact, and that the cache folder is made and swept
  * at registration rather than on the first search.

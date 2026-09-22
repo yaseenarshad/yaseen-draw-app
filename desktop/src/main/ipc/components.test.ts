@@ -1,5 +1,5 @@
 /**
- * The `components:*` doors on a real temp library, with `electron` mocked (🔒 D5, YAZ-1819): the
+ * The `components:*` doors on a real temp library, with `electron` mocked (🔒 YAZ-1775 D5, YAZ-1819): the
  * six channels, the guards a sandboxed renderer's arguments have to pass, and the ONE push every
  * window gets whichever vault it is on.
  */
@@ -80,7 +80,7 @@ const renameIt = (req: unknown) => registered(CH.componentsRename)({ sender }, r
 const remove = (req: unknown) => registered(CH.componentsDelete)({ sender }, req)
 const preview = (req: unknown) => registered(CH.componentsPreview)({ sender }, req)
 
-describe('registerComponentsIpc (🔒 D5, YAZ-1819)', () => {
+describe('registerComponentsIpc (🔒 YAZ-1775 D5, YAZ-1819)', () => {
   it('registers exactly the six component channels', () => {
     expect(
       vi
@@ -90,7 +90,7 @@ describe('registerComponentsIpc (🔒 D5, YAZ-1819)', () => {
     ).toEqual([CH.componentsDelete, CH.componentsList, CH.componentsPreview, CH.componentsRead, CH.componentsRename, CH.componentsSave].sort())
   })
 
-  it('save → list → read → preview → rename → delete, all under `<userData>/library` by default (🔒 D5)', async () => {
+  it('save → list → read → preview → rename → delete, all under `<userData>/library` by default (🔒 YAZ-1775 D5)', async () => {
     const saved = await save({ name: 'A card', fragmentJson: fragment(), previewPng: PNG })
     expect(saved).toEqual(ok(expect.objectContaining({ slug: 'a-card', name: 'A card', elementCount: 1 })))
     expect(await readdir(path.join(userData, 'library', LIBRARY_COMPONENTS_DIR))).toContain('a-card.excalidraw')
@@ -139,7 +139,7 @@ describe('registerComponentsIpc (🔒 D5, YAZ-1819)', () => {
     expect(await remove({ slug: 'gone' })).toEqual(bad('NOT_FOUND'))
   })
 
-  it('broadcasts components:changed to EVERY window on a save, whichever vault they are on (🔒 D5)', async () => {
+  it('broadcasts components:changed to EVERY window on a save, whichever vault they are on (🔒 YAZ-1775 D5)', async () => {
     const a = fakeWindow()
     const b = fakeWindow()
     vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([a, b] as unknown as BrowserWindow[])

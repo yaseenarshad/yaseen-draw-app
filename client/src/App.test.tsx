@@ -30,14 +30,10 @@ interface SidebarStubProps {
   onCollapse: () => void
   revealRequest?: { id: number; path: string; lens: SidebarLens }
   onRevealConsumed?: (id: number) => void
-  /** A folder search row (🔒 D3, YAZ-1491): App flips to Files and issues a reveal request for the dir. */
+  /** A folder search row (🔒 YAZ-1491 D3): App flips to Files and issues a reveal request for the dir. */
   onRevealInFiles?: (path: string) => void
-  /**
-   * The read-only window onto the sidebar's selection (🔒 D4): App owns the box (the sidebar
-   * unmounts on collapse), the Sidebar owns the state (🔒 D1) and writes it here.
-   */
   onNotice: (message: string, icon?: NoticeKind) => void
-  /** ⌘C / ⌘X / ⌘V's handle (D6 amended, YAZ-1674): App asks, the Sidebar (here a stub) answers. */
+  /** ⌘C / ⌘X / ⌘V's handle (⚡ YAZ-1674 D6 amended): App asks, the Sidebar (here a stub) answers. */
   clipboardRef: { current: { cutOrCopy: (op: 'copy' | 'cut') => boolean; paste: () => boolean } | null }
 }
 
@@ -128,7 +124,7 @@ function installBridge(state: AppState, identity: IdentityFixture) {
       onCloseTab: menuSub(menuCloseTab),
       onNextTab: menuSub(menuNextTab),
       onPrevTab: menuSub(menuPrevTab),
-      // 🔒 D10 / 🔒 D3: the three canvas items; App routes them to the visible drawing layer by DOM.
+      // 🔒 YAZ-1775 D10 / D3: the three canvas items; App routes them to the visible drawing layer by DOM.
       onExportImage: menuSub(menuExportImage),
       onCanvasBackground: menuSub(menuCanvasBackground),
       onExportDrawing: menuSub(menuExportDrawing),
@@ -572,11 +568,11 @@ describe('App sidebar resize (YAZ-738)', () => {
 })
 
 /**
- * The sidebar's lens (🔒 D4, YAZ-847): App-owned, persisted as window identity (YAZ-1628), and
+ * The sidebar's lens (🔒 YAZ-1775 D4, YAZ-847): App-owned, persisted as window identity (YAZ-1628), and
  * passed down — never a Sidebar-local flag. The sidebar is mounted `key={root}` and only while it
  * is open, so the collapse → reopen step below is the whole reason the value lives here.
  */
-describe('App sidebar lens (🔒 D4, YAZ-847)', () => {
+describe('App sidebar lens (🔒 YAZ-1775 D4, YAZ-847)', () => {
   it('mounts the sidebar on the STORED lens — Files by default', async () => {
     await mount(defaultAppState(), { id: 'w1', root: '/v', file: null, tabs: [] })
     expect(captured.sidebar?.lens).toBe('files')
@@ -608,12 +604,12 @@ describe('App sidebar lens (🔒 D4, YAZ-847)', () => {
 })
 
 /**
- * Reveal requests are App's (YAZ-1023, 🔒 D3 YAZ-1491): the sidebar unmounts while collapsed and
+ * Reveal requests are App's (YAZ-1023, 🔒 YAZ-1775 D3 YAZ-1491): the sidebar unmounts while collapsed and
  * is re-keyed on every root, so the request — its id, its lens, its consumption — lives up here.
  * A FOLDER search row asks for one through `onRevealInFiles`: always the Files lens, whichever
  * lens was showing, because a folder exists on no other one.
  */
-describe('App reveal request ownership (YAZ-1023, 🔒 D3 YAZ-1491)', () => {
+describe('App reveal request ownership (YAZ-1023, 🔒 YAZ-1775 D3 YAZ-1491)', () => {
   it('a folder search row flips the lens to FILES and issues the reveal request on that lens', async () => {
     await mount(defaultAppState(), { id: 'w1', root: '/v', file: '/v/a.excalidraw', tabs: ['/v/a.excalidraw'], sidebarLens: 'favorites' })
     expect(captured.sidebar?.lens).toBe('favorites') // the row was chosen from Favorites
