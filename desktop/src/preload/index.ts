@@ -132,6 +132,17 @@ const api: YaseenDrawApi = {
     write: (root, name, value) => call(CH.vaultConfigWrite, root, name, value),
     onChange: on<VaultConfigChange>(CH.vaultConfigChanged),
   },
+  // The cross-vault media library over `<library>/media.json` (🔒 D4 / D5, YAZ-1817): pointers only, every window hears every change.
+  media: {
+    favorites: (req) => call(CH.mediaFavorites, req),
+    recent: (req) => call(CH.mediaRecent, req),
+    onChanged: on<void>(CH.mediaChanged),
+  },
+  // The secrets door (🔒 D4): write and ask, never read — there is no channel that answers a value.
+  secrets: {
+    set: (req) => call(CH.secretsSet, req),
+    has: (req) => call(CH.secretsHas, req),
+  },
   // Per-vault GitHub sync over `.yaseendraw/github.json` (YAZ-1081); every window gets every status.
   github: {
     status: (root) => call(CH.githubStatus, root),

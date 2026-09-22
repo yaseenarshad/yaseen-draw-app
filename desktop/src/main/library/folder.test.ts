@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { DEFAULT_LIBRARY_DIR, ensureLibraryFolder, resolveLibraryFolder } from './library'
+import { DEFAULT_LIBRARY_DIR, ensureLibraryFolder, resolveLibraryFolder } from './folder'
 
 let dir: string
 beforeEach(async () => {

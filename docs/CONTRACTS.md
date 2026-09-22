@@ -123,6 +123,10 @@ Electron flattens a thrown Error to its message, which is why failure travels as
 | `menu.on*` | `menu:*` | Open Folder…, Open Recent, Search Vault, Switch Vault…, Settings…, Toggle Sidebar, Close Tab, Next/Previous Tab, Export Image…, Canvas Background |
 | `link.onOpenFile` / `onNotice` | `link:*` | a routed `yaseendraw://` link |
 | `favorites.get` / `set` / `onChanged` | `favorites:*` | `<vault>/.yaseendraw/favorites.json` |
+| `media.favorites(req)` | `media:favorites` | `{ op: 'list' }` · `{ op: 'add', item }` · `{ op: 'remove', itemKey }` over `<library>/media.json` (🔒 D5); every verb answers the resulting list |
+| `media.recent(req)` | `media:recent` | `{ op: 'list' }` · `{ op: 'record', item }` — the MRU, `RECENT_LIMIT` 60 |
+| `media.onChanged` | `media:changed` | pushed to EVERY window when `media.json` changes — any vault, any writer, no payload |
+| `secrets.set(req)` / `has(req)` | `secrets:set` / `secrets:has` | `{ name, value \| null }` writes or clears an encrypted secret; `{ name }` → boolean. NO channel answers a value (🔒 D4) |
 | `vaultConfig.read` / `write` / `onChanged` | `vaultConfig:*` | any file in `<vault>/.yaseendraw/` |
 | `github.status` / `syncNow` / `setEnabled` / `onStatus` | `github:*` | per-vault GitHub sync |
 
@@ -142,6 +146,9 @@ Rules that hold across the whole surface:
   embed their images as base64.
 - **Assets are immutable and append-only.** A save writes an asset with `wx` and treats EEXIST as
   success; nothing but the orphan sweep ever removes one.
+- **A secret never crosses the bridge outward** (🔒 D4). The renderer may `set` one and ask `has`;
+  there is no channel, no state field and no push that carries a value, so a key cannot reach a
+  devtools console, a `state:get` answer or a renderer crash dump. Main reads it itself.
 
 ### The orphan sweep (🔒 D3)
 
@@ -241,6 +248,47 @@ for `<userData>/library`. Only main can resolve null, so Settings asks through
 `drawing:library-folder`; main also `mkdir -p`s the folder at startup, so the row always names a
 directory that exists. A folder that cannot be created is still the answer — a launch must not
 fail because a picked path has gone read-only.
+
+### The Library folder (🔒 D5)
+
+```
+<library>/
+  media.json          the media library — 3A (YAZ-1817)
+  components/         saved components, `<name>.excalidraw` + `<name>.png` — 3C writes it; 3A creates NOTHING here
+```
+
+`media.json` is `{ version: 1, favorites: StoredMediaItem[], recent: StoredMediaItem[] }`, both
+lists newest-first, de-duplicated by `itemKey`, and capped on the tail — `favorites` at 500
+(`MAX_MEDIA_FAVORITES`), `recent` at `RECENT_LIMIT` 60 as an MRU. A `StoredMediaItem` is the web
+app's (`convex/mediaTypes.ts`, field for field, so a library written by either app reads in the
+other): `itemKey` (the identity), `provider` (`pixabay` | `iconify` | `shape`), `providerId`,
+`kind`, `title`, the optional attribution and layout fields (`previewUrl`, `creator`,
+`creatorUrl`, `collectionName`, `sourceUrl`, `licenseName`, `licenseUrl`, `attribution`, `width`,
+`height`, `trademarkNotice`), and `updatedAt`, which MAIN stamps on every write — a renderer's own
+is dropped. `previewUrl` is stored but NEVER trusted: a CDN URL expires, and 3B re-derives every
+preview from `provider` + `providerId`. Pointers only — the BYTES never live in the library (they
+go through 3B's import into the vault's `assets/`).
+
+The rules are pure (`shared/mediaLibrary.ts`); the disk half (`desktop/src/main/library/mediaStore.ts`)
+follows the app's file idioms: a read never creates the file, a mutation that changes nothing does
+not write, writes are tmp + rename and serialised, a file that is not a version-1 library is moved
+aside as `media.json.corrupt-<epoch>`, and a bad ROW in a good file is dropped rather than costing
+the rest. ONE chokidar watches the library folder (depth 0, `media.json` only), re-pointed when
+`settings.libraryFolder` changes; an own write notifies every window synchronously and its echo is
+dropped by mtime, an external write (the other machine, through a synced vault) notifies as usual.
+`media:changed` carries no payload because every window re-lists regardless of its vault — that is
+the cross-vault promise.
+
+### Secrets (🔒 D4)
+
+`<userData>/secrets.json` = `{ version: 1, values: Record<name, base64(safeStorage.encryptString(value))> }`,
+owned by `desktop/src/main/secrets.ts`. It is NOT part of the app state file and never rides
+`state:changed`. `has` means "stored AND decryptable on this machine": a file copied from another
+Mac is full of blobs this keychain cannot open, and the honest answer is then no. Without an OS
+keychain at all (`safeStorage.isEncryptionAvailable()` false) `set` refuses with
+`ENCRYPTION_UNAVAILABLE` rather than falling back to plaintext, and `has` is false. The one name so
+far is `pixabayApiKey` (`PIXABAY_SECRET`), typed once in Settings › Images and read by main when 3B
+builds a Pixabay request.
 
 Two things live in the VAULT instead, because they are the user's own data:
 `<vault>/.yaseendraw/favorites.json` (YAZ-1794: vault-relative paths, so favorites travel with the
@@ -355,7 +403,8 @@ knows the row.
 | Appearance | Theme (the only one — 🔒 D9 put everything else about the canvas in Canvas) |
 | Canvas | the fourteen `CanvasPrefs` (🔒 D9) in three groups: Drawing aids, Modes, New elements |
 | Files | Confirm before deleting · Library folder (🔒 D5: resolved path, Choose…, Reset to default) |
-| Sync | the per-vault GitHub switch — the one setting NOT in `SettingsState` (it lives in `.yaseendraw/github.json`) |
+| Images | Pixabay API key (🔒 D4: a password field, Save / Clear, "Key set" / "No key" from `secrets:has`, never echoed) — NOT in `SettingsState`, it lives in main's encrypted `secrets.json` |
+| Sync | the per-vault GitHub switch — the other setting NOT in `SettingsState` (it lives in `.yaseendraw/github.json`) |
 | Hotkeys | its own page: the Window, Canvas and Mouse tables, from `hotkeys.ts` |
 
 `hotkeys.ts` is the single source of truth for every binding the app advertises, and

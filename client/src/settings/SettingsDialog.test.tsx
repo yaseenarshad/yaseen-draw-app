@@ -11,15 +11,22 @@ import { createRoot, type Root } from 'react-dom/client'
 import { DEFAULT_SETTINGS, type GithubSyncStatus, type SettingsState } from '@shared/types'
 import { SettingsDialog } from './SettingsDialog'
 
-// The Library folder row (🔒 D5) is the one row that ASKS main something: only main knows what a
-// null setting resolves to. The bridge is stubbed at the client `api` seam, like every other test.
+// Two rows ASK main something: the Library folder (🔒 D5 — only main knows what a null setting
+// resolves to) and the Pixabay key (🔒 D4 — only main knows whether one is set). The bridge is
+// stubbed at the client `api` seam, like every other test.
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),
-  api: { drawing: { libraryFolder: vi.fn(async () => '/userData/library') }, pickFolder: vi.fn(async () => ({ cancelled: true as const })) },
+  api: {
+    drawing: { libraryFolder: vi.fn(async () => '/userData/library') },
+    pickFolder: vi.fn(async () => ({ cancelled: true as const })),
+    secrets: { has: vi.fn(async () => false), set: vi.fn(async () => undefined) },
+  },
 }))
-import { api } from '../api'
+import { api, BridgeRequestError } from '../api'
 const libraryFolder = vi.mocked(api.drawing.libraryFolder)
 const pickFolder = vi.mocked(api.pickFolder)
+const secretHas = vi.mocked(api.secrets.has)
+const secretSet = vi.mocked(api.secrets.set)
 
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -35,6 +42,8 @@ beforeEach(() => {
   libraryFolder.mockResolvedValue('/userData/library')
   pickFolder.mockClear()
   pickFolder.mockResolvedValue({ cancelled: true })
+  secretHas.mockReset().mockResolvedValue(false)
+  secretSet.mockReset().mockResolvedValue(undefined)
 })
 
 function mount(settings: SettingsState = { ...DEFAULT_SETTINGS }, syncStatus?: GithubSyncStatus | null) {
@@ -143,16 +152,16 @@ describe('SettingsDialog shell (D1)', () => {
 describe('SettingsDialog: one page of every settings section (the post-demo redesign)', () => {
   it('the nav: the settings-page anchors (Sync only with the engine), a divider, then the standalone Hotkeys page', () => {
     const { el } = mount()
-    expect(navShape(el)).toEqual(['Appearance', 'Canvas', 'Files', '—', 'Hotkeys'])
+    expect(navShape(el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images', '—', 'Hotkeys'])
     unmount()
     const withSync = mount({ ...DEFAULT_SETTINGS }, status())
-    expect(navShape(withSync.el)).toEqual(['Appearance', 'Canvas', 'Files', 'Sync', '—', 'Hotkeys'])
+    expect(navShape(withSync.el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images', 'Sync', '—', 'Hotkeys'])
   })
 
   it('renders every settings section on the one page, in order, each anchored by id and every row addressed by data-setting — Hotkeys is not on it', () => {
     const { el } = mount({ ...DEFAULT_SETTINGS }, status())
-    expect(headings(el)).toEqual(['Appearance', 'Canvas', 'Files', 'Sync'])
-    expect(sections(el).map((s) => s.id)).toEqual(['settings-appearance', 'settings-canvas', 'settings-files', 'settings-sync'])
+    expect(headings(el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images', 'Sync'])
+    expect(sections(el).map((s) => s.id)).toEqual(['settings-appearance', 'settings-canvas', 'settings-files', 'settings-images', 'settings-sync'])
     expect(rowIds(el)).toEqual([
       'theme',
       // 🔒 D9's fourteen, in the order Settings › Canvas shows them.
@@ -172,6 +181,7 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
       'canvas.defaultTextAlign',
       'confirmDelete',
       'libraryFolder',
+      'pixabayApiKey',
       'githubSync',
     ])
     for (const r of el.querySelectorAll<HTMLElement>('.setting')) expect(r.dataset.setting).toBeTruthy()
@@ -183,6 +193,7 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
     expect(groupTitles(el)).toEqual(['Drawing aids', 'Modes', 'New elements'])
     expect([...el.querySelectorAll('#settings-appearance .settings-group__title')]).toEqual([])
     expect(el.querySelector('#settings-files .settings-group__title')).toBeNull()
+    expect(el.querySelector('#settings-images .settings-group__title')).toBeNull()
     expect(row(el, 'theme')?.querySelector('.setting__label')?.textContent).toBe('Theme')
     expect(row(el, 'confirmDelete')?.querySelector('.setting__label')?.textContent).toBe('Confirm before deleting')
   })
@@ -211,7 +222,7 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
     clickNav(el, 'Hotkeys')
     clickNav(el, 'Files')
     expect(currentNav(el)).toBe('Files')
-    expect(headings(el)).toEqual(['Appearance', 'Canvas', 'Files'])
+    expect(headings(el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images'])
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
     expect(scrollIntoView.mock.instances[0]).toBe(el.querySelector('#settings-files'))
   })
@@ -235,15 +246,15 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
 
   it('scrollspy: the current nav item follows the pane scroll — last heading above the read line, the last section at the bottom', () => {
     const { el } = mount({ ...DEFAULT_SETTINGS }, status())
-    layOut(el) // four sections at 0 / 300 / 600 / 900, pane 400 of 1200
+    layOut(el) // five sections at 0 / 300 / 600 / 900 / 1200, pane 400 of 1500
     scrollTo(el, 0)
     expect(currentNav(el)).toBe('Appearance')
     scrollTo(el, 270) // the read line (scrollTop + 24 = 294) is still above Canvas' top (300)
     expect(currentNav(el)).toBe('Appearance')
     scrollTo(el, 280) // 304: Canvas' top is now at or above it
     expect(currentNav(el)).toBe('Canvas')
-    // The bottom: 1200 - 400 = 800, and Sync's top (900) never reaches the read line.
-    scrollTo(el, 800)
+    // The bottom: 1500 - 400 = 1100, and Sync's top (1200) never reaches the read line.
+    scrollTo(el, 1100)
     expect(currentNav(el)).toBe('Sync')
   })
 
@@ -254,7 +265,7 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
     unmount()
     const again = mount()
     expect(currentNav(again.el)).toBe('Appearance')
-    expect(headings(again.el)).toEqual(['Appearance', 'Canvas', 'Files'])
+    expect(headings(again.el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images'])
   })
 })
 
@@ -355,12 +366,12 @@ describe('SettingsDialog search (D6)', () => {
     pressEscape(searchInput(el))
     expect(onClose).not.toHaveBeenCalled()
     expect(searchInput(el).value).toBe('')
-    expect(headings(el)).toEqual(['Appearance', 'Canvas', 'Files'])
+    expect(headings(el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images'])
 
     type(searchInput(el), 'dark')
     act(() => el.querySelector<HTMLButtonElement>('[aria-label="Clear search settings"]')?.click())
     expect(searchInput(el).value).toBe('')
-    expect(headings(el)).toEqual(['Appearance', 'Canvas', 'Files'])
+    expect(headings(el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images'])
   })
 
   it('a nav click during a search clears the query and then scrolls to that section on the restored page', () => {
@@ -457,5 +468,67 @@ describe('Settings › Files › Library folder (🔒 D5)', () => {
       await Promise.resolve()
     })
     expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...DEFAULT_SETTINGS, libraryFolder: '/Elsewhere/Library' })
+  })
+})
+
+describe('Settings › Images › Pixabay API key (🔒 D4)', () => {
+  const statusText = (el: HTMLElement) => el.querySelector('[data-testid="pixabay-key-status"]')?.textContent
+  const keyInput = (el: HTMLElement) => row(el, 'pixabayApiKey')?.querySelector<HTMLInputElement>('input') as HTMLInputElement
+  const flush = () => act(async () => await Promise.resolve())
+
+  it('asks main whether a key is set and says "No key": a password field, Save disabled until typed, Clear disabled with nothing to clear', async () => {
+    const { el } = mount()
+    await flush()
+    expect(secretHas).toHaveBeenCalledExactlyOnceWith({ name: 'pixabayApiKey' })
+    expect(statusText(el)).toBe('No key')
+    expect(keyInput(el).type).toBe('password')
+    expect(rowButtons(el, 'pixabayApiKey').map((b) => b.textContent)).toEqual(['Save', 'Clear'])
+    expect(rowButtons(el, 'pixabayApiKey').map((b) => b.disabled)).toEqual([true, true])
+    expect(row(el, 'pixabayApiKey')?.querySelector('.setting__hint')?.textContent).toBe('Stored encrypted on this machine and never shown again. Iconify needs no key.')
+  })
+
+  it('a set key reads "Key set" with Clear enabled; Clear writes null and the row says "No key"', async () => {
+    secretHas.mockResolvedValue(true)
+    const { el } = mount()
+    await flush()
+    expect(statusText(el)).toBe('Key set')
+    expect(rowButtons(el, 'pixabayApiKey')[1].disabled).toBe(false)
+    await act(async () => {
+      rowButtons(el, 'pixabayApiKey')[1].click()
+      await Promise.resolve()
+    })
+    expect(secretSet).toHaveBeenCalledExactlyOnceWith({ name: 'pixabayApiKey', value: null })
+    expect(statusText(el)).toBe('No key')
+    expect(rowButtons(el, 'pixabayApiKey')[1].disabled).toBe(true)
+  })
+
+  it('Save sends the typed value to main ONCE, then empties the field — the value is never echoed anywhere in the dialog', async () => {
+    const { el, onChange } = mount()
+    await flush()
+    type(keyInput(el), 'sk-very-secret')
+    expect(rowButtons(el, 'pixabayApiKey')[0].disabled).toBe(false)
+    await act(async () => {
+      rowButtons(el, 'pixabayApiKey')[0].click()
+      await Promise.resolve()
+    })
+    expect(secretSet).toHaveBeenCalledExactlyOnceWith({ name: 'pixabayApiKey', value: 'sk-very-secret' })
+    expect(onChange).not.toHaveBeenCalled() // not a SettingsState field: nothing rides state:set-settings
+    expect(statusText(el)).toBe('Key set')
+    expect(keyInput(el).value).toBe('')
+    expect(el.textContent).not.toContain('sk-very-secret')
+    expect(rowButtons(el, 'pixabayApiKey').map((b) => b.disabled)).toEqual([true, false])
+  })
+
+  it('a machine with no keychain is told so in the status line, and the key stays unset', async () => {
+    secretSet.mockRejectedValue(new BridgeRequestError('ENCRYPTION_UNAVAILABLE', 'this machine cannot encrypt secrets'))
+    const { el } = mount()
+    await flush()
+    type(keyInput(el), 'k')
+    await act(async () => {
+      rowButtons(el, 'pixabayApiKey')[0].click()
+      await Promise.resolve()
+    })
+    expect(statusText(el)).toBe("This machine can't encrypt secrets, so the key can't be stored.")
+    expect(rowButtons(el, 'pixabayApiKey')[1].disabled).toBe(true)
   })
 })
