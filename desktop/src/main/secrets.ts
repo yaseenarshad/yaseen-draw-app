@@ -1,6 +1,6 @@
 /**
- * THE SECRETS DOOR (🔒 YAZ-1775 D4, YAZ-1817): `userData/secrets.json` =
- * `{ version: 1, values: Record<name, base64(safeStorage.encryptString(value))> }`.
+ * THE SECRETS DOOR (🔒 YAZ-1842 D1, amending YAZ-1775 D4; YAZ-1817): `userData/secrets.json` =
+ * `{ version: 2, values: Record<name, value> }`, plain text, owner-only (mode 0600).
  *
  * THE RULE, and it has no exceptions: **the renderer never receives a value.** It may write one
  * (`set`) and ask whether one is there (`has`); reading (`read`) is main's alone — YAZ-1818's provider
@@ -8,44 +8,41 @@
  * `SettingsState` field: the store is broadcast to every window on every change, and a key in it
  * would be a key in every renderer's devtools console.
  *
- * Electron-free: the cipher comes in as an argument (production passes `safeStorage`), so the
- * module unit-tests against a temp dir with a fake. `has` answers "stored AND decryptable on this
- * machine" — a `secrets.json` copied from another Mac is a file full of blobs this keychain cannot
- * open, and the honest answer to "is the key set?" is then no. With no keychain at all
- * (`isEncryptionAvailable()` false — some Linux sessions) `set` refuses with
- * `ENCRYPTION_UNAVAILABLE` rather than falling back to plaintext, and `has` is false.
+ * WHY PLAIN TEXT (YAZ-1842). Version 1 encrypted values with Electron's `safeStorage`, which on
+ * macOS keys on a Keychain item bound to the app's code identity. This app is ad-hoc signed (no
+ * Developer ID, locked), so every build is a different identity to the Keychain: a key written by
+ * one build could not be read by the next, `has` answered false, and the Settings row looked
+ * broken. The file lives in the user's own Library, never in a vault, and is readable only by the
+ * user — the same protection as an `.env` file. A version-1 file is treated as corrupt (moved
+ * aside), so the next paste starts clean rather than half-migrating blobs nobody can open.
  *
  * Lazy, like every other file this app owns: reading never creates the file; a corrupt one is
  * moved aside as `secrets.json.corrupt-<epoch>` (the `store.ts` posture). Writes are atomic and
  * chained.
  */
 
-import { atomicWrite, BridgeFailure, fsCall } from './fs/fsUtils'
+import { chmod, stat } from 'node:fs/promises'
 import { isRecord } from '@shared/guards'
+import { atomicWrite, fsCall } from './fs/fsUtils'
 import { createChain, readOrQuarantine } from './watchedFolder'
-import { stat } from 'node:fs/promises'
 
 export const SECRETS_FILE = 'secrets.json'
-
-/** The slice of Electron's `safeStorage` this module uses. */
-export interface SecretCipher {
-  isEncryptionAvailable(): boolean
-  encryptString(plainText: string): Buffer
-  decryptString(encrypted: Buffer): string
-}
+/** Owner read/write only — the whole reason the file may hold plain text. */
+export const SECRETS_FILE_MODE = 0o600
+const VERSION = 2
 
 export interface Secrets {
-  /** Store `value` encrypted, or clear the name with null. Rejects `ENCRYPTION_UNAVAILABLE` without a keychain. */
+  /** Store `value`, or clear the name with null. */
   set(name: string, value: string | null): Promise<void>
-  /** Stored AND decryptable on this machine. The only question a renderer may ask. */
+  /** Whether a value is stored. The only question a renderer may ask. */
   has(name: string): Promise<boolean>
-  /** The plaintext, for MAIN only (YAZ-1818's providers). Null when absent, undecryptable, or without a keychain. */
+  /** The value, for MAIN only (YAZ-1818's providers). Null when absent. */
   read(name: string): Promise<string | null>
 }
 
 type Values = Record<string, string>
 
-export function createSecrets(file: string, cipher: SecretCipher): Secrets {
+export function createSecrets(file: string): Secrets {
   /** Writes chain so two read-modify-writes never interleave. */
   const chain = createChain()
   /**
@@ -56,7 +53,7 @@ export function createSecrets(file: string, cipher: SecretCipher): Secrets {
   let cached: { mtimeMs: number; values: Values } | null = null
 
   const parse = (raw: unknown): Values | null =>
-    isRecord(raw) && raw.version === 1 && isRecord(raw.values)
+    isRecord(raw) && raw.version === VERSION && isRecord(raw.values)
       ? Object.fromEntries(Object.entries(raw.values).filter((e): e is [string, string] => typeof e[1] === 'string'))
       : null
 
@@ -69,28 +66,19 @@ export function createSecrets(file: string, cipher: SecretCipher): Secrets {
     return values
   }
 
-  const decrypt = (blob: string): string | null => {
-    try {
-      return cipher.decryptString(Buffer.from(blob, 'base64'))
-    } catch {
-      return null
-    }
-  }
-
-  async function read(name: string): Promise<string | null> {
-    if (!cipher.isEncryptionAvailable()) return null
-    const blob = (await load())[name]
-    return blob === undefined ? null : decrypt(blob)
-  }
+  const read = async (name: string): Promise<string | null> => (await load())[name] ?? null
 
   return {
     set(name, value) {
-      if (!cipher.isEncryptionAvailable()) return Promise.reject(new BridgeFailure('ENCRYPTION_UNAVAILABLE', 'this machine cannot encrypt secrets'))
       return chain.run(async () => {
         const values = { ...(await load()) }
         if (value === null) delete values[name]
-        else values[name] = cipher.encryptString(value).toString('base64')
-        const { mtime } = await fsCall(file, () => atomicWrite(file, `${JSON.stringify({ version: 1, values }, null, 2)}\n`))
+        else values[name] = value
+        const { mtime } = await fsCall(file, async () => {
+          const written = await atomicWrite(file, `${JSON.stringify({ version: VERSION, values }, null, 2)}\n`)
+          await chmod(file, SECRETS_FILE_MODE)
+          return written
+        })
         cached = { mtimeMs: mtime, values }
       })
     },

@@ -4,7 +4,7 @@
  * the refill pass, and the image proxy that turns a provider's bytes into something a sandboxed
  * renderer can draw. `curation.ts` holds every decision it makes; `cache.ts` holds what it keeps.
  *
- * WHY MAIN AND NOT THE RENDERER (🔒 YAZ-1775 D4): the Pixabay key. It is stored encrypted and read HERE
+ * WHY MAIN AND NOT THE RENDERER (🔒 YAZ-1775 D4): the Pixabay key. It is stored by main and read HERE
  * (`secrets.read`), so it never crosses the bridge, never lands in a devtools console and never
  * reaches a crash dump. The renderer learns exactly one thing about it — `pixabayAvailable` — and
  * when it is false the provider is simply skipped: no error, no empty section, no mention of keys.

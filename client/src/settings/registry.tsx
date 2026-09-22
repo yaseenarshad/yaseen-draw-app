@@ -11,7 +11,7 @@
  * Two settings are NOT in `SettingsState`. GitHub sync (YAZ-1081 YAZ-1818) lives per-vault in
  * `.yaseendraw/github.json`, read and written through the engine, so its section is `available`
  * only when App hands the engine's status + setter over. The Pixabay API key (🔒 YAZ-1775 D4) lives in
- * main's encrypted `secrets.json` and is never in any renderer's state at all — its row writes
+ * main's owner-only `secrets.json` (YAZ-1842 D1) and is never in any renderer's state at all — its row writes
  * through `secrets:set` and reads back only "set" / "not set".
  */
 import type { ReactNode } from 'react'
@@ -143,12 +143,12 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
       {
         items: [
           {
-            // 🔒 YAZ-1775 D4: the key is typed here once, encrypted by main, and never shown again. Its id is
+            // 🔒 YAZ-1775 D4: the key is typed here once, kept by main, and never shown again. Its id is
             // not a `SettingsState` field — the state file is broadcast to every window, and a key
             // in it would be a key in every devtools console.
             id: 'pixabayApiKey',
             label: 'Pixabay API key',
-            hint: 'Stored encrypted on this machine and never shown again. Iconify needs no key.',
+            hint: 'Stored in this app\'s data folder, readable only by your user, and never shown again. Iconify needs no key.',
             keywords: ['pixabay', 'api key', 'iconify', 'photos', 'icons', 'image studio', 'secret'],
             wide: true,
             render: () => <PixabayKeyControl />,
