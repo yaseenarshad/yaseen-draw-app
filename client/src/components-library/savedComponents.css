@@ -1,0 +1,342 @@
+/*
+ * The Components tab's styling (YAZ-1819): `excalidraw-app/components/SavedComponents.scss`
+ * ported. The file was already flat CSS, so it travels close to as-is, with four differences: the
+ * `saved-components-dialog` block is gone with the modal (the name prompt is a form inside the
+ * panel), `__inline` is new (the rename field and the delete confirm live in the card), the
+ * element-SVG preview rules are gone with the fallback that drew them, and `__placeholder` is new
+ * — a card whose picture could not be read draws the same chequerboard the Images tab does rather
+ * than a broken image. The custom properties are the ENGINE's: this panel renders inside the
+ * engine's sidebar and follows its light/dark theme, not the shell's.
+ */
+
+.saved-components {
+  box-sizing: border-box;
+  color: var(--text-primary-color);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  min-height: 0;
+  padding: 12px;
+}
+
+.saved-components__header {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.saved-components__header > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.saved-components__header h2 {
+  font-size: 15px;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.saved-components__header span {
+  color: var(--text-secondary-color);
+  font-size: 11px;
+}
+
+.saved-components__create-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.saved-components__create-actions button {
+  background: var(--color-primary);
+  border: 0;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 10px;
+}
+
+.saved-components__create-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.saved-components__naming {
+  background: var(--island-bg-color);
+  border: 1px solid var(--default-border-color);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+
+.saved-components__naming label {
+  color: var(--text-primary-color);
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 5px;
+}
+
+.saved-components__naming-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.saved-components__naming-actions button {
+  background: var(--button-gray-1);
+  border: 0;
+  border-radius: 8px;
+  color: var(--text-primary-color);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  padding: 7px 11px;
+}
+
+.saved-components__naming-actions button:last-child {
+  background: var(--color-primary);
+  color: white;
+}
+
+.saved-components__naming-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.saved-components__search,
+.saved-components__naming input,
+.saved-components__inline input {
+  background: var(--input-bg-color);
+  border: 1px solid var(--default-border-color);
+  border-radius: 8px;
+  box-sizing: border-box;
+  color: var(--text-primary-color);
+  font: inherit;
+  padding: 9px 10px;
+  width: 100%;
+}
+
+.saved-components__search:focus,
+.saved-components__naming input:focus,
+.saved-components__inline input:focus {
+  border-color: var(--color-primary);
+  outline: none;
+}
+
+.saved-components__content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.saved-components__grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.saved-components__card {
+  background: var(--input-bg-color);
+  border: 1px solid var(--default-border-color);
+  border-radius: 10px;
+  min-width: 0;
+  overflow: visible;
+  position: relative;
+}
+
+.saved-components__card[aria-busy='true'] {
+  opacity: 0.65;
+}
+
+.saved-components__insert {
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  color: var(--text-primary-color);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  text-align: left;
+  width: 100%;
+}
+
+.saved-components__insert:hover,
+.saved-components__insert:focus-visible {
+  background: var(--button-hover-bg);
+  outline: none;
+}
+
+.saved-components__insert:disabled {
+  cursor: not-allowed;
+}
+
+.saved-components__insert > span:last-child {
+  font-size: 11px;
+  max-width: calc(100% - 22px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-components__preview {
+  align-items: center;
+  background:
+    linear-gradient(45deg, var(--color-gray-10) 25%, transparent 25%) 0 0 / 12px 12px,
+    linear-gradient(-45deg, var(--color-gray-10) 25%, transparent 25%) 0 0 / 12px 12px,
+    var(--island-bg-color);
+  border-radius: 7px;
+  display: flex;
+  height: 86px;
+  justify-content: center;
+  overflow: hidden;
+  width: 100%;
+}
+
+.saved-components__preview img {
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+.saved-components__placeholder {
+  height: 100%;
+  width: 100%;
+}
+
+.saved-components__options {
+  background: var(--island-bg-color);
+  border: 1px solid var(--default-border-color);
+  border-radius: 6px;
+  bottom: 5px;
+  color: var(--text-secondary-color);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 1px 5px 4px;
+  position: absolute;
+  right: 5px;
+}
+
+.saved-components__menu {
+  background: var(--island-bg-color);
+  border: 1px solid var(--default-border-color);
+  border-radius: 8px;
+  bottom: 30px;
+  box-shadow: var(--shadow-island);
+  display: flex;
+  flex-direction: column;
+  min-width: 94px;
+  padding: 4px;
+  position: absolute;
+  right: 5px;
+  z-index: 3;
+}
+
+.saved-components__menu button {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text-primary-color);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  padding: 7px 8px;
+  text-align: left;
+}
+
+.saved-components__menu button:hover,
+.saved-components__menu button:focus-visible {
+  background: var(--button-hover-bg);
+  outline: none;
+}
+
+.saved-components__menu button:last-child {
+  color: var(--color-danger);
+}
+
+.saved-components__inline {
+  align-items: center;
+  background: var(--island-bg-color);
+  border-top: 1px solid var(--default-border-color);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+}
+
+.saved-components__inline span {
+  flex: 1;
+  font-size: 11px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-components__inline button {
+  background: var(--button-gray-1);
+  border: 0;
+  border-radius: 6px;
+  color: var(--text-primary-color);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  padding: 5px 8px;
+}
+
+.saved-components__inline[role='alertdialog'] button:not(:last-child) {
+  background: var(--color-danger);
+  color: white;
+}
+
+.saved-components__state {
+  align-items: center;
+  color: var(--text-secondary-color);
+  display: flex;
+  font-size: 12px;
+  justify-content: center;
+  min-height: 84px;
+  padding: 16px;
+  text-align: center;
+}
+
+.saved-components__error {
+  background: var(--color-danger-light);
+  border: 1px solid var(--color-danger);
+  border-radius: 8px;
+  color: var(--text-primary-color);
+  font-size: 11px;
+  padding: 8px;
+}
+
+.saved-components__more {
+  background: var(--button-gray-1);
+  border: 0;
+  border-radius: 8px;
+  color: var(--text-primary-color);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  padding: 8px;
+}
+
+.saved-components__footer {
+  border-top: 1px solid var(--default-border-color);
+  color: var(--text-secondary-color);
+  font-size: 10px;
+  line-height: 1.4;
+  padding-top: 8px;
+}

@@ -21,10 +21,9 @@
  * ENGINE-BOUND BY DESIGN: the module takes the LOADED engine as an argument rather than importing
  * the package (`engine.ts`'s lazy rule).
  */
-import type { ComponentProps } from 'react'
 import type { ViewportInsertionRequest } from '@excalidraw/excalidraw/data/viewportInsertion'
 import type { MediaImportResponse, StudioItem } from '@shared/types'
-import type { ExcalidrawModule } from '../drawings/engine'
+import type { ExcalidrawImperativeApi, ExcalidrawModule } from '../drawings/engine'
 import type { ShapeCatalogItem } from './shapes'
 
 /**
@@ -35,14 +34,13 @@ import type { ShapeCatalogItem } from './shapes'
  */
 export const IMAGE_STUDIO_INSERTION: ViewportInsertionRequest = { targetScreenSize: 320, viewportFraction: 0.55 }
 
-type ImperativeApi = NonNullable<Parameters<NonNullable<ComponentProps<ExcalidrawModule['Excalidraw']>['onExcalidrawAPI']>>[0]>
-
 /**
  * The slice of the engine's imperative handle an insert uses — narrowed from the engine's OWN
- * type rather than re-declared, so a change to any of the four signatures is a build error here
- * instead of a runtime surprise. A test passes a stub through one cast.
+ * type (`engine.ts`'s `ExcalidrawImperativeApi`) rather than re-declared, so a change to any of
+ * the four signatures is a build error here instead of a runtime surprise. A test passes a stub
+ * through one cast.
  */
-export type InsertTarget = Pick<ImperativeApi, 'getAppState' | 'getSceneElementsIncludingDeleted' | 'updateScene' | 'insertImages'>
+export type InsertTarget = Pick<ExcalidrawImperativeApi, 'getAppState' | 'getSceneElementsIncludingDeleted' | 'updateScene' | 'insertImages'>
 
 /** The engine values an insert needs; both are on `@excalidraw/excalidraw`'s own index. */
 export type InsertEngine = Pick<ExcalidrawModule, 'convertToExcalidrawElements' | 'CaptureUpdateAction'>

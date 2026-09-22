@@ -20,6 +20,7 @@ marks an amendment to an earlier locked decision; the amendment wins.
 | `client/` | the renderer: React 19, Vite. Talks to nothing but `window.yaseenDraw`. |
 | `client/src/drawings/` | the drawing document: the engine seam (`ExcalidrawSurface`, the ONE importer of the package), its host, and what a scene is |
 | `client/src/media/` | the canvas panel's Images tab: the Image Studio, the shapes catalog, both insert paths |
+| `client/src/components-library/` | the canvas panel's Components tab: the saved-component library, its capture, preview and insert (named so it is never confused with `client/src/components/`) |
 | `client/src/sidebar/` | the file tree, its context menu, rename/move/trash, favorites, vault switcher |
 | `client/src/tabs/` | the tab strip |
 | `client/src/workspace/` | the tab model (`tabsReducer`) and its per-tab history |
@@ -130,6 +131,13 @@ Electron flattens a thrown Error to its message, which is why failure travels as
 | `media.search(req)` | `media:search` | `{ q, source: 'all' \| 'iconify' \| 'pixabay', cursor? }` → `{ items, nextCursor, pixabayAvailable, warnings }` (🔒 D4) |
 | `media.preview(req)` | `media:preview` | `{ provider: 'pixabay' \| 'iconify', id }` → `{ mimeType, dataURL }`, from the 24 h disk cache when it is there |
 | `media.import(req)` | `media:import` | the same request → `{ mimeType, dataURL, item }`; NEVER cached, capped at `MAX_IMPORT_BYTES` 20 MB |
+| `components.list()` | `components:list` | the saved-component index over `<library>/components/` (🔒 D5); a missing or corrupt index is rebuilt from the folder |
+| `components.save(req)` | `components:save` | `{ name, fragmentJson, previewPng }` → the `ComponentItem` it made; writes `<slug>.excalidraw` + `<slug>.png` |
+| `components.read(req)` | `components:read` | `{ slug }` → `{ fragmentJson }` — the bytes an insert needs |
+| `components.rename(req)` | `components:rename` | `{ slug, name }` → the row; the LABEL only, both files keep their names |
+| `components.delete(req)` | `components:delete` | `{ slug }`; both files to the OS trash (`shell.trashItem`) and the row out of the index |
+| `components.preview(req)` | `components:preview` | `{ slug }` → the stored PNG as a dataURL |
+| `components.onChanged` | `components:changed` | pushed to EVERY window when the components library changes — any vault, any writer, no payload |
 | `secrets.set(req)` / `has(req)` | `secrets:set` / `secrets:has` | `{ name, value \| null }` writes or clears an encrypted secret; `{ name }` → boolean. NO channel answers a value (🔒 D4) |
 | `vaultConfig.read` / `write` / `onChanged` | `vaultConfig:*` | any file in `<vault>/.yaseendraw/` |
 | `github.status` / `syncNow` / `setEnabled` / `onStatus` | `github:*` | per-vault GitHub sync |
@@ -260,8 +268,11 @@ fail because a picked path has gone read-only.
 
 ```
 <library>/
-  media.json          the media library — 3A (YAZ-1817)
-  components/         saved components, `<name>.excalidraw` + `<name>.png` — 3C writes it; 3A creates NOTHING here
+  media.json                      the media library — 3A (YAZ-1817)
+  components.json                 the saved-component index — 3C (YAZ-1819)
+  components/
+    <slug>.excalidraw             one component: a whole Excalidraw document, images EMBEDDED
+    <slug>.png                    its preview, bounded at 800 × 600
 ```
 
 `media.json` is `{ version: 1, favorites: StoredMediaItem[], recent: StoredMediaItem[] }`, both
@@ -343,6 +354,50 @@ needs `@excalidraw/element`, which arrives on its own lazy promise so the basics
 viewport) and `imageStudio.css`. ⌘F opens the tab AND focuses its search field; offline, Search
 shows a passive line while Shapes, Favorites and Recent keep working — previews from the cache
 where main still has them, a placeholder where it does not.
+
+### Saved components (🔒 D5)
+
+The canvas panel's **Components** tab is the web app's Saved Components, and the library is a
+folder rather than a Convex table. One component is TWO files named after its slug —
+`<library>/components/<slug>.excalidraw` and `<slug>.png` — plus a row in
+`<library>/components.json`, which is `{ version: 1, items: ComponentItem[] }` with
+`ComponentItem = { slug, name, elementCount, createdAt, updatedAt }`, newest-updated first.
+
+**The fragment embeds its images**, which is the one place this app deliberately does not follow
+🔒 D3: it is a whole `{ type: 'excalidraw', version: 2, source, elements, appState: {}, files }`
+document whose `files` map carries the component's bytes as dataURLs. A component is small and has
+to insert into ANY vault on ANY machine, so it cannot point at a `<vault>/assets/` file. On insert
+those bytes are handed to the canvas as files; the board's next save extracts them into THIS
+vault's `assets/` through 2E, deduped by `fileId`.
+
+**The slug is the identity, the name is only the label.** The slug is the kebab of the name, uniqued
+with `-2`, `-3` (Finder's counting, never `-1`), capped at 60 characters, and validated as a path
+segment — lowercase words joined by single hyphens and nothing else, so a slug out of a hand-edited
+index can never name a file outside the folder. A rename therefore moves no file.
+
+**The folder is the truth; the index is a cache.** Every read reconciles them: a fragment the index
+does not know is adopted (named after its own slug, counted by reading it once), a row whose file
+has gone drops out, an unreadable fragment is skipped rather than offered as a tile that cannot be
+inserted, and an index that is missing or is not a version-1 index is rebuilt from the folder — the
+bad one moved aside as `components.json.corrupt-<epoch>`. A READ NEVER WRITES: the reconciliation is
+in memory and only a mutation puts it on disk, so listing costs a read-only disk nothing and does
+not churn a synced folder. One chokidar watches the library folder at depth 1 (the index, and the
+two files a component is — an `atomicWrite` tmp file is silence), own writes are echo-suppressed by
+path + mtime, and `components:changed` carries no payload because every window re-lists regardless
+of its vault. A delete is `shell.trashItem`, never `fs.rm`, and a trash that fails leaves the row.
+
+The rules are pure (`shared/savedComponents.ts`); the disk half is
+`desktop/src/main/library/componentStore.ts`, guarded by `desktop/src/main/ipc/components.ts`.
+
+The renderer half is `client/src/components-library/`: `componentData.ts` (the web app's
+`SavedComponentsData.ts` — the capture with its four assertions, the fragment, and the insert),
+`componentPreview.ts` (`SavedComponentPreview.ts`, PNG instead of WebP so every reader can open the
+file), `SavedComponents.tsx` and `savedComponents.css`. **Insert makes an independent copy**: the
+elements go through the engine's own `insertElements`, which duplicates ids and centres on the
+viewport, so two inserts of one component are two unrelated sets of elements. Search is the app's
+ONE ranking matcher (`search/matchCandidates.ts`, the same one ⌘K uses) over the names, paged by
+`PAGE_SIZE` 24. Rename and delete are inline in the card rather than `window.prompt` /
+`window.confirm`, and 🔒 `confirmDelete` (Settings › Files) decides whether the delete asks first.
 
 ### Secrets (🔒 D4)
 
@@ -451,7 +506,8 @@ search field (YAZ-1818, the web app's `onRequestImageStudioSearch`, as a counter
 — bound on the drawing's own element in the capture
 phase, never `window`, and suppressed whenever the keystroke could have meant something else (an
 editable target, a live selection, a gesture in flight, a dialog, or anything selected on the
-canvas). Settings › Hotkeys lists every one of them and is the single place that copy lives.
+canvas). That last gate is why ⌘C with a selection is still the engine's COPY and nothing else
+(YAZ-1819): the Components tab is what ⌘C means only when there is nothing to copy. Settings › Hotkeys lists every one of them and is the single place that copy lives.
 
 The right-click menu inside the renderer is Electron's (`buildContextMenuTemplate`): spelling
 suggestions, Add to Dictionary, and cut/copy/paste. Electron ships no default one, which is why
