@@ -1,0 +1,293 @@
+/*
+ * The Images tab's styling (YAZ-1818): `excalidraw-app/image-studio/ImageStudio.scss` ported.
+ * The file was already flat CSS — no nesting, no variables of its own — so it travels as-is, with
+ * three differences: the radix kebab menu's rules are gone with the kebab, `--placeholder` is new
+ * (a tile whose preview could not be had draws a chequerboard rather than a broken image), and the
+ * custom properties are the ENGINE's, because this panel renders inside the engine's sidebar and
+ * must follow its light/dark theme rather than the shell's.
+ */
+
+.image-studio {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  min-height: 0;
+  padding: 12px;
+}
+
+.image-studio__header span {
+  color: var(--color-primary);
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.image-studio__header strong {
+  font-size: 17px;
+}
+
+.image-studio__nav {
+  background: var(--button-hover-bg);
+  border-radius: 10px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 3px;
+}
+
+.image-studio__nav button {
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  color: var(--text-secondary-color);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 7px 3px;
+}
+
+.image-studio__nav button.is-active {
+  background: var(--island-bg-color);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+  color: var(--text-primary-color);
+  font-weight: 700;
+}
+
+.image-studio__search {
+  display: flex;
+  gap: 6px;
+}
+
+.image-studio__search input,
+.image-studio__search select {
+  background: var(--input-bg-color);
+  border: 1px solid var(--default-border-color);
+  border-radius: 9px;
+  color: var(--text-primary-color);
+  padding: 9px 10px;
+}
+
+.image-studio__search input {
+  flex: 1;
+  min-width: 0;
+}
+
+.image-studio__search select {
+  max-width: 88px;
+}
+
+.image-studio__search button,
+.image-studio__retry {
+  background: var(--color-primary);
+  border: 0;
+  border-radius: 9px;
+  color: white;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 8px 10px;
+}
+
+/* One-pixel tail of the grid the observer watches; `overflow-anchor` keeps the scroll from jumping
+   when the next page lands underneath it. */
+.image-studio__search-sentinel {
+  align-self: start;
+  grid-column: 1 / -1;
+  height: 1px;
+  min-height: 1px;
+  overflow-anchor: none;
+}
+
+.image-studio__grid {
+  align-content: start;
+  display: grid;
+  flex: 1;
+  gap: 8px;
+  grid-auto-rows: max-content;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.image-studio__card {
+  align-self: start;
+  background: var(--button-hover-bg);
+  border: 1px solid var(--default-border-color);
+  border-radius: 10px;
+  min-width: 0;
+  overflow: hidden;
+  overflow-anchor: auto;
+  position: relative;
+}
+
+.image-studio__add {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: block;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.image-studio__add:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+/* The chequerboard: these are transparent graphics, and a white tile would hide a white icon. */
+.image-studio__preview {
+  align-items: center;
+  background-color: white;
+  background-image: linear-gradient(45deg, #eee 25%, transparent 25%), linear-gradient(-45deg, #eee 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #eee 75%),
+    linear-gradient(-45deg, transparent 75%, #eee 75%);
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-size: 16px 16px;
+  display: flex;
+  height: 112px;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.image-studio__preview img {
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+.image-studio__preview svg {
+  color: #1b1b1f;
+  height: 72%;
+  width: 72%;
+}
+
+/* A preview that could not be fetched (offline, no key, a name the set dropped): the tile stays
+   the right size and the card stays clickable — it is only the picture that is missing. */
+.image-studio__placeholder {
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+.image-studio__shape-path--basic,
+.image-studio__shape-path--open {
+  fill: none;
+  stroke: currentColor;
+  stroke-linejoin: round;
+}
+
+.image-studio__shape-path--basic {
+  stroke-width: 3;
+}
+
+.image-studio__shape-path--open {
+  stroke-width: 8;
+}
+
+.image-studio__shape-path--closed {
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+.image-studio__adding {
+  background: rgb(0 0 0 / 72%);
+  border-radius: 999px;
+  color: white;
+  font-size: 11px;
+  left: 50%;
+  padding: 6px 9px;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.image-studio__meta {
+  display: block;
+  min-width: 0;
+  padding: 8px;
+}
+
+.image-studio__meta strong,
+.image-studio__meta small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-studio__meta strong {
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.image-studio__meta small {
+  color: var(--text-secondary-color);
+  font-size: 9px;
+  margin-top: 3px;
+  text-transform: capitalize;
+}
+
+.image-studio__favorite {
+  background: rgb(255 255 255 / 88%);
+  border: 0;
+  border-radius: 999px;
+  color: #4b4b55;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 28px;
+  padding: 0;
+  position: absolute;
+  right: 7px;
+  text-align: center;
+  top: 7px;
+  width: 28px;
+}
+
+.image-studio__favorite.is-active {
+  color: #7c5ce7;
+}
+
+.image-studio__empty,
+.image-studio__notice,
+.image-studio__warning,
+.image-studio__error {
+  border-radius: 8px;
+  color: var(--text-secondary-color);
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 9px;
+}
+
+.image-studio__empty {
+  margin: auto 0;
+  text-align: center;
+}
+
+.image-studio__notice,
+.image-studio__warning {
+  background: var(--button-hover-bg);
+}
+
+.image-studio__error {
+  background: #fff0f0;
+  color: #b42318;
+}
+
+.image-studio__retry {
+  align-self: center;
+}
+
+.image-studio__loading-more {
+  color: var(--text-secondary-color);
+  font-size: 11px;
+  text-align: center;
+}
+
+.image-studio__footer {
+  color: var(--text-secondary-color);
+  font-size: 9px;
+  line-height: 1.35;
+  text-align: center;
+}

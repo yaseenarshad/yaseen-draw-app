@@ -45,9 +45,9 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
   - [x] 2H — ⌘K search over the drawing catalog (YAZ-1814)
   - [x] 2I — New drawing, naming, extension display, file association (YAZ-1815)
   - [x] 3A — Library folder and secrets plumbing (YAZ-1817)
-- Now: [→] 3B — Images tab: Image Studio with main-process providers (YAZ-1818)
+  - [x] 3B — Images tab: Image Studio with main-process providers (YAZ-1818)
+- Now: [→] 3C — Components tab: Saved Components as library files (YAZ-1819)
 - Remaining:
-  - [ ] 3C — Components tab: Saved Components as library files (YAZ-1819)
   - [ ] 3D — Present tab: presentation sidebar and player (YAZ-1820)
   - [ ] 3E — Export menu: PNG, SVG, standalone `.excalidraw` (YAZ-1821)
   - [ ] 4A — Prove the image-heavy board round trip through quit, relaunch, sync and clone (YAZ-1823)
@@ -65,7 +65,7 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 - UNCONFIRMED (posted on YAZ-1815, awaiting Yasin): where a drawing outside EVERY open vault should open. 2I kept the shipped E1 rule — a NEW window rooted at the file's parent folder — rather than repointing the focused window's vault, which would discard its tabs and would need a main→renderer "switch vault and open this" message that does not exist. Documented in CONTRACTS as built.
 - RESOLVED (🔒 on YAZ-1775, with the phase-2 merge): the rename CONFIRM sheet is **deleted** — with wikilinks gone it warned about nothing, and "New drawing" landing on the inline rename field made every new `Untitled` board trip it. `ConfirmRename.tsx`/`.test.tsx` and App's `requestRename` detour are gone; rename commits on Enter. Delete and move keep their confirms. First commit of phase 3.
 
-## Learnings (2D / 2E / 2F / 2G / 2H / 2I / 3A)
+## Learnings (2D / 2E / 2F / 2G / 2H / 2I / 3A / 3B)
 
 - **The library store is `vaultConfig.ts` with one file.** Same shape end to end: lazy read, tmp +
   rename write, one chokidar, own-write echo dropped by mtime, external edit debounced. The one
@@ -86,6 +86,30 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 - **The cipher comes in as an argument.** `createSecrets(file, safeStorage)` — the module is
   Electron-free and its tests use a reversible scramble that is visibly not the plaintext, which is
   how the "never on disk in clear" claim is actually asserted.
+- **The Worker's curation is four modules, and only one of them fetches.** `curation.ts` (pure
+  rules and constants), `cachePolicy.ts` (pure key scheme and 24 h), `cache.ts` (the disk), and
+  `providers.ts` (the only one that calls `fetch`, which comes in as an argument). Two of the four
+  are testable with nothing mocked at all, and the provider tests stub not one global.
+- **`curateIconifyResults` is dead in the Worker too.** It is exported and tested there and
+  `searchUncached` never calls it. Ported anyway, with the fact written down: 🔒 D4 names
+  `LOW_PRIORITY_COLLECTIONS`, and the next person to want ranking should find the rule rather than
+  invent a worse one.
+- **Put the key-presence bit IN the search cache key.** The Worker cached a search only when a
+  Pixabay key was configured — the crude version of the same idea. With the bit in the key, both
+  worlds cache and adding a key never keeps serving yesterday's Iconify-only page.
+- **Freshness is the file's own mtime.** One number, written by the write: the 24 h read guard and
+  the startup sweep become the same rule, and there is no sidecar timestamp to drift.
+- **A `fetch` that THREW is offline; a response that refused is the provider's fault.** That one
+  distinction is the whole difference between a passive "You're offline" line and an error banner.
+- **`@excalidraw/element` is a SECOND lazy package.** The Smart Shapes' three values are not
+  re-exported by `@excalidraw/excalidraw`'s index, so they need their own dynamic import — and
+  because the seven basic shapes need nothing, the Shapes view renders immediately and grows.
+- **`IMAGE_STUDIO_INSERTION` has no runtime module in the vendored build.** `@excalidraw/excalidraw/*`
+  maps to TYPES only. The two numbers are copied (the `formFactor.ts` precedent) with the TYPE
+  still imported, so a change in its shape is still a build error.
+- **The studio writes nothing to disk.** It leaves the engine holding bytes the store has not got;
+  2E's `unpersistedFiles` is what turns that into an `assets/` file, and the insert test asserts it
+  with that very function.
 - **`main/library.ts` became `main/library/folder.ts`** so `library/mediaStore.ts` could sit where
   the contract names it; TypeScript would have resolved `./library` to the file over the folder,
   which is a trap for the next reader.

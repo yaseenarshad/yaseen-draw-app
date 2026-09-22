@@ -370,6 +370,14 @@ export function ExcalidrawSurface({
   const panelRef = useRef(canvasPanel)
   /** The engine's raw handle, for the rail and the shortcuts; null until it has mounted. */
   const rawApiRef = useRef<ImperativeApi | null>(null)
+  /**
+   * The same handle as STATE, because the Images tab is a child of `<Excalidraw>` that has to
+   * re-render when it arrives (YAZ-1818) — a ref alone would leave the tab's insert button
+   * disabled for the life of the mount.
+   */
+  const [imperativeApi, setImperativeApi] = useState<ImperativeApi | null>(null)
+  /** ⌘F's counter: every press is a fresh request to focus the Images tab's search field. */
+  const [searchFocusRequest, setSearchFocusRequest] = useState(0)
   /** This seam's own element — the handle's `focus()` reaches the engine's container through it. */
   const rootRef = useRef<HTMLDivElement | null>(null)
   emitRef.current = onSnapshot
@@ -470,6 +478,9 @@ export function ExcalidrawSurface({
       event.preventDefault()
       event.stopPropagation()
       rail.openTab(tab)
+      // ⌘F does not just open the tab, it puts the caret in the search field — the web app's
+      // `onRequestImageStudioSearch` (`AppSidebar.tsx:1071-1072`), as a counter the tab watches.
+      if (tab === 'image-studio') setSearchFocusRequest((request) => request + 1)
     },
     [rail],
   )
@@ -555,6 +566,7 @@ export function ExcalidrawSurface({
       // never calls after its own unmount.
       if (mod === null || api === null) return
       rawApiRef.current = api
+      setImperativeApi(api)
       // Frames are never appState (🔒 D9): applied the moment the engine can take them.
       applyFramesVisibility(api, appliedRef.current.framesVisible)
       // The dock preference the web app kept per cloud username, kept in the shell store here.
@@ -595,8 +607,11 @@ export function ExcalidrawSurface({
   const [activeTab, setActiveTab] = useState<CanvasPanelTab | null>(null)
   useEffect(() => rail.subscribe(() => setActiveTab(rail.getState().activeTab)), [rail])
   const canvasSidebar = useMemo(
-    () => (engine === null ? null : <CanvasSidebar engine={engine} activeTab={activeTab} onClose={closePanel} onDock={onDock} />),
-    [engine, activeTab, closePanel, onDock],
+    () =>
+      engine === null ? null : (
+        <CanvasSidebar engine={engine} activeTab={activeTab} onClose={closePanel} onDock={onDock} excalidrawAPI={imperativeApi} searchFocusRequest={searchFocusRequest} />
+      ),
+    [engine, activeTab, closePanel, onDock, imperativeApi, searchFocusRequest],
   )
 
   if (engine === null) return <div className="drawing-editor__loading" />
