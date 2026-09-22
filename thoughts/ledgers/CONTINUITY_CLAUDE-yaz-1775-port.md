@@ -279,6 +279,10 @@ focused window's vault and discarding its tabs. Documented at `docs/CONTRACTS.md
 - **A label that names no issue cannot be looked up.** 304 🔒 labels, 200 of them bare, drawn from
   three decision namespaces — `App.tsx` carried two different `D1`s a hundred lines apart. The
   convention was only ever usable because one person remembered which was which.
+- **A `FileReader` in the path makes a test settle a TASK late.** Two `SavedComponents` cases
+  passed alone and failed under full-suite load, and one of them recorded its save against the
+  NEXT test. The fix is the file's own `settle()` helper, plus clearing the spy after the setup
+  click — not a longer timeout.
 - **An in-file copy of a document drifts from it.** The parity checklist was 171 lines duplicating
   a Linear comment named as its own source of truth, and had drifted three ways in three phases.
   The file keeps the short true list; the record stays where it was written.
