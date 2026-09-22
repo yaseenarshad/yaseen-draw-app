@@ -527,53 +527,115 @@ button {
   stroke: var(--accent);
 }
 
-/* Expand / collapse all (YAZ-862) — the header collapse button's icon look, pushed to the far
-   end of the lens row so it reads as chrome and not as a third tab. */
-.sidebar__expand-all {
-  flex: none;
+/* The lens row's right-hand tools (YAZ-1800): sort (🔒 YAZ-1835 D5) · preview (🔒 YAZ-1800 D3) · Focus
+   Mode's eye (YAZ-1605) · expand-all (YAZ-862), in ONE group pushed to the far end, so whichever are
+   present sit flush right and read as chrome, not as tabs. The gap is the lens row's own. */
+.sidebar__tools {
+  display: flex;
+  gap: 2px;
   margin-left: auto;
+}
+
+/* Every tool wears the header collapse button's icon look. */
+.sidebar__tools > button {
+  flex: none;
   padding: 0 8px;
   color: var(--fg-muted);
 }
 
-.sidebar__expand-all:hover {
-  color: var(--fg);
-  background: var(--bg-hover);
-}
-
-/* Focus Mode's eye (YAZ-1605) — the expand-all look, one slot to its LEFT, in the accent so a lit
-   eye reads as "you are in a focus" and not as one more grey chrome button. It takes the push to
-   the far end when no sort button precedes it (🔒 YAZ-1835 D5); the chevrons then sit flush beside it. */
-.sidebar__focus-off {
-  flex: none;
-  margin-left: auto;
-  padding: 0 8px;
+/* Lit in the accent: the eye while a focus stands, the preview toggle while previews are on. */
+.sidebar__tools > .sidebar__focus-off,
+.sidebar__tools > .sidebar__preview--on {
   color: var(--accent);
 }
 
-.sidebar__focus-off:hover {
+.sidebar__tools > button:hover {
   color: var(--fg);
   background: var(--bg-hover);
 }
 
-/* The sort control (🔒 YAZ-1835 D5): the same chrome look, and it takes the push to the far end when
-   present — whichever of the three right-side buttons comes first carries it, the rest sit flush. */
-.sidebar__sort {
+/* The hover preview panel (YAZ-1800): a card beside the sidebar, portalled to <body>. It never takes
+   the pointer — the row under the mouse must keep its hover, and nothing in the panel is clickable. */
+.board-preview {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+}
+
+.board-preview__header {
   flex: none;
-  margin-left: auto;
-  padding: 0 8px;
-  color: var(--fg-muted);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
 }
 
-.sidebar__sort:hover {
+.board-preview__name {
+  flex: none;
+  max-width: 60%;
+  overflow: hidden;
+  font-weight: 600;
   color: var(--fg);
-  background: var(--bg-hover);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.sidebar__sort + .sidebar__focus-off,
-.sidebar__sort + .sidebar__expand-all,
-.sidebar__focus-off + .sidebar__expand-all {
-  margin-left: 0;
+.board-preview__folder {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fg-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A subtle checkerboard, so a transparent or background-less board still reads as a picture. */
+.board-preview__body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background-color: var(--bg-side);
+  background-image:
+    linear-gradient(45deg, var(--bg-hover) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--bg-hover) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--bg-hover) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--bg-hover) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+.board-preview__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.board-preview__img--loaded {
+  opacity: 1;
+}
+
+.board-preview__msg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--fg-muted);
 }
 
 /* The Info popover (🔒 YAZ-1835 D6/D7): a two-column definition list on the menu surface. */

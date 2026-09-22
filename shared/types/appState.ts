@@ -62,6 +62,8 @@ export interface SettingsState {
    * cog — a one-way switch would leave hand-editing `yaseendraw.json` as the only way back.
    */
   confirmDelete: boolean
+  /** Rest the mouse on a board in the sidebar to see the whole drawing (YAZ-1800). Every window and vault share it. */
+  hoverPreview: boolean
   /**
    * The canvas preferences every board, every window and every relaunch share (🔒 YAZ-1775 D9). Seeded
    * into the engine at mount and kept in step both ways, diff-before-write in each direction so
@@ -80,6 +82,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   theme: 'system',
   libraryFolder: null,
   confirmDelete: true,
+  hoverPreview: true,
   canvas: DEFAULT_CANVAS_PREFS,
   canvasPanel: DEFAULT_CANVAS_PANEL,
 }

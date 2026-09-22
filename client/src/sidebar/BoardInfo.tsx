@@ -1,5 +1,6 @@
 import type { FileNode } from '@shared/treeSort'
 import { formatBytes, formatDateTime } from '../lib/format'
+import { boardFolder } from '../lib/paths'
 import { relativeTime } from '../lib/relativeTime'
 
 /**
@@ -8,8 +9,7 @@ import { relativeTime } from '../lib/relativeTime'
  * popover stands. A board with no block yet says so instead of inventing dates (🔒 YAZ-1834 D7).
  */
 export function BoardInfo({ node, root, now }: { node: FileNode; root: string; now: number }) {
-  const rel = node.path.startsWith(`${root}/`) ? node.path.slice(root.length + 1) : node.path
-  const folder = rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '/'
+  const folder = boardFolder(root, node.path)
   const when = (ms: number) => (
     <>
       {formatDateTime(ms)} <span className="board-info__ago">· {relativeTime(ms, now)}</span>

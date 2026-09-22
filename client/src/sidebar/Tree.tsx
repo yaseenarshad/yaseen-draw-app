@@ -1,4 +1,5 @@
 import type { TreeNode } from '@shared/types'
+import type { FileNode } from '@shared/treeSort'
 import { stripExt } from '../lib/paths'
 import { CreateInline } from './CreateInline'
 import { renameInputName, type EntryKind } from './createEntry'
@@ -102,6 +103,11 @@ interface TreeProps {
   selection: TreeSelection
   /** Favorites-only (YAZ-1766 D4): root rows reorder the list instead of moving files; nested rows do not drag. */
   reorder?: TreeReorder
+  /**
+   * The hover preview's trigger (YAZ-1800): a BOARD row's pointer and focus, entering (the node) and
+   * leaving (null). The Sidebar owns the dwell and the panel. Absent = previews off.
+   */
+  onHoverFile?: (node: FileNode | null) => void
   depth?: number
 }
 
@@ -120,13 +126,21 @@ export function Tree({
   move,
   selection,
   reorder,
+  onHoverFile,
   depth = 0,
 }: TreeProps) {
-  const recurse = { expanded, activeFile, onToggle, onOpenFile, onOpenFileBackground, onOpenDefault, onNodeContextMenu, pending, renaming, move, selection, reorder }
+  const recurse = { expanded, activeFile, onToggle, onOpenFile, onOpenFileBackground, onOpenDefault, onNodeContextMenu, pending, renaming, move, selection, reorder, onHoverFile }
   // The reorder gesture lives on depth-0 rows alone; deeper rows of a reorderable tree drag nothing.
   const rowReorder = reorder !== undefined && depth === 0 ? reorder : null
   // What a FILE row's drag does: move on disk (E1b) on an ordinary tree, reorder at depth 0 of a reorderable one, nothing below that.
   const fileDrag: Pick<TreeFileMove, 'start' | 'end'> | null = reorder === undefined ? move : rowReorder
+  // A BOARD row's hover preview trigger (YAZ-1800) — pointer and focus alike. It replaces the native
+  // path tooltip, which would sit on top of the panel that already names the board; any other file
+  // (no in-app viewer, no picture) keeps its tooltip.
+  const hoverProps = (node: FileNode) =>
+    onHoverFile === undefined || node.kind !== 'drawing'
+      ? { title: node.path }
+      : { onMouseEnter: () => onHoverFile(node), onMouseLeave: () => onHoverFile(null), onFocus: () => onHoverFile(node), onBlur: () => onHoverFile(null) }
   const dropEdge = (path: string) => (rowReorder?.over?.path === path ? ` tree__row--drop-${rowReorder.over.edge}` : '')
   return (
     <ul className="tree" role={depth === 0 ? 'tree' : 'group'}>
@@ -234,7 +248,7 @@ export function Tree({
                 else if (node.path !== activeFile) onOpenFile(node.path)
               }}
               onContextMenu={(e) => onNodeContextMenu(node, e)}
-              title={node.path}
+              {...hoverProps(node)}
               data-path={node.path}
               draggable={fileDrag !== null}
               onDragStart={fileDrag === null ? undefined : (e) => {

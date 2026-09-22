@@ -3,14 +3,17 @@ import { DRAWING_VIEW_EXTENSIONS, SIDEBAR_LENSES, SORT_ORDERS, type FileClipStat
 import { api, BridgeRequestError } from '../api'
 import { EMPTY_SCENE_JSON } from '../drawings/drawingScene'
 import { ContextMenuSurface } from '../components/ContextMenuSurface'
-import { ChevronsIcon, EyeIcon, HeartIcon, SearchIcon, SidebarPanelIcon, SortIcon } from '../components/icons'
+import { ChevronsIcon, EyeIcon, HeartIcon, PreviewIcon, SearchIcon, SidebarPanelIcon, SortIcon } from '../components/icons'
 import type { WatchSource } from '../hooks/useWatch'
 import { basename } from '../lib/paths'
 import { storage } from '../lib/storage'
 import { EMPTY_SELECTION, orderedSelection, selectionReducer } from '../lib/selection'
 import { allDirs, ancestorDirs, favoriteRoots, findDirNode, findNode, focusRoots, treeHasFile, treeHasPath, treeReducer } from '../lib/treeState'
-import { sortTree } from '@shared/treeSort'
+import { sortTree, type FileNode } from '@shared/treeSort'
+import { useAppliedTheme } from '../lib/theme'
 import { BoardInfo } from './BoardInfo'
+import { BoardPreview } from './BoardPreview'
+import { boardPreviewKey } from './boardPreviewCache'
 import { SearchResults } from '../search/SearchResults'
 import type { SearchCandidate } from '../search/searchCandidates'
 import { useSearchResults } from '../search/useSearchResults'
@@ -252,6 +255,9 @@ function isBoard(tree: readonly TreeNode[], path: string): boolean {
 /** The sort control's labels (🔒 YAZ-1835 D5), in `SORT_ORDERS` order. */
 const SORT_LABEL: Record<SortOrder, string> = { name: 'Name', updated: 'Last updated', created: 'Created' }
 
+/** How long the pointer (or focus) rests on a board row before its preview opens (YAZ-1800). */
+export const BOARD_PREVIEW_DWELL_MS = 400
+
 /** The Favorites tree's file move (YAZ-1766 D4): nothing on that tab drags to disk, so every callback is a no-op. */
 const INERT_MOVE: TreeFileMove = { dragging: null, dropDir: null, start: () => undefined, end: () => undefined, hover: () => undefined, drop: () => undefined }
 const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i])
@@ -373,6 +379,77 @@ export function Sidebar({
   // A tree refresh can shrink the list under the keyboard's index (F1 finding 2, YAZ-808), so
   // every reader of the selection clamps: the highlight lands on the last row, not on nowhere.
   const sel = Math.min(selected, results.length - 1)
+
+  // THE HOVER PREVIEW (YAZ-1800): a board row rested on for the dwell opens a picture of the whole
+  // board beside the sidebar. `hover` is the row — pending until the dwell ends, then shown. A save to
+  // it is only a new picture key, which the panel swaps in place (🔒 D5 amendment); only the row
+  // leaving the tree closes it. Every close bumps `hoverRequest`, so an earlier row's dwell never fires late.
+  const asideRef = useRef<HTMLElement>(null)
+  const theme = useAppliedTheme()
+  const [hover, setHover] = useState<{ path: string; shown: boolean } | null>(null)
+  const hoverRef = useRef(hover)
+  hoverRef.current = hover
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hoverRequest = useRef(0)
+  // A menu or the Info popover owns the pointer while it stands: nothing opens under it.
+  const hoverBlocked = menu !== null || sortMenu !== null || infoPopover !== null
+  const hoverBlockedRef = useRef(hoverBlocked)
+  hoverBlockedRef.current = hoverBlocked
+  const closePreview = useCallback(() => {
+    hoverRequest.current++
+    if (hoverTimer.current !== null) clearTimeout(hoverTimer.current)
+    hoverTimer.current = null
+    hoverRef.current = null
+    setHover(null)
+  }, [])
+  const hoverFile = useCallback(
+    (node: FileNode | null) => {
+      // The same row again (focus after the pointer, or back) keeps its dwell or its panel.
+      if (node !== null && hoverRef.current?.path === node.path) return
+      closePreview()
+      if (node === null || hoverBlockedRef.current) return
+      const id = hoverRequest.current
+      const { path } = node
+      hoverRef.current = { path, shown: false }
+      setHover(hoverRef.current)
+      hoverTimer.current = setTimeout(() => {
+        hoverTimer.current = null
+        if (id === hoverRequest.current) setHover({ path, shown: true })
+      }, BOARD_PREVIEW_DWELL_MS)
+    },
+    [closePreview],
+  )
+  const previewsOn = settings.hoverPreview && !searching
+  // The hovered board off the LIVE tree (the Info popover's rule): its fresh mtime keys the picture, and gone closes the panel.
+  const hoverNode = useMemo(() => {
+    if (hover === null || tree === null) return null
+    const n = findNode(tree.tree, hover.path)
+    return n !== null && n.type === 'file' ? n : null
+  }, [hover, tree])
+  useEffect(() => {
+    if (hover !== null && tree !== null && hoverNode === null) closePreview()
+  }, [hover, tree, hoverNode, closePreview])
+  // Everything else that ends a glance: the toggle, a search, a menu opening, another board opening.
+  useEffect(() => {
+    if (!previewsOn || hoverBlocked) closePreview()
+  }, [previewsOn, hoverBlocked, closePreview])
+  useEffect(() => closePreview(), [activeFile, closePreview])
+  // Escape closes the preview — and ONLY while there is one, so the key is otherwise untouched for the
+  // selection, the menus and the canvas. Capture phase, so it wins before the body's own Escape.
+  const hoverActive = hover !== null
+  useEffect(() => {
+    if (!hoverActive) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      e.stopPropagation()
+      e.stopImmediatePropagation()
+      closePreview()
+    }
+    document.addEventListener('keydown', onKey, true)
+    return () => document.removeEventListener('keydown', onKey, true)
+  }, [hoverActive, closePreview])
+  useEffect(() => closePreview, [closePreview]) // unmount: no dwell timer outlives the sidebar
 
   // One activation rule for keyboard AND click (🔒 D3, YAZ-1491): a folder reveals, a file opens.
   // Enter PREVIEWS — focus stays in the bar, so ↑/↓ carry on walking the results.
@@ -1091,7 +1168,7 @@ export function Sidebar({
   const canNewFolder = menu !== null
 
   return (
-    <aside className="sidebar">
+    <aside ref={asideRef} className="sidebar">
       {/* The root header doubles as the "move to the vault root" drop target (E1b). */}
       <div
         className={`sidebar__header${dropDir === root ? ' sidebar__header--drop' : ''}`}
@@ -1145,37 +1222,55 @@ export function Sidebar({
             the chevrons; one click ends the focus. Gone while a query is typed, like its neighbour. */}
         {/* The sort control (🔒 YAZ-1835 D5): Files lens only, gone while a query is typed; it opens the
             same menu component the rows use, with a check on the current order. */}
-        {!searching && lens === 'files' && (
-          <button
-            type="button"
-            className="sidebar__sort"
-            aria-label={`Sort by ${SORT_LABEL[sortOrder]}`}
-            title={`Sort by ${SORT_LABEL[sortOrder]}`}
-            onClick={(e) => {
-              const r = e.currentTarget.getBoundingClientRect()
-              setSortMenu({ x: r.left, y: r.bottom + 2 })
-            }}
-          >
-            <SortIcon />
-          </button>
-        )}
-        {!searching && focused && (
-          <button type="button" className="sidebar__focus-off" aria-label="Exit focus mode" title="Exit focus mode" onClick={exitFocus}>
-            <EyeIcon />
-          </button>
-        )}
-        {!searching && foldable.length > 0 && (
-          <button
-            type="button"
-            className="sidebar__expand-all"
-            aria-label={allLabel}
-            title={allLabel}
-            // Only the dirs ON SCREEN move (YAZ-1605): folds outside a focus are exactly as they were when it ends.
-            onClick={() => dispatch({ type: 'setAll', dirs: anyExpanded ? expanded.filter((d) => !bodyDirs.includes(d)) : [...new Set([...expanded, ...bodyDirs])] })}
-          >
-            <ChevronsIcon />
-          </button>
-        )}
+        {/* The right-hand tools sit in ONE group pushed to the far end (YAZ-1800), in the order
+            sort · preview · eye · chevrons, so whichever of them are present stay flush right. */}
+        <span className="sidebar__tools">
+          {!searching && lens === 'files' && (
+            <button
+              type="button"
+              className="sidebar__sort"
+              aria-label={`Sort by ${SORT_LABEL[sortOrder]}`}
+              title={`Sort by ${SORT_LABEL[sortOrder]}`}
+              onClick={(e) => {
+                const r = e.currentTarget.getBoundingClientRect()
+                setSortMenu({ x: r.left, y: r.bottom + 2 })
+              }}
+            >
+              <SortIcon />
+            </button>
+          )}
+          {/* The hover preview's toggle (🔒 YAZ-1800 D3): accent while previews are on, one slot right of the sort
+              control; the same flag as Settings › Files › Preview on hover. Gone while a query is typed. */}
+          {!searching && (
+            <button
+              type="button"
+              className={`sidebar__preview${settings.hoverPreview ? ' sidebar__preview--on' : ''}`}
+              aria-pressed={settings.hoverPreview}
+              aria-label="Preview on hover"
+              title="Preview on hover"
+              onClick={() => onChangeSettings({ ...settings, hoverPreview: !settings.hoverPreview })}
+            >
+              <PreviewIcon />
+            </button>
+          )}
+          {!searching && focused && (
+            <button type="button" className="sidebar__focus-off" aria-label="Exit focus mode" title="Exit focus mode" onClick={exitFocus}>
+              <EyeIcon />
+            </button>
+          )}
+          {!searching && foldable.length > 0 && (
+            <button
+              type="button"
+              className="sidebar__expand-all"
+              aria-label={allLabel}
+              title={allLabel}
+              // Only the dirs ON SCREEN move (YAZ-1605): folds outside a focus are exactly as they were when it ends.
+              onClick={() => dispatch({ type: 'setAll', dirs: anyExpanded ? expanded.filter((d) => !bodyDirs.includes(d)) : [...new Set([...expanded, ...bodyDirs])] })}
+            >
+              <ChevronsIcon />
+            </button>
+          )}
+        </span>
       </div>
       {/* Persistent search bar (YAZ-739 A-, chrome v2 row 2 — 🔒 YAZ-797): always visible, never a
           tab or a view — on BOTH lenses (YAZ-847 keeps that rule). YAZ-750's filter affordance
@@ -1247,6 +1342,12 @@ export function Sidebar({
         // clicks (a row click SELECTS, D9), and a right-click keeps the selection standing
         // (YAZ-1337: its menu is about the root, not a fresh pick; the menu's overlay lives
         // outside this body, so its own mousedown never arrives here).
+        // A click on any row, a drag, or a right-click ends a hover preview at once (YAZ-1800).
+        onClickCapture={(e) => {
+          if (e.target instanceof Element && e.target.closest('.tree__row') !== null) closePreview()
+        }}
+        onDragStartCapture={closePreview}
+        onContextMenuCapture={closePreview}
         onMouseDown={(e) => {
           if (e.button !== 0 || selectedPaths.size === 0) return
           if (e.target instanceof Element && e.target.closest('button, input, textarea, a, [role="treeitem"]') !== null) return
@@ -1285,6 +1386,7 @@ export function Sidebar({
                 move={INERT_MOVE}
                 reorder={favoriteReorder}
                 selection={selection}
+                onHoverFile={previewsOn ? hoverFile : undefined}
               />
             )}
           </>
@@ -1310,6 +1412,7 @@ export function Sidebar({
                 renaming={renaming}
                 move={fileMove}
                 selection={selection}
+                onHoverFile={previewsOn ? hoverFile : undefined}
               />
             )}
           </>
@@ -1363,6 +1466,9 @@ export function Sidebar({
         <ContextMenuSurface x={infoPopover.x} y={infoPopover.y} width={300} role="dialog" onClose={() => setInfoPopover(null)}>
           <BoardInfo node={infoNode} root={root} now={infoPopover.now} />
         </ContextMenuSurface>
+      )}
+      {hover?.shown === true && hoverNode !== null && previewsOn && (
+        <BoardPreview key={hoverNode.path} root={root} node={hoverNode} cacheKey={boardPreviewKey(root, hoverNode, theme)} anchor={asideRef} />
       )}
       {confirmingDelete !== null && <ConfirmDelete target={confirmingDelete} onConfirm={confirmDelete} onCancel={() => setConfirmingDelete(null)} />}
     </aside>
