@@ -202,7 +202,8 @@
  *     `.is-collaborating [data-testid=clear-canvas-button]`, `.plus-banner`,
  *     `.board-preview-overlay*`, `.yaseen-welcome-lockup*`, `.collab-errors-button`,
  *     `.ShareDialog`                                    DROPPED — footer, collab, Excalidraw+, Boards, share
- *   presentation-active chrome hiding                   PORTED via 3D
+ *   presentation-active chrome hiding                   PORTED (3D) — on `.drawing-surface`, not
+ *                                            `body`: several tabs are mounted, one is in front
  *   `.image-studio__footer`, PresentationSidebar footer  PORTED with their panels (3A / 3D)
  *   `.ToolIcon__keybinding` override                    DROPPED (⚡ R5) — the fork hides key hints only
  *                                            under `.App-toolbar--compact`, which this app never shows
@@ -242,6 +243,7 @@ import { applyToolbarMode, loadExcalidraw, YASEEN_FULL_TOOLBAR_MODE, type Excali
 import { yaseenFormFactor } from './formFactor'
 import { applyFramesVisibility } from './framesVisibility'
 import { createLauncherStore, LauncherRail } from './LauncherRail'
+import { PresentationPlayer } from './presentation/PresentationPlayer'
 
 type ExcalidrawProps = ComponentProps<ExcalidrawModule['Excalidraw']>
 type ChangeArgs = Parameters<NonNullable<ExcalidrawProps['onChange']>>
@@ -387,6 +389,13 @@ export function ExcalidrawSurface({
   const [hasSelection, setHasSelection] = useState(false)
   /** This seam's own element — the handle's `focus()` reaches the engine's container through it. */
   const rootRef = useRef<HTMLDivElement | null>(null)
+  /**
+   * The presentation, if one is running (YAZ-1820): the player is a SIBLING of `<Excalidraw>`, not
+   * a child of the Present tab, because a tab's body is unmounted the moment the panel closes and
+   * closing the panel must not end a presentation. It covers this pane and no other, which is why
+   * it is here rather than portalled to `document.body` as the web app's was.
+   */
+  const [presenting, setPresenting] = useState<{ initialFrameId: string | null } | null>(null)
   emitRef.current = onSnapshot
   failRef.current = onFailed
   apiRef.current = onApi
@@ -454,6 +463,25 @@ export function ExcalidrawSurface({
   }, [])
 
   const closePanel = useCallback(() => rawApiRef.current?.toggleSidebar({ name: null, force: false }), [])
+  // Play (YAZ-1820): the panel closes, because it would otherwise sit on top of the deck. Stable
+  // identities, so the memoized panel and the memoized `<Excalidraw>` are untouched by them.
+  const startPresentation = useCallback(
+    (initialFrameId: string | null) => {
+      rawApiRef.current?.toggleSidebar({ name: null, force: false })
+      setPresenting({ initialFrameId })
+    },
+    [],
+  )
+  const endPresentation = useCallback(() => setPresenting(null), [])
+  /**
+   * The player hid the frame outlines to present; this puts back what the USER's preference says
+   * (🔒 D9: `SettingsState.canvas.framesVisible`, read off the one ref that knows what the engine
+   * is believed to hold — where the web app read a localStorage key).
+   */
+  const restoreFrames = useCallback(() => {
+    const api = rawApiRef.current
+    if (api !== null) applyFramesVisibility(api, appliedRef.current.framesVisible)
+  }, [])
   const onDock = useCallback((docked: boolean) => rememberPanel({ docked }), [rememberPanel])
 
   /**
@@ -625,9 +653,10 @@ export function ExcalidrawSurface({
           excalidrawAPI={imperativeApi}
           searchFocusRequest={searchFocusRequest}
           hasSelection={hasSelection}
+          onStartPresentation={startPresentation}
         />
       ),
-    [engine, activeTab, closePanel, onDock, imperativeApi, searchFocusRequest, hasSelection],
+    [engine, activeTab, closePanel, onDock, imperativeApi, searchFocusRequest, hasSelection, startPresentation],
   )
 
   if (engine === null) return <div className="drawing-editor__loading" />
@@ -651,6 +680,15 @@ export function ExcalidrawSurface({
       >
         {canvasSidebar}
       </Excalidraw>
+      {presenting !== null && imperativeApi !== null && (
+        <PresentationPlayer
+          engine={engine}
+          excalidrawAPI={imperativeApi}
+          initialFrameId={presenting.initialFrameId}
+          onExit={endPresentation}
+          onRestoreFrames={restoreFrames}
+        />
+      )}
     </div>
   )
 }

@@ -19,6 +19,7 @@ marks an amendment to an earlier locked decision; the amendment wins.
 |---|---|
 | `client/` | the renderer: React 19, Vite. Talks to nothing but `window.yaseenDraw`. |
 | `client/src/drawings/` | the drawing document: the engine seam (`ExcalidrawSurface`, the ONE importer of the package), its host, and what a scene is |
+| `client/src/drawings/presentation/` | the canvas panel's Present tab: the slide rules, the panel and the full-pane player |
 | `client/src/media/` | the canvas panel's Images tab: the Image Studio, the shapes catalog, both insert paths |
 | `client/src/components-library/` | the canvas panel's Components tab: the saved-component library, its capture, import, preview and insert (named so it is never confused with `client/src/components/`) |
 | `client/src/sidebar/` | the file tree, its context menu, rename/move/trash, favorites, vault switcher |
@@ -415,6 +416,56 @@ component is named after the file's base name and its preview is drawn from the 
 bounded like every other, so importing a board-sized scene is allowed and still yields a tile.
 Every refusal throws BEFORE `components:save` is called and shows as a PASSIVE notice
 (`role="status"`, not the assertive error line) — nothing is written.
+
+### Presenting (YAZ-1820)
+
+The canvas panel's **Present** tab is the web app's `PresentationSidebar`, and ▶ Start
+presentation mounts its `PresentationPlayer` over the canvas pane. The whole of it is
+`client/src/drawings/presentation/`: `slides.ts` (the rules), `camera.ts` (the offsets),
+`PresentationSidebar.tsx`, `PresentationPlayer.tsx`, `presentationIcons.tsx`, `presentation.css`.
+
+**A slide is a top-level frame, and the deck's order lives in the FILE.** The position is
+`frame.customData.presentationOrder`, with `customData.yaseenPresentation.presentationOrder` read
+as a fallback so a deck generated against the in-package contract
+(`packages/excalidraw/presentation/CONTRACT.md`) and a deck a human dragged into shape are the
+same deck. Nothing about a presentation is in `SettingsState` or in any store: a board carries its
+own deck. A frame nested in another frame is a shape in a slide, not a slide; a deleted one is not
+a slide either.
+
+**The order is a request, not a guarantee.** A file is user data, so a claim is honoured only when
+it is in range AND is the only claim for its slot; everything else fills the gaps in scene order.
+The answer is therefore always exactly the top-level frames, numbered 1..n with no holes. A
+reorder — drag the handle, or Alt+↑ / Alt+↓ — writes the new numbers back through `updateScene`
+with `CaptureUpdateAction.IMMEDIATELY`, so it is one undo step and it lands in the file on the next
+autosave. A reorder request is completed rather than trusted: unknown ids are dropped, duplicates
+taken once, and a frame the caller forgot keeps its place at the end, so a stale list can reshuffle
+the deck but can never lose a slide out of it. A rename writes the frame's own `name`.
+
+**The player covers the PANE, not the window.** The web app portalled to `document.body`, hid the
+chrome with a `body` class and measured `window.innerWidth`; this shell keeps several drawing tabs
+mounted at once, each with its own engine, so the overlay is a child of `.drawing-surface`, the two
+chrome classes (`--presenting`, `--presentation-tools`) go on that element, and the camera reserve
+(0.32 of the width, always on) is a fraction of the pane. The keyboard and double-click handlers
+are still document-wide — the canvas has the keyboard while presenting, and it is not inside the
+overlay — so both stand down unless the overlay is in the visible tab layer, the same test
+`drawingCommand.ts` makes for the menu's canvas items.
+
+**Keys:** → / PageDown / Space (Space only while the tools are hidden) next, ← / PageUp previous,
+Home / End the ends, **Esc zooms out to the whole deck and never leaves** (restarting a deck by
+accident is worse than reaching for ✕), ⇧T shows or hides the editor chrome, Tab is trapped in the
+control bar while the chrome is hidden. Double-clicking the canvas presents the smallest slide
+under the pointer. Presenting is free-form: the camera is never locked, the hand tool pans while
+the chrome is hidden, and the tool the presenter had before is put back on exit. Frame outlines are
+hidden for the duration and restored to `SettingsState.canvas.framesVisible` — never to a
+hardcoded value — whether the presenter left through ✕, the deck emptied under them, or the
+component was simply unmounted.
+
+**Not ported** (locked exclusion on 🔒 YAZ-1775): hosted HTML animations and everything that served
+them — `PresentationAnimationController`, `animationOrchestrator`, `animationDomAdapter`, the
+CSP-sandboxed iframe assets, and the `yaseendraw:presentation-frame` lifecycle event they were the
+only subscriber to. What that event DROVE is kept, because it is the camera behaving itself rather
+than an animation protocol: the transition token that stops a stale landing, and the rule that an
+in-flight transition must not land while the deck is zoomed out.
 
 ### Secrets (🔒 D4)
 

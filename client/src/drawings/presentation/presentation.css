@@ -1,0 +1,360 @@
+/**
+ * The Present tab and the player (YAZ-1820): `excalidraw-app/presentation/PresentationSidebar.scss`
+ * and `PresentationPlayer.scss` ported to plain CSS (this app ships no SCSS — `savedComponents.css`
+ * set the precedent).
+ *
+ * TWO CHANGES, BOTH BECAUSE THE PLAYER COVERS A PANE AND NOT THE WINDOW: the overlay is
+ * `position: absolute` inside `.drawing-surface` rather than `fixed` over the page, and the two
+ * chrome classes sit on that element rather than on `body` — the shell keeps several drawing tabs
+ * mounted at once and a `body` class would hide the chrome of every one of them.
+ */
+
+/* ---------- the panel ---------- */
+
+.presentation-sidebar {
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+  color: var(--text-primary-color);
+}
+
+.presentation-sidebar__header {
+  padding: 0.75rem 0.85rem 0.6rem;
+  border-bottom: 1px solid var(--default-border-color);
+}
+
+.presentation-sidebar__header h2,
+.presentation-sidebar__header p {
+  margin: 0;
+}
+
+.presentation-sidebar__header h2 {
+  font-size: 1.05rem;
+}
+
+.presentation-sidebar__header p {
+  margin-top: 0.2rem;
+  color: var(--text-secondary-color);
+  font-size: 0.75rem;
+}
+
+.presentation-sidebar__slides {
+  display: flex;
+  overflow: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0.35rem;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.15rem;
+  list-style: none;
+}
+
+.presentation-sidebar__slide {
+  display: flex;
+  min-height: 2.25rem;
+  padding-right: 0.15rem;
+  border-radius: 0.45rem;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.presentation-sidebar__slide:hover {
+  background: var(--button-hover-bg);
+}
+
+.presentation-sidebar__slide--active {
+  background: var(--button-hover-bg);
+}
+
+.presentation-sidebar__slide--active .presentation-sidebar__name {
+  font-weight: 600;
+}
+
+.presentation-sidebar__slide--dragging {
+  background: var(--button-hover-bg);
+  opacity: 0.6;
+}
+
+.presentation-sidebar__slide--drop-before {
+  box-shadow: inset 0 2px 0 var(--color-primary);
+}
+
+.presentation-sidebar__slide--drop-after {
+  box-shadow: inset 0 -2px 0 var(--color-primary);
+}
+
+.presentation-sidebar__handle {
+  display: grid;
+  width: 1.1rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary-color);
+  /* Always discoverable: dim at rest, full on hover/focus/drag. */
+  opacity: 0.45;
+  place-items: center;
+  touch-action: none;
+  cursor: grab;
+}
+
+.presentation-sidebar__handle:active {
+  cursor: grabbing;
+}
+
+.presentation-sidebar__handle svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.presentation-sidebar__open {
+  display: flex;
+  overflow: hidden;
+  min-width: 0;
+  padding: 0.35rem 0.2rem 0.35rem 0.35rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  flex: 1;
+  align-items: center;
+  gap: 0.5rem;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.presentation-sidebar__number {
+  min-width: 1.15rem;
+  color: var(--text-secondary-color);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.presentation-sidebar__name {
+  overflow: hidden;
+  /* Without this a flex item refuses to shrink below its text, so a long slide name would push
+     the row wide instead of ellipsising. */
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8rem;
+}
+
+.presentation-sidebar__rename {
+  width: 100%;
+  min-height: 1.9rem;
+  margin: 0.15rem 0.2rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--color-primary);
+  border-radius: 0.35rem;
+  background: var(--input-bg-color);
+  color: inherit;
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.presentation-sidebar__actions {
+  display: flex;
+  opacity: 0;
+  gap: 0.1rem;
+}
+
+.presentation-sidebar__actions button {
+  display: grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--text-secondary-color);
+  place-items: center;
+  cursor: pointer;
+}
+
+.presentation-sidebar__actions button:hover:not(:disabled) {
+  background: var(--button-gray-1);
+  color: var(--text-primary-color);
+}
+
+.presentation-sidebar__actions button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.presentation-sidebar__actions button svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.presentation-sidebar__slide:hover .presentation-sidebar__actions,
+.presentation-sidebar__slide:focus-within .presentation-sidebar__actions,
+.presentation-sidebar__slide:hover .presentation-sidebar__handle,
+.presentation-sidebar__slide:focus-within .presentation-sidebar__handle,
+.presentation-sidebar__slide--dragging .presentation-sidebar__handle {
+  opacity: 1;
+}
+
+.presentation-sidebar__footer {
+  padding: 0.65rem;
+  border-top: 1px solid var(--default-border-color);
+}
+
+.presentation-sidebar__footer button {
+  display: flex;
+  width: 100%;
+  min-height: 2.7rem;
+  padding: 0.6rem 0.85rem;
+  border: 0;
+  border-radius: 0.6rem;
+  background: var(--color-primary);
+  color: white;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.presentation-sidebar__live {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.presentation-sidebar--empty {
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  gap: 1rem;
+  text-align: center;
+}
+
+.presentation-sidebar--empty h2,
+.presentation-sidebar--empty p {
+  margin: 0;
+}
+
+.presentation-sidebar--empty p {
+  margin-top: 0.4rem;
+  color: var(--text-secondary-color);
+  line-height: 1.45;
+}
+
+.presentation-sidebar--empty button {
+  padding: 0.65rem 0.9rem;
+  border: 0;
+  border-radius: 0.55rem;
+  background: var(--color-primary);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ---------- the player ---------- */
+
+/* The overlay never takes the pointer: presenting is free-form, the canvas underneath pans and
+   zooms and a double-click presents a slide. Only the control bar is ours to click. */
+.presentation-player {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  outline: none;
+  pointer-events: none;
+}
+
+.presentation-player__status {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* A compact icon-only pill. No counter, no frame name; both live in the `__status` live region. */
+.presentation-player__controls {
+  position: absolute;
+  display: flex;
+  pointer-events: auto;
+  padding: 0.25rem;
+  border: 1px solid rgb(255 255 255 / 30%);
+  border-radius: 999px;
+  background: rgb(20 37 31 / 88%);
+  box-shadow: 0 0.8rem 2rem rgb(20 37 31 / 20%);
+  color: white;
+  inset-block-end: 1rem;
+  inset-inline-start: 50%;
+  align-items: center;
+  gap: 0.25rem;
+  transform: translateX(-50%);
+  backdrop-filter: blur(14px);
+  cursor: default;
+}
+
+.presentation-player__controls button {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  place-items: center;
+  cursor: pointer;
+}
+
+.presentation-player__controls button svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.presentation-player__controls button:hover:not(:disabled) {
+  background: rgb(255 255 255 / 18%);
+}
+
+.presentation-player__controls button:focus-visible {
+  outline: 2px solid rgb(255 255 255 / 85%);
+  outline-offset: 1px;
+}
+
+.presentation-player__controls button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* The engine's icon set only ships a right arrow. */
+.presentation-player__previous svg {
+  transform: scaleX(-1);
+}
+
+.presentation-player__divider {
+  width: 1px;
+  height: 1.15rem;
+  background: rgb(255 255 255 / 25%);
+}
+
+/*
+ * Hide the editor chrome while presenting. Pure CSS keyed on the class the player already owns —
+ * no zen mode, no view mode, no appState churn — so nothing can leak into a saved scene. The
+ * `:not()` lets the tools toggle (⇧T) bring the chrome back.
+ *
+ * `.layer-ui__wrapper` is the toolbar, the contextual properties toolbar, the footer/zoom and the
+ * top-left / top-right app slots; `.sidebar` is the canvas panel, rendered as a sibling of the
+ * wrapper. Everything else stays painted: the canvases, and this overlay, which is a sibling of
+ * `.excalidraw` rather than inside it.
+ */
+.drawing-surface--presenting:not(.drawing-surface--presentation-tools) .layer-ui__wrapper,
+.drawing-surface--presenting:not(.drawing-surface--presentation-tools) .sidebar,
+.drawing-surface--presenting:not(.drawing-surface--presentation-tools) .App-top-bar,
+.drawing-surface--presenting:not(.drawing-surface--presentation-tools) .App-bottom-bar {
+  display: none !important;
+}
