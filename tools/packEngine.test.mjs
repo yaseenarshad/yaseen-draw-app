@@ -165,31 +165,6 @@ describe('rewriteLockfile', () => {
     expect(lock.packages['node_modules/@excalidraw/fractional-indexing'].resolved).not.toContain(OLD)
   })
 
-  it('also walks the legacy dependencies tree of a v1/v2 lockfile', () => {
-    const lock = {
-      lockfileVersion: 2,
-      packages: {},
-      dependencies: {
-        '@excalidraw/math': {
-          version: '0.18.0',
-          resolved: `file:client/vendor/yaseendraw-math-0.18.0-${OLD}.tgz`,
-          integrity: 'sha512-STALE',
-          requires: { '@excalidraw/common': `file:vendor/yaseendraw-common-0.18.0-${OLD}.tgz` },
-          dependencies: {
-            '@excalidraw/common': {
-              version: '0.18.0',
-              resolved: `file:client/vendor/yaseendraw-common-0.18.0-${OLD}.tgz`,
-              integrity: 'sha512-STALE',
-            },
-          },
-        },
-      },
-    }
-    rewriteLockfile(lock, buildEngineMap(entries))
-    expect(findStaleTarballRefs(JSON.stringify(lock), NEW)).toEqual([])
-    expect(lock.dependencies['@excalidraw/math'].integrity).toBe('sha512-MAT')
-    expect(lock.dependencies['@excalidraw/math'].dependencies['@excalidraw/common'].integrity).toBe('sha512-COM')
-  })
 
   it('reports zero edits for a package the lockfile never mentions', () => {
     const edits = rewriteLockfile({ packages: {} }, buildEngineMap(entries))

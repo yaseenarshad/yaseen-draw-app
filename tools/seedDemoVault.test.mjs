@@ -1,8 +1,12 @@
+import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { homedir } from 'node:os'
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
 import { describe, expect, it } from 'vitest'
-import { EXT, assetFileName, defaultOrigin, defaultVault, fileIdFor, fracIndex, parseArgs } from './lib/seedDemoVault.mjs'
+import { EXT, assetFileName, fileIdFor, fracIndex, parseArgs } from './lib/seedDemoVault.mjs'
 
 /**
  * `tools/seedDemoVault.mjs` writes a ~130 MB vault, so the suite covers the pure rules only: the
@@ -50,13 +54,11 @@ describe('fracIndex', () => {
   })
 })
 
-describe('parseArgs', () => {
-  it('defaults to the demo vault and the bare origin beside it on the Desktop', () => {
-    const args = parseArgs([])
-    expect(args.vault).toBe(path.join(homedir(), 'Desktop', 'Port to Electron App - Local Version'))
-    expect(args.origin).toBe(path.join(homedir(), 'Desktop', 'Port to Electron App - Local Version (origin).git'))
-    expect(args.vault).toBe(defaultVault())
-    expect(args.origin).toBe(defaultOrigin())
+describe('parseArgs — the script wipes what it is given, so nothing is implied', () => {
+  it('REQUIRES --vault: there is no default that could one day be a real vault', () => {
+    expect(() => parseArgs([])).toThrow(/--vault <dir> is required/)
+    expect(() => parseArgs(['--origin', '/tmp/o.git'])).toThrow(/--vault <dir> is required/)
+    expect(() => parseArgs(['--force'])).toThrow(/--vault <dir> is required/)
   })
 
   it('takes --vault and --origin and resolves them to absolute paths', () => {
@@ -65,20 +67,58 @@ describe('parseArgs', () => {
     expect(args.origin).toBe(path.resolve('scratch/origin.git'))
   })
 
-  it('leaves the other path at its default when only one is given', () => {
-    expect(parseArgs(['--vault', '/tmp/v']).origin).toBe(defaultOrigin())
-    expect(parseArgs(['--origin', '/tmp/o.git']).vault).toBe(defaultVault())
+  it('puts the bare origin beside the vault when only --vault is given', () => {
+    expect(parseArgs(['--vault', '/tmp/v']).origin).toBe('/tmp/v (origin).git')
   })
 
-  it('throws rather than wiping a default the caller did not mean', () => {
+  it('--force is off unless it is asked for', () => {
+    expect(parseArgs(['--vault', '/tmp/v']).force).toBe(false)
+    expect(parseArgs(['--vault', '/tmp/v', '--force']).force).toBe(true)
+  })
+
+  it('throws rather than wiping a directory the caller did not mean', () => {
     expect(() => parseArgs(['--vault'])).toThrow(/needs a directory/)
     expect(() => parseArgs(['--vault', '--origin', '/tmp/o.git'])).toThrow(/needs a directory/)
     expect(() => parseArgs(['--vualt', '/tmp/v'])).toThrow(/unknown argument/)
     expect(() => parseArgs(['/tmp/v'])).toThrow(/unknown argument/)
   })
 
-  it('reports --help without deciding anything else', () => {
+  it('reports --help without requiring anything else', () => {
     expect(parseArgs(['--help']).help).toBe(true)
-    expect(parseArgs([]).help).toBe(false)
+    expect(parseArgs(['--vault', '/tmp/v']).help).toBe(false)
+  })
+})
+
+/** The script itself, run as the user runs it — the guard is worthless if only the parser has it. */
+describe('the script refuses to wipe anything it was not told to', () => {
+  const run = promisify(execFile)
+  const script = fileURLToPath(new URL('./seedDemoVault.mjs', import.meta.url))
+  const exec = (args) => run(process.execPath, [script, ...args]).catch((err) => err)
+
+  it('a bare run says what it needs and touches nothing', async () => {
+    const result = await exec([])
+    expect(result.code).toBe(2)
+    expect(`${result.stderr}`).toMatch(/--vault <dir> is required/)
+  })
+
+  it('refuses an EXISTING vault, and says --force is the way past it', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'yaseendraw-seed-'))
+    try {
+      await writeFile(path.join(dir, 'precious.excalidraw'), '{}')
+      const result = await exec(['--vault', dir])
+      expect(result.code).toBe(2)
+      expect(`${result.stderr}`).toMatch(/refusing to wipe an existing vault/)
+      expect(`${result.stderr}`).toMatch(/--force/)
+      // And nothing was touched.
+      expect(await readdir(dir)).toEqual(['precious.excalidraw'])
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('--help prints the usage and exits cleanly', async () => {
+    const result = await exec(['--help'])
+    expect(result.code).toBeUndefined()
+    expect(`${result.stdout}`).toMatch(/--vault <dir>/)
   })
 })
