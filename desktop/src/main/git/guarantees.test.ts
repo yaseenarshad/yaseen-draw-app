@@ -5,7 +5,7 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { GithubSyncStatus, WatchEvent } from '@shared/types'
 import { git } from './exec'
-import { makeBareRemote, makeGitRepo, requireGit, wireOrigin, type GitRepo } from './gitFixture'
+import { makeBareRemote, makeGitRepo, REAL_GIT_TIMEOUT_MS, requireGit, wireOrigin, type GitRepo } from './gitFixture'
 import { createGitSync, type GitSyncHost, type GitSyncManager } from './manager'
 import { syncPass } from './sync'
 
@@ -78,7 +78,7 @@ async function pushFromB(bin: string, bDir: string, content: string): Promise<vo
   }
 }
 
-describe('guarantee 1: a rebase conflict is lossless', () => {
+describe('guarantee 1: a rebase conflict is lossless', { timeout: REAL_GIT_TIMEOUT_MS }, () => {
   it('aborts back to a byte-identical working tree and reports attention/conflict', async () => {
     const { bin, a, bDir } = await twoClonesOneRemote()
     await pushFromB(bin, bDir, 'line one CHANGED ON B\nline two\n')
@@ -96,7 +96,7 @@ describe('guarantee 1: a rebase conflict is lossless', () => {
   })
 })
 
-describe('guarantee 2: passes serialize and triggers coalesce', () => {
+describe('guarantee 2: passes serialize and triggers coalesce', { timeout: REAL_GIT_TIMEOUT_MS }, () => {
   it('a burst of syncNow during a running pass yields exactly one follow-up pass', async () => {
     const log: string[] = []
     // `null as …` keeps TS from narrowing to `never`: the only assignment lives in a nested closure.
@@ -133,7 +133,7 @@ describe('guarantee 2: passes serialize and triggers coalesce', () => {
   })
 })
 
-describe('guarantee 3: a disabled root is completely silent', () => {
+describe('guarantee 3: a disabled root is completely silent', { timeout: REAL_GIT_TIMEOUT_MS }, () => {
   it('never subscribes the vault watcher and never runs a pass', async () => {
     let vaultSubs = 0
     let passes = 0
@@ -166,7 +166,7 @@ describe('guarantee 3: a disabled root is completely silent', () => {
   })
 })
 
-describe('guarantee 4: no git binary is a classification, not a crash', () => {
+describe('guarantee 4: no git binary is a classification, not a crash', { timeout: REAL_GIT_TIMEOUT_MS }, () => {
   it('reports attention/no-git', async () => {
     const repo = await makeGitRepo()
     cleanups.push(repo.cleanup)
@@ -176,7 +176,7 @@ describe('guarantee 4: no git binary is a classification, not a crash', () => {
   })
 })
 
-describe('guarantee 5: quit flush lands pending edits', () => {
+describe('guarantee 5: quit flush lands pending edits', { timeout: REAL_GIT_TIMEOUT_MS }, () => {
   it('commits and pushes before resolving', async () => {
     const { remoteUrl, a } = await twoClonesOneRemote()
     await a.write('note.md', 'line one\nline two\nline three added\n')
