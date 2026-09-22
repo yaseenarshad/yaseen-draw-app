@@ -22,10 +22,18 @@ npm run dev
 npm run desktop:build
 ```
 
-- Builds `desktop/out` (electron-vite) and then packages with electron-builder: `desktop/dist-app/mac-arm64/Yaseen Draw.app` and `desktop/dist-app/Yaseen Draw-<version>-arm64.dmg` (arm64 only; the filenames contain spaces, so quote them). `mac.identity: null` makes electron-builder skip signing, so `desktop/build/adhocSign.cjs` (`afterPack`) deep ad-hoc signs the bundle itself — without that seal Gatekeeper reports a downloaded copy as "damaged" instead of offering **Open Anyway**.
+- Builds `desktop/out` (electron-vite) and then packages with electron-builder: `desktop/dist-app/mac-arm64/Yaseen Draw.app` (~300 MB) and `desktop/dist-app/Yaseen Draw-0.1.0-arm64.dmg` (~130 MB) — arm64 only, and the version in the dmg name is the ROOT `package.json` version that `tools/packDesktop.mjs` stamps in. The filenames contain spaces, so quote every path.
+- `mac.identity: null` makes electron-builder skip signing, so `desktop/build/adhocSign.cjs` (`afterPack`) deep ad-hoc signs the bundle itself — without that seal Gatekeeper reports a downloaded copy as "damaged" instead of offering **Open Anyway**. Check it with `codesign -dv --verbose=2 "desktop/dist-app/mac-arm64/Yaseen Draw.app"`, which prints `Signature=adhoc`. `spctl -a -t install` on the same bundle prints `rejected` — expected, because nothing here is Developer-ID signed.
 - The first packaging run on a clean machine needs network: electron-builder downloads its Electron dist zip and dmgbuild once, then caches them.
-- Install: drag `Yaseen Draw.app` into `/Applications` in Finder — either straight from `desktop/dist-app/mac-arm64/`, or from the mounted dmg.
-- On another Mac the first open is blocked by Gatekeeper (the app is not notarized): System Settings › Privacy & Security › **Open Anyway**, once. See `README.md` "Sharing it".
+- Install: open the dmg and drag `Yaseen Draw.app` into `/Applications` in Finder (or copy it straight from `desktop/dist-app/mac-arm64/`). The installed app and a `npm run dev` instance coexist — different userData, different single-instance lock.
+- First open is blocked by Gatekeeper (the app is not notarized): right-click › **Open**, or System Settings › Privacy & Security › **Open Anyway** — once, then never again on that Mac. See `README.md` "Sharing it".
+- The app claims `.excalidraw` as Owner, so after that first open Finder double-click opens drawings with it, and from a shell:
+
+```bash
+open -a "Yaseen Draw" "/path/to/some drawing.excalidraw"
+```
+
+- 🔒 Releases are Yasin's call: no tag, no GitHub release, no `npm version` unless he says so. `npm run desktop:build` is how the release path gets verified.
 - Windows: `npm run desktop:build:win` packages an unsigned x64 NSIS installer, `desktop/dist-app/Yaseen Draw-<version>-win-x64-setup.exe` (electron-builder can produce it from a Mac too). First open shows SmartScreen — **More info › Run anyway**, once. Both scripts stamp the root `package.json` version through `tools/packDesktop.mjs`.
 - No toolchain on the target machine? Download the `.dmg` (Mac, Apple Silicon) or the `-win-x64-setup.exe` (Windows) from the repo's [Releases page](https://github.com/yaseenarshad/yaseen-draw-app/releases). Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds both on GitHub runners and attaches them to that tag's release.
 
@@ -79,6 +87,12 @@ cd desktop && YASEEN_DRAW_USER_DATA_DIR=/tmp/draw-profile npx electron-vite dev
 The env var is read before the single-instance lock, so the installed app and the dev app run side
 by side. Do NOT add `--watch` while agents are editing main-process files: every rebuild relaunches
 the window on the user's screen.
+
+The vault itself is generated — `node tools/seedDemoVault.mjs --vault <dir> --origin <bare-dir>`
+writes 63 boards plus a content-addressed `assets/` folder covering every awkward case (missing
+asset, legacy embedded dataURLs, corrupt and empty files, a 40-image board, a ~10 MB PNG, unicode
+and nested paths, two orphans) and a bare origin for the sync chip. It WIPES both paths, so point
+it at a scratch dir. It writes no profile: open the vault with ⌘O.
 
 Then run the scenario list by hand (or by computer-use). The standing list, from the demo Yasin
 approved on YAZ-1775, is: external disk edit hot-reloads a clean tab · paste → one asset, small
