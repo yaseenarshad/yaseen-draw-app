@@ -117,6 +117,18 @@ describe('renamedPath (Links E1, GRO-2194)', () => {
     expect(renamedPath('/r/Guide.txt.excalidraw', 'Manual.txt')).toBe('/r/Manual.txt.excalidraw')
   })
 
+  it('an EXTENSIONLESS file keeps its bare name — there is no suffix to inherit', () => {
+    expect(renamedPath('/v/README', 'NOTES')).toBe('/v/NOTES')
+    expect(renamedPath('/v/LICENSE', 'COPYING')).toBe('/v/COPYING')
+    expect(renamedPath('/v/README', 'README')).toBe('/v/README') // unchanged → caller no-op
+    expect(renamedPath('/v/README', 'NOTES.excalidraw')).toBe('/v/NOTES.excalidraw') // an explicit drawing suffix still wins
+  })
+
+  it('reads the suffix off the FILENAME, never off a dotted parent directory', () => {
+    expect(renamedPath('/v/my.folder/README', 'NOTES')).toBe('/v/my.folder/NOTES')
+    expect(renamedPath('/v/my.folder/data.json', 'profile')).toBe('/v/my.folder/profile.json')
+  })
+
   it('a DIRECTORY renames with no extension logic at all (E1b, GRO-2241)', () => {
     expect(renamedPath('/r/sub/Old', 'New', 'dir')).toBe('/r/sub/New')
     expect(renamedPath('/r/Old', ' Notes.excalidraw ', 'dir')).toBe('/r/Notes.excalidraw') // a folder may be NAMED like a file
