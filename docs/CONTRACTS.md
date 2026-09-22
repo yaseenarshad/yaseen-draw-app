@@ -34,7 +34,7 @@ nothing to do with each other. A bare `D3` would be unresolvable, so there are n
 | `client/vendor/` | the five vendored `yaseendraw-*-<forkCommit>.tgz` engine tarballs (🔒 YAZ-1775 D2) |
 | `desktop/` | the Electron shell: `src/main` (files, state, windows, menu, git sync), `src/preload` (the bridge) |
 | `shared/` | types and pure helpers imported by BOTH sides (`@shared/*`); the contracts are grouped by domain under `shared/types/` behind the `@shared/types` barrel, so no consumer depends on the grouping |
-| `tools/` | `packEngine.mjs` (bump the vendored engine), `packDesktop.mjs` (electron-builder), `seedDemoVault.mjs` (the stress-test vault the behaviour checks run against); the pure halves of the last two live in `tools/lib/` beside their tests |
+| `tools/` | `packEngine.mjs` (bump the vendored engine), `packDesktop.mjs` (electron-builder), `seedDemoVault.mjs` (the stress-test vault the behaviour checks run against), `seedSortDemoVault.mjs` / `seedPreviewDemoVault.mjs` (the demo vaults behind YAZ-1835 and YAZ-1800, each proved by an integration test); the pure halves of `packEngine` and `seedDemoVault` live in `tools/lib/` beside their tests |
 | `docs/` | this file |
 | `thoughts/ledgers/` | continuity ledgers for in-flight work |
 
@@ -405,8 +405,8 @@ The rules are pure (`shared/savedComponents.ts`); the disk half is
 
 The renderer half is `client/src/components-library/`: `componentData.ts` (the web app's
 `SavedComponentsData.ts` — the capture with its four assertions, the fragment, and the insert),
-`componentPreview.ts` (`SavedComponentPreview.ts`, PNG instead of WebP so every reader can open the
-file), `SavedComponents.tsx` and `savedComponents.css`. **Insert makes an independent copy**: the
+`client/src/lib/scenePreview.ts` (`SavedComponentPreview.ts`, PNG instead of WebP so every reader can open the
+file; since YAZ-1800 the ONE scene renderer, shared with the sidebar's hover preview), `SavedComponents.tsx` and `savedComponents.css`. **Insert makes an independent copy**: the
 elements go through the engine's own `insertElements`, which duplicates ids and centres on the
 viewport, so two inserts of one component are two unrelated sets of elements. Search is the app's
 ONE ranking matcher (`search/matchCandidates.ts`, the same one ⌘K uses) over the names, paged by
@@ -613,6 +613,32 @@ Updated · On disk (mtime); dates as "Sep 22, 2026, 3:14 PM · 2 hours ago" (`fo
 `relativeTime`); a board with no trustworthy block reads "Not stamped yet · written on the next
 save" for the two dates (🔒 YAZ-1834 D7). No new IPC. The demo vault behind these rules is
 `tools/seedSortDemoVault.mjs`, proved by `sortVault.integration.test.ts`.
+
+### Sidebar hover preview (🔒 YAZ-1800)
+
+**🔒 D1 — drawn on the first hover, in the renderer, kept in memory.** No new IPC: the picture is
+`drawing:load` → `parseSceneText` → `restoreElements` → `visibleElements` → `createScenePreviewPng`
+(`lib/scenePreview.ts`) fit to 1200 × 800 with 16 px padding. Nothing visible answers `''` ("Empty
+board"); a refused load or a failed draw is the cache's `null` ("Preview unavailable"). Nothing is
+written to the vault or to userData; a relaunch redraws. The key is `root \n path \n mtime \n
+theme` — mtime, not the `updatedAt` block, because every write moves it and the block's one
+advantage (surviving a clone) means nothing to a memory cache.
+
+**🔒 D2 / D3 — the switch.** `SettingsState.hoverPreview`, app-wide, default `true`, in
+`yaseendraw.json`; flipped by Settings › Files › Preview on hover and by the picture-frame button in
+the lens row's `.sidebar__tools` group (sort · preview · eye · chevrons), accent while on.
+
+**🔒 D4 / D5 — the panel and its triggers.** `BoardPreview.tsx`, portalled, `pointer-events: none`,
+right of the sidebar and vertically centred (`boardPreviewPlacement`). It opens after a 400 ms
+dwell of the pointer OR keyboard focus on a board row, in either lens. It closes at once on leave,
+blur, a row click, drag, right-click, another board opening, a menu or Info opening, a search, the
+toggle, the row leaving the tree, and a capture-phase Escape that touches nothing else. A save or a
+theme flip is a new key, swapped in place. Board rows drop the native path tooltip while previews
+are on.
+
+**🔒 D6 — bounded.** `createPreviewCache(fetch, { limit })` evicts the least recently seen picture;
+boards keep 32. The demo vault is `tools/seedPreviewDemoVault.mjs`, proved by
+`previewVault.integration.test.ts`.
 
 ### Board metadata (🔒 YAZ-1834)
 

@@ -39,6 +39,7 @@ describe('settingCandidates', () => {
       'canvas.defaultRoughness',
       'canvas.defaultTextAlign',
       'confirmDelete',
+      'hoverPreview',
       'libraryFolder',
       'pixabayApiKey',
       'hotkeys-window',
@@ -95,8 +96,8 @@ describe('searchSettings', () => {
     expect(ids(searchSettings(settingCandidates(ctx({ status: null, setEnabled: () => undefined })), 'sync this vault'))).toEqual(['githubSync'])
   })
 
-  it('matches on the group title: "mouse" finds the Mouse table', () => {
-    expect(ids(searchSettings(settingCandidates(ctx()), 'mouse'))).toEqual(['hotkeys-mouse'])
+  it('matches on the group title: "mouse" finds the Mouse table (and the hover preview, whose hint says "mouse" — YAZ-1800)', () => {
+    expect(ids(searchSettings(settingCandidates(ctx()), 'mouse'))).toEqual(['hotkeys-mouse', 'hoverPreview'])
   })
 
   it('a hotkey label or key finds its Hotkeys table: "close tab" → Window', () => {

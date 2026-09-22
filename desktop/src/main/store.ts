@@ -98,6 +98,7 @@ const SETTINGS_FIELD_OK: { [K in keyof SettingsState]: (v: unknown) => v is Sett
   // empty string would resolve to the process cwd, which is not a place to put a user's library.
   libraryFolder: (v): v is string | null => v === null || (typeof v === 'string' && isAbsolute(v)),
   confirmDelete: (v): v is boolean => typeof v === 'boolean',
+  hoverPreview: (v): v is boolean => typeof v === 'boolean',
   // 🔒 YAZ-1775 D9: STRICT at the bridge — a sandboxed renderer hands over a whole `CanvasPrefs` or nothing.
   canvas: isCanvasPrefs,
   canvasPanel: isCanvasPanel,

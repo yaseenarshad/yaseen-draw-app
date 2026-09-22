@@ -179,6 +179,7 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
       'canvas.defaultRoughness',
       'canvas.defaultTextAlign',
       'confirmDelete',
+      'hoverPreview',
       'libraryFolder',
       'pixabayApiKey',
       'githubSync',
@@ -320,10 +321,11 @@ describe('SettingsDialog search (D6)', () => {
 
   it('a titled group heads its hits with a breadcrumb, without repeating the group title below it', () => {
     const { el } = mount()
+    // "mouse" also finds the hover preview's row (its hint says "mouse", YAZ-1800), under Files.
     type(searchInput(el), 'mouse')
-    expect(headings(el)).toEqual(['Hotkeys › Mouse'])
+    expect(headings(el)).toEqual(['Files', 'Hotkeys › Mouse'])
     expect(groupTitles(el)).toEqual([])
-    expect(rowIds(el)).toEqual(['hotkeys-mouse'])
+    expect(rowIds(el)).toEqual(['hoverPreview', 'hotkeys-mouse'])
   })
 
   it('hits from several groups stack under their own breadcrumbs, in registry order', () => {
@@ -332,7 +334,7 @@ describe('SettingsDialog search (D6)', () => {
     // Window table whose clipboard rows name files — two breadcrumbs, registry order, never rank.
     type(searchInput(el), 'files')
     expect(headings(el)).toEqual(['Files', 'Hotkeys › Window'])
-    expect(rowIds(el)).toEqual(['confirmDelete', 'libraryFolder', 'hotkeys-window'])
+    expect(rowIds(el)).toEqual(['confirmDelete', 'hoverPreview', 'libraryFolder', 'hotkeys-window'])
     type(searchInput(el), 'keyboard shortcuts')
     expect(headings(el)).toEqual(['Hotkeys › Window', 'Hotkeys › Canvas', 'Hotkeys › Mouse'])
     expect(rowIds(el)).toEqual(['hotkeys-window', 'hotkeys-canvas', 'hotkeys-mouse'])

@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DEFAULT_SETTINGS, MAX_RECENT_ROOTS, SIDEBAR_DEFAULT_W, SIDEBAR_MAX_W, SIDEBAR_MIN_W, addRecentRoot, defaultAppState, type AppState, type WindowEntry } from '@shared/types'
-import { createStore } from './store'
+import { createStore, isSettings } from './store'
 
 // `rename` is the atomic write's last step: one rename = one write to disk.
 vi.mock('node:fs/promises', async (importOriginal) => {
@@ -104,6 +104,18 @@ describe('createStore: loading', () => {
     expect(createStore(file).get().settings).toEqual({ ...DEFAULT_SETTINGS, confirmDelete: false })
     await seed(valid({ settings: 'nope' }))
     expect(createStore(file).get().settings).toEqual(DEFAULT_SETTINGS)
+  })
+
+  it('hoverPreview: an old file without it reads ON, junk falls back to ON, OFF survives; the IPC guard wants a boolean (YAZ-1800 D2)', async () => {
+    const { hoverPreview: _omitted, ...preHoverSettings } = DEFAULT_SETTINGS
+    await seed(valid({ settings: preHoverSettings }))
+    expect(createStore(file).get().settings.hoverPreview).toBe(true)
+    await seed(valid({ settings: { hoverPreview: 'no' } }))
+    expect(createStore(file).get().settings.hoverPreview).toBe(true)
+    await seed(valid({ settings: { hoverPreview: false } }))
+    expect(createStore(file).get().settings.hoverPreview).toBe(false)
+    expect(isSettings({ ...DEFAULT_SETTINGS, hoverPreview: 'on' })).toBe(false)
+    expect(isSettings({ ...DEFAULT_SETTINGS, hoverPreview: false })).toBe(true)
   })
 
   it('theme: an old settings object without the key sanitizes to system; junk falls back too (GRO-2218)', async () => {
