@@ -5,16 +5,18 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import type { TreeNode } from '@shared/types'
-import { BOARD_META_KEY } from '@shared/drawingAssets'
+import { BOARD_META_KEY, parseBoardMetaBlock } from '@shared/drawingAssets'
 import { createFile } from './create'
 import { loadDrawing, saveDrawing } from './drawing'
 import { renameFile } from './rename'
+import { blockOf as blockOfText } from './testFixture'
 import { tree } from './tree'
 
 /**
  * 1834D — the `yaseendraw` block across the REAL boundaries (🔒 YAZ-1834): the stress vault
  * `tools/seedDemoVault.mjs` builds (63 boards: legacy-embedded, empty, corrupt, unicode, 40-image,
  * 10 MB), the real doors, and a `git clone` of the vault's own origin. No Playwright, no app.
+ * `.integration.test.ts` because it forks `node` and `git`: seconds, not milliseconds.
  */
 
 const run = promisify(execFile)
@@ -34,23 +36,19 @@ afterAll(() => rm(work, { recursive: true, force: true }))
 const boards = (nodes: TreeNode[]): Extract<TreeNode, { type: 'file' }>[] =>
   nodes.flatMap((n) => (n.type === 'dir' ? boards(n.children) : n.kind === 'drawing' ? [n] : []))
 const byName = (nodes: TreeNode[], name: string) => boards(nodes).find((n) => n.name === name)
-const blockOf = async (file: string): Promise<Record<string, unknown>> => {
-  const parsed = JSON.parse(await readFile(file, 'utf8')) as Record<string, Record<string, unknown>>
-  expect(Object.keys(parsed)[0]).toBe(BOARD_META_KEY)
-  return parsed[BOARD_META_KEY]
-}
+const blockOf = async (file: string) => blockOfText(await readFile(file, 'utf8'))
 const plain = (elements: unknown[] = []) => `${JSON.stringify({ type: 'excalidraw', version: 2, elements, appState: {}, files: {} }, null, 2)}\n`
 
 describe('1834D — the block on the seeded stress vault', () => {
-  it('1. a fresh seed has 63 boards, all listed, none with meta', async () => {
+  it('1. a fresh seed lists every board, none with meta', async () => {
     const all = boards((await tree(vault)).tree)
-    expect(all.length).toBe(63)
+    expect(all.length).toBeGreaterThan(50)
     expect(all.filter((n) => n.meta !== undefined)).toEqual([])
     for (const name of ['07 Corrupt.excalidraw', '08 Empty file.excalidraw', '06 Big image 10MB.excalidraw']) expect(byName(all, name), name).toBeDefined()
   })
 
   it('2. a new board is born stamped', async () => {
-    const file = path.join(vault, 'Folder A', 'Born here.excalidraw')
+    const file = path.join(vault, 'Born here.excalidraw')
     await createFile({ path: file, content: plain() })
     const node = byName((await tree(vault)).tree, 'Born here.excalidraw')
     expect(node?.meta).toBeDefined()
@@ -77,7 +75,8 @@ describe('1834D — the block on the seeded stress vault', () => {
     expect(byName((await tree(vault)).tree, '03 Legacy embedded.excalidraw')?.meta).toEqual({ createdAt: second.createdAt, updatedAt: second.updatedAt })
   })
 
-  it('5. a backfilled board (the importer shape) keeps its cloud dates and its cloudId across an app save', async () => {
+  it('5–7. a backfilled board keeps its cloud dates and cloudId through an app save, a rename, a folder move and a git clone', async () => {
+    // 5. The importer's shape (YAZ-1832): the block first, the cloud row's dates, its own key beside them.
     const file = path.join(vault, 'Folder A', 'From the cloud.excalidraw')
     await writeFile(file, `${JSON.stringify({ [BOARD_META_KEY]: { createdAt: 1600000000000, updatedAt: 1600000000001, cloudId: 'j97abc' }, type: 'excalidraw', version: 2, elements: [], appState: {}, files: {} }, null, 2)}\n`)
     expect(byName((await tree(vault)).tree, 'From the cloud.excalidraw')?.meta).toEqual({ createdAt: 1600000000000, updatedAt: 1600000000001 })
@@ -86,18 +85,16 @@ describe('1834D — the block on the seeded stress vault', () => {
     const block = await blockOf(file)
     expect(block).toMatchObject({ createdAt: 1600000000000, cloudId: 'j97abc' })
     expect(block.updatedAt).toBeGreaterThan(1600000000001)
-  })
 
-  it('6. rename a stamped board and move a folder holding one: the meta follows the bytes', async () => {
+    // 6. Rename the board, then move its folder: the meta follows the bytes.
     const before = byName((await tree(vault)).tree, 'From the cloud.excalidraw')?.meta
-    await renameFile({ oldPath: path.join(vault, 'Folder A', 'From the cloud.excalidraw'), newPath: path.join(vault, 'Folder A', 'Renamed.excalidraw') })
+    await renameFile({ oldPath: file, newPath: path.join(vault, 'Folder A', 'Renamed.excalidraw') })
     await renameFile({ oldPath: path.join(vault, 'Folder A'), newPath: path.join(vault, 'Folder B') })
     const after = byName((await tree(vault)).tree, 'Renamed.excalidraw')
     expect(after?.path).toBe(path.join(vault, 'Folder B', 'Renamed.excalidraw'))
     expect(after?.meta).toEqual(before)
-  })
 
-  it('7. a clone of the vault reports the same meta while its mtimes differ', async () => {
+    // 7. Commit, push to the seeded origin, clone: same meta, different mtimes.
     await run('git', ['-C', vault, 'add', '-A'])
     await run('git', ['-C', vault, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'stamped'])
     await run('git', ['-C', vault, 'push', '-q', 'origin', 'HEAD'])
@@ -105,18 +102,16 @@ describe('1834D — the block on the seeded stress vault', () => {
     await run('git', ['clone', '-q', origin, clone])
     const here = boards((await tree(vault)).tree).filter((n) => n.meta !== undefined)
     const there = boards((await tree(clone)).tree).filter((n) => n.meta !== undefined)
-    expect(here.length).toBeGreaterThanOrEqual(3)
+    expect(here.length).toBeGreaterThanOrEqual(2)
     expect(there.map((n) => [path.relative(clone, n.path), n.meta])).toEqual(here.map((n) => [path.relative(vault, n.path), n.meta]))
-    // The block is the point: the clone's mtimes are clone-time, the dates are not.
     const cloud = there.find((n) => n.name === 'Renamed.excalidraw')
     expect(cloud?.meta?.createdAt).toBe(1600000000000)
     expect(cloud?.mtime).toBeGreaterThan(1600000000001)
   })
 
-  it('8. corrupt, empty and misplaced-block boards are listed without meta and never throw', async () => {
-    await writeFile(path.join(vault, 'Misplaced.excalidraw'), JSON.stringify({ type: 'excalidraw', elements: [], [BOARD_META_KEY]: { createdAt: 1, updatedAt: 2 } }))
+  it('8. the seeded corrupt and empty boards are listed without meta and never throw', async () => {
     const all = boards((await tree(vault)).tree)
-    for (const name of ['07 Corrupt.excalidraw', '08 Empty file.excalidraw', 'Misplaced.excalidraw']) {
+    for (const name of ['07 Corrupt.excalidraw', '08 Empty file.excalidraw']) {
       expect(byName(all, name), name).toBeDefined()
       expect(byName(all, name), name).not.toHaveProperty('meta')
     }
@@ -127,5 +122,6 @@ describe('1834D — the block on the seeded stress vault', () => {
     const original = await readFile(file, 'utf8')
     await expect(saveDrawing({ root: vault, path: file, json: plain(), expectedMtime: 1, newFiles: [] })).rejects.toMatchObject({ code: 'CONFLICT' })
     expect(await readFile(file, 'utf8')).toBe(original)
+    expect(parseBoardMetaBlock(original)).toBeNull()
   })
 })

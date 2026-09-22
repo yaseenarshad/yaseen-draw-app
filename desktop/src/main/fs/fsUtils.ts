@@ -94,25 +94,29 @@ export async function requireDir(dir: string): Promise<void> {
 }
 
 /**
- * Recursive tree of every regular file under `dir`, each carrying its preview `kind` (`null` = no
- * in-app viewer, YAZ-1577 D1). Dirs first, then files, each sorted case-insensitively; every dir
- * shows even when empty, so freshly created folders are visible (GRO-2022 D1). Dot-entries and
- * `node_modules` are skipped; unreadable subdirs are skipped. A drawing also carries `meta`, its
- * `yaseendraw` block read off the file head in the same open as its stat (🔒 YAZ-1834 D6); a board
- * without a trustworthy block simply has none.
+ * A drawing's dates and stat in one open, or just the stat of any other file. A board that
+ * cannot be OPENED (EACCES, say) is still a board: it falls back to the stat, so it is listed
+ * without dates rather than dropped (🔒 YAZ-1834 D7 — no metadata is never no board).
  */
-/** A drawing's dates and stat in one open, or just the stat of any other file. */
-async function fileHead(full: string): Promise<{ meta: BoardMeta | null; mtime: number; size: number } | null> {
-  if (!isDrawing(full)) {
+async function fileHead(full: string): Promise<{ meta: BoardMeta | null; mtime: number; size: number }> {
+  const head = isDrawing(full) ? await readBoardHead(full).catch(() => null) : null
+  if (head === null) {
     const st = await stat(full)
     return { meta: null, mtime: st.mtimeMs, size: st.size }
   }
-  const head = await readBoardHead(full)
-  if (head === null) return null
   const { block, mtime, size } = head
   return { meta: block === null ? null : { createdAt: block.createdAt, updatedAt: block.updatedAt }, mtime, size }
 }
 
+/**
+ * Recursive tree of every regular file under `dir`, each carrying its preview `kind` (`null` = no
+ * in-app viewer, YAZ-1577 D1). Dirs first, then files, each sorted case-insensitively; every dir
+ * shows even when empty, so freshly created folders are visible (GRO-2022 D1). Dot-entries and
+ * `node_modules` are skipped; unreadable subdirs are skipped. A drawing also carries `meta`, its
+ * `yaseendraw` block read off the file head in the same open as its stat (🔒 YAZ-1834 D6) — one
+ * open+read per drawing instead of one stat, measured fine on the 63-board stress vault (1834D);
+ * a board without a trustworthy block simply has none.
+ */
 export async function buildTree(dir: string): Promise<TreeNode[]> {
   const entries = await readdir(dir, { withFileTypes: true })
   const dirs: TreeNode[] = []

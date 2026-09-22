@@ -9,7 +9,7 @@ import type { BridgeErrorCode, FileKind, MAX_DRAWING_BYTES } from './errors'
  * block, which every save preserves (D5). Rules and readers: `shared/drawingAssets.ts`.
  */
 export interface BoardMeta {
-  /** Epoch ms. Born on create or on the first save of a board without a block; never rewritten after. */
+  /** Epoch ms. Born on create or on the first save of a board without a block; never rewritten once it is a finite number. */
   createdAt: number
   /** Epoch ms of the last in-app save. */
   updatedAt: number
@@ -58,14 +58,15 @@ export interface CreateDirResponse {
 // ---------- createFile(req) ----------
 
 /**
- * `createFile` takes the bare path or `{ path, content }` (Bible B, GRO-2202): when `content` is
- * given it lands in the same atomic `wx` write. That is what lets "New drawing" be born with the
- * empty scene inside it, with no create-then-write race and the never-overwrite guarantee intact.
+ * `createFile` takes `{ path, content }` (Bible B, GRO-2202): the content lands in the same
+ * atomic `wx` write, which is what lets "New drawing" be born with the empty scene inside it —
+ * no create-then-write race, never a zero-byte board, and the never-overwrite guarantee intact.
+ * Main stamps the scene's `yaseendraw` block before writing (🔒 YAZ-1834 D3).
  */
 export interface CreateFileRequest {
   path: string
-  /** Initial file contents; omitted → an empty file. */
-  content?: string
+  /** The scene, as JSON text. Must be a JSON object → otherwise `BAD_REQUEST`. */
+  content: string
 }
 
 export interface CreateFileResponse {

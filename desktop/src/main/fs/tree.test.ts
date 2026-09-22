@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { rm, writeFile } from 'node:fs/promises'
+import { chmod, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { TreeNode } from '@shared/types'
 import { tree } from './tree'
@@ -67,6 +67,20 @@ describe('tree', () => {
       }
     } finally {
       await Promise.all(candidates.map(([file]) => rm(file, { force: true })))
+    }
+  })
+
+  it.skipIf(process.getuid?.() === 0)('still lists a board main cannot OPEN, without meta — no metadata is never no board (🔒 YAZ-1834 D7)', async () => {
+    const file = path.join(root, 'locked.excalidraw')
+    await writeFile(file, `${JSON.stringify({ yaseendraw: { createdAt: 1, updatedAt: 2 }, elements: [] })}\n`)
+    await chmod(file, 0o000)
+    try {
+      const node = files(await tree(root)).find((n) => n.name === 'locked.excalidraw')
+      expect(node).toMatchObject({ kind: 'drawing', size: expect.any(Number) })
+      expect(node).not.toHaveProperty('meta')
+    } finally {
+      await chmod(file, 0o644)
+      await rm(file, { force: true })
     }
   })
 

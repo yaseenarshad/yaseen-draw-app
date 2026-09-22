@@ -42,9 +42,9 @@ describe('api', () => {
     expect(bridge.tree).toHaveBeenCalledWith('/v')
     await expect(api.pickFolder()).resolves.toEqual({ cancelled: true })
     await api.createDir('/v/d')
-    await api.createFile('/v/n.excalidraw')
+    await api.createFile({ path: '/v/n.excalidraw', content: '{}' })
     expect(bridge.createDir).toHaveBeenCalledWith('/v/d')
-    expect(bridge.createFile).toHaveBeenCalledWith('/v/n.excalidraw')
+    expect(bridge.createFile).toHaveBeenCalledWith({ path: '/v/n.excalidraw', content: '{}' })
   })
 
   it('the file dialogs delegate and answer what the user chose (YAZ-1833 / 🔒 YAZ-1775 D3 YAZ-1821)', async () => {

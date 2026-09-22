@@ -37,10 +37,10 @@ typecheck + all vitest projects + build green, merged to main. No release.
   - [x] 1834A scope comment (YAZ-1836)
   - [x] 1834B pure functions + tests (YAZ-1837)
   - [x] 1834C wire create/save/tree, types, CONTRACTS (YAZ-1838)
-- Now: [→] 1834D verify against seeded vault + clone (YAZ-1839)
-- Remaining:
-  - [ ] 1834E audit comment (YAZ-1840)
-  - [ ] 1834F apply audit, merge (YAZ-1841)
+  - [x] 1834D verify against seeded vault + clone (YAZ-1839) — `boardMetaVault.integration.test.ts`
+  - [x] 1834E audit comment (YAZ-1840) — 37 items, 3 bugs
+  - [x] 1834F apply audit, merge (YAZ-1841)
+- Now: merged to main; nothing pending. Follow-ups live in YAZ-1835 (sort) and YAZ-1832 (importer).
 
 ## Open Questions
 
@@ -55,9 +55,18 @@ typecheck + all vitest projects + build green, merged to main. No release.
   block that is not first is replaced, not moved. Locked as D7 wording; the importer writes first.
 - **The old "untouched save is byte-identical" test had to change meaning:** with `updatedAt`
   stamped on every save, the invariant is "byte-identical BELOW the block". Recorded in CONTRACTS.
-- **`fs:create-file` got stricter:** non-object content is now `BAD_REQUEST` before the disk is
-  touched (it used to write junk under the drawing extension). Empty content still writes an
-  empty file; nothing sends it — a candidate for the 1834E audit.
+- **`fs:create-file` got stricter, then simpler:** content is required and must be a JSON object
+  (`BAD_REQUEST` otherwise, before the disk is touched). The bare-path and empty-content forms
+  were dead in the app and were the last way to write a zero-byte board; the audit deleted them.
+- **The audit's three real catches:** (1) opening every drawing in the tree walk turned an
+  unreadable board (EACCES) into a *missing* board — now it falls back to `stat` and lists
+  without dates; (2) the `TOO_LARGE` ceiling measured the scene before the block was added, so
+  a save could write what its own load refuses — the ceiling now measures the stamped bytes;
+  (3) the head reader hardcoded the key its constant already named.
+- **Two readers on purpose:** `readBoundedHandle` is "whole file or fail"; `readBoardHead` is
+  "first KB of anything". Reusing one for the other would weaken its invariant.
+- **A fresh-eyes audit agent over the full diff was worth it** — the three bugs above were all
+  in code I had just written and re-read myself.
 
 ## Working Set
 

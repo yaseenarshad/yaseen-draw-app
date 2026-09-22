@@ -46,7 +46,7 @@
  * Pure rules (`referencedFileIds`, `stripEmbeddedFiles`, `stampBoardMeta`, …) live in
  * `shared/drawingAssets.ts`; this file is the fs around them.
  */
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { DrawingFileEntry, DrawingLoadRequest, DrawingLoadResponse, DrawingSaveRequest, DrawingSaveResponse } from '@shared/types'
 import { MAX_DRAWING_BYTES } from '@shared/types'
@@ -178,15 +178,19 @@ export async function saveDrawing(req: DrawingSaveRequest): Promise<DrawingSaveR
     if (data === null || name === null) continue
     pending.push({ fileId, name, bytes: Buffer.from(data.base64, 'base64') })
   }
-  if (Buffer.byteLength(lean, 'utf8') > MAX_DRAWING_BYTES) throw new BridgeFailure('TOO_LARGE', TOO_LARGE, { path: file })
   await requireDir(dir)
-  if (expectedMtime !== undefined) {
+  // The file as it is now: its block and mtime in one open (🔒 YAZ-1834 D3), serving both the
+  // conflict guard and the stamp. A block-less board is as old as its file; a brand-new one is
+  // born now. The bytes measured against the ceiling are the bytes that will be written.
+  const prior = await fsCall(file, () => readBoardHead(file))
+  const now = Date.now()
+  const bornAt = prior?.mtime ?? now
+  const stamped = stampBoardMeta(lean, { createdAt: bornAt, updatedAt: now }, prior?.block ?? null)
+  if (Buffer.byteLength(stamped, 'utf8') > MAX_DRAWING_BYTES) throw new BridgeFailure('TOO_LARGE', TOO_LARGE, { path: file })
+  if (expectedMtime !== undefined && prior !== null && prior.mtime !== expectedMtime) {
     // A file that is GONE is not a conflict: the tab's own copy is the only one left, and
     // refusing here would strand it. Only a file that is there and DIFFERENT blocks the write.
-    const st = await stat(file).catch(() => undefined)
-    if (st !== undefined && st.mtimeMs !== expectedMtime) {
-      throw new BridgeFailure('CONFLICT', 'drawing changed on disk since last read', { path: file, mtime: st.mtimeMs })
-    }
+    throw new BridgeFailure('CONFLICT', 'drawing changed on disk since last read', { path: file, mtime: prior.mtime })
   }
   // Assets first (see the module doc), and only once the conflict guard has passed — a refused
   // save must leave the vault exactly as it found it.
@@ -207,10 +211,6 @@ export async function saveDrawing(req: DrawingSaveRequest): Promise<DrawingSaveR
       persisted.push(asset.fileId)
     }
   }
-  const { mtime, size } = await fsCall(file, async () => {
-    const prior = await readBoardHead(file)
-    const now = Date.now()
-    return atomicWrite(file, stampBoardMeta(lean, { createdAt: prior?.mtime ?? now, updatedAt: now }, prior?.block ?? null))
-  })
+  const { mtime, size } = await fsCall(file, () => atomicWrite(file, stamped))
   return { path: file, mtime, size, persisted }
 }

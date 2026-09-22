@@ -11,7 +11,7 @@ import {
   mimeForAssetExt,
   parseDataUrl,
   planOrphanSweep,
-  readBoardMetaHead,
+  parseBoardMetaBlock,
   referencedFileIds,
   stampBoardMeta,
   stripEmbeddedFiles,
@@ -217,14 +217,14 @@ describe('stampBoardMeta (🔒 YAZ-1834 D3/D5/D7)', () => {
     expect(out.endsWith('\n')).toBe(true)
     // The drawing itself is untouched, and the block reads back off the head.
     expect(JSON.parse(out)).toMatchObject({ type: 'excalidraw', elements: [], files: {} })
-    expect(readBoardMetaHead(out.slice(0, BOARD_META_HEAD_BYTES))).toEqual({ createdAt: 1000, updatedAt: 2000 })
+    expect(parseBoardMetaBlock(out.slice(0, BOARD_META_HEAD_BYTES))).toEqual({ createdAt: 1000, updatedAt: 2000 })
   })
 
   it('keeps an existing createdAt and every unknown key, bumps only updatedAt — the backfill contract', () => {
     const backfilled = lean({ [BOARD_META_KEY]: { createdAt: 1600000000000, updatedAt: 1600000000001, cloudId: 'abc', note: 'has a } brace' } })
     const out = stampBoardMeta(backfilled, at)
     expect(block(out)).toEqual({ createdAt: 1600000000000, updatedAt: 2000, cloudId: 'abc', note: 'has a } brace' })
-    expect(readBoardMetaHead(out)).toEqual({ createdAt: 1600000000000, updatedAt: 2000, cloudId: 'abc', note: 'has a } brace' })
+    expect(parseBoardMetaBlock(out)).toEqual({ createdAt: 1600000000000, updatedAt: 2000, cloudId: 'abc', note: 'has a } brace' })
   })
 
   it('takes the block the FILE holds (`prior`) over one inside the text — the disk is the block`s truth on save', () => {
@@ -261,18 +261,18 @@ describe('stampBoardMeta (🔒 YAZ-1834 D3/D5/D7)', () => {
   })
 })
 
-describe('readBoardMetaHead (🔒 YAZ-1834 D6/D7)', () => {
+describe('parseBoardMetaBlock (🔒 YAZ-1834 D6/D7)', () => {
   const head = (obj: unknown) => `${JSON.stringify(obj, null, 2)}\n`.slice(0, BOARD_META_HEAD_BYTES)
 
   it('reads the two dates when the block is the first key', () => {
-    expect(readBoardMetaHead(head({ [BOARD_META_KEY]: { createdAt: 1, updatedAt: 2 }, type: 'excalidraw' }))).toEqual({ createdAt: 1, updatedAt: 2 })
+    expect(parseBoardMetaBlock(head({ [BOARD_META_KEY]: { createdAt: 1, updatedAt: 2 }, type: 'excalidraw' }))).toEqual({ createdAt: 1, updatedAt: 2 })
     // Minified, and with the head cut off mid-document, still fine: only the block is parsed.
-    expect(readBoardMetaHead('{"yaseendraw":{"createdAt":1,"updatedAt":2},"elements":[{"id":"a","ty')).toEqual({ createdAt: 1, updatedAt: 2 })
+    expect(parseBoardMetaBlock('{"yaseendraw":{"createdAt":1,"updatedAt":2},"elements":[{"id":"a","ty')).toEqual({ createdAt: 1, updatedAt: 2 })
   })
 
   it('carries extra keys in the block back, even one whose value holds a brace', () => {
-    expect(readBoardMetaHead(head({ [BOARD_META_KEY]: { createdAt: 1, updatedAt: 2, note: 'a } b', cloudId: 'x' } }))).toEqual({ createdAt: 1, updatedAt: 2, note: 'a } b', cloudId: 'x' })
-    expect(readBoardMetaHead(head({ [BOARD_META_KEY]: { createdAt: 1, updatedAt: 2, note: 'esc \\" } q' } }))).toEqual({ createdAt: 1, updatedAt: 2, note: 'esc \\" } q' })
+    expect(parseBoardMetaBlock(head({ [BOARD_META_KEY]: { createdAt: 1, updatedAt: 2, note: 'a } b', cloudId: 'x' } }))).toEqual({ createdAt: 1, updatedAt: 2, note: 'a } b', cloudId: 'x' })
+    expect(parseBoardMetaBlock(head({ [BOARD_META_KEY]: { createdAt: 1, updatedAt: 2, note: 'esc \\" } q' } }))).toEqual({ createdAt: 1, updatedAt: 2, note: 'esc \\" } q' })
   })
 
   it('is null when the block is missing, not first, malformed, non-finite, or cut short', () => {
@@ -287,6 +287,6 @@ describe('readBoardMetaHead (🔒 YAZ-1834 D6/D7)', () => {
       empty: '',
       array: '[{"yaseendraw":{}}]',
     }
-    for (const [name, text] of Object.entries(cases)) expect(readBoardMetaHead(text), name).toBeNull()
+    for (const [name, text] of Object.entries(cases)) expect(parseBoardMetaBlock(text), name).toBeNull()
   })
 })

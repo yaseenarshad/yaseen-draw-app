@@ -6,7 +6,7 @@ import { MAX_DRAWING_BYTES } from '@shared/types'
 import { BOARD_META_KEY, ORPHAN_MAX_AGE_MS } from '@shared/drawingAssets'
 import { sweepOrphanAssets } from '../drawings/orphanSweep'
 import { loadDrawing, saveDrawing } from './drawing'
-import { failure } from './testFixture'
+import { blockOf, failure, withoutBlock } from './testFixture'
 
 const PNG_B64 = 'aGVsbG8='
 const dataUrl = (b64 = PNG_B64) => `data:image/png;base64,${b64}`
@@ -36,18 +36,6 @@ async function seed(rel: string, body: string): Promise<string> {
   await mkdir(path.dirname(file), { recursive: true })
   await writeFile(file, body)
   return file
-}
-
-/** The saved bytes with the `yaseendraw` block taken out again — what the SCENE part of a save wrote. */
-function withoutBlock(json: string): string {
-  const { [BOARD_META_KEY]: _block, ...rest } = JSON.parse(json) as Record<string, unknown>
-  return `${JSON.stringify(rest, null, 2)}\n`
-}
-/** The block a saved file starts with (🔒 YAZ-1834 D1: it is always the first key). */
-function blockOf(json: string): Record<string, unknown> {
-  const parsed = JSON.parse(json) as Record<string, Record<string, unknown>>
-  expect(Object.keys(parsed)[0]).toBe(BOARD_META_KEY)
-  return parsed[BOARD_META_KEY]
 }
 
 beforeEach(async () => {
@@ -328,23 +316,14 @@ describe('🔒 YAZ-1775 D3 — the image store on save', () => {
   })
 })
 
-/**
- * The simulated end-to-end (🔒 YAZ-1811 acceptance): a real temp vault, the real doors, no
- * Electron and no React. `shell.trashItem` is the one thing injected — a test must not move
- * files into the developer's own Trash.
- */
 describe('🔒 YAZ-1834 — the yaseendraw block on save', () => {
-  const window = async <T,>(work: () => Promise<T>): Promise<{ result: T; before: number; after: number }> => {
-    const before = Date.now()
-    const result = await work()
-    return { result, before, after: Date.now() }
-  }
-
   it('births a block on a LEGACY board: createdAt = its pre-save mtime, updatedAt = the save', async () => {
     const file = await seed('Old.excalidraw', scene())
     const born = new Date('2021-03-04T05:06:07Z')
     await utimes(file, born, born)
-    const { before, after } = await window(() => saveDrawing({ root, path: file, json: scene([{ id: 'a' }]), newFiles: [] }))
+    const before = Date.now()
+    await saveDrawing({ root, path: file, json: scene([{ id: 'a' }]), newFiles: [] })
+    const after = Date.now()
     const block = blockOf(await readFile(file, 'utf8'))
     expect(block.createdAt).toBe(born.getTime())
     expect(block.updatedAt).toBeGreaterThanOrEqual(before)
@@ -368,7 +347,7 @@ describe('🔒 YAZ-1834 — the yaseendraw block on save', () => {
     const file = await seed('Legacy.excalidraw', legacy)
     await saveDrawing({ root, path: file, json: legacy, newFiles: [] })
     const written = await readFile(file, 'utf8')
-    blockOf(written)
+    expect(Object.keys(JSON.parse(written) as object)[0]).toBe(BOARD_META_KEY)
     expect((JSON.parse(written) as { files: unknown }).files).toEqual({})
     expect(await readdir(path.join(root, 'assets'))).toEqual(['abc.png'])
   })
@@ -387,6 +366,11 @@ describe('🔒 YAZ-1834 — the yaseendraw block on save', () => {
   })
 })
 
+/**
+ * The simulated end-to-end (🔒 YAZ-1811 acceptance): a real temp vault, the real doors, no
+ * Electron and no React. `shell.trashItem` is the one thing injected — a test must not move
+ * files into the developer's own Trash.
+ */
 describe('end to end on a temp vault', () => {
   it('legacy board → load → save → assets extracted, JSON shrunk, and it reopens with its picture', async () => {
     const legacy = scene([imageEl('sha1id')], { files: { sha1id: { mimeType: 'image/png', dataURL: dataUrl() } } })

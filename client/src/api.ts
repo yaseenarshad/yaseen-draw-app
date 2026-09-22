@@ -33,7 +33,7 @@ async function call<T>(fn: () => Promise<T>): Promise<T> {
 export const api = {
   tree: (root: string) => call<TreeResponse>(() => window.yaseenDraw.tree(root)),
   createDir: (path: string) => call<CreateDirResponse>(() => window.yaseenDraw.createDir(path)),
-  createFile: (req: string | CreateFileRequest) => call<CreateFileResponse>(() => window.yaseenDraw.createFile(req)),
+  createFile: (req: CreateFileRequest) => call<CreateFileResponse>(() => window.yaseenDraw.createFile(req)),
   /** In-app rename: file rename/move or folder rename, never overwrites (Links E1 GRO-2194, E1b GRO-2241). */
   rename: (req: RenameFileRequest) => call<RenameFileResponse>(() => window.yaseenDraw.file.rename(req)),
   /** In-app delete to the SYSTEM Trash (GRO-2272); never `fs.rm`, and a trash failure deletes nothing. */
