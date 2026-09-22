@@ -1,0 +1,82 @@
+/** The drawing DOCUMENT's two doors and the image bytes that travel with a scene (🔒 YAZ-1810). */
+
+import type { SettingsState } from './appState'
+
+/**
+ * One image the canvas holds, as it crosses the bridge: the engine's own mime plus a base64
+ * `data:` URL. Deliberately NOT the engine's `BinaryFileData` — the bridge must not depend on a
+ * renderer package, and `created`/`lastRetrieved` are the engine's bookkeeping, not the file's.
+ */
+export interface DrawingFileEntry {
+  mimeType: string
+  /** `data:<mime>;base64,<payload>` — the only form either side accepts. */
+  dataURL: string
+}
+
+export interface DrawingLoadRequest {
+  /** Vault root; the document must resolve inside it. */
+  root: string
+  /** The document, vault-relative or absolute under `root`. Never a basename search. */
+  path: string
+}
+
+export interface DrawingLoadResponse {
+  /** Absolute path that was read — what every later save addresses. */
+  path: string
+  /** The file's bytes as UTF-8 text, exactly as they sit on disk. */
+  json: string
+  /** Disk mtime of the read: the `expectedMtime` the first save goes back with. */
+  mtime: number
+  size: number
+  /**
+   * Every image the scene still references and whose bytes were found, keyed by `fileId`. An id
+   * with no bytes anywhere is simply absent — the engine draws its placeholder and the document
+   * still opens (🔒 YAZ-1775 D3).
+   */
+  files: Record<string, DrawingFileEntry>
+  /**
+   * The subset of `files` that came from the STORE rather than from the file's own embedded
+   * `files` map. The renderer never ships these back (they are already on disk); anything else
+   * it holds is `newFiles` on the next save.
+   */
+  stored: string[]
+}
+
+/** One image a save must land in the store before the scene that names it is written. */
+export interface DrawingNewFile extends DrawingFileEntry {
+  /** Excalidraw's own content id (the SHA-1 of the bytes) — the file's name under `assets/`. */
+  fileId: string
+}
+
+export interface DrawingSaveRequest {
+  root: string
+  path: string
+  /** The serialized scene. Written verbatim but for the store's own `files: {}` rewrite (🔒 YAZ-1775 D3). */
+  json: string
+  /** The mtime the renderer last read or wrote; a differing disk mtime rejects `CONFLICT` and writes NOTHING — assets included. */
+  expectedMtime?: number
+  /** Images the store does not have yet. Written first, so the scene on disk never names bytes that are missing. */
+  newFiles: DrawingNewFile[]
+}
+
+export interface DrawingSaveResponse {
+  path: string
+  mtime: number
+  size: number
+  /** The ids now on disk — the renderer adds them to its persisted set so it never ships them twice. */
+  persisted: string[]
+}
+
+export interface DrawingApi {
+  /** Read one `.excalidraw` AS A DOCUMENT, with the bytes of the images it names. */
+  load(req: DrawingLoadRequest): Promise<DrawingLoadResponse>
+  /** Write one `.excalidraw`: assets first, then the scene, atomically. */
+  save(req: DrawingSaveRequest): Promise<DrawingSaveResponse>
+  /**
+   * The RESOLVED library folder (🔒 YAZ-1775 D5): `SettingsState.libraryFolder`, or `<userData>/library`
+   * when that is null. Only main knows where userData is, so only main can answer — the Settings
+   * row shows what comes back. Main also makes sure the folder exists at startup, so the answer
+   * always names a real directory. Its CONTENTS (`media.json`, `components/`) are YAZ-1817/YAZ-1818/YAZ-1819's.
+   */
+  libraryFolder(): Promise<string>
+}

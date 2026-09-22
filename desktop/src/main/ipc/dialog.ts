@@ -26,10 +26,11 @@ const SAVE_FILE_OPTIONS: Omit<Electron.SaveDialogOptions, 'defaultPath'> = {
 const TOO_LARGE = `drawing exceeds ${MAX_DRAWING_BYTES} bytes`
 
 /**
- * ONE DIALOG IN FLIGHT PER WINDOW, shared by every dialog this module opens (`inFlight`; windowless
- * senders share the `null` bucket): a second call while that window has a sheet up resolves
- * `{ cancelled: true }` — a benign no-op for the renderer, same as dismissing it — rather than
- * stacking another sheet or rejecting. Answers null when the guard refused, else the dialog result.
+ * ONE DIALOG IN FLIGHT PER WINDOW, shared by every dialog this module opens: a second call while
+ * that window has a sheet up resolves `{ cancelled: true }` — a benign no-op for the renderer,
+ * same as dismissing it — rather than stacking another sheet or rejecting. `BrowserWindow` is
+ * nullable because Electron says so, and a windowless sender simply shares one bucket. Answers
+ * null when the guard refused, else the dialog result.
  */
 async function showOnce<T>(e: IpcMainInvokeEvent, inFlight: Set<BrowserWindow | null>, show: (win: BrowserWindow | null) => Promise<T>): Promise<T | null> {
   const win = BrowserWindow.fromWebContents(e.sender)

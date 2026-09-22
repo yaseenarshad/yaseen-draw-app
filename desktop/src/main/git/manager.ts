@@ -1,4 +1,4 @@
-import type { GithubSyncStatus, VaultConfigChange, WatchEvent } from '@shared/types'
+import type { GithubSyncConfig, GithubSyncStatus, VaultConfigChange, WatchEvent } from '@shared/types'
 import { isRecord } from '@shared/guards'
 
 /**
@@ -350,7 +350,7 @@ export function createGitSync(host: GitSyncHost): GitSyncManager {
     },
 
     async setEnabled(root, enabled) {
-      await host.writeConfig(root, GITHUB_SYNC_FILE, { enabled } satisfies { enabled: boolean })
+      await host.writeConfig(root, GITHUB_SYNC_FILE, { enabled } satisfies GithubSyncConfig)
       if (!enabled) {
         drop(root)
         const off: GithubSyncStatus = { root, state: 'off', enabled: false }

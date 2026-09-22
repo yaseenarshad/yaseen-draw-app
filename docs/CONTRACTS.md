@@ -33,7 +33,7 @@ nothing to do with each other. A bare `D3` would be unresolvable, so there are n
 | `client/src/search/` | ⌘K title search and the one ranking matcher |
 | `client/vendor/` | the five vendored `yaseendraw-*-<forkCommit>.tgz` engine tarballs (🔒 YAZ-1775 D2) |
 | `desktop/` | the Electron shell: `src/main` (files, state, windows, menu, git sync), `src/preload` (the bridge) |
-| `shared/` | types and pure helpers imported by BOTH sides (`@shared/*`) |
+| `shared/` | types and pure helpers imported by BOTH sides (`@shared/*`); the contracts are grouped by domain under `shared/types/` behind the `@shared/types` barrel, so no consumer depends on the grouping |
 | `tools/` | `packEngine.mjs` (bump the vendored engine), `packDesktop.mjs` (electron-builder), `seedDemoVault.mjs` (the stress-test vault the behaviour checks run against); the pure halves of the last two live in `tools/lib/` beside their tests |
 | `docs/` | this file |
 | `thoughts/ledgers/` | continuity ledgers for in-flight work |
@@ -99,7 +99,7 @@ One kind, one extension.
 
 The renderer is sandboxed (`contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`).
 Its ONLY door to the machine is `window.yaseenDraw`, defined by `desktop/src/preload/index.ts`
-over the channels in `desktop/src/channels.ts`, typed by `YaseenDrawApi` in `shared/types.ts`.
+over the channels in `desktop/src/channels.ts`, typed by `YaseenDrawApi` in `shared/types/`.
 Every `ipcMain.handle` answers with an `Envelope<T>`: `{ ok: true, value }` or
 `{ ok: false, error }` carrying a structured `BridgeError` (`code`, `message`, optional `path` /
 `mtime`), which the preload rethrows. Electron flattens a thrown Error to its message, which is
@@ -226,7 +226,7 @@ FolderState {
 }
 ```
 
-`SettingsState.canvas` is `CanvasPrefs` (`shared/types.ts`, mapped by `shared/canvasPrefs.ts`) —
+`SettingsState.canvas` is `CanvasPrefs` (`shared/types/`, mapped by `shared/canvasPrefs.ts`) —
 the fourteen user-level canvas preferences 🔒 YAZ-1775 D9 took out of the engine's browser localStorage:
 
 ```ts
