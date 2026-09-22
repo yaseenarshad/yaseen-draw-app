@@ -46,6 +46,30 @@ describe('tree', () => {
     expect(all.some((p) => p.includes('.yaseendraw'))).toBe(false)
   })
 
+  it('carries `meta` for a stamped board and nothing for a legacy, misplaced-block, corrupt or non-drawing file (🔒 YAZ-1834 D6/D7)', async () => {
+    const block = { createdAt: 1600000000000, updatedAt: 1700000000000 }
+    const candidates: Array<[string, string]> = [
+      [path.join(root, 'stamped.excalidraw'), `${JSON.stringify({ yaseendraw: { ...block, cloudId: 'x' }, type: 'excalidraw', elements: [] }, null, 2)}\n`],
+      [path.join(root, 'legacy.excalidraw'), '{"type":"excalidraw","elements":[]}\n'],
+      [path.join(root, 'misplaced.excalidraw'), JSON.stringify({ type: 'excalidraw', elements: [], yaseendraw: block })],
+      [path.join(root, 'corrupt.excalidraw'), '{ not json'],
+      [path.join(root, 'empty.excalidraw'), ''],
+      [path.join(root, 'stamped.txt'), JSON.stringify({ yaseendraw: block })],
+    ]
+    try {
+      await Promise.all(candidates.map(([file, content]) => writeFile(file, content)))
+      const all = files(await tree(root))
+      const node = (name: string) => all.find((n) => n.name === name)
+      expect(node('stamped.excalidraw')).toMatchObject({ meta: block, size: candidates[0][1].length })
+      for (const name of ['legacy.excalidraw', 'misplaced.excalidraw', 'corrupt.excalidraw', 'empty.excalidraw', 'stamped.txt']) {
+        expect(node(name), name).toBeDefined()
+        expect(node(name), name).not.toHaveProperty('meta')
+      }
+    } finally {
+      await Promise.all(candidates.map(([file]) => rm(file, { force: true })))
+    }
+  })
+
   it('classifies a drawing by kind whatever the case, and lists every other file with kind null (YAZ-1577 D1)', async () => {
     const candidates = [
       [path.join(root, 'scene.EXCALIDRAW'), '{}', 'drawing'],
