@@ -1,38 +1,8 @@
 /*
- * The Components tab's styling (YAZ-1819): `excalidraw-app/components/SavedComponents.scss`
- * ported. The file was already flat CSS, so it travels close to as-is, with four differences: the
- * `saved-components-dialog` block is gone with the modal (the name prompt is a form inside the
- * panel), `__inline` is new (the rename field and the delete confirm live in the card), the
- * element-SVG preview rules are gone with the fallback that drew them, and `__placeholder` is new
- * — a card whose picture could not be read draws the same chequerboard the Images tab does rather
- * than a broken image. The custom properties are the ENGINE's: this panel renders inside the
- * engine's sidebar and follows its light/dark theme, not the shell's.
+ * The Components tab's own styling (YAZ-1819). What it SHARES with the other two tabs — the panel
+ * shell, the card chequerboard, the placeholder and the message boxes — is
+ * `drawings/canvasPanel.css`; the custom properties are the ENGINE's, for the reason stated there.
  */
-
-/* The menu items' `Rename <name>` suffix: read aloud, never drawn. Declared here rather than
-   borrowed from the engine's global sheet — this panel's markup may not depend on it. */
-.saved-components .visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-  border: 0;
-}
-
-.saved-components {
-  box-sizing: border-box;
-  color: var(--text-primary-color);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  height: 100%;
-  min-height: 0;
-  padding: 12px;
-}
 
 .saved-components__header {
   align-items: center;
@@ -331,20 +301,6 @@
 .saved-components__notice {
   background: var(--island-bg-color);
   border: 1px solid var(--default-border-color);
-  border-radius: 8px;
-  color: var(--text-secondary-color);
-  font-size: 11px;
-  line-height: 1.4;
-  padding: 8px;
-}
-
-.saved-components__error {
-  background: var(--color-danger-light);
-  border: 1px solid var(--color-danger);
-  border-radius: 8px;
-  color: var(--text-primary-color);
-  font-size: 11px;
-  padding: 8px;
 }
 
 .saved-components__sentinel {
