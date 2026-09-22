@@ -22,6 +22,7 @@ function installBridge() {
   const prevTabListeners = new Set<() => void>()
   const exportImageListeners = new Set<() => void>()
   const canvasBackgroundListeners = new Set<(color: string) => void>()
+  const exportDrawingListeners = new Set<() => void>()
   const sub = <T,>(set: Set<T>) =>
     vi.fn((l: T) => {
       set.add(l)
@@ -40,6 +41,7 @@ function installBridge() {
       onPrevTab: sub(prevTabListeners),
       onExportImage: sub(exportImageListeners),
       onCanvasBackground: sub(canvasBackgroundListeners),
+      onExportDrawing: sub(exportDrawingListeners),
     },
   }
   Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
@@ -55,7 +57,8 @@ function installBridge() {
     emitPrevTab: () => prevTabListeners.forEach((l) => l()),
     emitExportImage: () => exportImageListeners.forEach((l) => l()),
     emitCanvasBackground: (color: string) => canvasBackgroundListeners.forEach((l) => l(color)),
-    count: () => openFolderListeners.size + openRootListeners.size + searchListeners.size + switchVaultListeners.size + settingsListeners.size + toggleSidebarListeners.size + closeTabListeners.size + nextTabListeners.size + prevTabListeners.size + exportImageListeners.size + canvasBackgroundListeners.size,
+    emitExportDrawing: () => exportDrawingListeners.forEach((l) => l()),
+    count: () => openFolderListeners.size + openRootListeners.size + searchListeners.size + switchVaultListeners.size + settingsListeners.size + toggleSidebarListeners.size + closeTabListeners.size + nextTabListeners.size + prevTabListeners.size + exportImageListeners.size + canvasBackgroundListeners.size + exportDrawingListeners.size,
   }
 }
 
@@ -71,6 +74,7 @@ interface ProbeProps {
   onPrevTab: () => void
   onExportImage: () => void
   onCanvasBackground: (color: string) => void
+  onExportDrawing: () => void
 }
 
 function Probe(props: ProbeProps) {
@@ -88,7 +92,7 @@ afterEach(() => {
 describe('useMenuEvents', () => {
   it('routes menu gestures to the callbacks and unsubscribes on unmount', () => {
     const b = installBridge()
-    const handlers = { onOpenFolder: vi.fn(), onOpenRoot: vi.fn(), onSearch: vi.fn(), onSwitchVault: vi.fn(), onSettings: vi.fn(), onToggleSidebar: vi.fn(), onCloseTab: vi.fn(), onNextTab: vi.fn(), onPrevTab: vi.fn(), onExportImage: vi.fn(), onCanvasBackground: vi.fn() }
+    const handlers = { onOpenFolder: vi.fn(), onOpenRoot: vi.fn(), onSearch: vi.fn(), onSwitchVault: vi.fn(), onSettings: vi.fn(), onToggleSidebar: vi.fn(), onCloseTab: vi.fn(), onNextTab: vi.fn(), onPrevTab: vi.fn(), onExportImage: vi.fn(), onCanvasBackground: vi.fn(), onExportDrawing: vi.fn() }
     root = createRoot(document.createElement('div'))
     act(() => root?.render(<Probe {...handlers} />))
 
@@ -110,11 +114,13 @@ describe('useMenuEvents', () => {
     expect(handlers.onNextTab).toHaveBeenCalledTimes(1)
     act(() => b.emitPrevTab())
     expect(handlers.onPrevTab).toHaveBeenCalledTimes(1)
-    // 🔒 D10: the two items that left the canvas hamburger for the application menu.
+    // 🔒 D10: the items that left the canvas hamburger for the application menu, plus 🔒 D3's export.
     act(() => b.emitExportImage())
     expect(handlers.onExportImage).toHaveBeenCalledTimes(1)
     act(() => b.emitCanvasBackground('#fffce8'))
     expect(handlers.onCanvasBackground).toHaveBeenCalledWith('#fffce8')
+    act(() => b.emitExportDrawing())
+    expect(handlers.onExportDrawing).toHaveBeenCalledTimes(1)
 
     act(() => root?.unmount())
     root = null

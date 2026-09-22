@@ -42,7 +42,7 @@ const api: YaseenDrawApi = {
   },
   pickFolder: () => call(CH.dialogPickFolder),
   // The import picker (YAZ-1833): a native open-file dialog that answers the picked file's bytes.
-  dialog: { openDrawing: () => call(CH.dialogOpenFile) },
+  dialog: { openDrawing: () => call(CH.dialogOpenFile), saveDrawing: (req) => call(CH.dialogSaveFile, req) },
   watch: (root, listener) => {
     const id = crypto.randomUUID()
     const onEvent = (_e: unknown, msg: { id: string; ev: WatchEvent }) => {
@@ -95,6 +95,7 @@ const api: YaseenDrawApi = {
     // the focused window's active tab is a drawing.
     onExportImage: on<void>(CH.menuExportImage),
     onCanvasBackground: on<string>(CH.menuCanvasBackground),
+    onExportDrawing: on<void>(CH.menuExportDrawing),
   },
   // Deep links (E1, GRO-2171): main routes a yaseendraw:// URL to the best window.
   link: {

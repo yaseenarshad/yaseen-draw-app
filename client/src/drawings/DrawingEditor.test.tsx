@@ -19,7 +19,7 @@ import { DRAWING_COMMAND_EVENT, requestDrawingCommand, type DrawingCommand } fro
 
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),
-  api: { drawing: { load: vi.fn(), save: vi.fn() } },
+  api: { drawing: { load: vi.fn(), save: vi.fn() }, dialog: { saveDrawing: vi.fn() } },
 }))
 
 /** The engine stub: records what it was given and hands the host the two callbacks it owns. */
@@ -33,8 +33,10 @@ const surface = {
   refreshes: 0,
   /** How many times the tab-reveal handoff (🔒 YAZ-1812) put the keyboard in this canvas. */
   focuses: 0,
-  /** What the application menu's two items (🔒 D10) reached this canvas as. */
+  /** What the application menu's three canvas items (🔒 D10 / 🔒 D3) reached this canvas as. */
   commands: [] as DrawingCommand[],
+  /** What `exportScene()` answers — the standalone bytes the save sheet is offered (🔒 D3). */
+  exportedScene: '{"type":"excalidraw","elements":[],"files":{}}\n',
 }
 
 vi.mock('./ExcalidrawSurface', () => ({
@@ -60,6 +62,10 @@ vi.mock('./ExcalidrawSurface', () => ({
       setCanvasBackground: (color) => {
         surface.commands.push({ kind: 'canvas-background', color })
       },
+      exportScene: () => {
+        surface.commands.push({ kind: 'export-drawing' })
+        return surface.exportedScene
+      },
     } satisfies DrawingSurfaceApi)
     // The real engine renders this into its own top-right row; the stub just puts it on screen,
     // because WHERE the chips go is the surface's business and WHAT they say is the host's.
@@ -69,10 +75,12 @@ vi.mock('./ExcalidrawSurface', () => ({
 
 import { api } from '../api'
 import { _resetRenameContinuity, flushRenamedPath, retireDeletedPath } from '../lib/renameContinuity'
+import { BridgeRequestError } from '../api'
 import { BROKEN_DRAWING_DOCUMENT, DrawingEditor } from './DrawingEditor'
 
 const load = vi.mocked(api.drawing.load)
 const save = vi.mocked(api.drawing.save)
+const saveDrawing = vi.mocked(api.dialog.saveDrawing)
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const ROOT = '/vault'
@@ -150,6 +158,7 @@ beforeEach(() => {
   })
   load.mockResolvedValue(loaded())
   save.mockResolvedValue({ path: PATH, mtime: 200, size: 50, persisted: [] })
+  saveDrawing.mockReset().mockResolvedValue({ cancelled: true })
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -584,7 +593,7 @@ describe('chips and the canvas frame', () => {
     })
   })
 
-  it('claims the application menu`s two canvas commands on its own section (🔒 D10)', async () => {
+  it('claims the application menu`s three canvas commands on its own section (🔒 D10, 🔒 D3)', async () => {
     // The container IS this tab's workspace layer, which is what `requestDrawingCommand` selects.
     container.className = 'tabstack__layer'
     render()
@@ -592,7 +601,9 @@ describe('chips and the canvas frame', () => {
 
     expect(requestDrawingCommand({ kind: 'export-image' }, document.body)).toBe(true)
     expect(requestDrawingCommand({ kind: 'canvas-background', color: '#fffce8' }, document.body)).toBe(true)
-    expect(surface.commands).toEqual([{ kind: 'export-image' }, { kind: 'canvas-background', color: '#fffce8' }])
+    expect(requestDrawingCommand({ kind: 'export-drawing' }, document.body)).toBe(true)
+    await flush()
+    expect(surface.commands).toEqual([{ kind: 'export-image' }, { kind: 'canvas-background', color: '#fffce8' }, { kind: 'export-drawing' }])
   })
 
   it('ignores a command once the editor is gone — the listener goes with it', async () => {
@@ -602,6 +613,47 @@ describe('chips and the canvas frame', () => {
     act(() => root?.render(null))
     section.dispatchEvent(new CustomEvent(DRAWING_COMMAND_EVENT, { detail: { kind: 'export-image' } }))
     expect(surface.commands).toEqual([])
+  })
+
+  it('Export Drawing… offers the canvas`s standalone bytes under the BOARD`s name (🔒 D3, YAZ-1821)', async () => {
+    container.className = 'tabstack__layer'
+    const onNotice = vi.fn()
+    render({ onNotice })
+    await flush()
+    saveDrawing.mockResolvedValue({ path: '/Users/x/Desktop/Board.excalidraw' })
+
+    requestDrawingCommand({ kind: 'export-drawing' }, document.body)
+    await flush()
+    expect(saveDrawing).toHaveBeenCalledExactlyOnceWith({ defaultName: 'Board.excalidraw', content: surface.exportedScene })
+    expect(onNotice).toHaveBeenCalledWith('Exported to Board.excalidraw')
+    // 🔒 D3: the VAULT file is not touched — no save, no flush, nothing read back.
+    expect(save).not.toHaveBeenCalled()
+    expect(load).toHaveBeenCalledTimes(1)
+  })
+
+  it('a dismissed export sheet says nothing at all', async () => {
+    container.className = 'tabstack__layer'
+    const onNotice = vi.fn()
+    render({ onNotice })
+    await flush()
+    saveDrawing.mockResolvedValue({ cancelled: true })
+
+    requestDrawingCommand({ kind: 'export-drawing' }, document.body)
+    await flush()
+    expect(onNotice).not.toHaveBeenCalled()
+  })
+
+  it('a refused export is a passive notice, and the board carries on', async () => {
+    container.className = 'tabstack__layer'
+    const onNotice = vi.fn()
+    render({ onNotice })
+    await flush()
+    saveDrawing.mockRejectedValue(new BridgeRequestError('IO_ERROR', 'disk is full'))
+
+    requestDrawingCommand({ kind: 'export-drawing' }, document.body)
+    await flush()
+    expect(onNotice).toHaveBeenCalledWith('disk is full', 'error')
+    expect(chips()).not.toContain(BROKEN_DRAWING_DOCUMENT)
   })
 
   it('hands the surface the shell`s canvas prefs to seed the scene with (🔒 D9)', async () => {

@@ -319,10 +319,37 @@ export type OpenDrawingResponse =
       cancelled: true
     }
 
+/**
+ * The native SAVE dialog and the write behind it (🔒 D3, YAZ-1821): File › Export Drawing… writes
+ * a standalone `.excalidraw` — every image embedded — somewhere the user picks, which is by
+ * definition outside the vault. It is one door rather than "pick a path, then write it", because a
+ * renderer holding an arbitrary absolute path it may write to is exactly what the fs layer's
+ * root-relative rules exist to prevent: here the only path that is ever written is the one the
+ * user just typed into a native sheet.
+ */
+export interface SaveDrawingRequest {
+  /** The name the sheet opens on, extension included (`<board name>.excalidraw`). */
+  defaultName: string
+  /** The bytes to write, atomically (tmp + rename), once the user has picked. */
+  content: string
+}
+
+export type SaveDrawingResponse =
+  | {
+      /** Absolute path of the file that was written. */
+      path: string
+    }
+  | {
+      /** The user dismissed the dialog; nothing was written. */
+      cancelled: true
+    }
+
 /** Native file dialogs that answer a DOCUMENT rather than a folder (`pickFolder()` predates this namespace). */
 export interface DialogApi {
   /** Pick one `.excalidraw` and get its bytes back; `{ cancelled: true }` when dismissed (YAZ-1833). */
   openDrawing(): Promise<OpenDrawingResponse>
+  /** Pick a destination and write a standalone `.excalidraw` there (🔒 D3, YAZ-1821). */
+  saveDrawing(req: SaveDrawingRequest): Promise<SaveDrawingResponse>
 }
 
 // ---------- watch(root, listener) ----------
@@ -1182,6 +1209,12 @@ export interface MenuApi {
    * canvas value that IS per board. Same enablement rule as Export Image…. Returns an unsubscribe.
    */
   onCanvasBackground(listener: (color: string) => void): () => void
+  /**
+   * File › Export Drawing… (⌘⇧S, 🔒 D3, YAZ-1821) targeted this window: the VISIBLE drawing
+   * assembles a standalone `.excalidraw` with every image embedded and offers it to a save sheet.
+   * Same enablement rule as Export Image…. Returns an unsubscribe.
+   */
+  onExportDrawing(listener: () => void): () => void
 }
 
 /**

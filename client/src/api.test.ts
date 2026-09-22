@@ -55,6 +55,23 @@ describe('api', () => {
     expect(bridge.createFile).toHaveBeenCalledWith('/v/n.excalidraw')
   })
 
+  it('the file dialogs delegate and answer what the user chose (YAZ-1833 / 🔒 D3 YAZ-1821)', async () => {
+    const dialog = { openDrawing: vi.fn(), saveDrawing: vi.fn() }
+    Object.defineProperty(window.yaseenDraw, 'dialog', { value: dialog, configurable: true })
+    const picked = { path: '/x/a.excalidraw', name: 'a', content: '{}' }
+    dialog.openDrawing.mockResolvedValue(picked)
+    await expect(api.dialog.openDrawing()).resolves.toEqual(picked)
+    const req = { defaultName: 'Board.excalidraw', content: '{"type":"excalidraw"}' }
+    dialog.saveDrawing.mockResolvedValue({ path: '/x/Board.excalidraw' })
+    await expect(api.dialog.saveDrawing(req)).resolves.toEqual({ path: '/x/Board.excalidraw' })
+    expect(dialog.saveDrawing).toHaveBeenCalledWith(req)
+    // A refusal arrives as plain data and comes back as the class.
+    dialog.saveDrawing.mockRejectedValue({ code: 'IO_ERROR', message: 'disk is full' })
+    const err = (await api.dialog.saveDrawing(req).catch((e: unknown) => e)) as BridgeRequestError
+    expect(err).toBeInstanceOf(BridgeRequestError)
+    expect(err.code).toBe('IO_ERROR')
+  })
+
   it('the drawing document doors pass their request through and answer the receipt (🔒 YAZ-1810)', async () => {
     const drawing = { load: vi.fn(), save: vi.fn(), libraryFolder: vi.fn() }
     Object.defineProperty(window.yaseenDraw, 'drawing', { value: drawing, configurable: true })

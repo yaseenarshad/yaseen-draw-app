@@ -291,6 +291,7 @@ export function App() {
   // in front. Main greys both items out off a drawing tab, so a miss here is already impossible.
   const exportImage = useCallback(() => void requestDrawingCommand({ kind: 'export-image' }), [])
   const setCanvasBackground = useCallback((color: string) => void requestDrawingCommand({ kind: 'canvas-background', color }), [])
+  const exportDrawing = useCallback(() => void requestDrawingCommand({ kind: 'export-drawing' }), [])
   useMenuEvents({
     onOpenFolder: pick,
     onOpenRoot: openRoot,
@@ -303,6 +304,7 @@ export function App() {
     onPrevTab: prevTab,
     onExportImage: exportImage,
     onCanvasBackground: setCanvasBackground,
+    onExportDrawing: exportDrawing,
   })
 
   // Deep links (E1, GRO-2171): a routed link behaves like a sidebar click (Tabs rule 10) —
@@ -559,6 +561,7 @@ export function App() {
                   onCanvasPrefsChange={changeCanvasPrefs}
                   canvasPanel={settings.canvasPanel}
                   onCanvasPanelChange={changeCanvasPanel}
+                  onNotice={notify}
                 />
               </div>
             ))}

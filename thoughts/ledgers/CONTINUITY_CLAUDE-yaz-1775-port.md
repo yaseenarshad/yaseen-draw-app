@@ -49,9 +49,9 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
   - [x] 3C — Components tab: Saved Components as library files (YAZ-1819)
   - [x] 3C1 — Import JSON into the components library (YAZ-1833)
   - [x] 3D — Present tab: presentation sidebar and player (YAZ-1820)
-- Now: [→] 3E — Export menu: PNG, SVG, standalone `.excalidraw` (YAZ-1821)
+  - [x] 3E — Export menu: PNG, SVG, standalone `.excalidraw` (YAZ-1821)
+- Now: [→] 4A — Prove the image-heavy board round trip through quit, relaunch, sync and clone (YAZ-1823)
 - Remaining:
-  - [ ] 4A — Prove the image-heavy board round trip through quit, relaunch, sync and clone (YAZ-1823)
   - [ ] 4B — Prove windows, tabs, favorites, vault switcher and same-board-in-two-windows (YAZ-1824)
   - [ ] 4C — Prove Image Studio, Components and Present online and offline (YAZ-1825)
   - [ ] 4D — Release workflow renamed and a local DMG install verified (YAZ-1826)
@@ -66,8 +66,19 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 - UNCONFIRMED (posted on YAZ-1815, awaiting Yasin): where a drawing outside EVERY open vault should open. 2I kept the shipped E1 rule — a NEW window rooted at the file's parent folder — rather than repointing the focused window's vault, which would discard its tabs and would need a main→renderer "switch vault and open this" message that does not exist. Documented in CONTRACTS as built.
 - RESOLVED (🔒 on YAZ-1775, with the phase-2 merge): the rename CONFIRM sheet is **deleted** — with wikilinks gone it warned about nothing, and "New drawing" landing on the inline rename field made every new `Untitled` board trip it. `ConfirmRename.tsx`/`.test.tsx` and App's `requestRename` detour are gone; rename commits on Enter. Delete and move keep their confirms. First commit of phase 3.
 
-## Learnings (2D / 2E / 2F / 2G / 2H / 2I / 3A / 3B / 3C / 3C1 / 3D)
+## Learnings (2D / 2E / 2F / 2G / 2H / 2I / 3A / 3B / 3C / 3C1 / 3D / 3E)
 
+- **A save dialog and its write are ONE door.** Splitting them would hand the renderer an arbitrary
+  absolute path it may write to, which is exactly what the fs layer's root-relative rules exist to
+  prevent. `dialog:save-file` shows the sheet and does the atomic write in the same call, and
+  re-checks the extension afterwards because a name can be typed freely into a sheet.
+- **Export reads the ENGINE's files map, not the store's.** The store knows what is in `assets/`;
+  only the engine holds that plus everything pasted or inserted and not yet saved. An export off
+  the store would silently drop the second half.
+- **Filter the deleted elements' bytes yourself, even though the engine does too.** An undo leaves
+  an image's bytes in the map long after its element is gone; `referencedFileIds` is the same rule
+  2E's save uses, so the two can never disagree, and `serializeAsJSON(…, 'local')` filtering again
+  is idempotent redundancy rather than a second opinion.
 - **The player cannot live in the tab that starts it.** A `Sidebar.Tab` body is unmounted the
   moment the panel closes, and closing the panel is the FIRST thing Play does. So `Play` goes up
   to `ExcalidrawSurface`, which mounts the player as a sibling of `<Excalidraw>`.

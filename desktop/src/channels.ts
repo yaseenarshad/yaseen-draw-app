@@ -31,6 +31,9 @@ export const CH = {
   // Import JSON. It answers the picked file's BYTES, because that file lives outside the vault
   // and no other channel reads an arbitrary absolute path.
   dialogOpenFile: 'dialog:open-file',
+  // The native SAVE dialog plus the write behind it (🔒 D3, YAZ-1821): File › Export Drawing…
+  // writes a standalone `.excalidraw` OUTSIDE the vault, which is why it is not `fs:write`.
+  dialogSaveFile: 'dialog:save-file',
   watchSubscribe: 'watch:subscribe',
   watchUnsubscribe: 'watch:unsubscribe',
   watchEvent: 'watch:event',
@@ -60,6 +63,8 @@ export const CH = {
   // The two canvas gestures that left the engine's own menu (🔒 D10): they reach the focused
   // window's renderer, which routes them to the VISIBLE drawing layer.
   menuExportImage: 'menu:export-image',
+  // File › Export Drawing… (🔒 D3, YAZ-1821): same gating and same delivery as `menu:export-image`.
+  menuExportDrawing: 'menu:export-drawing',
   menuCanvasBackground: 'menu:canvas-background',
   linkOpenFile: 'link:open-file',
   linkNotice: 'link:notice',
