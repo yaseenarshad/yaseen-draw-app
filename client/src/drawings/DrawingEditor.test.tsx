@@ -74,7 +74,7 @@ vi.mock('./ExcalidrawSurface', () => ({
 }))
 
 import { api } from '../api'
-import { _resetRenameContinuity, flushRenamedPath, retireDeletedPath } from '../lib/renameContinuity'
+import { _resetRenameContinuity, flushRenamedPath, retirePath } from '../lib/renameContinuity'
 import { BridgeRequestError } from '../api'
 import { BROKEN_DRAWING_DOCUMENT, DrawingEditor } from './DrawingEditor'
 
@@ -304,7 +304,7 @@ describe('autosave', () => {
     emit(1)
     emit(2)
     save.mockClear()
-    act(() => retireDeletedPath(PATH))
+    act(() => retirePath(PATH))
     act(() => root?.unmount())
     root = null
     await flush()

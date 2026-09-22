@@ -304,7 +304,6 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasPrefs, 
         flush: async () => {
           if (!retired.current) await autosave.current?.flush()
         },
-        capture: () => null,
         retire: () => {
           retired.current = true
           autosave.current?.dispose()

@@ -499,10 +499,10 @@ describe('App rename push (Links E1, GRO-2194)', () => {
     expect(bridge.window.setIdentity).not.toHaveBeenCalled()
   })
 
-  it('carries the dirty buffer BEFORE the workspace repair, and a dir rename remaps every open tab under the folder', async () => {
+  it('retires the old editor BEFORE the workspace repair, and a dir rename remaps every open tab under the folder', async () => {
     const order: string[] = []
-    const carry = vi.spyOn(continuity, 'carryEditorAcrossRename').mockImplementation(() => void order.push('carry'))
-    const carryDir = vi.spyOn(continuity, 'carryEditorsAcrossDirRename')
+    const retire = vi.spyOn(continuity, 'retirePath').mockImplementation(() => void order.push('retire'))
+    const retireDirSpy = vi.spyOn(continuity, 'retireDir')
     const { bridge, el, emitFileRenamed } = await mount(defaultAppState(), {
       id: 'w1',
       root: '/v',
@@ -511,18 +511,18 @@ describe('App rename push (Links E1, GRO-2194)', () => {
     })
     vi.mocked(bridge.window.setIdentity).mockImplementation(async () => void order.push('workspace'))
     await act(async () => emitFileRenamed('/v/Docs/a.excalidraw', '/v/Docs/b.excalidraw', 'file'))
-    expect(order).toEqual(['carry', 'workspace'])
+    expect(order).toEqual(['retire', 'workspace'])
     expect(el.querySelector('[data-editor]')?.getAttribute('data-path')).toBe('/v/Docs/b.excalidraw')
 
     // A `dir` event is a PREFIX remap: every open editor and tab under the folder follows.
     await act(async () => emitFileRenamed('/v/Docs', '/v/Notes', 'dir'))
-    expect(carryDir).toHaveBeenCalledWith('/v/Docs', '/v/Notes')
+    expect(retireDirSpy).toHaveBeenCalledWith('/v/Docs')
     expect(el.querySelector('[data-editor]')?.getAttribute('data-path')).toBe('/v/Notes/b.excalidraw')
     expect(bridge.window.setIdentity).toHaveBeenLastCalledWith({
       tabs: ['/v/Notes/b.excalidraw', '/v/x.excalidraw'],
       file: '/v/Notes/b.excalidraw',
     })
-    carry.mockRestore()
+    retire.mockRestore()
   })
 })
 
@@ -952,7 +952,7 @@ describe('App root-missing (C2, GRO-2164)', () => {
 describe('in-app delete (GRO-2272)', () => {
   it('retires the editor BEFORE remapping the workspace — asserted by call order, not by reading the code', async () => {
     const order: string[] = []
-    const retireSpy = vi.spyOn(continuity, 'retireDeletedPath').mockImplementation(() => void order.push('retire'))
+    const retireSpy = vi.spyOn(continuity, 'retirePath').mockImplementation(() => void order.push('retire'))
     const b = installBridge(defaultAppState(), { id: 'w1', root: '/v', file: '/v/a.excalidraw', tabs: ['/v/a.excalidraw', '/v/b.excalidraw'] })
     await storage.init()
     container = document.createElement('div')
@@ -974,7 +974,7 @@ describe('in-app delete (GRO-2272)', () => {
   })
 
   it('a dir event retires and closes every tab under the folder', async () => {
-    const retireDir = vi.spyOn(continuity, 'retireDeletedDir')
+    const retireDir = vi.spyOn(continuity, 'retireDir')
     const b = await mount(defaultAppState(), { id: 'w1', root: '/v', file: '/v/Docs/a.excalidraw', tabs: ['/v/Docs/a.excalidraw', '/v/x.excalidraw'] })
     await act(async () => b.emitFileDeleted('/v/Docs', 'dir'))
     expect(retireDir).toHaveBeenCalledWith('/v/Docs')
