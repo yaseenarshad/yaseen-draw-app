@@ -159,6 +159,10 @@
   flex-direction: column;
 }
 
-.tabstack__layer--hidden {
-  visibility: hidden;
+/* Hides EVERY descendant (🔒 YAZ-1862): the engine forces its footer buttons back to
+   `visibility: visible`, which a plain hidden parent loses to — a background tab's zoom label
+   would paint over the active one and take its clicks. `!important` because we do not own that rule. */
+.tabstack__layer--hidden,
+.tabstack__layer--hidden * {
+  visibility: hidden !important;
 }
