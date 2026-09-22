@@ -34,12 +34,6 @@
   height: 100%;
 }
 
-/* The frame held while the engine chunk is still arriving: the same box, painted by nothing. */
-.drawing-editor__loading {
-  width: 100%;
-  height: 100%;
-}
-
 /* ---------- the status chips, in the engine's top-right row ---------- */
 
 .editor--drawing .excalidraw .drawing-editor__top-right {
@@ -229,41 +223,12 @@
   width: 2rem;
 }
 
-/* ---------- Engine parity: the two `excalidraw-app/index.scss` rules that survive (🔒 R3) ----------
-   Tool key hints need no override: the fork hides `.ToolIcon__keybinding` only under
-   `.App-toolbar--compact` (`Toolbar.scss`), and this app never shows that mode (⚡ R4/R5). */
-
-/* The Chubb-illusion offset of the primary colour, both themes (`index.scss:3-7`). */
+/* ---------- Engine parity: the one `excalidraw-app/index.scss` rule that survives (🔒 YAZ-1775 R3) ----------
+   The Chubb-illusion offset of the primary colour, both themes (`index.scss:3-7`). */
 .editor--drawing .excalidraw {
   --color-primary-contrast-offset: #625ee0;
 }
 
 .editor--drawing .excalidraw.theme--dark {
   --color-primary-contrast-offset: #726dff;
-}
-
-/* The engine's own transient banners sit under the toolbar, centred (`index.scss:57-79`). */
-.editor--drawing .excalidraw .alert {
-  pointer-events: none;
-  position: absolute;
-  top: 6.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  text-align: center;
-  line-height: 1.5;
-  border-radius: var(--border-radius-md);
-  z-index: 6;
-  white-space: pre;
-}
-
-.editor--drawing .excalidraw .alert--warning {
-  background-color: var(--color-warning);
-  color: var(--color-text-warning);
-}
-
-.editor--drawing .excalidraw .alert--danger {
-  background-color: var(--color-danger-dark);
-  color: var(--color-danger-text);
 }

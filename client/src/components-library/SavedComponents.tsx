@@ -325,7 +325,7 @@ export function SavedComponents({ engine, excalidrawAPI, hasSelection }: SavedCo
         >
           <label>
             Name
-            {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the button that opened this form is the only way here */}
+            {/* Autofocused: the button that opened this form is the only way here. */}
             <input autoFocus value={name} maxLength={120} required aria-label="Component name" placeholder="Name this component" onChange={(event) => setName(event.target.value)} />
           </label>
           <div className="saved-components__naming-actions">
@@ -421,7 +421,7 @@ export function SavedComponents({ engine, excalidrawAPI, hasSelection }: SavedCo
                       commitRename(item)
                     }}
                   >
-                    {/* eslint-disable-next-line jsx-a11y/no-autofocus -- opened by the menu item above */}
+                    {/* Autofocused: the menu item above is the only way here. */}
                     <input autoFocus value={renameValue} maxLength={120} aria-label={`Rename ${item.name}`} onChange={(event) => setRenameValue(event.target.value)} />
                     <button type="submit">Save</button>
                     <button type="button" onClick={() => setRenamingSlug(null)}>
