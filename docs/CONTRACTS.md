@@ -113,6 +113,7 @@ Electron flattens a thrown Error to its message, which is why failure travels as
 | `drawing.libraryFolder()` | `drawing:library-folder` | the RESOLVED library folder — the setting, or `<userData>/library` (🔒 D5) |
 | `pickFolder()` | `dialog:pick-folder` | the native open-directory dialog |
 | `dialog.openDrawing()` | `dialog:open-file` | the native OPEN-FILE dialog, `.excalidraw` filter → `{ path, name, content }` or `{ cancelled: true }`; the bytes come back because the picked file is outside the vault |
+| `dialog.saveDrawing(req)` | `dialog:save-file` | the native SAVE sheet AND the atomic write behind it → `{ path }` or `{ cancelled: true }`; the only path ever written is the one the user just typed |
 | `watch(root, cb)` | `watch:*` | chokidar under the root; `ready` / `change` / `add` / `unlink` / `error` |
 | `file.rename(req)` | `fs:rename` | same-parent rename or a move; never overwrites |
 | `file.delete(req)` | `fs:delete` | `shell.trashItem` ONLY — never `fs.rm`, no permanent fallback |
@@ -124,7 +125,7 @@ Electron flattens a thrown Error to its message, which is why failure travels as
 | `window.identity` / `setIdentity` | `window:*` | THIS window's `WindowEntry`, by the `?win=<id>` in its URL |
 | `window.open` / `duplicate` / `openRecent` / `closeSelf` / `zoom` | `window:*` | window lifecycle |
 | `window.onFlush` | `app:flush` / `app:flushed` | the close/quit handshake (main waits, 5s cap) |
-| `menu.on*` | `menu:*` | Open Folder…, Open Recent, Search Vault, Switch Vault…, Settings…, Toggle Sidebar, Close Tab, Next/Previous Tab, Export Image…, Canvas Background |
+| `menu.on*` | `menu:*` | Open Folder…, Open Recent, Search Vault, Switch Vault…, Settings…, Toggle Sidebar, Close Tab, Next/Previous Tab, Export Image…, Export Drawing…, Canvas Background |
 | `link.onOpenFile` / `onNotice` | `link:*` | a routed `yaseendraw://` link |
 | `favorites.get` / `set` / `onChanged` | `favorites:*` | `<vault>/.yaseendraw/favorites.json` |
 | `media.favorites(req)` | `media:favorites` | `{ op: 'list' }` · `{ op: 'add', item }` · `{ op: 'remove', itemKey }` over `<library>/media.json` (🔒 D5); every verb answers the resulting list |
@@ -533,6 +534,7 @@ never silently do nothing).
 | File | Open Recent ▸ | — (⌥-click an entry opens it beside this window) |
 | File | Search Vault | ⌘K |
 | File | Export Image… (a drawing tab only) | ⌘⇧E |
+| File | Export Drawing… (a drawing tab only) | ⌘⇧S |
 | File | Close Tab | ⌘W |
 | File | Close Window | ⌘⇧W |
 | Edit | Undo / Redo / Cut / Copy / Paste / Select All | stock roles |
@@ -546,15 +548,46 @@ never silently do nothing).
 Zoom is deliberately NOT the stock roles: a registered accelerator never reaches the page on
 macOS, so main applies the step to the focused window's `webContents` itself.
 
-Export Image… and Canvas Background are the canvas's own two items, moved out of the engine's main
-menu by 🔒 D10 (there is no `<MainMenu>` in a drawing and the engine's stock trigger is hidden).
-Main enables them only while the window a menu action would target has a `.excalidraw` in front,
-rebuilding the menu when any window's active file changes and when focus moves between windows.
-Each is pushed to that window's renderer, which dispatches it as a DOM event on the VISIBLE
-drawing layer (`client/src/drawings/drawingCommand.ts`) — several tabs are mounted at once, each
-with its own engine, so a prop or a `window` listener would reach the wrong canvas. The drawing
-then calls the engine's own door: `openDialog: { name: 'imageExport' }`, or `viewBackgroundColor`,
-which the engine writes into the file.
+Export Image…, Export Drawing… and Canvas Background are the canvas's own three items, moved out
+of the engine's main menu by 🔒 D10 (there is no `<MainMenu>` in a drawing and the engine's stock
+trigger is hidden). Main enables them only while the window a menu action would target has a
+`.excalidraw` in front, rebuilding the menu when any window's active file changes and when focus
+moves between windows. Each is pushed to that window's renderer, which dispatches it as a DOM
+event on the VISIBLE drawing layer (`client/src/drawings/drawingCommand.ts`) — several tabs are
+mounted at once, each with its own engine, so a prop or a `window` listener would reach the wrong
+canvas. The drawing then calls the engine's own door: `openDialog: { name: 'imageExport' }` (the
+engine's PNG / SVG export dialog), or `viewBackgroundColor`, which the engine writes into the
+file — or, for Export Drawing…, the assembly below.
+
+### Export Drawing… (🔒 D3, YAZ-1821)
+
+**🔒 D3 says the vault file never embeds, and that export is the one place that does.** A board in
+a vault is a lean scene (`files: {}`) beside a shared `<vault>/assets/` folder, because embedding
+base64 makes multi-MB files that git rewrites on every save. A file being handed to someone else
+has no `assets/` folder to point at, so Export Drawing… writes a STANDALONE `.excalidraw` with
+every image it uses embedded — the file upstream Excalidraw and excalidraw.com open with its
+pictures intact. Sharing links and view-only tokens are not ported; this is the sharing story.
+
+- **The renderer assembles it** (`client/src/drawings/exportDrawing.ts`):
+  `serializeAsJSON(elements, appState, files, 'local')` — the library's own writer, the same one
+  the vault save uses — over the **full canvas files map**: everything 2E hydrated out of `assets/`
+  at load, plus anything pasted, imported or inserted since and not yet saved. The engine's live
+  map is the only place all of it is in one piece.
+- **Files only deleted elements name are not sent.** An undo can leave an image's bytes in the
+  engine's map long after the element is gone, and shipping them would put a deleted picture inside
+  a file about to be handed to someone. The filter is `referencedFileIds`, the same rule 2E's save
+  path uses; `serializeAsJSON(…, 'local')` filters again (`filterOutDeletedFiles`) — belt and
+  braces, and idempotent.
+- **Main owns the sheet and the write.** `dialog:save-file` shows the save dialog (default name
+  `<board name>.excalidraw`, `.excalidraw` filter) and then writes atomically, in the same call.
+  One door rather than "pick a path, then write it": a renderer holding an arbitrary absolute path
+  it may write to is what the fs layer's root-relative rules exist to prevent, so the only path
+  ever written is the one the user has just typed into a native sheet. The extension is enforced
+  after the sheet, because a name can be typed freely.
+- **The vault file is not touched.** An export reads nothing from the vault, writes nothing into
+  it, and does not flush the autosave: exporting a dirty board exports what is on the canvas, and
+  the board's own save timer carries on. Where it landed, or why it did not, is the window's one
+  passive notice.
 
 **Focus on tab reveal** (🔒 the focus-handoff decision on YAZ-1812). Several tabs are mounted at
 once; the canvas has `autoFocus`, but that fires only at mount, so switching to an

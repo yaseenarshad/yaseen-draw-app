@@ -141,7 +141,8 @@
  * §4 AppMainMenu ITEMS, ONE BY ONE — where each one went
  *   LoadScene                     DROPPED — `loadScene: false`; the file is the document
  *   SaveToActiveFile              DROPPED — autosave owns the file
- *   Export                        PORTED via 3E — the shell's own Export menu (PNG / SVG / .excalidraw)
+ *   Export                        PORTED via 3E — File › Export Drawing… ⌘⇧S → `menu:export-drawing`
+ *                                           → `exportScene()` below → the main save dialog
  *   SaveAsImage                   PORTED via 🔒 D10 — File › Export Image… ⌘⇧E → `menu:export-image`
  *                                           → `openImageExport()` below
  *   LiveCollaborationTrigger      DROPPED — collab
@@ -243,6 +244,7 @@ import { applyToolbarMode, loadExcalidraw, YASEEN_FULL_TOOLBAR_MODE, type Excali
 import { yaseenFormFactor } from './formFactor'
 import { applyFramesVisibility } from './framesVisibility'
 import { createLauncherStore, LauncherRail } from './LauncherRail'
+import { assembleStandaloneScene } from './exportDrawing'
 import { PresentationPlayer } from './presentation/PresentationPlayer'
 
 type ExcalidrawProps = ComponentProps<ExcalidrawModule['Excalidraw']>
@@ -281,6 +283,12 @@ export interface DrawingSurfaceApi {
    * writes into the file. The one canvas value that is per BOARD rather than per user.
    */
   setCanvasBackground(color: string): void
+  /**
+   * File › Export Drawing… (🔒 D3, YAZ-1821): the canvas as a STANDALONE `.excalidraw` — the whole
+   * live files map, minus what only deleted elements name, embedded in the JSON. This is the one
+   * place this app embeds; `serialize()` above is the lean vault form and is untouched by it.
+   */
+  exportScene(): string
   /**
    * Replace what the canvas shows (the file changed on disk under a clean editor). Returns the
    * version the engine will report for it — the host's new clean baseline. Computed from the
@@ -616,6 +624,15 @@ export function ExcalidrawSurface({
         focus: () => rootRef.current?.querySelector<HTMLElement>('.excalidraw-container')?.focus(),
         openImageExport: () => api.updateScene({ appState: { openDialog: { name: 'imageExport' } } as unknown as EngineAppState }),
         setCanvasBackground: (color) => api.updateScene({ appState: { viewBackgroundColor: color } as unknown as EngineAppState }),
+        // The FULL files map, straight off the engine: everything 2E hydrated out of `assets/` at
+        // load plus anything pasted or inserted since and not yet saved. The store's copy would be
+        // missing the second half.
+        exportScene: () =>
+          assembleStandaloneScene(mod, {
+            elements: api.getSceneElements() as readonly unknown[],
+            appState: api.getAppState() as unknown as Record<string, unknown>,
+            files: api.getFiles() as unknown as Record<string, unknown>,
+          }),
         replaceScene: (next) => {
           const restored = mod.restoreElements(next.elements as ChangeArgs[0], null)
           api.updateScene({ elements: restored })

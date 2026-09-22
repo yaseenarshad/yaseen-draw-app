@@ -23,6 +23,7 @@ const noopHandlers = (): MenuHandlers => ({
   prevTab: vi.fn(),
   toggleSidebar: vi.fn(),
   exportImage: vi.fn(),
+  exportDrawing: vi.fn(),
   canvasBackground: vi.fn(),
   openHelp: vi.fn(),
 })
@@ -175,6 +176,29 @@ describe('buildMenuTemplate', () => {
     expect(handlers.exportImage).toHaveBeenCalledTimes(1)
     // A non-drawing tab (or no tab at all) greys it out rather than letting it silently no-op.
     expect(menuOf(build(RECENTS, false, handlers, false), 'File').find((i) => i.id === 'menu.file.export-image')?.enabled).toBe(false)
+  })
+
+  it('File › Export Drawing… is ⌘⇧S, gated the same way, and calls exportDrawing (🔒 D3, YAZ-1821)', () => {
+    const handlers = noopHandlers()
+    const file = menuOf(build(RECENTS, false, handlers, true), 'File')
+    const item = file.find((i) => i.id === 'menu.file.export-drawing')
+    expect(item?.label).toBe('Export Drawing…')
+    expect(item?.accelerator).toBe('CmdOrCtrl+Shift+S')
+    expect(item?.enabled).toBe(true)
+    click(item)
+    expect(handlers.exportDrawing).toHaveBeenCalledTimes(1)
+    expect(menuOf(build(RECENTS, false, handlers, false), 'File').find((i) => i.id === 'menu.file.export-drawing')?.enabled).toBe(false)
+    // It sits beside the image export, and the two are not the same gesture.
+    expect(file.findIndex((i) => i.id === 'menu.file.export-drawing')).toBe(file.findIndex((i) => i.id === 'menu.file.export-image') + 1)
+  })
+
+  it('⌘⇧S is claimed by nothing else in the menu bar', () => {
+    const accelerators = build()
+      .flatMap((top) => (Array.isArray(top.submenu) ? (top.submenu as MenuItemConstructorOptions[]) : []))
+      .flatMap((item) => [item, ...(Array.isArray(item.submenu) ? (item.submenu as MenuItemConstructorOptions[]) : [])])
+      .map((item) => item.accelerator)
+      .filter((a): a is string => a !== undefined)
+    expect(accelerators.filter((a) => a === 'CmdOrCtrl+Shift+S')).toEqual(['CmdOrCtrl+Shift+S'])
   })
 
   it('View › Canvas Background carries the engine`s five picks, gated the same way (🔒 D10)', () => {
@@ -495,12 +519,16 @@ describe('createMenuHandlers', () => {
 
 // ---------- subscribeMenuRebuild ----------
 
-describe('createMenuHandlers — the two canvas gestures (🔒 D10)', () => {
-  it('exportImage and canvasBackground push to the focused renderer, colour and all', () => {
+describe('createMenuHandlers — the three canvas gestures (🔒 D10, 🔒 D3)', () => {
+  it('exportImage, exportDrawing and canvasBackground push to the focused renderer, colour and all', () => {
     const wc = { id: 7, send: vi.fn() }
     const { handlers } = makeHandlers(wc)
     handlers.exportImage()
     expect(wc.send).toHaveBeenCalledExactlyOnceWith(CH.menuExportImage)
+    wc.send.mockClear()
+    // Same gating and the same delivery as the image export — one channel apart.
+    handlers.exportDrawing()
+    expect(wc.send).toHaveBeenCalledExactlyOnceWith(CH.menuExportDrawing)
     wc.send.mockClear()
     handlers.canvasBackground('#fffce8')
     expect(wc.send).toHaveBeenCalledExactlyOnceWith(CH.menuCanvasBackground, '#fffce8')
@@ -510,6 +538,7 @@ describe('createMenuHandlers — the two canvas gestures (🔒 D10)', () => {
     const { handlers } = makeHandlers(undefined)
     expect(() => {
       handlers.exportImage()
+      handlers.exportDrawing()
       handlers.canvasBackground('#ffffff')
     }).not.toThrow()
   })
