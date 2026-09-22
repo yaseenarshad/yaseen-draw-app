@@ -22,6 +22,12 @@ import type { Store } from '../store'
 import { broadcastAll } from './broadcast'
 import { handle } from './envelope'
 
+/**
+ * The SHAPE guard only — "is this field a non-empty string" — because the request crosses IPC
+ * from a sandboxed renderer and arrives as `unknown`. What the value MEANS (a real slug, a usable
+ * name, a PNG dataURL) is the store's, which is the only layer that can answer it; the messages
+ * agree on purpose, so a caller cannot tell which layer refused.
+ */
 function requireString(v: unknown, field: string): string {
   if (typeof v !== 'string' || v === '') throw new BridgeFailure('BAD_REQUEST', `'${field}' must be a non-empty string`)
   return v

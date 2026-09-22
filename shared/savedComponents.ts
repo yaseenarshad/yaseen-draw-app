@@ -17,14 +17,12 @@
  * file outside the components folder (`drawingAssets.ts`'s `isValidFileId` posture, same reason).
  */
 import { COMPONENTS_INDEX_FILE, LIBRARY_COMPONENTS_DIR, MAX_COMPONENT_NAME_LENGTH, type ComponentItem, type ComponentsIndexFile } from './types'
-import { isFiniteNumber, isRecord } from './guards'
-
-export { COMPONENTS_INDEX_FILE, LIBRARY_COMPONENTS_DIR }
+import { cleanList, isFiniteNumber, isRecord } from './guards'
 
 /** The fragment's extension — a component IS an Excalidraw document, openable by anything. */
-export const COMPONENT_EXT = '.excalidraw'
+const COMPONENT_EXT = '.excalidraw'
 /** The preview's extension (🔒 YAZ-1775 D5). PNG, not the web app's WebP: every reader has one. */
-export const COMPONENT_PREVIEW_EXT = '.png'
+const COMPONENT_PREVIEW_EXT = '.png'
 
 /**
  * The longest slug a name may produce. A component name is free text — someone will paste a
@@ -33,7 +31,7 @@ export const COMPONENT_PREVIEW_EXT = '.png'
 export const MAX_COMPONENT_SLUG_LENGTH = 60
 
 /** What a name with nothing sluggable in it (non-latin, punctuation only, empty) becomes. */
-export const FALLBACK_COMPONENT_SLUG = 'component'
+const FALLBACK_COMPONENT_SLUG = 'component'
 
 export const EMPTY_COMPONENTS_INDEX: ComponentsIndexFile = { version: 1, items: [] }
 
@@ -100,7 +98,7 @@ export function normalizeComponentName(v: unknown): string | null {
 }
 
 /** One index row, whole or not at all — a half-read row would be a tile that cannot be opened. */
-export function normalizeComponentItem(v: unknown): ComponentItem | null {
+function normalizeComponentItem(v: unknown): ComponentItem | null {
   if (!isRecord(v)) return null
   const { slug, name, elementCount, createdAt, updatedAt } = v
   if (!isValidComponentSlug(slug) || typeof name !== 'string' || name === '') return null
@@ -115,15 +113,8 @@ export function normalizeComponentItem(v: unknown): ComponentItem | null {
  */
 export function sanitizeComponentsIndex(v: unknown): ComponentsIndexFile | null {
   if (!isRecord(v) || v.version !== 1 || !Array.isArray(v.items)) return null
-  const items: ComponentItem[] = []
-  const seen = new Set<string>()
-  for (const raw of v.items) {
-    const item = normalizeComponentItem(raw)
-    if (item === null || seen.has(item.slug)) continue
-    seen.add(item.slug)
-    items.push(item)
-  }
-  return { version: 1, items }
+  // One row per slug, the first wins — `guards.ts`'s one list rule; the index has no cap.
+  return { version: 1, items: cleanList(v.items, normalizeComponentItem, (item) => item.slug) }
 }
 
 /** What the folder itself says about one component, before the index has had its say. */

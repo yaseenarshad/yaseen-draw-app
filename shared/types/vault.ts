@@ -1,0 +1,119 @@
+/** What lives in a vault's own `.yaseendraw/`: its config files, its GitHub switch and its favorites. */
+
+import type { MAX_FAVORITES } from './appState'
+
+/**
+ * The `.obsidian/`-style dotfolder that travels with a vault, and THE one definition of its name
+ * (YAZ-861 — main's `vaultConfig.ts` and the client's `ensureHome.ts` each used to declare their
+ * own copy of the literal). Both sides read it from here: main joins paths under it, and the
+ * client probes it because its existence IS adoption (6C-, YAZ-849).
+ */
+export const VAULT_CONFIG_DIR = '.yaseendraw'
+
+/**
+ * Pushed to every window after a config file under `<root>/.yaseendraw/` changes — an own
+ * `vaultConfig.write` or an external edit (sync tools). Renderers filter by their own root,
+ * the same posture as `state:changed`, and re-read the named file.
+ */
+export interface VaultConfigChange {
+  root: string
+  /** Config file name inside `.yaseendraw/`, e.g. `github.json`. */
+  name: string
+}
+
+// ---------- GitHub sync (`<root>/.yaseendraw/github.json` — YAZ-1081) ----------
+
+/**
+ * The per-vault sync switch (YAZ-1081 D4), stored as `<root>/.yaseendraw/github.json` so it
+ * travels with the folder like every other vault-local setting. OFF by default and off for any
+ * shape that isn't exactly `{ enabled: true }` — a vault someone copies onto a second machine
+ * therefore syncs there too, and a corrupt or hand-edited file fails closed rather than starting
+ * background git work nobody asked for.
+ */
+export interface GithubSyncConfig {
+  enabled: boolean
+}
+
+/**
+ * Why a root is stuck, when it is. Each value is a DIFFERENT thing to say to the user, which is
+ * the whole reason the set is closed: `no-git` wants "install git" (the Command Line Tools on a Mac, Git for Windows on a PC),
+ * `no-identity` wants "set a name and email", `auth` wants "sign in again", `conflict` wants
+ * "two machines edited the same lines" (the lossless rule: the working tree was put back exactly
+ * as it was — see `git/sync.ts`), and `error` is the honest catch-all that carries a message.
+ */
+export type GithubSyncAttention = 'no-git' | 'no-identity' | 'auth' | 'conflict' | 'error'
+
+/**
+ * What a vault's sync is doing right now — one object per root, pushed on every transition.
+ *
+ * `off` is not a failure: it is a vault with sync disabled, or one that is not a repo, or a repo
+ * with no `origin`. `pending` means "there is work to do and it will happen" — edits waiting out
+ * the quiet period (D2 cadence) or a pass that found the network down and armed a retry — so it
+ * is the one non-terminal state the UI should show as calm rather than alarming.
+ */
+export interface GithubSyncStatus {
+  root: string
+  state: 'off' | 'synced' | 'pending' | 'syncing' | 'attention'
+  attention?: GithubSyncAttention
+  message?: string
+  /** Read-only repo facts for the settings panel; absent when they could not be read at all. */
+  repo?: { remoteUrl: string | null; branch: string | null }
+  /**
+   * Whether the per-vault SWITCH is on — i.e. the manager is running this root. Distinct from
+   * `state: 'off'`, which also covers not-a-repo and no-remote: a vault the user just enabled
+   * that has no remote yet is `enabled: true` + `state: 'off'`, and the settings switch reads
+   * THIS field so it never contradicts the click that set it. Stamped by the manager; absent
+   * on statuses that never passed through it (a bare `syncPass` call in tests).
+   */
+  enabled?: boolean
+}
+
+/**
+ * Per-vault GitHub sync as the renderer sees it (YAZ-1081, YAZ-1809). Four methods, because there are
+ * only four things a UI ever needs: what is this vault doing, do it now, turn it on or off, and
+ * tell me when it changes.
+ *
+ * Every call answers with the SAME `GithubSyncStatus` the push carries, so a caller never has to
+ * follow a mutation with a read. `status` is the cheap one — it answers from the manager's last
+ * broadcast without touching git, and for a root whose sync is OFF it falls back to a read-only
+ * inspection (remote + branch) so a settings panel can show the repo it would sync to.
+ */
+export interface GithubApi {
+  /** This root's current status; `off` for a vault with sync disabled, never a failure. */
+  status(root: string): Promise<GithubSyncStatus>
+  /** Run a pass NOW (the manual "sync" button). A pass already running is joined, never raced; `off` roots answer `off`. */
+  syncNow(root: string): Promise<GithubSyncStatus>
+  /**
+   * The per-vault switch (D4), written to `<root>/.yaseendraw/github.json`. Turning it ON waits
+   * for the first pass and answers with its real outcome — "synced", or what needs fixing —
+   * rather than an optimistic `syncing`; turning it OFF is immediate and total (no watcher, no
+   * timers, no passes).
+   */
+  setEnabled(root: string, enabled: boolean): Promise<GithubSyncStatus>
+  /** Fired in every window on every transition of any vault; filter by `status.root`. Returns an unsubscribe. */
+  onStatus(listener: (status: GithubSyncStatus) => void): () => void
+}
+
+
+// ---------- Favorites (`<root>/.yaseendraw/favorites.json` — YAZ-1766 6A, D11) ----------
+
+/** The file on disk: VAULT-RELATIVE POSIX paths in the user's order (`MAX_FAVORITES` at most). */
+export interface FavoritesConfig {
+  version: 1
+  favorites: string[]
+}
+
+/**
+ * The Favorites tab's list as `window.yaseenDraw.favorites` (YAZ-1766 6A): ABSOLUTE paths over
+ * `.yaseendraw/favorites.json`, so the list travels with the vault (D11). A malformed file reads
+ * as `[]` and rejects every `set` with `INVALID_CONFIG`, never overwritten (D12); `set` drops
+ * entries whose path is gone from disk (D14); in-app rename/delete repair the file in main (D13).
+ */
+export interface FavoritesApi {
+  /** Absolute paths in stored order; `[]` when the file is absent or malformed. Never creates anything. */
+  get(root: string): Promise<string[]>
+  /** Replace the list; every path must be inside `root` (→ `BAD_REQUEST`). Creates the dotfolder and file on first write. */
+  set(root: string, paths: readonly string[]): Promise<void>
+  /** Fired in every window after any change to a vault's favorites.json, own or external; filter by `root`. Returns an unsubscribe. */
+  onChanged(listener: (change: { root: string }) => void): () => void
+}
