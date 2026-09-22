@@ -144,7 +144,7 @@ export interface DrawingApi {
    * The RESOLVED library folder (🔒 YAZ-1775 D5): `SettingsState.libraryFolder`, or `<userData>/library`
    * when that is null. Only main knows where userData is, so only main can answer — the Settings
    * row shows what comes back. Main also makes sure the folder exists at startup, so the answer
-   * always names a real directory. Its CONTENTS (`media.json`, `components/`) are 3A/3B/3C's.
+   * always names a real directory. Its CONTENTS (`media.json`, `components/`) are YAZ-1817/YAZ-1818/YAZ-1819's.
    */
   libraryFolder(): Promise<string>
 }
@@ -495,7 +495,7 @@ export interface SettingsState {
    * account in the web app; per-vault storage would mean re-favouriting in every vault, and app
    * userData alone would never be backed up. A folder the user can point inside a synced vault is
    * both. `drawing.libraryFolder()` resolves it; null is the default, never `''`. Its contents
-   * (`media.json`, `components/`) are written by 3A / 3B / 3C.
+   * (`media.json`, `components/`) are written by YAZ-1817 / YAZ-1818 / YAZ-1819.
    */
   libraryFolder: string | null
   /**
@@ -679,7 +679,7 @@ export interface GithubSyncStatus {
 }
 
 /**
- * Per-vault GitHub sync as the renderer sees it (YAZ-1081, 2C). Four methods, because there are
+ * Per-vault GitHub sync as the renderer sees it (YAZ-1081, YAZ-1809). Four methods, because there are
  * only four things a UI ever needs: what is this vault doing, do it now, turn it on or off, and
  * tell me when it changes.
  *
@@ -751,7 +751,7 @@ export const isMediaItemKind = (v: unknown): v is MediaItemKind => MEDIA_ITEM_KI
  * and layout metadata the studio shows.
  *
  * `previewUrl` is stored but NEVER TRUSTED: a provider's CDN URL expires, and a stale one in a
- * file that syncs between machines would render a broken tile. 3B re-derives every preview it
+ * file that syncs between machines would render a broken tile. YAZ-1818 re-derives every preview it
  * shows from `provider` + `providerId` and treats this field as a hint at best.
  */
 export interface MediaItem {
@@ -794,8 +794,8 @@ export interface MediaLibraryFile {
 /** The library file's name inside the library folder. */
 export const MEDIA_LIBRARY_FILE = 'media.json'
 /**
- * `<library>/components/` (🔒 YAZ-1775 D5): where 3C writes a saved component's `.excalidraw` + `.png`.
- * Named here so nothing else claims it; 3A creates NOTHING — the folder appears on 3C's first write.
+ * `<library>/components/` (🔒 YAZ-1775 D5): where YAZ-1819 writes a saved component's `.excalidraw` + `.png`.
+ * Named here so nothing else claims it; YAZ-1817 creates NOTHING — the folder appears on YAZ-1819's first write.
  */
 export const LIBRARY_COMPONENTS_DIR = 'components'
 /** The components index beside that folder: `<library>/components.json` (🔒 YAZ-1775 D5, YAZ-1819). */
@@ -812,7 +812,7 @@ export type MediaRecentRequest = { op: 'list' } | { op: 'record'; item: MediaIte
 
 /**
  * The media library as `window.yaseenDraw.media` (🔒 YAZ-1775 D4 / D5, YAZ-1817). Pointers only: the
- * BYTES never travel through here (3B's `media:import` writes them into the vault's `assets/`).
+ * BYTES never travel through here (YAZ-1818's `media:import` writes them into the vault's `assets/`).
  * Every mutation answers the list it produced, so a caller that just wrote does not have to read
  * back — and `onChanged` still fires in every window, so the OTHER vaults' windows follow too.
  */
@@ -987,7 +987,7 @@ export interface SecretHasRequest {
   name: string
 }
 
-/** The name the Pixabay API key is stored under (🔒 YAZ-1775 D4); 3B reads it in main, never here. */
+/** The name the Pixabay API key is stored under (🔒 YAZ-1775 D4); YAZ-1818 reads it in main, never here. */
 export const PIXABAY_SECRET = 'pixabayApiKey'
 
 /**

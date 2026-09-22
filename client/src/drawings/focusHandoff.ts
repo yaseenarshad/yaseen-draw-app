@@ -1,5 +1,5 @@
 /**
- * Focus handoff on tab reveal (🔒 decided on YAZ-1812, built in 2I).
+ * Focus handoff on tab reveal (🔒 decided on YAZ-1812, built in YAZ-1815).
  *
  * The canvas has `autoFocus`, which is safe on a background tab — a hidden layer is
  * `visibility: hidden` and Chromium will not focus into one — but it fires only at MOUNT. Switch

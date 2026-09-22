@@ -264,7 +264,7 @@ them by value and then diverges; a global `state:changed` broadcast never moves 
 Settings and `sidebarWidth` are global and every window follows a change live.
 
 `SettingsState.libraryFolder` (🔒 YAZ-1775 D5) is the ONE folder every vault shares, where media favorites
-and saved components live (3A / 3B filled it; 3C adds `components/`): an absolute path the user picked, or null
+and saved components live (YAZ-1817 / YAZ-1818 filled it; YAZ-1819 adds `components/`): an absolute path the user picked, or null
 for `<userData>/library`. Only main can resolve null, so Settings asks through
 `drawing:library-folder`; main also `mkdir -p`s the folder at startup, so the row always names a
 directory that exists. A folder that cannot be created is still the answer — a launch must not
@@ -274,8 +274,8 @@ fail because a picked path has gone read-only.
 
 ```
 <library>/
-  media.json                      the media library — 3A (YAZ-1817)
-  components.json                 the saved-component index — 3C (YAZ-1819)
+  media.json                      the media library — YAZ-1817 (YAZ-1817)
+  components.json                 the saved-component index — YAZ-1819 (YAZ-1819)
   components/
     <slug>.excalidraw             one component: a whole Excalidraw document, images EMBEDDED
     <slug>.png                    its preview, bounded at 800 × 600
@@ -337,7 +337,7 @@ another search is `BAD_REQUEST`, never a silent restart.
 - **Previews travel as dataURLs.** No custom protocol, no renderer fetch. A stored `previewUrl` is
   never read: every tile asks `media:preview` by `provider` + `providerId`.
 - **An import is not cached and does not touch the disk here.** Its bytes go to the engine's
-  `insertImages`, and the SAVE path (🔒 YAZ-1775 D3, 2E) writes them into `<vault>/assets/` before the scene
+  `insertImages`, and the SAVE path (🔒 YAZ-1775 D3, YAZ-1811) writes them into `<vault>/assets/` before the scene
   names them.
 
 ```
@@ -374,7 +374,7 @@ folder rather than a Convex table. One component is TWO files named after its sl
 document whose `files` map carries the component's bytes as dataURLs. A component is small and has
 to insert into ANY vault on ANY machine, so it cannot point at a `<vault>/assets/` file. On insert
 those bytes are handed to the canvas as files; the board's next save extracts them into THIS
-vault's `assets/` through 2E, deduped by `fileId`.
+vault's `assets/` through YAZ-1811, deduped by `fileId`.
 
 **The slug is the identity, the name is only the label.** The slug is the kebab of the name, uniqued
 with `-2`, `-3` (Finder's counting, never `-1`), capped at 60 characters, and validated as a path
@@ -499,7 +499,7 @@ One search, over NAMES, in the sidebar's own bar (🔒 YAZ-797: a persistent bar
 ⌘K focuses it — the sidebar un-collapses first — and a typed query replaces the active lens's body
 with a FLAT ranked list (🔒 the flat-list ruling on YAZ-739), never a filtered tree.
 
-- **The catalog** (`client/src/search/searchCandidates.ts`, 🔒 2H on YAZ-1814) is one row per
+- **The catalog** (`client/src/search/searchCandidates.ts`, 🔒 YAZ-1814 on YAZ-1814) is one row per
   `.excalidraw` file — under the name the tree and the tab strip show, WITHOUT the extension — plus
   one row per folder, matched by its own name (🔒 YAZ-1775 D2 on YAZ-1491) and labelled by its parent. A
   drawing never matches on its folder; the folder is its own row instead.
@@ -576,12 +576,12 @@ pictures intact. Sharing links and view-only tokens are not ported; this is the 
 
 - **The renderer assembles it** (`client/src/drawings/exportDrawing.ts`):
   `serializeAsJSON(elements, appState, files, 'local')` — the library's own writer, the same one
-  the vault save uses — over the **full canvas files map**: everything 2E hydrated out of `assets/`
+  the vault save uses — over the **full canvas files map**: everything YAZ-1811 hydrated out of `assets/`
   at load, plus anything pasted, imported or inserted since and not yet saved. The engine's live
   map is the only place all of it is in one piece.
 - **Files only deleted elements name are not sent.** An undo can leave an image's bytes in the
   engine's map long after the element is gone, and shipping them would put a deleted picture inside
-  a file about to be handed to someone. The filter is `referencedFileIds`, the same rule 2E's save
+  a file about to be handed to someone. The filter is `referencedFileIds`, the same rule YAZ-1811's save
   path uses; `serializeAsJSON(…, 'local')` filters again (`filterOutDeletedFiles`) — belt and
   braces, and idempotent.
 - **Main owns the sheet and the write.** `dialog:save-file` shows the save dialog (default name

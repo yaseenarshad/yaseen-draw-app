@@ -74,7 +74,7 @@ describe('drawing:load', () => {
     expect((await failure(loadDrawing({ root, path: 'gone.excalidraw' }))).code).toBe('NOT_FOUND')
   })
 
-  it('reports an EMPTY and a CORRUPT file as one readable IO_ERROR naming the path (2D acceptance)', async () => {
+  it('reports an EMPTY and a CORRUPT file as one readable IO_ERROR naming the path (YAZ-1810 acceptance)', async () => {
     const empty = await seed('Empty.excalidraw', '')
     const corrupt = await seed('Corrupt.excalidraw', '{ not json')
     const noElements = await seed('NoElements.excalidraw', '{"type":"excalidraw"}')

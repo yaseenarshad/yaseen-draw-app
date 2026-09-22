@@ -5,7 +5,7 @@ import { ensureVaultIgnores, VAULT_IGNORED } from './ignore'
 import { git, GIT_TIMEOUT_CODE, installGitHint, resolveGit, type GitResult } from './exec'
 
 /**
- * One sync pass (YAZ-1081, 2B): everything "make this vault and its GitHub remote agree" means,
+ * One sync pass (YAZ-1081 2B): everything "make this vault and its GitHub remote agree" means,
  * as a single async function of a root that answers with a `GithubSyncStatus` and never throws.
  *
  * The order is fixed and load-bearing — commit, fetch, rebase, push:

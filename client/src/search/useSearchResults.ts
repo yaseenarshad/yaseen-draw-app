@@ -1,5 +1,5 @@
 /**
- * The search bar's results (YAZ-803, rebuilt for the catalog in 2H/YAZ-1814): the tree the Sidebar
+ * The search bar's results (YAZ-803, rebuilt for the catalog in YAZ-1814/YAZ-1814): the tree the Sidebar
  * already holds, turned into the ⌘K catalog and ranked per keystroke by `searchTitles`.
  *
  * No debounce — the ranking scan is synchronous over title-scale data and the tripwire test in

@@ -27,7 +27,7 @@ const isPrimaryInstance = app.requestSingleInstanceLock()
 if (!isPrimaryInstance) app.quit()
 app.on('second-instance', (_event, argv) => {
   // Windows/Linux deliver a clicked yaseendraw:// link as an argv entry of the second launch —
-  // and a double-clicked `.excalidraw` as a bare PATH in the same place (2I): off macOS there is
+  // and a double-clicked `.excalidraw` as a bare PATH in the same place (YAZ-1815): off macOS there is
   // no `open-file` event, so argv is the only door the file association has.
   const urls = [...argv.filter((arg) => arg.startsWith('yaseendraw://')), ...openableFileArgs(argv, argsSkip()).map(fileLink)]
   if (urls.length > 0) {
@@ -206,7 +206,7 @@ app.whenReady().then(() => {
   powerMonitor.on('unlock-screen', () => gitSync?.notifyWake())
   manager.restoreAll()
   // A COLD launch from a Finder / Explorer double-click: macOS has already queued its `open-file`
-  // path above, Windows and Linux put it in this process's own argv and fire nothing (2I).
+  // path above, Windows and Linux put it in this process's own argv and fire nothing (YAZ-1815).
   for (const path of openableFileArgs(process.argv, argsSkip())) links.push(fileLink(path))
   links.flush()
 })

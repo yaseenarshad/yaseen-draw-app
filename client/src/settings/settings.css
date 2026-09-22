@@ -344,7 +344,7 @@
   transform: translateY(-50%);
   pointer-events: none;
   background: var(--fg-muted);
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2.5 3.75 2.5 2.5 2.5-2.5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%YAZ-1821%3Cpath d='m2.5 3.75 2.5 2.5 2.5-2.5'/%YAZ-1821%YAZ-1819/svg%YAZ-1821") center / contain no-repeat;
 }
 
 /* ---------- hotkey reference (GRO-2067) — one table per Hotkeys group ---------- */

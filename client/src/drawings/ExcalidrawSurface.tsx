@@ -488,7 +488,7 @@ export function ExcalidrawSurface({
         focus: () => rootRef.current?.querySelector<HTMLElement>('.excalidraw-container')?.focus(),
         openImageExport: () => api.updateScene({ appState: { openDialog: { name: 'imageExport' } } as unknown as EngineAppState }),
         setCanvasBackground: (color) => api.updateScene({ appState: { viewBackgroundColor: color } as unknown as EngineAppState }),
-        // The FULL files map, straight off the engine: everything 2E hydrated out of `assets/` at
+        // The FULL files map, straight off the engine: everything YAZ-1811 hydrated out of `assets/` at
         // load plus anything pasted or inserted since and not yet saved. The store's copy would be
         // missing the second half.
         exportScene: () =>

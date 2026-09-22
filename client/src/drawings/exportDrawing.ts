@@ -10,14 +10,14 @@
  * one exception, and it is a SEPARATE document: `drawing:save` is untouched and the vault file is
  * not read, written or renamed by an export.
  *
- * THE FILES MAP IS THE WHOLE CANVAS'S. Everything 2E hydrated out of `assets/` at load, plus
+ * THE FILES MAP IS THE WHOLE CANVAS'S. Everything YAZ-1811 hydrated out of `assets/` at load, plus
  * anything pasted, imported or inserted since and not yet saved — the engine's live map is the
  * only place all of it is in one piece, which is why the assembly takes it rather than re-reading
  * the store.
  *
  * DELETED ELEMENTS' FILES ARE NOT SENT. An undo can leave an image's bytes in the engine's map long
  * after the element is gone; shipping them would put a picture the user deleted inside a file they
- * are about to hand to someone. `referencedFileIds` is the same rule 2E's save path uses, so the
+ * are about to hand to someone. `referencedFileIds` is the same rule YAZ-1811's save path uses, so the
  * two never disagree. The engine's own `serializeAsJSON(…, 'local')` filters again
  * (`filterOutDeletedFiles`) — belt and braces, and idempotent, which is the only kind of
  * redundancy worth having.

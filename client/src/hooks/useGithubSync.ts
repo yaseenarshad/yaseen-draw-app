@@ -3,7 +3,7 @@ import type { GithubSyncStatus } from '@shared/types'
 import { api } from '../api'
 
 /**
- * Per-vault GitHub sync as the UI sees it (YAZ-1081, 3A): one `github.status(root)` fetch per
+ * Per-vault GitHub sync as the UI sees it (YAZ-1081 3A): one `github.status(root)` fetch per
  * root, live-replaced by `github:status` broadcasts for that root: one bridge object per root,
  * pushed on every transition. App owns ONE of these, and both the chip and the settings section
  * read it.

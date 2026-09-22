@@ -1,5 +1,5 @@
 /**
- * The focus-handoff gate (🔒 YAZ-1812, built in 2I): a drawing tab that becomes visible takes the
+ * The focus-handoff gate (🔒 YAZ-1812, built in YAZ-1815): a drawing tab that becomes visible takes the
  * keyboard so tool hotkeys work without a click — but only when nothing else is holding it.
  */
 import { describe, expect, it } from 'vitest'

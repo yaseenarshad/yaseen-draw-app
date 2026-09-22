@@ -58,11 +58,11 @@ export function App() {
   const [resizing, setResizing] = useState(false)
   const [settings, setSettings] = useState(storage.getSettings)
   const watch = useWatch(root)
-  // GitHub sync (YAZ-1081 3A/3B), owned here for the same reason: ONE per window. Two surfaces
+  // GitHub sync (YAZ-1081 YAZ-1817/YAZ-1818), owned here for the same reason: ONE per window. Two surfaces
   // read it — the editor's chip (every mounted tab) and the settings cog's section — and they
   // must never disagree, which two hooks watching the same root eventually would.
   const githubSync = useGithubSync(root)
-  // The attention banner (3B): passive — `role="status"`, explicit buttons, never a modal. Sync
+  // The attention banner (YAZ-1818): passive — `role="status"`, explicit buttons, never a modal. Sync
   // failing is not worth stealing focus over; the vault still works, and the drawing in front of
   // the user is untouched.
   //
@@ -459,7 +459,7 @@ export function App() {
           dialog's Sync page and the editor's chip read the same status, so they can never
           disagree about what this vault is doing. */}
       {settingsOpen && <SettingsDialog ctx={{ settings, onChange: changeSettings, sync: { status: githubSync.status, setEnabled: githubSync.setEnabled } }} onClose={closeSettings} />}
-      {/* 3B: sync needs attention. Two of the five reasons are things this app cannot fix from
+      {/* YAZ-1818: sync needs attention. Two of the five reasons are things this app cannot fix from
           inside itself (git missing, credentials rejected), so the offer is a prompt to paste
           into any LLM — an assistant that CAN drive the terminal — rather than a wizard. */}
       {syncCopy !== null && !syncDismissed && root !== null && githubSync.status !== null && (

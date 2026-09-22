@@ -332,7 +332,7 @@ export function Sidebar({
   const favoriteDirs = useMemo(() => allDirs(favoriteNodes), [favoriteNodes])
   // What the chevrons button unfolds on the two disk-reading lenses.
   const bodyDirs = lens === 'favorites' ? favoriteDirs : shownDirs
-  // ⌘K's feed (2H, YAZ-1814): the ONE tree this panel already holds and the watcher already keeps
+  // ⌘K's feed (YAZ-1814, YAZ-1814): the ONE tree this panel already holds and the watcher already keeps
   // fresh — the catalog walk lives in `search/`, is lazy until the first query, and drops
   // non-drawing files and (through `fs:tree`) the image store.
   const results = useSearchResults(root, query, tree?.tree ?? null)
@@ -829,7 +829,7 @@ export function Sidebar({
   )
 
   /**
-   * "New drawing" (🔒 R1 on YAZ-1775, 2I): the ONE file-creation door in the app, and it does NOT
+   * "New drawing" (🔒 R1 on YAZ-1775, YAZ-1815): the ONE file-creation door in the app, and it does NOT
    * ask for a name. The board is born as `Untitled` (`Untitled 2`, `Untitled 3`… beside its
    * siblings), with the EMPTY SCENE in the same `wx` write (content-at-create, 🔒 YAZ-1810 — a
    * zero-byte `.excalidraw` is the corrupt case, not a new board), opens in the CURRENT tab, and
@@ -1140,7 +1140,7 @@ export function Sidebar({
               else e.currentTarget.blur()
               return
             }
-            // The bar keeps focus while the list is driven from it (YAZ-803). ↑/↓ WRAP (2H,
+            // The bar keeps focus while the list is driven from it (YAZ-803). ↑/↓ WRAP (YAZ-1814,
             // YAZ-1814): the list is capped at 50 and read top-down, so falling off the end is a
             // request for the other end — and ↑ from the top row is the cheapest way to the
             // bottom of a full list. Opening leaves the list up.

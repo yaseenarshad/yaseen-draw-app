@@ -2,7 +2,7 @@
  * THE IN-CANVAS DOCKED PANEL (YAZ-1775 ⚡ YAZ-1775 D8 amended): the web app's `AppSidebar`
  * (`excalidraw-app/components/AppSidebar.tsx`) minus its Boards and Docs tabs. The shell sidebar
  * is this app's file manager, so the canvas panel holds only what the canvas owns — **Images**
- * (3B), **Components** (3C), **Present** (3D) — each an icon with a small label, in the web app's
+ * (YAZ-1818), **Components** (YAZ-1819), **Present** (YAZ-1820) — each an icon with a small label, in the web app's
  * own tab strip.
  *
  * Same engine `DefaultSidebar` the web app used: its docked/pinnable panel, `hideLibrary` (the
