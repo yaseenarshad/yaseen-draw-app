@@ -19,49 +19,50 @@ describe('tree', () => {
     const body = await tree(root)
     expect(body.root).toBe(root)
     expect(typeof body.generatedAt).toBe('number')
-    // Every dir shows, viewer-able files or not (GRO-2022 D1): Empty and assets-only included.
+    // Every dir shows, drawing files or not (GRO-2022 D1): Empty and assets-only included.
     // Every regular file shows too, viewer or not (YAZ-1577 D1): book.epub is listed with `kind: null`.
-    expect(names(body.tree)).toEqual(['alpha', 'assets-only', 'Empty', 'Zeta', 'A.md', 'b.md', 'book.epub', 'notes.txt'])
+    expect(names(body.tree)).toEqual(['alpha', 'assets-only', 'Empty', 'Zeta', 'A.excalidraw', 'b.excalidraw', 'book.epub', 'notes.txt'])
     expect(body.tree.find((n) => n.name === 'book.epub')).toMatchObject({ type: 'file', kind: null })
     const zeta = body.tree[3]
     if (zeta.type !== 'dir') throw new Error('expected dir')
-    expect(names(zeta.children)).toEqual(['inner', 'z.markdown'])
+    expect(names(zeta.children)).toEqual(['assets', 'inner', 'z.excalidraw'])
     const alpha = body.tree[0]
     if (alpha.type !== 'dir') throw new Error('expected dir')
-    expect(names(alpha.children)).toEqual(['a.md'])
+    expect(names(alpha.children)).toEqual(['a.excalidraw'])
     const assetsOnly = body.tree[1]
     if (assetsOnly.type !== 'dir') throw new Error('expected dir')
     expect(assetsOnly.children).toEqual([
-      expect.objectContaining({ type: 'file', name: 'img.png', kind: 'image' }),
+      expect.objectContaining({ type: 'file', name: 'img.png', kind: null }),
     ])
     const all = flatten(body.tree)
     expect(all).toContain(path.join(root, 'notes.txt'))
     expect(all.some((p) => p.includes('.obsidian') || p.includes('.git') || p.includes('node_modules'))).toBe(false)
-    expect(all).not.toContain(path.join(root, '.hidden.md'))
-    // `.yaseendocs/` (vault-local config, GRO-2188) never reaches the tree — the sidebar renders the tree as-is.
-    expect(all.some((p) => p.includes('.yaseendocs'))).toBe(false)
+    expect(all).not.toContain(path.join(root, '.hidden.excalidraw'))
+    // 🔒 D3: the image store at the ROOT is invisible; a user's own `assets` folder deeper in
+    // the vault is theirs and shows, contents and all.
+    expect(all).not.toContain(path.join(root, 'assets', 'deadbeef.png'))
+    expect(all).toContain(path.join(root, 'Zeta', 'assets', 'theirs.excalidraw'))
+    // `.yaseendraw/` (vault-local config, GRO-2188) never reaches the tree — the sidebar renders the tree as-is.
+    expect(all.some((p) => p.includes('.yaseendraw'))).toBe(false)
   })
 
-  it('classifies text, PDF and raster images by kind, and lists SVG and arbitrary binaries with kind null (YAZ-1577 D1)', async () => {
+  it('classifies a drawing by kind whatever the case, and lists every other file with kind null (YAZ-1577 D1)', async () => {
     const candidates = [
-      [path.join(root, 'data.JSON'), '{}', 'text'],
-      [path.join(root, 'tool.py'), 'print("ok")\n', 'text'],
-      [path.join(root, 'report.PDF'), '%PDF-1.7', 'pdf'],
-      [path.join(root, 'photo.png'), 'png', 'image'],
-      [path.join(root, 'cover.WEBP'), 'webp', 'image'],
+      [path.join(root, 'scene.EXCALIDRAW'), '{}', 'drawing'],
+      [path.join(root, 'data.JSON'), '{}', null],
+      [path.join(root, 'tool.py'), 'print("ok")\n', null],
+      [path.join(root, 'report.PDF'), '%PDF-1.7', null],
+      [path.join(root, 'photo.png'), 'png', null],
+      [path.join(root, 'cover.WEBP'), 'webp', null],
       [path.join(root, 'vector.svg'), '<svg/>', null],
       [path.join(root, 'archive.zip'), 'binary', null],
     ] as const
     try {
       await Promise.all(candidates.map(([file, content]) => writeFile(file, content)))
       const all = files(await tree(root))
-      expect(all.find((node) => node.name === 'data.JSON')?.kind).toBe('text')
-      expect(all.find((node) => node.name === 'tool.py')?.kind).toBe('text')
-      expect(all.find((node) => node.name === 'report.PDF')?.kind).toBe('pdf')
-      expect(all.find((node) => node.name === 'photo.png')?.kind).toBe('image')
-      expect(all.find((node) => node.name === 'cover.WEBP')?.kind).toBe('image')
-      expect(all.find((node) => node.name === 'vector.svg')?.kind).toBeNull()
-      expect(all.find((node) => node.name === 'archive.zip')?.kind).toBeNull()
+      for (const [file, , kind] of candidates) {
+        expect(all.find((node) => node.name === path.basename(file))?.kind).toBe(kind)
+      }
     } finally {
       await Promise.all(candidates.map(([file]) => rm(file, { force: true })))
     }
@@ -69,14 +70,14 @@ describe('tree', () => {
 
   it('file nodes carry size, mtime and kind', async () => {
     const body = await tree(root)
-    const a = body.tree.find((n) => n.name === 'A.md')
+    const a = body.tree.find((n) => n.name === 'A.excalidraw')
     if (a?.type !== 'file') throw new Error('expected file')
-    expect(a.size).toBe(4)
+    expect(a.size).toBe(8)
     expect(a.mtime).toBeGreaterThan(0)
-    expect(a.kind).toBe('markdown')
-    const z = (body.tree[3] as { children: TreeNode[] }).children.find((n) => n.name === 'z.markdown')
+    expect(a.kind).toBe('drawing')
+    const z = (body.tree[3] as { children: TreeNode[] }).children.find((n) => n.name === 'z.excalidraw')
     if (z?.type !== 'file') throw new Error('expected file')
-    expect(z.kind).toBe('markdown')
+    expect(z.kind).toBe('drawing')
   })
 
   it('BAD_REQUEST missing root, NOT_ABSOLUTE relative, NOT_FOUND missing dir, NOT_A_DIRECTORY when root is a file', async () => {
@@ -85,7 +86,7 @@ describe('tree', () => {
     const missing = await failure(tree(path.join(root, 'nope')))
     expect(missing.code).toBe('NOT_FOUND')
     expect(missing.path).toBe(path.join(root, 'nope'))
-    expect((await failure(tree(path.join(root, 'b.md')))).code).toBe('NOT_A_DIRECTORY')
+    expect((await failure(tree(path.join(root, 'b.excalidraw')))).code).toBe('NOT_A_DIRECTORY')
   })
 })
 

@@ -1,12 +1,12 @@
 /**
- * The `yaseendocs://` deep-link format (E1, GRO-2171; locked decision D7): path-only,
- * absolute, percent-encoded — `yaseendocs:///Users/me/vault/My%20note.md` — no vault id.
+ * The `yaseendraw://` deep-link format (E1, GRO-2171; locked decision D7): path-only,
+ * absolute, percent-encoded — `yaseendraw:///Users/me/vault/My%20note.md` — no vault id.
  * An optional `?root=` (also a percent-encoded absolute path) overrides which folder the
  * link opens under. Shared so main's parser and the client's generator agree byte-for-byte
  * on one encoding.
  */
 
-const SCHEME = 'yaseendocs://'
+const SCHEME = 'yaseendraw://'
 
 /**
  * `encodeURI` keeps `/` readable and encodes spaces/unicode, but leaves `#` and `?` alone —
@@ -14,7 +14,7 @@ const SCHEME = 'yaseendocs://'
  */
 const encodePath = (path: string): string => encodeURI(path).replace(/#/g, '%23').replace(/\?/g, '%3F')
 
-/** The `yaseendocs://` link that opens `path` (absolute). */
+/** The `yaseendraw://` link that opens `path` (absolute). */
 export function fileLink(path: string): string {
   return SCHEME + encodePath(path)
 }
@@ -29,10 +29,10 @@ function decode(encoded: string): string | null {
 }
 
 /**
- * Parses a `yaseendocs://` link back to its absolute path (+ optional `?root=` override).
+ * Parses a `yaseendraw://` link back to its absolute path (+ optional `?root=` override).
  * Null for any other scheme, a relative/empty path, or malformed percent-encoding. Manual
  * string parsing on purpose: `new URL()` host-parses the double-slash form
- * (`yaseendocs://Users/...`) unpredictably for non-special schemes — here it simply decodes
+ * (`yaseendraw://Users/...`) unpredictably for non-special schemes — here it simply decodes
  * to a relative path and is rejected.
  */
 export function parseFileLink(url: string): { path: string; root: string | null } | null {

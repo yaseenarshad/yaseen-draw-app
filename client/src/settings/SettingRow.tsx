@@ -3,7 +3,7 @@
  * between rows in a card (settings.css `.setting + .setting`). `data-setting` is the row's stable
  * address — tests and the e2e specs find a row by it rather than by position or label text.
  * `wide` stacks the control full-width under the text for the two controls a right-hand cell
- * cannot hold: the new-note folder input and the hotkey tables.
+ * cannot hold: the hotkey tables.
  */
 import type { ReactNode } from 'react'
 

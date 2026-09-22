@@ -6,7 +6,7 @@ import { VAULT_CONFIG_DIR, type VaultConfigChange } from '@shared/types'
 import { atomicWrite, BridgeFailure, fsCall, requireAbsPath, toBridgeFailure } from './fs/fsUtils'
 
 /**
- * Vault-local config store (Desktop J, GRO-2188): JSON files in `<root>/.yaseendocs/`, the
+ * Vault-local config store (Desktop J, GRO-2188): JSON files in `<root>/.yaseendraw/`, the
  * `.obsidian/`-style dotfolder that travels with the vault. Electron-free, like `store.ts`.
  *
  * Lazy: reading never creates anything; the dotfolder appears on the first `writeConfig`
@@ -16,7 +16,7 @@ import { atomicWrite, BridgeFailure, fsCall, requireAbsPath, toBridgeFailure } f
  * this module runs its own chokidar per root, scoped to the dotfolder path. Chokidar tracks a
  * not-yet-existing path (verified for v4, FSEvents and polling), so the watcher is attached at
  * first subscribe whether or not the folder exists — it creates nothing, and an external
- * `mkdir .yaseendocs` + write by a sync tool is still picked up live. One caveat (verified): a
+ * `mkdir .yaseendraw` + write by a sync tool is still picked up live. One caveat (verified): a
  * polling watcher loses the path for good when the folder appears DURING its initialisation, so
  * the first `writeConfig` that creates the folder re-`add()`s it once — the debounce absorbs the
  * duplicate events FSEvents emits after a re-add. Same lifecycle idioms as `fs/watchers.ts`:
@@ -24,8 +24,8 @@ import { atomicWrite, BridgeFailure, fsCall, requireAbsPath, toBridgeFailure } f
  *
  * Echo policy: `writeConfig` notifies this process's subscribers synchronously (so every window
  * of the vault hears about a write from any of them), and the watcher's later echo of that same
- * write is dropped by mtime — the app's standard echo-suppression pattern (CONTRACTS.md,
- * multi-window). A genuinely external edit has a different mtime and notifies as usual,
+ * write is dropped by mtime — the app's standard echo-suppression pattern (docs/CONTRACTS.md,
+ * "Bridge API"). A genuinely external edit has a different mtime and notifies as usual,
  * debounced/deduped to one `{ root, name }` per file.
  */
 
@@ -65,7 +65,7 @@ function requireConfigName(name: unknown): string {
     throw new BridgeFailure('BAD_REQUEST', "'name' must be a plain file name", { path: String(name) })
   }
   if (!name.endsWith('.json') || name === '.json') {
-    throw new BridgeFailure('UNSUPPORTED_EXTENSION', 'only .json files live in .yaseendocs', { path: name })
+    throw new BridgeFailure('UNSUPPORTED_EXTENSION', 'only .json files live in .yaseendraw', { path: name })
   }
   return name
 }
@@ -96,7 +96,7 @@ export async function readConfigDetailed(root: string, name: string): Promise<Co
   }
 }
 
-/** Parsed `<root>/.yaseendocs/<name>`, or null when missing or malformed. NEVER creates the folder. */
+/** Parsed `<root>/.yaseendraw/<name>`, or null when missing or malformed. NEVER creates the folder. */
 export async function readConfig(root: string, name: string): Promise<unknown> {
   const res = await readConfigDetailed(root, name)
   if (res.state === 'ok') return res.value

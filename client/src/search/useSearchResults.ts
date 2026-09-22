@@ -1,59 +1,31 @@
 /**
- * The search bar's results (YAZ-803): one index snapshot per root, kept current by the watcher,
- * ranked per keystroke by `searchTitles`. No debounce — the ranking scan is synchronous over
- * title-scale data (guarded by `searchCandidates.perf.test.ts`). Since YAZ-1491 the list also
- * carries the tree's FOLDERS (🔒 D1): `dirs` is the Sidebar's own `allDirs` memo — no second
- * feed, no extra read — spliced in FIRST so a folder sits above a note it ties with (tree order:
- * dirs before files).
+ * The search bar's results (YAZ-803, rebuilt for the catalog in 2H/YAZ-1814): the tree the Sidebar
+ * already holds, turned into the ⌘K catalog and ranked per keystroke by `searchTitles`.
  *
- * The feed is LAZY (F1 finding 1, YAZ-808). The ALWAYS-ON per-window index feed is
- * WikilinkIndexBridge's; search must not duplicate it in every window for a bar nobody typed
- * into, so it pays for its data only once someone searches.
+ * No debounce — the ranking scan is synchronous over title-scale data and the tripwire test in
+ * `searchCandidates.test.ts` keeps it that way.
+ *
+ * The feed is LAZY, and latches: the catalog is not built at all until the first non-empty query
+ * of this mount, and from that moment on it is rebuilt with every new tree the watcher brings in,
+ * so a drawing created seconds ago is findable without a restart. Lazy because a vault is opened
+ * far more often than it is searched, and there is no point walking 5,000 rows for a session that
+ * never types; latched because the SECOND query must not pay for the walk again.
  */
-import { useEffect, useMemo, useState } from 'react'
-import type { IndexRecord } from '@shared/types'
-import { api } from '../api'
-import type { WatchSource } from '../hooks/useWatch'
-import { folderCandidates, searchCandidates, searchTitles, type SearchCandidate } from './searchCandidates'
+import { useMemo, useRef } from 'react'
+import type { TreeNode } from '@shared/types'
+import { EMPTY_CATALOG, buildDrawingCatalog, searchTitles, type SearchCandidate } from './searchCandidates'
 
-export function useSearchResults(root: string, watch: WatchSource, query: string, dirs: readonly string[]): SearchCandidate[] {
-  const [records, setRecords] = useState<readonly IndexRecord[]>([])
-  // Latched by the first non-empty query and never unlatched: after that the snapshot stays warm
-  // and watch-fresh for the rest of this component's life, so clearing the bar and typing again
-  // costs nothing. Until then there is no fetch and no subscription at all.
-  const [activated, setActivated] = useState(false)
-  useEffect(() => {
-    if (query.trim() !== '') setActivated(true)
-  }, [query])
+export function useSearchResults(root: string, query: string, tree: readonly TreeNode[] | null): SearchCandidate[] {
+  const typed = query.trim() !== ''
+  // The latch. Written during render on purpose: it only ever goes false → true, and it must be
+  // true on the render that FIRST sees a query — an effect would show one empty frame of results.
+  // Idempotent, so StrictMode's double render answers the same thing twice.
+  const latched = useRef(false)
+  const live = latched.current || typed
+  latched.current = live
 
-  useEffect(() => {
-    if (!activated) return
-    let cancelled = false
-    const load = () => {
-      // An unreadable index leaves search with no rows — quietly. Search is an accelerator, not a
-      // view: a banner here would shout about something the tree below is already showing fine.
-      api.index(root).then(
-        (res) => {
-          if (!cancelled) setRecords(res.records)
-        },
-        () => undefined,
-      )
-    }
-    load()
-    // Refresh on structural changes; `ready` also fires on every watch (re)subscription, covering missed events.
-    const off = watch.subscribe((ev) => {
-      if (ev.type !== 'change' && ev.type !== 'error') load()
-    })
-    return () => {
-      cancelled = true
-      off()
-    }
-  }, [root, watch, activated])
-
-  const folderRows = useMemo(() => folderCandidates(root, dirs), [root, dirs])
-  const noteRows = useMemo(() => searchCandidates(records), [records])
-  const candidates = useMemo(() => [...folderRows, ...noteRows], [folderRows, noteRows])
+  const catalog = useMemo(() => (live && tree !== null ? buildDrawingCatalog(root, tree) : EMPTY_CATALOG), [live, root, tree])
   // An empty query matches EVERYTHING through the shared matcher (`indexOf('')` is 0), so the
   // no-query case is answered here rather than by the ranker.
-  return useMemo(() => (query.trim() === '' ? [] : searchTitles(candidates, query)), [candidates, query])
+  return useMemo(() => (typed ? searchTitles(catalog, query) : []), [catalog, query, typed])
 }

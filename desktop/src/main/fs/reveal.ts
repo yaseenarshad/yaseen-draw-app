@@ -19,8 +19,7 @@ import { BridgeFailure, fsCall, requireAbsPath } from './fsUtils'
  *
  * No dot-entry guard and no extension guard, unlike `remove.ts` and `rename.ts`: revealing is
  * READ-ONLY and destroys nothing, so any absolute path the app can already show is fair game.
- * That matches the documented "no jail — any absolute path is allowed" posture in
- * `docs/CONTRACTS.md`. The asymmetry is deliberate; do not "restore" it for consistency.
+ * That matches the documented "no path jail" posture in `docs/CONTRACTS.md` ("Bridge API"). The asymmetry is deliberate; do not "restore" it for consistency.
  */
 export async function revealItem(req: unknown): Promise<RevealResponse> {
   if (typeof req !== 'object' || req === null) throw new BridgeFailure('BAD_REQUEST', 'request must be an object')

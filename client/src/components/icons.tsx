@@ -1,0 +1,65 @@
+/** The shell's stroked 14px glyphs, in the sidebar's style. */
+const svg = {
+  width: 14,
+  height: 14,
+  viewBox: '0 0 16 16',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.2,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+  'aria-hidden': true,
+}
+
+/** Octicons' `triangle-down` (the chevron GitHub Desktop's repository switcher wears, YAZ-1767 D6); `up` flips it while the panel is open. */
+export function TriangleIcon({ up = false }: { up?: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" style={up ? { transform: 'rotate(180deg)' } : undefined}>
+      <path d="m4.427 7.427 3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 7H4.604a.25.25 0 0 0-.177.427Z" />
+    </svg>
+  )
+}
+
+/**
+ * Panel-left pictogram shared by the sidebar's collapse button and the tab strip's Show-sidebar
+ * button (GRO-2023). Deliberately NOT on the shared `svg` spread: its square line caps are the
+ * original pixels.
+ */
+export function SidebarPanelIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true">
+      <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
+      <line x1="5.75" y1="2.5" x2="5.75" y2="13.5" />
+    </svg>
+  )
+}
+
+/** The sidebar's search affordance (⌘K). */
+export const SearchIcon = () => (
+  <svg {...svg}>
+    <circle cx="7" cy="7" r="4.5" />
+    <path d="m10.5 10.5 3.5 3.5" />
+  </svg>
+)
+
+/** Double chevron, for collapse-all in the Files tree. */
+export const ChevronsIcon = () => (
+  <svg {...svg}>
+    <path d="M4.5 4 8 7l3.5-3M4.5 9 8 12l3.5-3" />
+  </svg>
+)
+
+/** Focus Mode's eye (YAZ-1605). */
+export const EyeIcon = () => (
+  <svg {...svg}>
+    <path d="M1.5 8s2.4-4 6.5-4 6.5 4 6.5 4-2.4 4-6.5 4-6.5-4-6.5-4z" />
+    <circle cx="8" cy="8" r="1.8" />
+  </svg>
+)
+
+/** The Favorites lens tab (YAZ-1766 D1, a glyph not a word); filled while active via CSS. */
+export const HeartIcon = () => (
+  <svg {...svg} width={15} height={15} viewBox="0 0 24 24" strokeWidth={2} className="heart-icon">
+    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+  </svg>
+)

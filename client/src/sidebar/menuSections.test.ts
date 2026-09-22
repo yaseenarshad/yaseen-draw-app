@@ -19,15 +19,11 @@ const targets = (over: Partial<MenuSectionTargets> = {}): MenuSectionTargets => 
   openTabPaths: null,
   clipPaths: null,
   newWindowPath: null,
-  agentPath: null,
   renamePath: null,
   deletePath: null,
   revealPath: null,
   openVsCodePath: null,
   openDefaultPath: null,
-  folderPagePath: null,
-  folderPageIsOn: false,
-  topicsAnchor: null,
   focusPaths: null,
   favoritePaths: null,
   favoriteIsOn: false,
@@ -47,12 +43,9 @@ const handlers = (over: Partial<MenuHandlers> = {}): MenuHandlers => ({
   onCopy: vi.fn(),
   onPaste: vi.fn(),
   onNotice: vi.fn(),
-  onCopyForAgent: vi.fn(),
-  onNewNote: vi.fn(),
-  onNewFolderPage: vi.fn(),
+  onNewDrawing: vi.fn(),
   onNewFolder: vi.fn(),
   onNewDatedFolder: vi.fn(),
-  onToggleFolderPage: vi.fn(),
   onToggleFavorite: vi.fn(),
   onRename: vi.fn(),
   onDelete: vi.fn(),
@@ -93,19 +86,17 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-/** A Markdown FILE row inside no selection — the fullest singular menu there is. */
+/** A drawing FILE row inside no selection — the fullest singular menu there is. */
 const FILE_ROW: Partial<MenuSectionTargets> = {
   rowKind: 'file',
-  copyPath: '/v/Note.md',
-  clipPaths: ['/v/Note.md'],
-  newWindowPath: '/v/Note.md',
-  agentPath: '/v/Note.md',
-  renamePath: '/v/Note.md',
-  deletePath: '/v/Note.md',
-  revealPath: '/v/Note.md',
-  openVsCodePath: '/v/Note.md',
-  openDefaultPath: '/v/Note.md',
-  folderPagePath: '/v/Note.md',
+  copyPath: '/v/Note.excalidraw',
+  clipPaths: ['/v/Note.excalidraw'],
+  newWindowPath: '/v/Note.excalidraw',
+  renamePath: '/v/Note.excalidraw',
+  deletePath: '/v/Note.excalidraw',
+  revealPath: '/v/Note.excalidraw',
+  openVsCodePath: '/v/Note.excalidraw',
+  openDefaultPath: '/v/Note.excalidraw',
 }
 
 /** Blank space: every row-only target null, the root fallbacks in place (GRO-2273, GRO-2274). */
@@ -117,13 +108,13 @@ describe('the six groups (🔒 D7, amended)', () => {
     expect(build(FILE_ROW)).toHaveLength(6)
   })
 
-  it('a Markdown FILE row fills five of the six (the Open group is empty), in the pinned order', () => {
+  it('a drawing FILE row fills five of the six (the Open group is empty), in the pinned order', () => {
     // The Open group is EMPTY on one file row (no plural open, nothing to focus), so the clipboard
     // group leads; the OS verbs live in the "Open in ▸" flyout, a group of its own before Delete.
     expect(groupsOf(build(FILE_ROW))).toEqual([
-      ['Cut', 'Copy', 'Paste', 'Copy path', 'Copy for Agent'],
-      ['New note', 'New folder page', 'New folder', 'New dated folder'],
-      ['Turn into folder page', 'Rename'],
+      ['Cut', 'Copy', 'Paste', 'Copy path'],
+      ['New drawing', 'New folder', 'New dated folder'],
+      ['Rename'],
       ['Open in'],
       ['Delete'],
     ])
@@ -132,13 +123,13 @@ describe('the six groups (🔒 D7, amended)', () => {
   it('BLANK SPACE has no row to rename or delete: the this-row and Delete groups are empty, so the menu ends on "Open in"', () => {
     expect(groupsOf(build(BLANK))).toEqual([
       ['Paste', 'Copy path'],
-      ['New note', 'New folder page', 'New folder', 'New dated folder'],
+      ['New drawing', 'New folder', 'New dated folder'],
       ['Open in'], // the root's own OS verbs — the one this-row item blank space has
     ])
   })
 
   it('a 2+ selection: "Open N in new tabs" LEADS the menu and "Copy N paths" leads the text clipboard, below the Open group', () => {
-    const labels = labelsOf(build({ ...FILE_ROW, copyPaths: ['/v/a.md', '/v/b.md'], openTabPaths: ['/v/a.md', '/v/b.md'], clipPaths: ['/v/a.md', '/v/b.md'] }))
+    const labels = labelsOf(build({ ...FILE_ROW, copyPaths: ['/v/a.excalidraw', '/v/b.excalidraw'], openTabPaths: ['/v/a.excalidraw', '/v/b.excalidraw'], clipPaths: ['/v/a.excalidraw', '/v/b.excalidraw'] }))
     expect(labels[0]).toBe('Open 2 in new tabs')
     // 🔒 D7 loosens YAZ-1337's "the plural pair leads": the plural copy now sits in its group.
     expect(labels.indexOf('Copy 2 paths')).toBeGreaterThan(labels.indexOf('Open 2 in new tabs'))
@@ -148,8 +139,8 @@ describe('the six groups (🔒 D7, amended)', () => {
   it('"Open N in new tabs" LEADS the group and hands the exact FILE list (🔒 D5, YAZ-1337); a folders-only selection has none (YAZ-1578 🔒 D3)', () => {
     const onOpenInNewTabs = vi.fn()
     expect(labelsOf(build({ copyPaths: ['/v/one', '/v/two'], openTabPaths: null })).some((l) => /in new tabs$/.test(l))).toBe(false)
-    select(build({ openTabPaths: ['/v/a.md', '/v/b.md'] }, { onOpenInNewTabs }), 'Open 2 in new tabs')
-    expect(onOpenInNewTabs).toHaveBeenCalledExactlyOnceWith(['/v/a.md', '/v/b.md'])
+    select(build({ openTabPaths: ['/v/a.excalidraw', '/v/b.excalidraw'] }, { onOpenInNewTabs }), 'Open 2 in new tabs')
+    expect(onOpenInNewTabs).toHaveBeenCalledExactlyOnceWith(['/v/a.excalidraw', '/v/b.excalidraw'])
   })
 
   it('Delete is LAST wherever it appears, alone in its group, and flagged danger (GRO-2272 C1a)', () => {
@@ -163,67 +154,31 @@ describe('the six groups (🔒 D7, amended)', () => {
 })
 
 /**
- * The create group (🔒 D4, YAZ-817): "New folder page" is the SECOND item, directly after
- * "New note" — a folder page is a note born with one flag (🔒 D1), so it belongs beside the
- * note it is a kind of, not beside the act-on-this-row toggle further down. Pinned here
- * because the position IS the ruling, not an accident of ordering.
+ * The create group (⚡ D8 amended): ONE document birth — "New drawing" — leading the two disk
+ * folder births. The group targets a DIRECTORY, so it is offered on every row type and on blank
+ * space alike.
  */
-describe('create group (🔒 D4)', () => {
-  it('offers New folder page directly after New note, ahead of New folder', () => {
-    expect(build()[2].map((i) => i.label)).toEqual(['New note', 'New folder page', 'New folder', 'New dated folder'])
+describe('create group', () => {
+  it('offers New drawing first, then the two folder births', () => {
+    expect(build()[2].map((i) => i.label)).toEqual(['New drawing', 'New folder', 'New dated folder'])
   })
 
   it('is offered on every row type — the group targets a DIRECTORY, never the clicked row', () => {
-    expect(labelsOf(build(FILE_ROW))).toContain('New folder page')
-    expect(labelsOf(build(BLANK))).toContain('New folder page')
+    expect(labelsOf(build(FILE_ROW))).toContain('New drawing')
+    expect(labelsOf(build(BLANK))).toContain('New drawing')
   })
 
-  it('the two disk-folder births share ONE gate (YAZ-948; YAZ-1604): a null handler hides both', () => {
+  it('the two disk-folder births share ONE gate (YAZ-948; YAZ-1604): a null handler hides both, never the drawing', () => {
     const labels = labelsOf(build(FILE_ROW, { onNewFolder: null, onNewDatedFolder: null }))
     expect(labels).not.toContain('New folder')
     expect(labels).not.toContain('New dated folder')
-    expect(labels).toContain('New note')
-    expect(labels).toContain('New folder page')
+    expect(labels).toContain('New drawing')
   })
 
-  it('hands the click to the caller — the handler itself is the item (the New note idiom)', () => {
-    const onNewFolderPage = vi.fn()
-    select(build({}, { onNewFolderPage }), 'New folder page')
-    expect(onNewFolderPage).toHaveBeenCalledTimes(1)
-  })
-})
-
-/**
- * ONE state-aware item, both directions (🔒 D2, YAZ-817). The label is the flag's; the select
- * hands the handler BOTH the target and the direction, so the caller never has to re-derive
- * which way the toggle was pointing after the menu closed (GRO-2296).
- */
-describe('folder-page toggle item (🔒 D2)', () => {
-  it('reads "Turn into folder page" while the flag is off', () => {
-    const labels = labelsOf(build({ folderPagePath: '/v/a.md', folderPageIsOn: false }))
-    expect(labels).toContain('Turn into folder page')
-    expect(labels).not.toContain('Turn back into normal page')
-  })
-
-  it('reads "Turn back into normal page" while the flag is on', () => {
-    const labels = labelsOf(build({ folderPagePath: '/v/a.md', folderPageIsOn: true }))
-    expect(labels).toContain('Turn back into normal page')
-    expect(labels).not.toContain('Turn into folder page')
-  })
-
-  it('is absent entirely when there is no target', () => {
-    expect(labelsOf(build({ folderPagePath: null, folderPageIsOn: false })).some((l) => l.startsWith('Turn'))).toBe(false)
-  })
-
-  it('hands the select its own target AND the direction', () => {
-    const onToggleFolderPage = vi.fn()
-    select(build({ folderPagePath: '/v/a.md', folderPageIsOn: true }, { onToggleFolderPage }), 'Turn back into normal page')
-    expect(onToggleFolderPage).toHaveBeenCalledExactlyOnceWith('/v/a.md', true)
-  })
-
-  it('sits after the create group and directly above Rename — above the destructive pair, which keeps the bottom', () => {
-    const sections = build(FILE_ROW)
-    expect(sections[3].map((i) => i.label)).toEqual(['Turn into folder page', 'Rename'])
+  it('hands the click to the caller — the handler itself is the item', () => {
+    const onNewDrawing = vi.fn()
+    select(build({}, { onNewDrawing }), 'New drawing')
+    expect(onNewDrawing).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -234,15 +189,15 @@ describe('folder-page toggle item (🔒 D2)', () => {
  * (a second section). No child → no parent. The parent has no select of its own.
  */
 describe('"Open in ▸" (D7 amended)', () => {
-  it('a Markdown FILE row: the three open verbs, then Reveal in its own section', () => {
+  it('a drawing FILE row: the three open verbs, then Reveal in its own section', () => {
     expect(openInLabels(build(FILE_ROW))).toEqual([['New window', 'VS Code', 'Default app'], ['Reveal in Finder']])
   })
 
   it('the parent is a parent: no onSelect, and it stands ALONE in its own group between the this-row items and Delete', () => {
-    const sections = build({ ...FILE_ROW, openTabPaths: ['/v/a.md', '/v/b.md'] })
+    const sections = build({ ...FILE_ROW, openTabPaths: ['/v/a.excalidraw', '/v/b.excalidraw'] })
     expect(itemOf(sections, 'Open in')?.onSelect).toBeUndefined()
     expect(sections[0].map((i) => i.label)).toEqual(['Open 2 in new tabs'])
-    expect(sections[3].map((i) => i.label)).toEqual(['Turn into folder page', 'Rename'])
+    expect(sections[3].map((i) => i.label)).toEqual(['Rename'])
     expect(sections[4].map((i) => i.label)).toEqual(['Open in'])
   })
 
@@ -254,8 +209,8 @@ describe('"Open in ▸" (D7 amended)', () => {
     const onOpenNewWindow = vi.fn()
     expect(openInLabels(build(BLANK))).toEqual([['VS Code', 'Default app'], ['Reveal in Finder']])
     expect(subItemOf(build(BLANK), 'New window')).toBeUndefined()
-    subItemOf(build({ newWindowPath: '/v/a.md' }, { onOpenNewWindow }), 'New window')?.onSelect()
-    expect(onOpenNewWindow).toHaveBeenCalledExactlyOnceWith('/v/a.md')
+    subItemOf(build({ newWindowPath: '/v/a.excalidraw' }, { onOpenNewWindow }), 'New window')?.onSelect()
+    expect(onOpenNewWindow).toHaveBeenCalledExactlyOnceWith('/v/a.excalidraw')
   })
 
   it('each of VS Code / Default app / Reveal is a path or nothing, Default app directly after VS Code, and hands the caller its OWN path', () => {
@@ -279,7 +234,7 @@ describe('"Open in ▸" (D7 amended)', () => {
 /**
  * "Focus on …" (YAZ-1605): a VIEW verb, so it CLOSES the Open group — after the plural open,
  * ahead of the clipboard group. An EMPTY list hides it too (the caller's "nothing here
- * can be focused" answer), and the caller spells the label: it knows the lens and the count.
+ * can be focused" answer), and the caller spells the label: it knows the count.
  */
 describe('Focus item (YAZ-1605)', () => {
   it.each<[string, Partial<MenuSectionTargets>]>([
@@ -289,7 +244,7 @@ describe('Focus item (YAZ-1605)', () => {
     expect(labelsOf(build(over)).some((l) => l.startsWith('Focus'))).toBe(false)
   })
 
-  it('renders the caller\'s own label and hands the select the exact array', () => {
+  it("renders the caller's own label and hands the select the exact array", () => {
     const onFocus = vi.fn()
     const sections = build({ focusPaths: ['/v/a', '/v/b'] }, { focusLabel: 'Focus on 2 folders', onFocus })
     expect(labelsOf(sections)).toContain('Focus on 2 folders')
@@ -298,7 +253,7 @@ describe('Focus item (YAZ-1605)', () => {
   })
 
   it('closes the Open group — after the plural open, before the clipboard group', () => {
-    const sections = build({ ...FILE_ROW, focusPaths: ['/v/a'], openTabPaths: ['/v/a.md', '/v/b.md'] })
+    const sections = build({ ...FILE_ROW, focusPaths: ['/v/a'], openTabPaths: ['/v/a.excalidraw', '/v/b.excalidraw'] })
     expect(sections[0].map((i) => i.label)).toEqual(['Open 2 in new tabs', 'Focus on folder'])
     expect(sections[1][0]?.label).toBe('Cut')
   })
@@ -320,16 +275,16 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
   it('a 2+ selection counts: "Cut 3 items" / "Copy 3 items", handing the ORDERED list as given', () => {
     const onCut = vi.fn()
     const onCopy = vi.fn()
-    const sections = build({ clipPaths: ['/v/sub', '/v/a.md', '/v/b.md'] }, { onCut, onCopy })
+    const sections = build({ clipPaths: ['/v/sub', '/v/a.excalidraw', '/v/b.excalidraw'] }, { onCut, onCopy })
     select(sections, 'Cut 3 items')
     select(sections, 'Copy 3 items')
-    expect(onCut).toHaveBeenCalledExactlyOnceWith(['/v/sub', '/v/a.md', '/v/b.md'])
-    expect(onCopy).toHaveBeenCalledExactlyOnceWith(['/v/sub', '/v/a.md', '/v/b.md'])
+    expect(onCut).toHaveBeenCalledExactlyOnceWith(['/v/sub', '/v/a.excalidraw', '/v/b.excalidraw'])
+    expect(onCopy).toHaveBeenCalledExactlyOnceWith(['/v/sub', '/v/a.excalidraw', '/v/b.excalidraw'])
   })
 
-  it('carries the shortcut hints: ⌘X, ⌘C, ⌘V — and ⌘⇧C on Copy path', () => {
-    const sections = build({ clipPaths: ['/v/a.md'], copyPath: '/v/a.md' })
-    expect(sections[1].map((i) => [i.label, i.hint])).toEqual([['Cut', '⌘X'], ['Copy', '⌘C'], ['Paste', '⌘V'], ['Copy path', '⌘⇧C']])
+  it('carries the shortcut hints ⌘X, ⌘C, ⌘V — and none on Copy path, whose chord is gone', () => {
+    const sections = build({ clipPaths: ['/v/a.excalidraw'], copyPath: '/v/a.excalidraw' })
+    expect(sections[1].map((i) => [i.label, i.hint])).toEqual([['Cut', '⌘X'], ['Copy', '⌘C'], ['Paste', '⌘V'], ['Copy path', undefined]])
   })
 
   it('Paste is DISABLED with an empty clipboard — rendered for discoverability, inert on select', () => {
@@ -354,8 +309,8 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
     expect(onPaste).toHaveBeenCalledTimes(1)
   })
 
-  it('a null onPaste WITHHOLDS Paste entirely — the Topics PAGE row rule, the same gate as "New folder"', () => {
-    const labels = labelsOf(build({ clipPaths: ['/v/Home.md'], clip: { count: 2, op: 'cut' } }, { onPaste: null, onNewFolder: null, onNewDatedFolder: null }))
+  it('a null onPaste WITHHOLDS Paste entirely — the same gate as "New folder"', () => {
+    const labels = labelsOf(build({ clipPaths: ['/v/Home.excalidraw'], clip: { count: 2, op: 'cut' } }, { onPaste: null, onNewFolder: null, onNewDatedFolder: null }))
     expect(labels.some((l) => l.startsWith('Paste'))).toBe(false)
     expect(labels).toContain('Cut')
     expect(labels).toContain('Copy')
@@ -363,11 +318,11 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
 })
 
 /**
- * The text clipboard: "Copy path" (GRO-2273, the root on blank space), "Copy N paths" (🔒 D5,
+ * The text clipboard: "Copy path" (GRO-2273, the root on blank space) and "Copy N paths" (🔒 D5,
  * YAZ-1337 — the whole ordered selection, newline-joined), each confirming through the one notice
- * (YAZ-1341) and REPORTING a refused clipboard; "Copy for Agent" (YAZ-1617 🔒 D2) directly under.
+ * (YAZ-1341) and REPORTING a refused clipboard.
  */
-describe('Copy path / Copy N paths / Copy for Agent', () => {
+describe('Copy path / Copy N paths', () => {
   it('Copy path writes the exact path and confirms; absent without one', async () => {
     const writeText = installClipboard()
     const onNotice = vi.fn()
@@ -381,7 +336,7 @@ describe('Copy path / Copy N paths / Copy for Agent', () => {
   it('Copy path reports a clipboard the OS refused', async () => {
     installClipboard(new Error('denied'))
     const onNotice = vi.fn()
-    select(build({ copyPath: '/v/a.md' }, { onNotice }), 'Copy path')
+    select(build({ copyPath: '/v/a.excalidraw' }, { onNotice }), 'Copy path')
     await Promise.resolve()
     await Promise.resolve()
     expect(onNotice).toHaveBeenCalledExactlyOnceWith("Can't copy path: denied")
@@ -391,8 +346,8 @@ describe('Copy path / Copy N paths / Copy for Agent', () => {
     const writeText = installClipboard()
     const onNotice = vi.fn()
     expect(labelsOf(build()).some((l) => /^Copy \d+ paths$/.test(l))).toBe(false)
-    select(build({ copyPaths: ['/v/sub', '/v/a.md'] }, { onNotice }), 'Copy 2 paths')
-    expect(writeText).toHaveBeenCalledExactlyOnceWith('/v/sub\n/v/a.md')
+    select(build({ copyPaths: ['/v/sub', '/v/a.excalidraw'] }, { onNotice }), 'Copy 2 paths')
+    expect(writeText).toHaveBeenCalledExactlyOnceWith('/v/sub\n/v/a.excalidraw')
     await Promise.resolve()
     expect(onNotice).toHaveBeenCalledExactlyOnceWith('Copied 2 paths')
   })
@@ -400,20 +355,10 @@ describe('Copy path / Copy N paths / Copy for Agent', () => {
   it('Copy N paths reports a refused clipboard too', async () => {
     installClipboard(new Error('denied'))
     const onNotice = vi.fn()
-    select(build({ copyPaths: ['/v/a.md', '/v/b.md'] }, { onNotice }), 'Copy 2 paths')
+    select(build({ copyPaths: ['/v/a.excalidraw', '/v/b.excalidraw'] }, { onNotice }), 'Copy 2 paths')
     await Promise.resolve()
     await Promise.resolve()
     expect(onNotice).toHaveBeenCalledExactlyOnceWith("Can't copy paths: denied")
-  })
-
-  it('Copy for Agent is absent when agentPath is null; present it sits directly after Copy path and hands the exact path', () => {
-    const onCopyForAgent = vi.fn()
-    expect(itemOf(build({ copyPath: '/v/folder' }), 'Copy for Agent')).toBeUndefined()
-    const sections = build({ copyPath: '/v/Note.md', agentPath: '/v/Note.md' }, { onCopyForAgent })
-    const labels = labelsOf(sections)
-    expect(labels.indexOf('Copy for Agent')).toBe(labels.indexOf('Copy path') + 1)
-    select(sections, 'Copy for Agent')
-    expect(onCopyForAgent).toHaveBeenCalledExactlyOnceWith('/v/Note.md')
   })
 })
 
@@ -443,8 +388,8 @@ describe('Rename / Delete', () => {
  */
 describe('favorite toggle item (YAZ-1766 D3)', () => {
   it('reads "Add to favorites" on a row that is not pinned, "Remove from favorites" on one that is', () => {
-    expect(labelsOf(build({ favoritePaths: ['/v/a.md'], favoriteIsOn: false }))).toContain('Add to favorites')
-    expect(labelsOf(build({ favoritePaths: ['/v/a.md'], favoriteIsOn: false }))).not.toContain('Remove from favorites')
+    expect(labelsOf(build({ favoritePaths: ['/v/a.excalidraw'], favoriteIsOn: false }))).toContain('Add to favorites')
+    expect(labelsOf(build({ favoritePaths: ['/v/a.excalidraw'], favoriteIsOn: false }))).not.toContain('Remove from favorites')
     expect(labelsOf(build({ favoritePaths: ['/v/dir'], favoriteIsOn: true }))).toContain('Remove from favorites')
     expect(labelsOf(build({ favoritePaths: ['/v/dir'], favoriteIsOn: true }))).not.toContain('Add to favorites')
   })
@@ -454,22 +399,22 @@ describe('favorite toggle item (YAZ-1766 D3)', () => {
   })
 
   it('counts a 2+ selection: "Add 2 to favorites" / "Remove 3 from favorites"', () => {
-    expect(labelsOf(build({ favoritePaths: ['/v/a.md', '/v/b'], favoriteIsOn: false }))).toContain('Add 2 to favorites')
-    expect(labelsOf(build({ favoritePaths: ['/v/a.md', '/v/b', '/v/c.md'], favoriteIsOn: true }))).toContain('Remove 3 from favorites')
+    expect(labelsOf(build({ favoritePaths: ['/v/a.excalidraw', '/v/b'], favoriteIsOn: false }))).toContain('Add 2 to favorites')
+    expect(labelsOf(build({ favoritePaths: ['/v/a.excalidraw', '/v/b', '/v/c.excalidraw'], favoriteIsOn: true }))).toContain('Remove 3 from favorites')
   })
 
   it('a MIXED selection reads Add (isOn is false unless every path is pinned) and hands every path with the direction', () => {
     const onToggleFavorite = vi.fn()
-    select(build({ favoritePaths: ['/v/a.md', '/v/b'], favoriteIsOn: false }, { onToggleFavorite }), 'Add 2 to favorites')
-    expect(onToggleFavorite).toHaveBeenCalledExactlyOnceWith(['/v/a.md', '/v/b'], false)
+    select(build({ favoritePaths: ['/v/a.excalidraw', '/v/b'], favoriteIsOn: false }, { onToggleFavorite }), 'Add 2 to favorites')
+    expect(onToggleFavorite).toHaveBeenCalledExactlyOnceWith(['/v/a.excalidraw', '/v/b'], false)
     const onRemove = vi.fn()
-    select(build({ favoritePaths: ['/v/a.md'], favoriteIsOn: true }, { onToggleFavorite: onRemove }), 'Remove from favorites')
-    expect(onRemove).toHaveBeenCalledExactlyOnceWith(['/v/a.md'], true)
+    select(build({ favoritePaths: ['/v/a.excalidraw'], favoriteIsOn: true }, { onToggleFavorite: onRemove }), 'Remove from favorites')
+    expect(onRemove).toHaveBeenCalledExactlyOnceWith(['/v/a.excalidraw'], true)
   })
 
   it('leads the "Open in ▸" group — the this-row group ends on Rename, and the toggle sits directly above the flyout', () => {
-    const sections = build({ ...FILE_ROW, favoritePaths: ['/v/Note.md'], favoriteIsOn: false })
-    expect(sections[3].map((i) => i.label)).toEqual(['Turn into folder page', 'Rename'])
+    const sections = build({ ...FILE_ROW, favoritePaths: ['/v/Note.excalidraw'], favoriteIsOn: false })
+    expect(sections[3].map((i) => i.label)).toEqual(['Rename'])
     expect(sections[4].map((i) => i.label)).toEqual(['Add to favorites', 'Open in'])
   })
 })

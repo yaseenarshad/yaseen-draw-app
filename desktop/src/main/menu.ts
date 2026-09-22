@@ -6,17 +6,15 @@
  * lives in `main/index.ts`.
  */
 import type { MenuItemConstructorOptions } from 'electron'
-import type { ClipboardPasteRequest, RecentRoots, ZoomStep } from '@shared/types'
+import type { RecentRoots, ZoomStep } from '@shared/types'
 import { CH } from '../channels'
 import type { Store } from './store'
 import type { WindowManager } from './windows'
 
-/** Help › Yaseen Docs on GitHub: the repo README (origin URL of this repo). */
-export const HELP_URL = 'https://github.com/yaseenarshad/yaseen-milkdown#readme'
+/** Help › Yaseen Draw on GitHub: the repo README (origin URL of this repo). */
+export const HELP_URL = 'https://github.com/yaseenarshad/yaseen-draw-app#readme'
 
 export interface MenuHandlers {
-  copyAs(mode: 'plain' | 'markdown'): void
-  pasteAs(mode: ClipboardPasteRequest['mode']): void
   /** File › New Window (⌘⇧N, D6): duplicate the focused window — same folder, same file. */
   newWindow(): void
   /** File › Switch Vault… (⌘O, YAZ-1767 D8): the focused window's renderer opens its sidebar vault switcher. */
@@ -27,7 +25,7 @@ export interface MenuHandlers {
   openRecent(path: string, beside: boolean): void
   /** File › Search Vault (⌘K, YAZ-804): the focused window's renderer focuses its sidebar search bar. */
   search(): void
-  /** Yaseen Docs › Settings… (⌘,, YAZ-1679): the focused window's renderer opens its settings dialog. */
+  /** Yaseen Draw › Settings… (⌘,, YAZ-1679): the focused window's renderer opens its settings dialog. */
   settings(): void
   /** File › Close Tab (⌘W, GRO-2232): the focused window's renderer closes its active tab. */
   closeTab(): void
@@ -37,8 +35,12 @@ export interface MenuHandlers {
   prevTab(): void
   /** View › Toggle Sidebar: ask only the focused renderer to toggle its window identity. */
   toggleSidebar(): void
-  /** View › Zoom In / Out / Actual Size (⌘+ / ⌘− / ⌘0): the renderer routes it to the focused note or the app (YAZ-1710). */
+  /** View › Zoom In / Out / Actual Size (⌘+ / ⌘− / ⌘0): app-wide zoom on the focused window (YAZ-1710). */
   zoom(step: ZoomStep): void
+  /** File › Export Image… (⌘⇧E, 🔒 D10): the focused renderer's visible drawing opens the engine's export dialog. */
+  exportImage(): void
+  /** View › Canvas Background › a pick (🔒 D10): the focused renderer's visible drawing takes `color`. */
+  canvasBackground(color: string): void
   openHelp(): void
 }
 
@@ -47,13 +49,34 @@ export interface MenuInputs {
   recents: RecentRoots
   /** Dev builds get View › Toggle Developer Tools. */
   isDev: boolean
+  /**
+   * Whether the focused window's ACTIVE TAB is a drawing (🔒 D10). The two canvas items are
+   * enabled only then — they act on a canvas, and a menu row that silently does nothing is worse
+   * than a greyed-out one. `main/index.ts` recomputes it on every rebuild, and
+   * `subscribeMenuRebuildOnActiveFile` plus the focus hook are what make a rebuild happen.
+   */
+  activeIsDrawing: boolean
 }
 
 /**
- * The whole menu bar as a template. Item `id`s are stable so a live check (Playwright) can
- * drive items through `Menu.getApplicationMenu().getMenuItemById(...)`.
+ * The engine's own canvas-background picks (`DEFAULT_CANVAS_BACKGROUND_PICKS`,
+ * `packages/common/src/colors.ts`): white, then radix slate2 / blue2 / yellow2 / bronze2. No
+ * "Custom…" row — a colour dialog is not a menu item's job, and the engine's own picker is gone
+ * with its main menu (🔒 D10).
  */
-export function buildMenuTemplate({ recents, isDev }: MenuInputs, handlers: MenuHandlers): MenuItemConstructorOptions[] {
+export const CANVAS_BACKGROUND_PICKS: ReadonlyArray<{ label: string; color: string }> = [
+  { label: 'White', color: '#ffffff' },
+  { label: 'Slate', color: '#f8f9fa' },
+  { label: 'Blue', color: '#f5faff' },
+  { label: 'Yellow', color: '#fffce8' },
+  { label: 'Bronze', color: '#fdf8f6' },
+]
+
+/**
+ * The whole menu bar as a template. Item `id`s are stable so a live check can drive items
+ * through `Menu.getApplicationMenu().getMenuItemById(...)`.
+ */
+export function buildMenuTemplate({ recents, isDev, activeIsDrawing }: MenuInputs, handlers: MenuHandlers): MenuItemConstructorOptions[] {
   const recentItems: MenuItemConstructorOptions[] =
     recents.length === 0
       ? [{ label: 'No Recent Folders', enabled: false }]
@@ -67,7 +90,7 @@ export function buildMenuTemplate({ recents, isDev }: MenuInputs, handlers: Menu
   return [
     // macOS titles the first menu with the running app's name; the label only matters off-mac.
     {
-      label: 'Yaseen Docs',
+      label: 'Yaseen Draw',
       submenu: [
         { role: 'about' },
         { type: 'separator' },
@@ -97,6 +120,11 @@ export function buildMenuTemplate({ recents, isDev }: MenuInputs, handlers: Menu
         // so the gesture goes to the focused window's renderer — un-collapsing the sidebar first.
         { id: 'menu.file.search', label: 'Search Vault', accelerator: 'CmdOrCtrl+K', click: () => handlers.search() },
         { type: 'separator' },
+        // 🔒 D10: the drawing's image export left the canvas hamburger for the app menu bar. It
+        // opens the ENGINE's own export dialog (`openDialog: { name: 'imageExport' }`) — a
+        // standalone `.excalidraw` export is 3E's.
+        { id: 'menu.file.export-image', label: 'Export Image…', accelerator: 'CmdOrCtrl+Shift+E', enabled: activeIsDrawing, click: () => handlers.exportImage() },
+        { type: 'separator' },
         // ⌘W is Close Tab (GRO-2232, locked): the renderer owns tab state, so the gesture goes to
         // the focused window's renderer. Close Window moves to ⌘⇧W and keeps `role: 'close'` — the
         // OS close that windows.ts intercepts for the flush handshake.
@@ -106,7 +134,7 @@ export function buildMenuTemplate({ recents, isDev }: MenuInputs, handlers: Menu
     },
     {
       label: 'Edit',
-      submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, copyAsMenu(handlers.copyAs), { role: 'paste' }, pasteAsMenu(handlers.pasteAs, true), { role: 'selectAll' }],
+      submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }],
     },
     {
       label: 'View',
@@ -117,12 +145,22 @@ export function buildMenuTemplate({ recents, isDev }: MenuInputs, handlers: Menu
         ...(isDev ? [{ role: 'toggleDevTools' } satisfies MenuItemConstructorOptions] : []),
         { type: 'separator' },
         // Not the stock zoom roles (YAZ-1710): a registered accelerator never reaches the page on
-        // macOS, so main forwards the step and the renderer decides — the focused note or the app.
+        // macOS, so main applies the step to the focused window's webContents itself.
         { id: 'menu.view.zoom-reset', label: 'Actual Size', accelerator: 'CmdOrCtrl+0', click: () => handlers.zoom(0) },
         { id: 'menu.view.zoom-in', label: 'Zoom In', accelerator: 'CmdOrCtrl+Plus', click: () => handlers.zoom(1) },
         // Electron's own zoomIn role also answers ⌘= (no shift); keep that hidden twin.
         { id: 'menu.view.zoom-in-eq', label: 'Zoom In', accelerator: 'CmdOrCtrl+=', visible: false, click: () => handlers.zoom(1) },
         { id: 'menu.view.zoom-out', label: 'Zoom Out', accelerator: 'CmdOrCtrl+-', click: () => handlers.zoom(-1) },
+        { type: 'separator' },
+        // 🔒 D10: the engine's canvas-background picks, greyed out off a drawing tab. The value is
+        // per BOARD — the engine writes `viewBackgroundColor` into the file — which is why it is
+        // here and not in Settings › Canvas with the user-level prefs (🔒 D9).
+        {
+          id: 'menu.view.canvas-background',
+          label: 'Canvas Background',
+          enabled: activeIsDrawing,
+          submenu: CANVAS_BACKGROUND_PICKS.map(({ label, color }, i) => ({ id: `menu.view.canvas-background.${i}`, label, click: () => handlers.canvasBackground(color) })),
+        },
       ],
     },
     // Top-level role `window` marks this submenu as macOS's Windows menu, so the OS appends the window list.
@@ -143,68 +181,26 @@ export function buildMenuTemplate({ recents, isDev }: MenuInputs, handlers: Menu
         { role: 'front' },
       ],
     },
-    { label: 'Help', role: 'help', submenu: [{ id: 'menu.help.github', label: 'Yaseen Docs on GitHub', click: () => handlers.openHelp() }] },
+    { label: 'Help', role: 'help', submenu: [{ id: 'menu.help.github', label: 'Yaseen Draw on GitHub', click: () => handlers.openHelp() }] },
   ]
 }
 
-function copyAsMenu(copyAs: MenuHandlers['copyAs']): MenuItemConstructorOptions {
-  return {
-    label: 'Copy as',
-    submenu: [
-      { id: 'menu.edit.copy-plain', label: 'Plain text', click: () => copyAs('plain') },
-      { id: 'menu.edit.copy-markdown', label: 'Markdown', click: () => copyAs('markdown') },
-    ],
-  }
-}
-
-function pasteAsMenu(pasteAs: MenuHandlers['pasteAs'], accelerator = false): MenuItemConstructorOptions {
-  return {
-    label: 'Paste as',
-    submenu: [
-      { id: 'menu.edit.paste-plain', label: 'Plain text', ...(accelerator ? { accelerator: 'CmdOrCtrl+Shift+V' } : {}), click: () => pasteAs('plain') },
-      { id: 'menu.edit.paste-markdown', label: 'Markdown', click: () => pasteAs('markdown') },
-    ],
-  }
-}
-
 export interface ContextMenuActions {
-  copyAs(mode: 'plain' | 'markdown'): void
-  pasteAs(mode: ClipboardPasteRequest['mode']): void
   /** Swap the misspelled word under the cursor for the suggestion the user picked. */
   replace(word: string): void
   /** Teach the spellchecker a word it flagged, for good. */
   addToDictionary(word: string): void
-  /** Copy the right-clicked image's pixels to the clipboard (YAZ-1666). */
-  copyImage(): void
-  /** Reveal the right-clicked image's file in Finder (YAZ-1666); `srcURL` is the `<img src>` as loaded. */
-  revealImage(srcURL: string): void
 }
 
 /**
  * The right-click menu (YAZ-672). Electron ships no default one, so the spellchecker's squiggles
  * had nothing to act on. Pure like `buildMenuTemplate`; the `context-menu` event and the
  * `Menu.buildFromTemplate(...).popup()` apply layer live in `main/index.ts`.
- *
- * An IMAGE under the cursor (YAZ-1666, images-as-first-class-citizens YAZ-1656 D7) gets its
- * own two-row menu INSTEAD of the text one: cut/copy/paste act on a selection an image does
- * not have, and the spellchecker has nothing to say about pixels. Exactly two rows — a "Copy
- * Image Address" would hand out an `app://vault` URL that means nothing outside the app, and
- * "Copy Markdown" is the editor's job. Chromium reports `mediaType: 'image'` only for an
- * element laid out as an image (`<img>`, `<input type=image>`, SVG `<image>`), never for an
- * inline `<svg>` or a CSS background — so the sidebar's icons keep the text menu, and the rows
- * appear on the editor's images, the lightbox and card covers alike. Reveal receives the
- * `<img src>` verbatim; `vaultProtocol.ts` decides whether it names a vault file.
  */
 export function buildContextMenuTemplate(
-  params: Pick<Electron.ContextMenuParams, 'misspelledWord' | 'dictionarySuggestions' | 'editFlags' | 'mediaType' | 'srcURL'>,
+  params: Pick<Electron.ContextMenuParams, 'misspelledWord' | 'dictionarySuggestions' | 'editFlags'>,
   actions: ContextMenuActions,
 ): MenuItemConstructorOptions[] {
-  if (params.mediaType === 'image') {
-    return [
-      { label: 'Copy Image', click: () => actions.copyImage() },
-      { label: 'Reveal in Finder', click: () => actions.revealImage(params.srcURL) },
-    ]
-  }
   const suggestions: MenuItemConstructorOptions[] = params.dictionarySuggestions.map((s) => ({ label: s, click: () => actions.replace(s) }))
   const dictionary: MenuItemConstructorOptions[] =
     params.misspelledWord === ''
@@ -219,9 +215,7 @@ export function buildContextMenuTemplate(
     ...dictionary,
     { role: 'cut', enabled: params.editFlags.canCut },
     { role: 'copy', enabled: params.editFlags.canCopy },
-    { ...copyAsMenu(actions.copyAs), enabled: params.editFlags.canCopy },
     { role: 'paste', enabled: params.editFlags.canPaste },
-    { ...pasteAsMenu(actions.pasteAs), enabled: params.editFlags.canPaste },
   ]
 }
 
@@ -254,7 +248,8 @@ export interface MenuHost {
    * this through `pickMenuTargetWindow` (see its comment for why macOS forces the fallback).
    */
   focusedWebContents(): { id: number; send(channel: string, ...args: unknown[]): void } | undefined
-  readClipboardText(): string
+  /** App-wide zoom on the focused window: level ± 0.5, or back to 0 (YAZ-1710). */
+  zoom(step: ZoomStep): void
   openExternal(url: string): void
 }
 
@@ -268,13 +263,6 @@ export function createMenuHandlers(store: Store, windows: MenuWindows, host: Men
     return id === undefined ? undefined : store.get().windows.find((w) => w.id === id)
   }
   return {
-    copyAs(mode) {
-      host.focusedWebContents()?.send(CH.menuCopyAs, mode)
-    },
-    pasteAs(mode) {
-      const target = host.focusedWebContents()
-      if (target !== undefined) target.send(CH.menuPasteAs, { mode, text: host.readClipboardText() } satisfies ClipboardPasteRequest)
-    },
     newWindow() {
       const entry = focusedEntry()
       if (entry !== undefined) windows.duplicateWindow(entry)
@@ -313,7 +301,13 @@ export function createMenuHandlers(store: Store, windows: MenuWindows, host: Men
       host.focusedWebContents()?.send(CH.menuToggleSidebar)
     },
     zoom(step) {
-      host.focusedWebContents()?.send(CH.menuZoom, step)
+      host.zoom(step)
+    },
+    exportImage() {
+      host.focusedWebContents()?.send(CH.menuExportImage)
+    },
+    canvasBackground(color) {
+      host.focusedWebContents()?.send(CH.menuCanvasBackground, color)
     },
     openHelp() {
       host.openExternal(HELP_URL)
@@ -330,6 +324,27 @@ export function subscribeMenuRebuild(store: Store, rebuild: () => void): () => v
   return store.onChange((state) => {
     if (state.recents === last) return
     last = state.recents
+    rebuild()
+  })
+}
+
+/** The one fact the two canvas items are gated on: which file each window has in front. */
+const activeFilesKey = (state: { windows: ReadonlyArray<{ id: string; file: string | null }> }): string => state.windows.map((w) => `${w.id}=${w.file ?? ''}`).join('\n')
+
+/**
+ * Rebuild when any window's ACTIVE FILE changes (🔒 D10): File › Export Image… and View › Canvas
+ * Background are enabled only while the focused window's active tab is a drawing, so a tab switch
+ * has to re-evaluate them. A second subscription rather than a widening of `subscribeMenuRebuild`,
+ * so the recents rule — and its test — stays exactly what it was. Focus changes are the host's to
+ * report (`browser-window-focus` in `main/index.ts`): they move which window is asked, not what
+ * the store says.
+ */
+export function subscribeMenuRebuildOnActiveFile(store: Store, rebuild: () => void): () => void {
+  let last = activeFilesKey(store.get())
+  return store.onChange((state) => {
+    const next = activeFilesKey(state)
+    if (next === last) return
+    last = next
     rebuild()
   })
 }

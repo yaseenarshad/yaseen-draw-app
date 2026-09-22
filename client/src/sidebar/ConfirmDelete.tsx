@@ -5,37 +5,30 @@ import { basename } from '../lib/paths'
 export interface DeleteTarget {
   path: string
   kind: 'file' | 'dir'
-  /** Notes and subfolders inside a folder target; ignored for a file. */
-  children?: { notes: number; folders: number }
-  /** Notes whose `[[links]]` resolve to this target; omitted when the index was unavailable. */
-  backlinks?: number
+  /** Files and subfolders inside a folder target; ignored for a file. */
+  children?: { files: number; folders: number }
 }
 
 const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`
-/** Verb agreement: one thing "moves"/"links", several "move"/"link". */
+/** Verb agreement: one thing "moves", several "move". */
 const verb = (n: number, singular: string) => (n === 1 ? `${singular}s` : singular)
 
 /**
  * The confirm sheet's copy (GRO-2272 `C2-`). Pure and separately tested — the component is
  * then trivial. Deliberate details:
- *  - an EMPTY folder does not print "0 notes and 0 folders";
- *  - a folder with only notes (or only subfolders) does not print the empty half;
- *  - zero backlinks prints NOTHING, not "0 notes link to this";
+ *  - an EMPTY folder does not print "0 files and 0 folders";
+ *  - a folder with only files (or only subfolders) does not print the empty half;
  *  - singular and plural both read correctly.
  */
-export function deleteConfirmMessage({ path, kind, children, backlinks }: DeleteTarget): string {
+export function deleteConfirmMessage({ path, kind, children }: DeleteTarget): string {
   const name = basename(path)
-  const parts: string[] = []
-  if (kind === 'dir' && children !== undefined && children.notes + children.folders > 0) {
-    const inside = [children.notes > 0 ? plural(children.notes, 'note') : null, children.folders > 0 ? plural(children.folders, 'folder') : null]
+  if (kind === 'dir' && children !== undefined && children.files + children.folders > 0) {
+    const inside = [children.files > 0 ? plural(children.files, 'file') : null, children.folders > 0 ? plural(children.folders, 'folder') : null]
       .filter((p): p is string => p !== null)
       .join(' and ')
-    parts.push(`Delete "${name}"? ${inside} ${verb(children.notes + children.folders, 'move')} to the Trash.`)
-  } else {
-    parts.push(`Delete "${name}"? It moves to the Trash.`)
+    return `Delete "${name}"? ${inside} ${verb(children.files + children.folders, 'move')} to the Trash.`
   }
-  if (backlinks !== undefined && backlinks > 0) parts.push(`${plural(backlinks, 'note')} ${verb(backlinks, 'link')} to this.`)
-  return parts.join(' ')
+  return `Delete "${name}"? It moves to the Trash.`
 }
 
 interface ConfirmDeleteProps {
@@ -48,7 +41,7 @@ interface ConfirmDeleteProps {
 /**
  * In-app confirm sheet for delete (GRO-2272 — LOCKED decision B). Not a native dialog: the app
  * has a standing never-a-native-dialog convention, native dialogs are painful to drive in
- * Playwright, and only our own sheet can show the backlink count.
+ * a live check, and only our own sheet can carry the app's copy.
  *
  * The sheet IS the undo: `shell.trashItem` has no programmatic un-trash, so there is no in-app
  * restore behind it. Hence initial focus lands on **Cancel**, not Delete — a stray Enter

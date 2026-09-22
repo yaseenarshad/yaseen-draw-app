@@ -3,16 +3,14 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { MenuItemConstructorOptions } from 'electron'
-import { defaultRightPanelIdentity, type RecentRoots, type WindowEntry } from '@shared/types'
+import type { RecentRoots, WindowEntry } from '@shared/types'
 import { CH } from '../channels'
 import { createStore, type Store } from './store'
-import { HELP_URL, buildContextMenuTemplate, buildMenuTemplate, createMenuHandlers, pickMenuTargetWindow, subscribeMenuRebuild, type ContextMenuActions, type MenuHandlers, type MenuHost } from './menu'
+import { HELP_URL, buildContextMenuTemplate, buildMenuTemplate, createMenuHandlers, pickMenuTargetWindow, subscribeMenuRebuild, subscribeMenuRebuildOnActiveFile, CANVAS_BACKGROUND_PICKS, type ContextMenuActions, type MenuHandlers, type MenuHost } from './menu'
 
 // ---------- buildMenuTemplate (pure) ----------
 
 const noopHandlers = (): MenuHandlers => ({
-  copyAs: vi.fn(),
-  pasteAs: vi.fn(),
   newWindow: vi.fn(),
   switchVault: vi.fn(),
   openFolder: vi.fn(),
@@ -24,6 +22,8 @@ const noopHandlers = (): MenuHandlers => ({
   nextTab: vi.fn(),
   prevTab: vi.fn(),
   toggleSidebar: vi.fn(),
+  exportImage: vi.fn(),
+  canvasBackground: vi.fn(),
   openHelp: vi.fn(),
 })
 
@@ -33,8 +33,8 @@ const RECENTS: RecentRoots = [
   { path: '/vaults/old', lastOpened: 1 },
 ]
 
-function build(recents: RecentRoots = RECENTS, isDev = false, handlers: MenuHandlers = noopHandlers()) {
-  return buildMenuTemplate({ recents, isDev }, handlers)
+function build(recents: RecentRoots = RECENTS, isDev = false, handlers: MenuHandlers = noopHandlers(), activeIsDrawing = true) {
+  return buildMenuTemplate({ recents, isDev, activeIsDrawing }, handlers)
 }
 
 function menuOf(template: MenuItemConstructorOptions[], label: string): MenuItemConstructorOptions[] {
@@ -51,12 +51,12 @@ function click(item: MenuItemConstructorOptions | undefined, event: { altKey?: b
 
 describe('buildMenuTemplate', () => {
   it('has the six menus in order', () => {
-    expect(build().map((m) => m.label)).toEqual(['Yaseen Docs', 'File', 'Edit', 'View', 'Window', 'Help'])
+    expect(build().map((m) => m.label)).toEqual(['Yaseen Draw', 'File', 'Edit', 'View', 'Window', 'Help'])
   })
 
   it('App menu: About, Settings… ⌘, in its own group (YAZ-1679), the standard Hide roles, and Quit', () => {
     const handlers = noopHandlers()
-    const app = menuOf(build(RECENTS, false, handlers), 'Yaseen Docs')
+    const app = menuOf(build(RECENTS, false, handlers), 'Yaseen Draw')
     expect(app.map((i) => i.role ?? i.type ?? i.id)).toEqual(['about', 'separator', 'menu.app.settings', 'separator', 'hide', 'hideOthers', 'unhide', 'separator', 'quit'])
     const settings = app.find((i) => i.label === 'Settings…')
     expect(settings?.accelerator).toBe('CmdOrCtrl+,')
@@ -119,7 +119,7 @@ describe('buildMenuTemplate', () => {
     expect(handlers.openRecent).toHaveBeenLastCalledWith('/vaults/notes', true)
   })
 
-  it('a programmatic click (menuItem.click(), no event — Playwright) opens in place, not a crash', () => {
+  it('a programmatic click (menuItem.click(), no event) opens in place, not a crash', () => {
     const handlers = noopHandlers()
     const file = menuOf(build(RECENTS, false, handlers), 'File')
     const recent = file.find((i) => i.label === 'Open Recent')?.submenu as MenuItemConstructorOptions[]
@@ -133,20 +133,10 @@ describe('buildMenuTemplate', () => {
     expect(recent).toEqual([{ label: 'No Recent Folders', enabled: false }])
   })
 
-  it('Edit keeps native roles and adds explicit paste modes with one plain-text shortcut', () => {
-    const handlers = noopHandlers()
-    const items = menuOf(build(RECENTS, false, handlers), 'Edit')
-    expect(items.map((i) => i.role ?? i.type ?? i.label)).toEqual(['undo', 'redo', 'separator', 'cut', 'copy', 'Copy as', 'paste', 'Paste as', 'selectAll'])
-    const copyModes = items.find((i) => i.label === 'Copy as')?.submenu as MenuItemConstructorOptions[]
-    expect(copyModes.map((i) => [i.label, i.accelerator])).toEqual([['Plain text', undefined], ['Markdown', undefined]])
-    click(copyModes[0])
-    click(copyModes[1])
-    expect(vi.mocked(handlers.copyAs).mock.calls).toEqual([['plain'], ['markdown']])
-    const modes = items.find((i) => i.label === 'Paste as')?.submenu as MenuItemConstructorOptions[]
-    expect(modes.map((i) => [i.label, i.accelerator])).toEqual([['Plain text', 'CmdOrCtrl+Shift+V'], ['Markdown', undefined]])
-    click(modes[0])
-    click(modes[1])
-    expect(vi.mocked(handlers.pasteAs).mock.calls).toEqual([['plain'], ['markdown']])
+  it('Edit is the native roles only — no app-owned rows', () => {
+    const items = menuOf(build(RECENTS, false, noopHandlers()), 'Edit')
+    expect(items.map((i) => i.role ?? i.type ?? i.label)).toEqual(['undo', 'redo', 'separator', 'cut', 'copy', 'paste', 'selectAll'])
+    expect(items.every((i) => i.submenu === undefined)).toBe(true)
   })
 
   it('View menu: Toggle Sidebar, Reload, our own zoom items (not the roles); Toggle DevTools only in dev', () => {
@@ -173,6 +163,32 @@ describe('buildMenuTemplate', () => {
     ])
     zoom.forEach((item) => click(item))
     expect(vi.mocked(handlers.zoom).mock.calls).toEqual([[0], [1], [1], [-1]])
+  })
+
+  it('File › Export Image… is ⌘⇧E, enabled only on a drawing tab, and calls exportImage (🔒 D10)', () => {
+    const handlers = noopHandlers()
+    const item = menuOf(build(RECENTS, false, handlers, true), 'File').find((i) => i.id === 'menu.file.export-image')
+    expect(item?.label).toBe('Export Image…')
+    expect(item?.accelerator).toBe('CmdOrCtrl+Shift+E')
+    expect(item?.enabled).toBe(true)
+    click(item)
+    expect(handlers.exportImage).toHaveBeenCalledTimes(1)
+    // A non-drawing tab (or no tab at all) greys it out rather than letting it silently no-op.
+    expect(menuOf(build(RECENTS, false, handlers, false), 'File').find((i) => i.id === 'menu.file.export-image')?.enabled).toBe(false)
+  })
+
+  it('View › Canvas Background carries the engine`s five picks, gated the same way (🔒 D10)', () => {
+    const handlers = noopHandlers()
+    const item = menuOf(build(RECENTS, false, handlers, true), 'View').find((i) => i.id === 'menu.view.canvas-background')
+    expect(item?.label).toBe('Canvas Background')
+    expect(item?.enabled).toBe(true)
+    expect(item?.accelerator).toBeUndefined()
+    const picks = item?.submenu as MenuItemConstructorOptions[]
+    expect(picks.map((p) => p.label)).toEqual(['White', 'Slate', 'Blue', 'Yellow', 'Bronze'])
+    expect(CANVAS_BACKGROUND_PICKS.map((p) => p.color)).toEqual(['#ffffff', '#f8f9fa', '#f5faff', '#fffce8', '#fdf8f6'])
+    picks.forEach((pick) => click(pick))
+    expect(vi.mocked(handlers.canvasBackground).mock.calls).toEqual(CANVAS_BACKGROUND_PICKS.map((p) => [p.color]))
+    expect(menuOf(build(RECENTS, false, handlers, false), 'View').find((i) => i.id === 'menu.view.canvas-background')?.enabled).toBe(false)
   })
 
   it('Window menu: role window (macOS window list) with minimize / zoom, the tab-switching items, front', () => {
@@ -231,7 +247,7 @@ describe('buildMenuTemplate', () => {
     const template = build(RECENTS, false, handlers)
     const top = template.find((m) => m.label === 'Help')
     expect(top?.role).toBe('help')
-    const github = (top?.submenu as MenuItemConstructorOptions[]).find((i) => i.label === 'Yaseen Docs on GitHub')
+    const github = (top?.submenu as MenuItemConstructorOptions[]).find((i) => i.label === 'Yaseen Draw on GitHub')
     click(github)
     expect(handlers.openHelp).toHaveBeenCalledTimes(1)
   })
@@ -257,11 +273,11 @@ type ContextParams = Parameters<typeof buildContextMenuTemplate>[0]
 
 const EDIT_FLAGS: ContextParams['editFlags'] = { canUndo: true, canRedo: true, canCut: true, canCopy: true, canPaste: true, canDelete: true, canSelectAll: true, canEditRichly: true }
 
-const noopActions = (): ContextMenuActions => ({ copyAs: vi.fn(), pasteAs: vi.fn(), replace: vi.fn(), addToDictionary: vi.fn(), copyImage: vi.fn(), revealImage: vi.fn() })
+const noopActions = (): ContextMenuActions => ({ replace: vi.fn(), addToDictionary: vi.fn() })
 
 /** What Electron hands `context-menu`, defaulting to a clean right-click in an editable body. */
 function context(params: Partial<ContextParams> = {}): ContextParams {
-  return { misspelledWord: '', dictionarySuggestions: [], editFlags: EDIT_FLAGS, mediaType: 'none', srcURL: '', ...params }
+  return { misspelledWord: '', dictionarySuggestions: [], editFlags: EDIT_FLAGS, ...params }
 }
 
 const shapeOf = (items: MenuItemConstructorOptions[]) => items.map((i) => i.label ?? i.role ?? i.type)
@@ -269,40 +285,18 @@ const shapeOf = (items: MenuItemConstructorOptions[]) => items.map((i) => i.labe
 describe('buildContextMenuTemplate', () => {
   it('a misspelling with suggestions: the suggestions, Add to Dictionary, then cut/copy/paste', () => {
     const items = buildContextMenuTemplate(context({ misspelledWord: 'teh', dictionarySuggestions: ['the', 'ten', 'tea'] }), noopActions())
-    expect(shapeOf(items)).toEqual(['the', 'ten', 'tea', 'separator', 'Add to Dictionary', 'separator', 'cut', 'copy', 'Copy as', 'paste', 'Paste as'])
+    expect(shapeOf(items)).toEqual(['the', 'ten', 'tea', 'separator', 'Add to Dictionary', 'separator', 'cut', 'copy', 'paste'])
   })
 
   it('a misspelling Electron has no suggestions for leads with Add to Dictionary — no dangling separator', () => {
     const items = buildContextMenuTemplate(context({ misspelledWord: 'Yaseen' }), noopActions())
-    expect(shapeOf(items)).toEqual(['Add to Dictionary', 'separator', 'cut', 'copy', 'Copy as', 'paste', 'Paste as'])
+    expect(shapeOf(items)).toEqual(['Add to Dictionary', 'separator', 'cut', 'copy', 'paste'])
   })
 
   it('nothing misspelled: still never empty — cut/copy/paste mirroring editFlags', () => {
     const items = buildContextMenuTemplate(context({ editFlags: { ...EDIT_FLAGS, canCut: false, canPaste: false } }), noopActions())
-    expect(shapeOf(items)).toEqual(['cut', 'copy', 'Copy as', 'paste', 'Paste as'])
-    expect(items.map((i) => i.enabled)).toEqual([false, true, true, false, false])
-  })
-
-  it('context copy modes follow canCopy and dispatch only to their supplied target', () => {
-    const actions = noopActions()
-    const items = buildContextMenuTemplate(context(), actions)
-    const modes = items.find((i) => i.label === 'Copy as')?.submenu as MenuItemConstructorOptions[]
-    expect(modes.every((i) => i.accelerator === undefined)).toBe(true)
-    click(modes[0])
-    click(modes[1])
-    expect(vi.mocked(actions.copyAs).mock.calls).toEqual([['plain'], ['markdown']])
-    const disabled = buildContextMenuTemplate(context({ editFlags: { ...EDIT_FLAGS, canCopy: false } }), actions)
-    expect(disabled.find((i) => i.label === 'Copy as')?.enabled).toBe(false)
-  })
-
-  it('context paste modes call the supplied target and do not register duplicate accelerators', () => {
-    const actions = noopActions()
-    const items = buildContextMenuTemplate(context(), actions)
-    const modes = items.find((i) => i.label === 'Paste as')?.submenu as MenuItemConstructorOptions[]
-    expect(modes.every((i) => i.accelerator === undefined)).toBe(true)
-    click(modes[0])
-    click(modes[1])
-    expect(vi.mocked(actions.pasteAs).mock.calls).toEqual([['plain'], ['markdown']])
+    expect(shapeOf(items)).toEqual(['cut', 'copy', 'paste'])
+    expect(items.map((i) => i.enabled)).toEqual([false, true, false])
   })
 
   it('clicking a suggestion replaces the word; Add to Dictionary teaches the misspelled one', () => {
@@ -312,32 +306,6 @@ describe('buildContextMenuTemplate', () => {
     expect(actions.replace).toHaveBeenCalledWith('ten')
     click(items.find((i) => i.label === 'Add to Dictionary'))
     expect(actions.addToDictionary).toHaveBeenCalledWith('teh')
-  })
-
-  // ---------- images (YAZ-1666) ----------
-
-  it('an image under the cursor gets ONLY Copy Image and Reveal in Finder — no text rows, even mid-misspelling', () => {
-    const src = 'app://vault/%2Fv/pics/pic.png?from=notes'
-    const items = buildContextMenuTemplate(context({ mediaType: 'image', srcURL: src, misspelledWord: 'teh', dictionarySuggestions: ['the'] }), noopActions())
-    expect(shapeOf(items)).toEqual(['Copy Image', 'Reveal in Finder'])
-  })
-
-  it('Copy Image copies; Reveal in Finder hands the src URL through verbatim for the apply layer to resolve', () => {
-    const actions = noopActions()
-    const src = 'app://vault/%2Fv/pics/a%20b.png'
-    const items = buildContextMenuTemplate(context({ mediaType: 'image', srcURL: src }), actions)
-    click(items[0])
-    expect(actions.copyImage).toHaveBeenCalledTimes(1)
-    click(items[1])
-    expect(actions.revealImage).toHaveBeenCalledWith(src)
-    expect(actions.copyAs).not.toHaveBeenCalled()
-  })
-
-  it('any other media type keeps the text menu unchanged', () => {
-    for (const mediaType of ['none', 'video', 'canvas', 'file'] as const) {
-      const items = buildContextMenuTemplate(context({ mediaType, srcURL: 'app://vault/%2Fv/x.mp4' }), noopActions())
-      expect(shapeOf(items), mediaType).toEqual(['cut', 'copy', 'Copy as', 'paste', 'Paste as'])
-    }
   })
 })
 
@@ -383,21 +351,21 @@ let dir: string
 let store: Store
 beforeEach(async () => {
   dir = await mkdtemp(path.join(tmpdir(), 'yd-menu-'))
-  store = createStore(path.join(dir, 'yaseendocs.json'))
+  store = createStore(path.join(dir, 'yaseendraw.json'))
 })
 afterEach(async () => {
   await store.flush()
   await rm(dir, { recursive: true, force: true })
 })
 
-const ENTRY: WindowEntry = { id: 'w1', root: '/vaults/notes', file: '/vaults/notes/a.md', tabs: ['/vaults/notes/a.md'], rightPanel: defaultRightPanelIdentity(), sidebarCollapsed: false, sidebarLens: 'topics', focusDirs: [], focusTopics: [], focusFavorites: [], bounds: { x: 0, y: 0, width: 800, height: 600 } }
+const ENTRY: WindowEntry = { id: 'w1', root: '/vaults/notes', file: '/vaults/notes/a.excalidraw', tabs: ['/vaults/notes/a.excalidraw'], sidebarCollapsed: false, sidebarLens: 'files', focusDirs: [], focusFavorites: [], bounds: { x: 0, y: 0, width: 800, height: 600 } }
 
 function makeHandlers(focused?: { id: number; send: ReturnType<typeof vi.fn> }) {
   // `openRecentBeside` is the window manager's door (YAZ-1767 D1); the probe/prune/bump rules are windows.test's.
   const windows = { idFor: vi.fn(), openRecentBeside: vi.fn(() => true), duplicateWindow: vi.fn() }
   const host: MenuHost = {
     focusedWebContents: () => focused,
-    readClipboardText: vi.fn(() => '# Clipboard\n\nText'),
+    zoom: vi.fn(),
     openExternal: vi.fn(),
   }
   const handlers = createMenuHandlers(store, { ...windows, idFor: (wc: { id: number }) => (wc.id === 7 ? 'w1' : undefined) }, host)
@@ -405,30 +373,6 @@ function makeHandlers(focused?: { id: number; send: ReturnType<typeof vi.fn> }) 
 }
 
 describe('createMenuHandlers', () => {
-  it('copy modes request the selection from only the targeted window without reading the clipboard', () => {
-    const wc = { id: 7, send: vi.fn() }
-    const { handlers, host } = makeHandlers(wc)
-    handlers.copyAs('plain')
-    handlers.copyAs('markdown')
-    expect(wc.send.mock.calls).toEqual([[CH.menuCopyAs, 'plain'], [CH.menuCopyAs, 'markdown']])
-    expect(host.readClipboardText).not.toHaveBeenCalled()
-    expect(() => makeHandlers(undefined).handlers.copyAs('plain')).not.toThrow()
-  })
-  it('paste modes capture plain text only when there is a target and send the mode to that window', () => {
-    const wc = { id: 7, send: vi.fn() }
-    const { handlers, host } = makeHandlers(wc)
-    handlers.pasteAs('plain')
-    handlers.pasteAs('markdown')
-    expect(wc.send.mock.calls).toEqual([
-      [CH.menuPasteAs, { mode: 'plain', text: '# Clipboard\n\nText' }],
-      [CH.menuPasteAs, { mode: 'markdown', text: '# Clipboard\n\nText' }],
-    ])
-    expect(host.readClipboardText).toHaveBeenCalledTimes(2)
-    const absent = makeHandlers(undefined)
-    absent.handlers.pasteAs('plain')
-    expect(absent.host.readClipboardText).not.toHaveBeenCalled()
-  })
-
   it('newWindow duplicates the focused window entry', () => {
     store.upsertWindow(ENTRY)
     const wc = { id: 7, send: vi.fn() }
@@ -529,25 +473,73 @@ describe('createMenuHandlers', () => {
     expect(() => unfocused.toggleSidebar()).not.toThrow()
   })
 
-  it('zoom forwards the step to the focused renderer only (YAZ-1710)', () => {
+  it('zoom is applied by main on the focused window, never pushed to the renderer (YAZ-1710)', () => {
     const wc = { id: 7, send: vi.fn() }
-    const { handlers } = makeHandlers(wc)
+    const { handlers, host } = makeHandlers(wc)
     handlers.zoom(1)
-    expect(wc.send).toHaveBeenCalledExactlyOnceWith(CH.menuZoom, 1)
+    expect(host.zoom).toHaveBeenCalledExactlyOnceWith(1)
+    expect(wc.send).not.toHaveBeenCalled()
 
-    const { handlers: unfocused } = makeHandlers(undefined)
-    expect(() => unfocused.zoom(-1)).not.toThrow()
+    const { handlers: unfocused, host: unfocusedHost } = makeHandlers(undefined)
+    unfocused.zoom(-1)
+    expect(unfocusedHost.zoom).toHaveBeenCalledExactlyOnceWith(-1)
   })
 
   it('openHelp opens the repo README', () => {
     const { handlers, host } = makeHandlers(undefined)
     handlers.openHelp()
     expect(host.openExternal).toHaveBeenCalledWith(HELP_URL)
-    expect(HELP_URL).toBe('https://github.com/yaseenarshad/yaseen-milkdown#readme')
+    expect(HELP_URL).toBe('https://github.com/yaseenarshad/yaseen-draw-app#readme')
   })
 })
 
 // ---------- subscribeMenuRebuild ----------
+
+describe('createMenuHandlers — the two canvas gestures (🔒 D10)', () => {
+  it('exportImage and canvasBackground push to the focused renderer, colour and all', () => {
+    const wc = { id: 7, send: vi.fn() }
+    const { handlers } = makeHandlers(wc)
+    handlers.exportImage()
+    expect(wc.send).toHaveBeenCalledExactlyOnceWith(CH.menuExportImage)
+    wc.send.mockClear()
+    handlers.canvasBackground('#fffce8')
+    expect(wc.send).toHaveBeenCalledExactlyOnceWith(CH.menuCanvasBackground, '#fffce8')
+  })
+
+  it('with no window at all they are silent no-ops', () => {
+    const { handlers } = makeHandlers(undefined)
+    expect(() => {
+      handlers.exportImage()
+      handlers.canvasBackground('#ffffff')
+    }).not.toThrow()
+  })
+})
+
+describe('subscribeMenuRebuildOnActiveFile (🔒 D10)', () => {
+  it('rebuilds when a window`s active file changes, and not for other writes', () => {
+    store.upsertWindow(ENTRY)
+    const rebuild = vi.fn()
+    subscribeMenuRebuildOnActiveFile(store, rebuild)
+
+    store.setSidebarWidth(300)
+    store.pushRecent('/vaults/notes')
+    expect(rebuild).not.toHaveBeenCalled()
+
+    store.upsertWindow({ ...ENTRY, file: '/vaults/notes/b.excalidraw', tabs: ['/vaults/notes/b.excalidraw'] })
+    expect(rebuild).toHaveBeenCalledTimes(1)
+    // A write that leaves every window's active file alone is not a reason to rebuild.
+    store.upsertWindow({ ...ENTRY, file: '/vaults/notes/b.excalidraw', tabs: ['/vaults/notes/b.excalidraw'], sidebarCollapsed: true })
+    expect(rebuild).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns an unsubscribe', () => {
+    store.upsertWindow(ENTRY)
+    const rebuild = vi.fn()
+    subscribeMenuRebuildOnActiveFile(store, rebuild)()
+    store.upsertWindow({ ...ENTRY, file: null, tabs: [] })
+    expect(rebuild).not.toHaveBeenCalled()
+  })
+})
 
 describe('subscribeMenuRebuild', () => {
   it('rebuilds when recents change, not on other writes', () => {

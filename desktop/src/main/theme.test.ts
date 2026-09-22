@@ -11,7 +11,7 @@ let dir: string
 let file: string
 beforeEach(async () => {
   dir = await mkdtemp(path.join(tmpdir(), 'yd-theme-'))
-  file = path.join(dir, 'yaseendocs.json')
+  file = path.join(dir, 'yaseendraw.json')
 })
 afterEach(async () => {
   await rm(dir, { recursive: true, force: true })
@@ -58,7 +58,7 @@ describe('subscribeNativeTheme', () => {
     expect(apply).toHaveBeenCalledExactlyOnceWith('system')
 
     store.setSidebarWidth(321) // unrelated write
-    store.setSettings({ ...DEFAULT_SETTINGS, lineSpacing: 2 }) // settings write, same theme
+    store.setSettings({ ...DEFAULT_SETTINGS, confirmDelete: false }) // settings write, same theme
     expect(apply).toHaveBeenCalledTimes(1)
 
     store.setSettings({ ...DEFAULT_SETTINGS, theme: 'dark' })

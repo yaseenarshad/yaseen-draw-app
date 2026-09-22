@@ -1,0 +1,19 @@
+# CI (YAZ-1775 🔒 D7): every pull request gets a typecheck and the unit-test suite.
+# No Playwright/e2e here — behaviour is verified by launching the dev app against a test vault.
+name: ci
+
+on:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test

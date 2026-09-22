@@ -6,7 +6,7 @@ function setup(saveImpl?: (content: string, expectedMtime: number) => Promise<{ 
   const conflicts: number[] = []
   const save = vi.fn(saveImpl ?? (async () => ({ mtime: 200 })))
   const a = new Autosave({
-    markdown: 'base\n',
+    content: 'base\n',
     mtime: 100,
     save,
     onStatus: (s) => statuses.push(s),

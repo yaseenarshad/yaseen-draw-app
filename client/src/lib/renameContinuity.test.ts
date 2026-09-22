@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { _resetRenameContinuity, carryEditorAcrossPane, carryEditorAcrossRename, carryEditorsAcrossDirRename, flushRenamedDir, flushRenamedPath, registerRenameContinuity, retireDeletedDir, retireDeletedPath, takeRenameBuffer, type RenameContinuityHandle } from './renameContinuity'
+import { _resetRenameContinuity, carryEditorAcrossRename, carryEditorsAcrossDirRename, flushRenamedDir, flushRenamedPath, registerRenameContinuity, retireDeletedDir, retireDeletedPath, takeRenameBuffer, type RenameContinuityHandle } from './renameContinuity'
 
 afterEach(() => _resetRenameContinuity())
 
@@ -11,48 +11,39 @@ const handle = (over: Partial<RenameContinuityHandle> = {}): RenameContinuityHan
 })
 
 describe('renameContinuity (Links E1, GRO-2194)', () => {
-  it('pane transfer captures, retires, and exposes a dirty buffer at the same path', () => {
-    const h = handle({ capture: vi.fn(() => ({ frontmatter: '---\n---\n', body: 'newest keystrokes' })) })
-    registerRenameContinuity('/v/a.md', h)
-    carryEditorAcrossPane('/v/a.md')
-    expect(h.capture).toHaveBeenCalledTimes(1)
-    expect(h.retire).toHaveBeenCalledTimes(1)
-    expect(takeRenameBuffer('/v/a.md')).toEqual({ frontmatter: '---\n---\n', body: 'newest keystrokes' })
-  })
-
   it('flushRenamedPath flushes the registered handle and resolves without one', async () => {
     const h = handle()
-    registerRenameContinuity('/v/a.md', h)
-    await flushRenamedPath('/v/a.md')
+    registerRenameContinuity('/v/a.excalidraw', h)
+    await flushRenamedPath('/v/a.excalidraw')
     expect(h.flush).toHaveBeenCalledTimes(1)
-    await expect(flushRenamedPath('/v/other.md')).resolves.toBeUndefined()
+    await expect(flushRenamedPath('/v/other.excalidraw')).resolves.toBeUndefined()
   })
 
   it('carryEditorAcrossRename stashes a DIRTY buffer under the NEW path and retires the old handle', () => {
-    const h = handle({ capture: vi.fn(() => ({ frontmatter: '---\nk: 1\n---\n', body: 'dirty body' })) })
-    registerRenameContinuity('/v/old.md', h)
-    carryEditorAcrossRename('/v/old.md', '/v/new.md')
+    const h = handle({ capture: vi.fn(() => ({ body: 'dirty body' })) })
+    registerRenameContinuity('/v/old.excalidraw', h)
+    carryEditorAcrossRename('/v/old.excalidraw', '/v/new.excalidraw')
     expect(h.retire).toHaveBeenCalledTimes(1)
-    expect(takeRenameBuffer('/v/new.md')).toEqual({ frontmatter: '---\nk: 1\n---\n', body: 'dirty body' })
-    expect(takeRenameBuffer('/v/new.md')).toBeNull() // consumed exactly once
+    expect(takeRenameBuffer('/v/new.excalidraw')).toEqual({ body: 'dirty body' })
+    expect(takeRenameBuffer('/v/new.excalidraw')).toBeNull() // consumed exactly once
   })
 
   it('a CLEAN editor is retired without stashing anything (nothing to carry, nothing to resurrect)', () => {
     const h = handle()
-    registerRenameContinuity('/v/old.md', h)
-    carryEditorAcrossRename('/v/old.md', '/v/new.md')
+    registerRenameContinuity('/v/old.excalidraw', h)
+    carryEditorAcrossRename('/v/old.excalidraw', '/v/new.excalidraw')
     expect(h.retire).toHaveBeenCalledTimes(1)
-    expect(takeRenameBuffer('/v/new.md')).toBeNull()
+    expect(takeRenameBuffer('/v/new.excalidraw')).toBeNull()
   })
 
   it('no editor at the old path is a no-op; unregister removes only its own handle', () => {
-    carryEditorAcrossRename('/v/old.md', '/v/new.md') // must not throw
+    carryEditorAcrossRename('/v/old.excalidraw', '/v/new.excalidraw') // must not throw
     const first = handle()
-    const off = registerRenameContinuity('/v/a.md', first)
+    const off = registerRenameContinuity('/v/a.excalidraw', first)
     const second = handle()
-    registerRenameContinuity('/v/a.md', second) // remount replaced the handle
+    registerRenameContinuity('/v/a.excalidraw', second) // remount replaced the handle
     off() // stale unregister must not drop the replacement
-    carryEditorAcrossRename('/v/a.md', '/v/b.md')
+    carryEditorAcrossRename('/v/a.excalidraw', '/v/b.excalidraw')
     expect(second.retire).toHaveBeenCalledTimes(1)
     expect(first.retire).not.toHaveBeenCalled()
   })
@@ -64,10 +55,10 @@ describe('renameContinuity for a FOLDER rename (Links E1b, GRO-2241)', () => {
     const deep = handle()
     const outside = handle()
     const prefixCousin = handle()
-    registerRenameContinuity('/v/Old/a.md', inside)
-    registerRenameContinuity('/v/Old/deep/b.md', deep)
-    registerRenameContinuity('/v/x.md', outside)
-    registerRenameContinuity('/v/Older/c.md', prefixCousin) // `/v/Older` is NOT under `/v/Old`
+    registerRenameContinuity('/v/Old/a.excalidraw', inside)
+    registerRenameContinuity('/v/Old/deep/b.excalidraw', deep)
+    registerRenameContinuity('/v/x.excalidraw', outside)
+    registerRenameContinuity('/v/Older/c.excalidraw', prefixCousin) // `/v/Older` is NOT under `/v/Old`
     await flushRenamedDir('/v/Old')
     expect(inside.flush).toHaveBeenCalledTimes(1)
     expect(deep.flush).toHaveBeenCalledTimes(1)
@@ -76,18 +67,18 @@ describe('renameContinuity for a FOLDER rename (Links E1b, GRO-2241)', () => {
   })
 
   it('carryEditorsAcrossDirRename carries each editor under the dir to ITS new path (dirty stashed, all retired)', () => {
-    const dirty = handle({ capture: vi.fn(() => ({ frontmatter: '', body: 'dirty' })) })
+    const dirty = handle({ capture: vi.fn(() => ({ body: 'dirty' })) })
     const clean = handle()
     const outside = handle()
-    registerRenameContinuity('/v/Old/a.md', dirty)
-    registerRenameContinuity('/v/Old/deep/b.md', clean)
-    registerRenameContinuity('/v/x.md', outside)
+    registerRenameContinuity('/v/Old/a.excalidraw', dirty)
+    registerRenameContinuity('/v/Old/deep/b.excalidraw', clean)
+    registerRenameContinuity('/v/x.excalidraw', outside)
     carryEditorsAcrossDirRename('/v/Old', '/v/New')
     expect(dirty.retire).toHaveBeenCalledTimes(1)
     expect(clean.retire).toHaveBeenCalledTimes(1)
     expect(outside.retire).not.toHaveBeenCalled()
-    expect(takeRenameBuffer('/v/New/a.md')).toEqual({ frontmatter: '', body: 'dirty' })
-    expect(takeRenameBuffer('/v/New/deep/b.md')).toBeNull() // clean: nothing stashed
+    expect(takeRenameBuffer('/v/New/a.excalidraw')).toEqual({ body: 'dirty' })
+    expect(takeRenameBuffer('/v/New/deep/b.excalidraw')).toBeNull() // clean: nothing stashed
   })
 })
 
@@ -106,7 +97,7 @@ describe('retireDeletedPath / retireDeletedDir (GRO-2272)', () => {
         flush: async () => void calls.flush++,
         capture: () => {
           calls.capture++
-          return { frontmatter: '', body: 'dirty' }
+          return { body: 'dirty' }
         },
         retire: () => void calls.retire++,
       },
@@ -115,8 +106,8 @@ describe('retireDeletedPath / retireDeletedDir (GRO-2272)', () => {
 
   it('retires the editor at the path and never captures a buffer', () => {
     const a = handle()
-    registerRenameContinuity('/v/a.md', a.h)
-    retireDeletedPath('/v/a.md')
+    registerRenameContinuity('/v/a.excalidraw', a.h)
+    retireDeletedPath('/v/a.excalidraw')
     expect(a.calls.retire).toBe(1)
     expect(a.calls.capture).toBe(0) // the whole difference from carryEditorAcrossRename
     expect(a.calls.flush).toBe(0)
@@ -124,17 +115,17 @@ describe('retireDeletedPath / retireDeletedDir (GRO-2272)', () => {
 
   it('drops a buffer already stashed for that path, so a later mount cannot apply it', () => {
     const a = handle()
-    registerRenameContinuity('/v/a.md', a.h)
+    registerRenameContinuity('/v/a.excalidraw', a.h)
     // A rename landed moments before the delete and left a buffer at this path.
-    carryEditorAcrossRename('/v/old.md', '/v/a.md')
-    expect(takeRenameBuffer('/v/a.md')).toBeNull() // consumed by this probe...
-    carryEditorAcrossRename('/v/old2.md', '/v/a.md')
-    retireDeletedPath('/v/a.md')
-    expect(takeRenameBuffer('/v/a.md')).toBeNull() // ...and gone after the delete either way
+    carryEditorAcrossRename('/v/old.excalidraw', '/v/a.excalidraw')
+    expect(takeRenameBuffer('/v/a.excalidraw')).toBeNull() // consumed by this probe...
+    carryEditorAcrossRename('/v/old2.excalidraw', '/v/a.excalidraw')
+    retireDeletedPath('/v/a.excalidraw')
+    expect(takeRenameBuffer('/v/a.excalidraw')).toBeNull() // ...and gone after the delete either way
   })
 
   it('is a silent no-op when no editor is open at the path', () => {
-    expect(() => retireDeletedPath('/v/never-open.md')).not.toThrow()
+    expect(() => retireDeletedPath('/v/never-open.excalidraw')).not.toThrow()
   })
 
   it('retireDeletedDir retires every editor under the prefix and leaves the rest alone', () => {
@@ -142,10 +133,10 @@ describe('retireDeletedPath / retireDeletedDir (GRO-2272)', () => {
     const deeper = handle()
     const sibling = handle()
     const lookalike = handle()
-    registerRenameContinuity('/v/Docs/a.md', inside.h)
-    registerRenameContinuity('/v/Docs/deep/b.md', deeper.h)
-    registerRenameContinuity('/v/Other/c.md', sibling.h)
-    registerRenameContinuity('/v/Docsy.md', lookalike.h) // NOT under /v/Docs
+    registerRenameContinuity('/v/Docs/a.excalidraw', inside.h)
+    registerRenameContinuity('/v/Docs/deep/b.excalidraw', deeper.h)
+    registerRenameContinuity('/v/Other/c.excalidraw', sibling.h)
+    registerRenameContinuity('/v/Docsy.excalidraw', lookalike.h) // NOT under /v/Docs
     retireDeletedDir('/v/Docs')
     expect(inside.calls.retire).toBe(1)
     expect(deeper.calls.retire).toBe(1)
@@ -155,12 +146,12 @@ describe('retireDeletedPath / retireDeletedDir (GRO-2272)', () => {
   })
 
   it('retireDeletedDir drops stashed buffers under the prefix only', () => {
-    registerRenameContinuity('/v/Docs/a.md', handle().h)
-    carryEditorAcrossRename('/v/Docs/a.md', '/v/Docs/moved.md')
-    registerRenameContinuity('/v/Keep/k.md', handle().h)
-    carryEditorAcrossRename('/v/Keep/k.md', '/v/Keep/moved.md')
+    registerRenameContinuity('/v/Docs/a.excalidraw', handle().h)
+    carryEditorAcrossRename('/v/Docs/a.excalidraw', '/v/Docs/moved.excalidraw')
+    registerRenameContinuity('/v/Keep/k.excalidraw', handle().h)
+    carryEditorAcrossRename('/v/Keep/k.excalidraw', '/v/Keep/moved.excalidraw')
     retireDeletedDir('/v/Docs')
-    expect(takeRenameBuffer('/v/Docs/moved.md')).toBeNull()
-    expect(takeRenameBuffer('/v/Keep/moved.md')).not.toBeNull()
+    expect(takeRenameBuffer('/v/Docs/moved.excalidraw')).toBeNull()
+    expect(takeRenameBuffer('/v/Keep/moved.excalidraw')).not.toBeNull()
   })
 })

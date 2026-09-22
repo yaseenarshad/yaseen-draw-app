@@ -1,4 +1,4 @@
-// jsdom lacks a few layout/observer APIs that ProseMirror/CodeMirror touch; Crepe otherwise runs fine in jsdom.
+// jsdom lacks a few layout/observer APIs the canvas and the tree touch.
 class NoopObserver {
   observe() {}
   unobserve() {}

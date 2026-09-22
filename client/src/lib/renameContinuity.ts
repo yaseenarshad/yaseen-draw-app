@@ -46,9 +46,7 @@ export interface RenameContinuityHandle {
 }
 
 export interface RenameBuffer {
-  /** Raw frontmatter block as `useAutosave` holds it. */
-  frontmatter: string
-  /** Editor body. */
+  /** The editor's live bytes. */
   body: string
 }
 
@@ -103,11 +101,6 @@ function carryEditorBuffer(oldPath: string, newPath: string): void {
 
 export function carryEditorAcrossRename(oldPath: string, newPath: string): void {
   carryEditorBuffer(oldPath, newPath)
-}
-
-/** Same-path handoff before React moves one editable owner between main and right panes. */
-export function carryEditorAcrossPane(path: string): void {
-  carryEditorBuffer(path, path)
 }
 
 /** Consume the stashed buffer for a freshly mounting editor at `path`; null when none. */

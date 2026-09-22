@@ -1,5 +1,5 @@
 /**
- * useLinkEvents (E1, GRO-2171): the renderer's half of the yaseendocs:// deep-link pushes —
+ * useLinkEvents (E1, GRO-2171): the renderer's half of the yaseendraw:// deep-link pushes —
  * subscribed on mount, unsubscribed on unmount, latest callbacks win.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -24,7 +24,7 @@ function installBridge() {
       }),
     },
   }
-  Object.defineProperty(window, 'yaseenDocs', { value: bridge, configurable: true, writable: true })
+  Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
   return {
     emitOpenFile: (path: string) => openFileListeners.forEach((l) => l(path)),
     emitNotice: (message: string) => noticeListeners.forEach((l) => l(message)),
@@ -41,7 +41,7 @@ let root: Root | null = null
 afterEach(() => {
   act(() => root?.unmount())
   root = null
-  delete (window as unknown as Record<string, unknown>).yaseenDocs
+  delete (window as unknown as Record<string, unknown>).yaseenDraw
 })
 
 describe('useLinkEvents', () => {

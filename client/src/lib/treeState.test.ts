@@ -15,17 +15,17 @@ describe('treeReducer', () => {
   })
 
   it('expandTo opens every ancestor of the file under root and keeps existing state', () => {
-    const next = treeReducer(['/r/other'], { type: 'expandTo', root: '/r', file: '/r/a/b/c.md' })
+    const next = treeReducer(['/r/other'], { type: 'expandTo', root: '/r', file: '/r/a/b/c.excalidraw' })
     expect(next).toEqual(['/r/other', '/r/a', '/r/a/b'])
-    expect(treeReducer(next, { type: 'expandTo', root: '/r', file: '/r/a/b/c.md' })).toBe(next)
+    expect(treeReducer(next, { type: 'expandTo', root: '/r', file: '/r/a/b/c.excalidraw' })).toBe(next)
   })
 })
 
 describe('ancestorDirs', () => {
   it('returns nothing for a file directly under root or outside it', () => {
-    expect(ancestorDirs('/r', '/r/x.md')).toEqual([])
-    expect(ancestorDirs('/r', '/other/x.md')).toEqual([])
-    expect(ancestorDirs('/r/', '/r/a/x.md')).toEqual(['/r/a'])
+    expect(ancestorDirs('/r', '/r/x.excalidraw')).toEqual([])
+    expect(ancestorDirs('/r', '/other/x.excalidraw')).toEqual([])
+    expect(ancestorDirs('/r/', '/r/a/x.excalidraw')).toEqual(['/r/a'])
   })
 })
 
@@ -35,23 +35,23 @@ describe('treeHasFile', () => {
       type: 'dir',
       name: 'a',
       path: '/r/a',
-      children: [{ type: 'file', name: 'x.md', path: '/r/a/x.md', size: 1, mtime: 1, kind: 'markdown' }],
+      children: [{ type: 'file', name: 'x.excalidraw', path: '/r/a/x.excalidraw', size: 1, mtime: 1, kind: 'drawing' }],
     },
-    { type: 'file', name: 'y.md', path: '/r/y.md', size: 1, mtime: 1, kind: 'markdown' },
+    { type: 'file', name: 'y.excalidraw', path: '/r/y.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
   ]
   it('finds nested and top-level files only', () => {
-    expect(treeHasFile(tree, '/r/a/x.md')).toBe(true)
-    expect(treeHasFile(tree, '/r/y.md')).toBe(true)
+    expect(treeHasFile(tree, '/r/a/x.excalidraw')).toBe(true)
+    expect(treeHasFile(tree, '/r/y.excalidraw')).toBe(true)
     expect(treeHasFile(tree, '/r/a')).toBe(false)
-    expect(treeHasFile(tree, '/r/z.md')).toBe(false)
+    expect(treeHasFile(tree, '/r/z.excalidraw')).toBe(false)
   })
 
   it('treeHasPath finds files AND folders — the selection may hold either (YAZ-1578)', () => {
     expect(treeHasPath(tree, '/r/a')).toBe(true)
-    expect(treeHasPath(tree, '/r/a/x.md')).toBe(true)
-    expect(treeHasPath(tree, '/r/y.md')).toBe(true)
+    expect(treeHasPath(tree, '/r/a/x.excalidraw')).toBe(true)
+    expect(treeHasPath(tree, '/r/y.excalidraw')).toBe(true)
     expect(treeHasPath(tree, '/r/b')).toBe(false)
-    expect(treeHasPath(tree, '/r/z.md')).toBe(false)
+    expect(treeHasPath(tree, '/r/z.excalidraw')).toBe(false)
   })
 })
 
@@ -64,10 +64,10 @@ describe('allDirs', () => {
         path: '/r/a',
         children: [
           { type: 'dir', name: 'b', path: '/r/a/b', children: [] },
-          { type: 'file', name: 'x.md', path: '/r/a/x.md', size: 1, mtime: 1, kind: 'markdown' },
+          { type: 'file', name: 'x.excalidraw', path: '/r/a/x.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
         ],
       },
-      { type: 'file', name: 'y.md', path: '/r/y.md', size: 1, mtime: 1, kind: 'markdown' },
+      { type: 'file', name: 'y.excalidraw', path: '/r/y.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
       { type: 'dir', name: 'c', path: '/r/c', children: [] },
     ]
     expect(allDirs(tree)).toEqual(['/r/a', '/r/a/b', '/r/c'])
@@ -89,10 +89,10 @@ describe('findDirNode (YAZ-1605)', () => {
       path: '/v/Projects',
       children: [
         { type: 'dir', name: 'Alpha', path: '/v/Projects/Alpha', children: [] },
-        { type: 'file', name: 'p.md', path: '/v/Projects/p.md', size: 1, mtime: 1, kind: 'markdown' },
+        { type: 'file', name: 'p.excalidraw', path: '/v/Projects/p.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
       ],
     },
-    { type: 'file', name: 'top.md', path: '/v/top.md', size: 1, mtime: 1, kind: 'markdown' },
+    { type: 'file', name: 'top.excalidraw', path: '/v/top.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
   ]
 
   it('finds a dir nested two deep and hands back the node itself', () => {
@@ -100,7 +100,7 @@ describe('findDirNode (YAZ-1605)', () => {
   })
 
   it('is null for a file path, for an unknown path, and for the root itself', () => {
-    expect(findDirNode(tree, '/v/Projects/p.md')).toBeNull()
+    expect(findDirNode(tree, '/v/Projects/p.excalidraw')).toBeNull()
     expect(findDirNode(tree, '/v/Nope')).toBeNull()
     expect(findDirNode([], '/v/Projects')).toBeNull()
   })
@@ -120,7 +120,7 @@ describe('focusRoots (YAZ-1605)', () => {
       path: '/v/Projects',
       children: [{ type: 'dir', name: 'Alpha', path: '/v/Projects/Alpha', children: [] }],
     },
-    { type: 'file', name: 'top.md', path: '/v/top.md', size: 1, mtime: 1, kind: 'markdown' },
+    { type: 'file', name: 'top.excalidraw', path: '/v/top.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
   ]
 
   it('returns the focused dirs in TREE order, whatever order they were focused in', () => {
@@ -151,22 +151,22 @@ describe('findNode (YAZ-1766)', () => {
       path: '/v/Projects',
       children: [
         { type: 'dir', name: 'Alpha', path: '/v/Projects/Alpha', children: [] },
-        { type: 'file', name: 'p.md', path: '/v/Projects/p.md', size: 1, mtime: 1, kind: 'markdown' },
+        { type: 'file', name: 'p.excalidraw', path: '/v/Projects/p.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
       ],
     },
-    { type: 'file', name: 'top.md', path: '/v/top.md', size: 1, mtime: 1, kind: 'markdown' },
+    { type: 'file', name: 'top.excalidraw', path: '/v/top.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
   ]
 
   it('finds a file and a dir, at the root and nested', () => {
-    expect(findNode(tree, '/v/top.md')?.name).toBe('top.md')
-    expect(findNode(tree, '/v/Projects/p.md')?.name).toBe('p.md')
+    expect(findNode(tree, '/v/top.excalidraw')?.name).toBe('top.excalidraw')
+    expect(findNode(tree, '/v/Projects/p.excalidraw')?.name).toBe('p.excalidraw')
     expect(findNode(tree, '/v/Projects/Alpha')?.type).toBe('dir')
   })
 
   it('is null for an unknown path, and a prefix-sharing sibling never answers for the shorter name', () => {
-    expect(findNode(tree, '/v/Nope.md')).toBeNull()
-    expect(findNode(tree, '/v/Projects-Archive/p.md')).toBeNull()
-    expect(findNode([], '/v/top.md')).toBeNull()
+    expect(findNode(tree, '/v/Nope.excalidraw')).toBeNull()
+    expect(findNode(tree, '/v/Projects-Archive/p.excalidraw')).toBeNull()
+    expect(findNode([], '/v/top.excalidraw')).toBeNull()
   })
 })
 
@@ -177,21 +177,21 @@ describe('favoriteRoots (YAZ-1766 D4)', () => {
       type: 'dir',
       name: 'Projects',
       path: '/v/Projects',
-      children: [{ type: 'file', name: 'p.md', path: '/v/Projects/p.md', size: 1, mtime: 1, kind: 'markdown' }],
+      children: [{ type: 'file', name: 'p.excalidraw', path: '/v/Projects/p.excalidraw', size: 1, mtime: 1, kind: 'drawing' }],
     },
-    { type: 'file', name: 'top.md', path: '/v/top.md', size: 1, mtime: 1, kind: 'markdown' },
+    { type: 'file', name: 'top.excalidraw', path: '/v/top.excalidraw', size: 1, mtime: 1, kind: 'drawing' },
   ]
 
   it('returns the favorites in STORED order, files and dirs alike — never tree order', () => {
-    expect(favoriteRoots(tree, ['/v/top.md', '/v/Projects', '/v/Notes']).map((n) => n.path)).toEqual(['/v/top.md', '/v/Projects', '/v/Notes'])
+    expect(favoriteRoots(tree, ['/v/top.excalidraw', '/v/Projects', '/v/Notes']).map((n) => n.path)).toEqual(['/v/top.excalidraw', '/v/Projects', '/v/Notes'])
   })
 
   it('keeps a favorite INSIDE a favorited folder as its own root row too (redundancy, not focusRoots)', () => {
-    expect(favoriteRoots(tree, ['/v/Projects/p.md', '/v/Projects']).map((n) => n.path)).toEqual(['/v/Projects/p.md', '/v/Projects'])
+    expect(favoriteRoots(tree, ['/v/Projects/p.excalidraw', '/v/Projects']).map((n) => n.path)).toEqual(['/v/Projects/p.excalidraw', '/v/Projects'])
   })
 
   it('a path the tree no longer holds yields no row, and no favorites yields nothing', () => {
-    expect(favoriteRoots(tree, ['/v/Gone.md', '/v/Notes']).map((n) => n.path)).toEqual(['/v/Notes'])
+    expect(favoriteRoots(tree, ['/v/Gone.excalidraw', '/v/Notes']).map((n) => n.path)).toEqual(['/v/Notes'])
     expect(favoriteRoots(tree, [])).toEqual([])
   })
 })

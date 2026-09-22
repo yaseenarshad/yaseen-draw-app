@@ -1,11 +1,11 @@
 /**
  * Settings search (YAZ-1679 D6): every available setting becomes ONE candidate whose searchable
  * text is its label, hint, keywords, group title, group hint and section title run together, and the match
- * is the `[[` picker's own (`matchLinkCandidates`: exact, then prefix, then substring,
+ * is the app's one matcher (`matchCandidates`: exact, then prefix, then substring,
  * case-folded) — one ranking rule in the app, not two. The candidates are built once per dialog
  * open; the query runs over them on every keystroke.
  */
-import { matchLinkCandidates } from '../links/completion'
+import { matchCandidates } from '../search/matchCandidates'
 import { availableSections, resolveHint, type SettingDef, type SettingsCtx, type SettingsGroup, type SettingsSection } from './registry'
 
 export interface SettingHit {
@@ -30,5 +30,5 @@ export function settingCandidates(ctx: SettingsCtx): SettingHit[] {
 
 /** Every hit for `query`, best first; the cap is the whole list — a settings search never truncates. */
 export function searchSettings(candidates: readonly SettingHit[], query: string): SettingHit[] {
-  return matchLinkCandidates(candidates, query, candidates.length)
+  return matchCandidates(candidates, query, candidates.length)
 }
