@@ -575,8 +575,8 @@ export interface WindowEntry {
 }
 
 /**
- * View state that only means something inside that folder (the retired localStorage
- * mdapp.expanded / lastFile). `expanded` is a SESSION list (YAZ-1642): shared by every window on
+ * View state that only means something inside that folder. `expanded` is a SESSION list
+ * (YAZ-1642): shared by every window on
  * the vault through the main-owned store, never written to disk and never restored — a launch
  * starts the tree collapsed. `lastFile` persists.
  */
@@ -736,12 +736,12 @@ export interface FavoritesApi {
  * `shape` needs no network and no key at all.
  */
 export type MediaProvider = 'pixabay' | 'iconify' | 'shape'
-export const MEDIA_PROVIDERS: readonly MediaProvider[] = ['pixabay', 'iconify', 'shape']
+const MEDIA_PROVIDERS: readonly MediaProvider[] = ['pixabay', 'iconify', 'shape']
 export const isMediaProvider = (v: unknown): v is MediaProvider => MEDIA_PROVIDERS.includes(v as MediaProvider)
 
 /** What the item IS, independent of who served it (the web app's `ImageStudioItemKind`). */
 export type MediaItemKind = 'photo' | 'illustration' | 'icon' | 'logo' | 'shape'
-export const MEDIA_ITEM_KINDS: readonly MediaItemKind[] = ['photo', 'illustration', 'icon', 'logo', 'shape']
+const MEDIA_ITEM_KINDS: readonly MediaItemKind[] = ['photo', 'illustration', 'icon', 'logo', 'shape']
 export const isMediaItemKind = (v: unknown): v is MediaItemKind => MEDIA_ITEM_KINDS.includes(v as MediaItemKind)
 
 /**
@@ -838,7 +838,7 @@ export interface MediaApi {
  * federated mix (Iconify 14 + Pixabay 4 of `SEARCH_LIMIT` 18), the other two are one provider each.
  */
 export type MediaSearchSource = 'all' | 'iconify' | 'pixabay'
-export const MEDIA_SEARCH_SOURCES: readonly MediaSearchSource[] = ['all', 'iconify', 'pixabay']
+const MEDIA_SEARCH_SOURCES: readonly MediaSearchSource[] = ['all', 'iconify', 'pixabay']
 export const isMediaSearchSource = (v: unknown): v is MediaSearchSource => MEDIA_SEARCH_SOURCES.includes(v as MediaSearchSource)
 
 /**
@@ -851,7 +851,7 @@ export type StudioItem = MediaItem
 
 /** The two providers that serve BYTES; `shape` is drawn by the renderer and never fetched. */
 export type MediaBytesProvider = 'pixabay' | 'iconify'
-export const MEDIA_BYTES_PROVIDERS: readonly MediaBytesProvider[] = ['pixabay', 'iconify']
+const MEDIA_BYTES_PROVIDERS: readonly MediaBytesProvider[] = ['pixabay', 'iconify']
 export const isMediaBytesProvider = (v: unknown): v is MediaBytesProvider => MEDIA_BYTES_PROVIDERS.includes(v as MediaBytesProvider)
 
 /** `media:search` — the query, the providers, and the opaque cursor of the page before this one. */

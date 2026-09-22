@@ -58,14 +58,17 @@ export function slugForComponentName(name: string): string {
 
 /**
  * The first free slug: the base, then `-2`, `-3`, … — Finder's own counting, and never `-1`,
- * because "the second one" is what a duplicate name means.
+ * because "the second one" is what a duplicate name means. The stem is re-trimmed for EVERY
+ * candidate, because the suffix grows: reserving a fixed three characters made `-100` overflow
+ * `MAX_COMPONENT_SLUG_LENGTH` and produced a slug `isValidComponentSlug` then rejected.
  */
 export function uniqueComponentSlug(base: string, taken: ReadonlySet<string>): string {
   if (!taken.has(base)) return base
-  const room = MAX_COMPONENT_SLUG_LENGTH - 3
-  const stem = base.length > room ? base.slice(0, room).replace(/-+$/g, '') : base
   for (let n = 2; ; n++) {
-    const candidate = `${stem}-${n}`
+    const suffix = `-${n}`
+    const room = MAX_COMPONENT_SLUG_LENGTH - suffix.length
+    const stem = base.length > room ? base.slice(0, room).replace(/-+$/g, '') : base
+    const candidate = `${stem}${suffix}`
     if (!taken.has(candidate)) return candidate
   }
 }

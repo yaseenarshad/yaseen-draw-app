@@ -52,7 +52,7 @@ async function remoteHead(repo: GitRepo, remote: BareRemote): Promise<string> {
 /** An independent second clone, standing in for the user's other machine. */
 async function secondClone(remote: BareRemote): Promise<string> {
   const bin = await requireGit()
-  const dir = await mkdtemp(path.join(tmpdir(), 'mdapp-clone-'))
+  const dir = await mkdtemp(path.join(tmpdir(), 'yaseendraw-clone-'))
   cleanups.push(() => rm(dir, { recursive: true, force: true }))
   expect((await git(bin, tmpdir(), ['clone', remote.url, dir])).code).toBe(0)
   for (const cfg of [
@@ -183,7 +183,7 @@ describe('syncPass', { timeout: REAL_GIT_TIMEOUT_MS }, () => {
   })
 
   it('reports a plain directory as off', async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), 'mdapp-nosync-'))
+    const dir = await mkdtemp(path.join(tmpdir(), 'yaseendraw-nosync-'))
     cleanups.push(() => rm(dir, { recursive: true, force: true }))
     expect(await syncPass(dir)).toEqual({ root: dir, state: 'off', repo: { remoteUrl: null, branch: null } })
   })
@@ -201,7 +201,7 @@ describe('syncPass', { timeout: REAL_GIT_TIMEOUT_MS }, () => {
    */
   it('commits locally and reports pending when the remote is unreachable', async () => {
     const { repo } = await pushedRepo()
-    await repo.run(['remote', 'set-url', 'origin', path.join(tmpdir(), 'mdapp-no-such-remote')])
+    await repo.run(['remote', 'set-url', 'origin', path.join(tmpdir(), 'yaseendraw-no-such-remote')])
     await repo.write('offline.md', '# written on a train\n')
 
     const status = await syncPass(repo.root)

@@ -199,13 +199,13 @@ function sanitizeFolders(raw: unknown): Record<string, FolderState> {
   return out
 }
 
-/** Null when the document is not a version-1 state object at all (→ treated as corrupt). */
 /** The file's shape: each folder bucket minus its session fields (YAZ-1642) — what a relaunch restores, nothing more. */
 function toDisk(state: AppState): unknown {
   const folders = Object.fromEntries(Object.entries(state.folders).map(([root, { expanded: _e, ...kept }]) => [root, kept]))
   return { ...state, folders }
 }
 
+/** Null when the document is not a version-1 state object at all (→ treated as corrupt). */
 function sanitizeState(raw: unknown): AppState | null {
   if (!isRecord(raw) || raw.version !== 1) return null
   // YAZ-1280 migration: a v1 file's retired global value seeds only windows that do not yet
@@ -413,6 +413,12 @@ export function createStore(filePath: string): Store {
       })
       const recents = state.recents.filter((r) => !gone(r.path))
       if (recents.length !== state.recents.length) changed = true
+      /** A `lastFile` that went is forgotten, and that counts as a change worth committing. */
+      const keepLastFile = (lastFile: string | null): string | null => {
+        if (lastFile === null || !gone(lastFile)) return lastFile
+        changed = true
+        return null
+      }
       const folders = Object.fromEntries(
         Object.entries(state.folders)
           .filter(([root]) => {
@@ -425,7 +431,7 @@ export function createStore(filePath: string): Store {
             {
               ...folder,
               expanded: drop(folder.expanded),
-              lastFile: folder.lastFile !== null && gone(folder.lastFile) ? ((changed = true), null) : folder.lastFile,
+              lastFile: keepLastFile(folder.lastFile),
             },
           ]),
       )

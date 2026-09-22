@@ -45,6 +45,7 @@ import {
   normalizeIconifyResults,
   normalizePixabayResults,
   oppositePixabayType,
+  PIXABAY_API,
   PIXABAY_PAGE_SIZE,
   pixabaySearchUrl,
   providerLimits,
@@ -145,7 +146,9 @@ export function createMediaProviders({ fetch, readPixabayKey, cache }: MediaProv
       const start = cursor.colorStart
       const page = await fetchIconifyPage(query, start, Math.min(ICONIFY_COLOR_BATCH_LIMIT, limit), COLOR_COLLECTION_PRIORITY)
       const returnedItems = page.items.slice(0, limit)
-      const consumedCount = returnedItems.length || page.fetchedCount === 0 ? returnedItems.length : page.fetchedCount
+      // A page that yielded nothing usable still consumed what it fetched — otherwise the cursor
+      // never advances and the next request asks for the same window again.
+      const consumedCount = returnedItems.length > 0 || page.fetchedCount === 0 ? returnedItems.length : page.fetchedCount
       cursor.colorStart += consumedCount
       cursor.colorExhausted = iconifyPageExhausted(start, consumedCount, page)
       items.push(...returnedItems)
@@ -304,7 +307,7 @@ export function createMediaProviders({ fetch, readPixabayKey, cache }: MediaProv
   async function pixabayRecord(id: string, key: string | null): Promise<PixabayHit> {
     if (key === null) throw new BridgeFailure('PROVIDER_FAILED', 'Pixabay needs an API key')
     if (!/^\d+$/.test(id)) throw new BridgeFailure('BAD_REQUEST', "'id' is not a Pixabay id")
-    const url = new URL('https://pixabay.com/api/')
+    const url = new URL(PIXABAY_API)
     url.searchParams.set('key', key)
     url.searchParams.set('id', id)
     const payload = await cachedJson<{ hits?: PixabayHit[] }>(pixabayItemCacheKey(id), url.toString())

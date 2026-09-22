@@ -82,8 +82,6 @@ const RENDERER_DIR = join(__dirname, '../renderer')
 /** One user-global state file (D9, GRO-2159): `~/Library/Application Support/Yaseen Draw/yaseendraw.json`. */
 const store = createStore(join(app.getPath('userData'), 'yaseendraw.json'))
 
-/** Persistent vault-index cache (GRO-2223 D1): one JSON per vault under userData, never in the vault. */
-
 /** Window lifecycle (GRO-2160) lives in windows.ts; this host is its Electron-only half. */
 const manager = createWindowManager(store, {
   create(entry: WindowEntry) {
@@ -197,16 +195,15 @@ app.whenReady().then(() => {
   // A tab switch changes which file is in front (🔒 D10); focus changes which window is asked.
   subscribeMenuRebuildOnActiveFile(store, applyMenu)
   rebuildMenuOnFocus = applyMenu
-  const sync = registerIpc(store, manager, app.getPath('userData'))
-  gitSync = sync
+  gitSync = registerIpc(store, manager, app.getPath('userData'))
   // 🔒 D5: the one library folder every vault shares. Made at startup, detached — a launch must
   // not wait on a disk, and a path that cannot be created is still what the Settings row names.
   void ensureLibraryFolder(store.get().settings.libraryFolder, app.getPath('userData'))
   // YAZ-1081 D3: a lid that just opened is the other "the world moved on while you were away"
   // moment, and the machine that edited the vault meanwhile is usually the other one. Wired here
   // rather than at module scope because powerMonitor is only safe to touch after `ready`.
-  powerMonitor.on('resume', () => sync.notifyWake())
-  powerMonitor.on('unlock-screen', () => sync.notifyWake())
+  powerMonitor.on('resume', () => gitSync?.notifyWake())
+  powerMonitor.on('unlock-screen', () => gitSync?.notifyWake())
   manager.restoreAll()
   // A COLD launch from a Finder / Explorer double-click: macOS has already queued its `open-file`
   // path above, Windows and Linux put it in this process's own argv and fire nothing (2I).

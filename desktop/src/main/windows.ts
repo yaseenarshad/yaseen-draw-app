@@ -163,7 +163,7 @@ export type LinkTarget = { kind: 'existing'; id: string } | { kind: 'new'; root:
 /** Trailing slash off (never off `/` itself), so `/v` and `/v/` name the same root. */
 const stripSlash = (p: string): string => (p.length > 1 && p.endsWith('/') ? p.slice(0, -1) : p)
 
-/** `root` is an ancestor directory of `path` (or its dirname) — by segment, so `/a/b` never contains `/a/bc/x.md`. */
+/** `root` is an ancestor directory of `path` (or its dirname) — by segment, so `/a/b` never contains `/a/bc/x.excalidraw`. */
 const rootContains = (root: string, path: string): boolean => {
   const r = stripSlash(root)
   return path.startsWith(r === '/' ? '/' : r + '/') && path.length > r.length + 1
