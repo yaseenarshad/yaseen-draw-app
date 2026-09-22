@@ -62,6 +62,7 @@ import { registerRenameContinuity } from '../lib/renameContinuity'
 import { useAppliedTheme } from '../lib/theme'
 import { DRAWING_COMMAND_EVENT, type DrawingCommand } from './drawingCommand'
 import { parseSceneText, type DrawingScene } from './drawingScene'
+import { mayTakeFocus } from './focusHandoff'
 import { ExcalidrawSurface, type DrawingSnapshot, type DrawingSurfaceApi } from './ExcalidrawSurface'
 import { SaveIndicator } from './SaveIndicator'
 import { SyncIndicator } from './SyncIndicator'
@@ -322,12 +323,19 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasPrefs, 
     return () => section.removeEventListener(DRAWING_COMMAND_EVENT, onCommand)
   }, [])
 
-  // A tab coming back from `visibility: hidden` may have been laid out at the wrong size.
+  // A tab coming back from `visibility: hidden` may have been laid out at the wrong size — and it
+  // also has nobody holding the keyboard, because `autoFocus` only ever fired at MOUNT. So the
+  // same moment re-measures the canvas AND hands it the keyboard (🔒 focus handoff on tab reveal,
+  // YAZ-1812), gated by `mayTakeFocus`: never out from under the ⌘K search bar, the vault switcher
+  // or a dialog. The layer is the whole tab stack, so the tab being LEFT hands over to this one.
   useEffect(() => {
     const host = hostRef.current
     if (host === null || typeof IntersectionObserver === 'undefined') return
     const observer = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting)) surface.current?.refresh()
+      if (!entries.some((e) => e.isIntersecting)) return
+      surface.current?.refresh()
+      const layer = host.closest('.tabstack') ?? host.closest('.tabstack__layer')
+      if (mayTakeFocus(document.activeElement, layer)) surface.current?.focus()
     })
     observer.observe(host)
     return () => observer.disconnect()

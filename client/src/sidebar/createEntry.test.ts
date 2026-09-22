@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TreeNode } from '@shared/types'
-import { datedFolderSeed, entryPath, renamedPath, renameInputName, targetDirFor, validateEntryName } from './createEntry'
+import { datedFolderSeed, entryPath, renamedPath, renameInputName, targetDirFor, untitledDrawingName, validateEntryName } from './createEntry'
 
 const dir = (path: string): TreeNode => ({ type: 'dir', name: path.split('/').pop()!, path, children: [] })
 const file = (path: string): TreeNode => ({ type: 'file', name: path.split('/').pop()!, path, size: 0, mtime: 1, kind: 'drawing' })
@@ -121,5 +121,34 @@ describe('renamedPath (Links E1, GRO-2194)', () => {
     expect(renamedPath('/r/sub/Old', 'New', 'dir')).toBe('/r/sub/New')
     expect(renamedPath('/r/Old', ' Notes.excalidraw ', 'dir')).toBe('/r/Notes.excalidraw') // a folder may be NAMED like a file
     expect(renamedPath('/r/Old', 'Old', 'dir')).toBe('/r/Old') // unchanged → caller no-op
+  })
+})
+
+/**
+ * "New drawing" names itself (🔒 R1 on YAZ-1775): the context menu no longer asks for a name, so
+ * the birth has to pick one the folder does not already hold — and never overwrite.
+ */
+describe('untitledDrawingName', () => {
+  it('an empty folder gets the bare name', () => {
+    expect(untitledDrawingName([])).toBe('Untitled')
+    expect(untitledDrawingName(['Board.excalidraw', 'Plan.excalidraw'])).toBe('Untitled')
+  })
+
+  it('counts UP from 2, never reusing a taken name', () => {
+    expect(untitledDrawingName(['Untitled.excalidraw'])).toBe('Untitled 2')
+    expect(untitledDrawingName(['Untitled.excalidraw', 'Untitled 2.excalidraw'])).toBe('Untitled 3')
+    expect(untitledDrawingName(['Untitled.excalidraw', 'Untitled 2.excalidraw', 'Untitled 3.excalidraw'])).toBe('Untitled 4')
+  })
+
+  it('fills a gap rather than running past it', () => {
+    expect(untitledDrawingName(['Untitled.excalidraw', 'Untitled 3.excalidraw'])).toBe('Untitled 2')
+  })
+
+  it('compares case-insensitively — the Mac`s own filesystem does, so `untitled` is in the way', () => {
+    expect(untitledDrawingName(['untitled.EXCALIDRAW'])).toBe('Untitled 2')
+  })
+
+  it('a folder or a non-drawing of the same stem is NOT in the way — only the exact file name is', () => {
+    expect(untitledDrawingName(['Untitled', 'Untitled.png'])).toBe('Untitled')
   })
 })

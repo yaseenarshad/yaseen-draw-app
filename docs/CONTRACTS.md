@@ -69,6 +69,17 @@ One kind, one extension.
   always written with `files: {}`; a legacy file that still embeds its images is extracted on its
   first save. `assets/` is hidden from the sidebar tree (the TOP-LEVEL one only: a folder the
   user called `assets` inside a subfolder is theirs and shows).
+- There is ONE door that makes a drawing, and it is the sidebar's context menu (🔒 R1 on
+  YAZ-1775): the Create group is **New drawing**, New folder, New dated folder, in that order, on
+  a row or on blank space. Nowhere else in the app creates a file.
+  - "New drawing" does not ask for a name. The board is born `Untitled.excalidraw` — then
+    `Untitled 2`, `Untitled 3`… beside its siblings, filling a gap rather than running past it,
+    compared case-insensitively because the filesystem is — in the right-clicked FOLDER (a file
+    row means its parent, blank space means the vault root).
+  - It is written with the `EMPTY_SCENE` in the same `wx` write (content-at-create), never
+    overwriting: a name lost to a race retries with the next number.
+  - It then opens in the CURRENT tab and lands with the tree's inline rename field focused, so the
+    first thing typed is its name.
 - A `.excalidraw` has ONE door per direction (🔒 YAZ-1810): `drawing:load` and `drawing:save`.
   Not `fs:read` / `fs:write` (a text buffer capped at 10 MiB), and not the image pipe — which
   stopped accepting drawings in YAZ-1810, because a second writer with different rules about the
@@ -309,6 +320,16 @@ with its own engine, so a prop or a `window` listener would reach the wrong canv
 then calls the engine's own door: `openDialog: { name: 'imageExport' }`, or `viewBackgroundColor`,
 which the engine writes into the file.
 
+**Focus on tab reveal** (🔒 the focus-handoff decision on YAZ-1812). Several tabs are mounted at
+once; the canvas has `autoFocus`, but that fires only at mount, so switching to an
+already-mounted tab used to leave the keyboard nowhere until the user clicked. The reveal effect in
+`DrawingEditor` (the `IntersectionObserver` that re-measures the canvas) now also hands it the
+keyboard through `DrawingSurfaceApi.focus()` — GATED by `drawings/focusHandoff.ts`: only when
+`document.activeElement` is the body or nothing at all, or is inside the tab layer (the tab being
+left). The sidebar search bar, the vault switcher, a dialog and the tab strip keep what they have;
+a tab becoming visible must never pull ⌘K's caret out from under the user. The re-measure is
+unconditional — only the focus is gated.
+
 Renderer-owned chords (`client/src/lib/*Hotkey.ts`, all gated by `ownsWindowChord` so a text field
 or an open modal keeps the key): ⌘B toggles the sidebar (YAZ-1280); ⌘X / ⌘C / ⌘V drive the
 sidebar's file clipboard when the selection owns them. Inside a focused canvas, ⌘F and ⌘C open the
@@ -371,7 +392,28 @@ window's one passive notice; never a dialog. macOS delivers links through `open-
 before `ready` on a cold start, so they queue (`main/linkQueue.ts`) until the windows exist.
 
 The packaged app registers the scheme (`protocols` in `desktop/package.json`) and claims
-`.excalidraw` as an Owner file association.
+`.excalidraw` as an Owner file association (🔒 D1 on YAZ-1775).
+
+**Opening a drawing from outside the app** — a Finder double-click, `open -a "Yaseen Draw"
+Board.excalidraw`, or a plain `open Board.excalidraw` once the association is registered — travels
+the deep-link pipeline rather than a path of its own. The OS delivers it differently per platform
+and main converts each into the same `yaseendraw://` push:
+
+| Platform | How the path arrives | Where it is read |
+|---|---|---|
+| macOS | the `open-file` event (before `ready` on a cold start) | `app.on('open-file')` → `fileLink` → the link queue |
+| Windows / Linux, app not running | this process's own `process.argv` | `openableFileArgs(process.argv)` after `restoreAll()` |
+| Windows / Linux, app running | the `second-instance` argv | `openableFileArgs(argv)` in that handler |
+
+`main/fileArgs.ts` is the one filter: an argument counts only when it is not a switch, is not a
+URL, and names a file of a kind this app owns.
+
+From there the routing rule is the ordinary link rule, and it decides **which window and which
+tab**: the open window whose root contains the file (most specific root wins) activates the tab if
+that file is already open and otherwise opens it in the current tab; failing that, a new window on
+the most recent remembered vault that contains the file; and failing that — a drawing outside every
+open and every remembered vault — **a new window with the file's PARENT FOLDER as the vault**. An
+unsupported or missing file shows the window's one passive notice, never a dialog.
 
 ## Packaging
 

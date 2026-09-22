@@ -526,6 +526,17 @@ describe('resolveLinkTarget (pure)', () => {
     })
   })
 
+  it('a Finder double-click on a drawing OUTSIDE every open vault opens its PARENT FOLDER as the vault (2I)', () => {
+    // The file association travels this same path (`open-file` / argv → `yaseendraw://` → here),
+    // so a board that belongs to no open and no recent vault still opens — in a new window whose
+    // root is the folder the file sits in.
+    expect(resolveLinkTarget('/Users/me/Desktop/Sketch.excalidraw', [win('w1', '/v')], [])).toEqual({
+      kind: 'new',
+      root: '/Users/me/Desktop',
+      file: '/Users/me/Desktop/Sketch.excalidraw',
+    })
+  })
+
   it('a containing rootOverride wins: the open window on exactly that root first, else a new window there', () => {
     const windows = [win('w1', '/v'), win('w2', '/v/sub')]
     // Without the override, the more specific /v/sub would win; the override pins /v.

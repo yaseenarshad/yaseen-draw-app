@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import { SIDEBAR_LENSES, type FileClipState, type SettingsState, type SidebarLens, type TreeNode, type TreeResponse } from '@shared/types'
+import { DRAWING_VIEW_EXTENSIONS, SIDEBAR_LENSES, type FileClipState, type SettingsState, type SidebarLens, type TreeNode, type TreeResponse } from '@shared/types'
 import { api, BridgeRequestError } from '../api'
 import { EMPTY_SCENE_JSON } from '../drawings/drawingScene'
 import { ChevronsIcon, EyeIcon, HeartIcon, SearchIcon, SidebarPanelIcon } from '../components/icons'
@@ -13,7 +13,7 @@ import type { SearchCandidate } from '../search/searchCandidates'
 import { useSearchResults } from '../search/useSearchResults'
 import { ConfirmDelete, type DeleteTarget } from './ConfirmDelete'
 import { ContextMenu } from './ContextMenu'
-import { datedFolderSeed, entryPath, renamedPath, targetDirFor, type EntryKind, type MenuRow } from './createEntry'
+import { datedFolderSeed, entryPath, renamedPath, targetDirFor, untitledDrawingName, type EntryKind, type MenuRow } from './createEntry'
 import { SettingsButton } from '../settings/SettingsButton'
 import { buildMenuSections, countItems } from './menuSections'
 import type { NoticeKind } from '../lib/notice'
@@ -849,6 +849,48 @@ export function Sidebar({
     [creating, refresh, onOpenFile],
   )
 
+  /**
+   * "New drawing" (🔒 R1 on YAZ-1775, 2I): the ONE file-creation door in the app, and it does NOT
+   * ask for a name. The board is born as `Untitled` (`Untitled 2`, `Untitled 3`… beside its
+   * siblings), with the EMPTY SCENE in the same `wx` write (content-at-create, 🔒 YAZ-1810 — a
+   * zero-byte `.excalidraw` is the corrupt case, not a new board), opens in the CURRENT tab, and
+   * lands with the tree's inline rename field focused so the first thing the user types is its
+   * name. Nothing is ever overwritten: `fs:create-file` refuses an existing path, and a name lost
+   * to a race (another window, a sync) is simply retried with the next number.
+   */
+  const createDrawing = useCallback(async () => {
+    if (menu === null) return
+    const parentDir = menu.targetDir
+    setMenu(null)
+    // The row has to be visible for the rename field to mount, exactly as the inline create needs.
+    if (parentDir !== root) dispatch({ type: 'expandTo', root, file: `${parentDir}/x` })
+    if (lens === 'favorites' && parentDir !== root && findDirNode(favoriteNodes, parentDir) === null) onLensChange('files')
+    const node = tree === null || parentDir === root ? null : findDirNode(tree.tree, parentDir)
+    const level: readonly TreeNode[] = tree === null ? [] : parentDir === root ? tree.tree : node !== null && node.type === 'dir' ? node.children : []
+    const siblings = level.map((n) => n.name)
+    const taken = [...siblings]
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const name = untitledDrawingName(taken)
+      const path = entryPath(parentDir, name, 'file')
+      try {
+        await api.createFile({ path, content: EMPTY_SCENE_JSON })
+        refresh()
+        onOpenFile(path)
+        setRenamingEntry({ path, kind: 'file' })
+        return
+      } catch (err: unknown) {
+        // Someone else got there between the tree we read and the write: take the next number.
+        if (err instanceof BridgeRequestError && err.code === 'ALREADY_EXISTS') {
+          taken.push(`${name}${DRAWING_VIEW_EXTENSIONS[0]}`)
+          continue
+        }
+        onNotice(`Can't create drawing: ${err instanceof Error ? err.message : String(err)}`, 'error')
+        return
+      }
+    }
+    onNotice("Can't create drawing: too many untitled drawings here", 'error')
+  }, [menu, root, lens, favoriteNodes, onLensChange, tree, refresh, onOpenFile, onNotice])
+
   const cancelCreate = useCallback(() => setCreating(null), [])
 
   /**
@@ -1255,7 +1297,7 @@ export function Sidebar({
               // Paste goes exactly where "New folder" goes (🔒 D5, YAZ-1674).
               onPaste: canNewFolder ? () => void pasteInto(menu.targetDir) : null,
               onNotice,
-              onNewDrawing: () => startCreate('file'),
+              onNewDrawing: () => void createDrawing(),
               onNewFolder: canNewFolder ? () => startCreate('dir') : null,
               onNewDatedFolder: canNewFolder ? () => startCreate('dir', datedFolderSeed()) : null,
               onToggleFavorite: toggleFavorite,

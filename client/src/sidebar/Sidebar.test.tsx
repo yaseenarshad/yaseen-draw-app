@@ -15,6 +15,7 @@ import { EMPTY_SELECTION } from '../lib/selection'
 // Focus Mode's persistence is the REAL storage module (no mock in this file): a spy on its read is
 // how a test hands the Sidebar a focus restored from an earlier session (YAZ-1605).
 import { storage } from '../lib/storage'
+import { BridgeRequestError } from '../api'
 import { countChildren, Sidebar, type SidebarClipboard } from './Sidebar'
 
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
@@ -262,19 +263,71 @@ describe('Sidebar file-row open gestures (D2 GRO-2168, I3 GRO-2235)', () => {
     expect(el.querySelector('.ctx-menu')).toBeNull()
   })
 
-  it('"New drawing" creates the file with an EMPTY SCENE, not an empty file (🔒 YAZ-1810), and opens it', async () => {
-    const { el, props, bridge } = await mount()
-    act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
-    act(() => itemByLabel(el, 'New drawing')?.click())
-    const input = el.querySelector<HTMLInputElement>('.create-inline__input')
-    act(() => {
-      input!.value = 'Board'
-      input!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  /**
+   * "New drawing" (🔒 R1 on YAZ-1775, 2I): the app's ONE file-creation door, and it never asks for
+   * a name — the board is born `Untitled`, opens in the current tab, and offers the inline rename.
+   */
+  describe('"New drawing" (2I)', () => {
+    /** Right-click blank space and take the item; the whole birth settles inside one act. */
+    const newDrawing = async (el: HTMLElement) => {
+      act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
+      await act(async () => itemByLabel(el, 'New drawing')?.click())
+      await act(async () => undefined)
+    }
+    /** `createFile` that also grows the tree the next refresh reads — what the watcher does in production. */
+    const growsTree = (bridge: ReturnType<typeof installBridge>, tree: TreeNode[] = TREE) =>
+      bridge.createFile.mockImplementation(async (req: string | { path: string; content?: string }) => {
+        const p = typeof req === 'string' ? req : req.path
+        bridge.tree.mockResolvedValue({ root: '/v', tree: [...tree, { type: 'file', name: p.slice(p.lastIndexOf('/') + 1), path: p, size: 1, mtime: 2, kind: 'drawing' }], generatedAt: 2 })
+        return { path: p, mtime: 2, size: 0 }
+      })
+
+    it('names itself `Untitled`, writes an EMPTY SCENE rather than an empty file (🔒 YAZ-1810), and opens it in the current tab', async () => {
+      const { el, props, bridge } = await mount()
+      await newDrawing(el)
+      expect(bridge.createFile).toHaveBeenCalledExactlyOnceWith({ path: '/v/Untitled.excalidraw', content: EMPTY_SCENE_JSON })
+      expect(JSON.parse(EMPTY_SCENE_JSON)).toMatchObject({ type: 'excalidraw', elements: [] })
+      expect(props.onOpenFile).toHaveBeenCalledExactlyOnceWith('/v/Untitled.excalidraw')
+      expect(props.onOpenFileBackground).not.toHaveBeenCalled()
     })
-    await act(async () => undefined)
-    expect(bridge.createFile).toHaveBeenCalledExactlyOnceWith({ path: '/v/Board.excalidraw', content: EMPTY_SCENE_JSON })
-    expect(JSON.parse(EMPTY_SCENE_JSON)).toMatchObject({ type: 'excalidraw', elements: [] })
-    expect(props.onOpenFile).toHaveBeenCalledWith('/v/Board.excalidraw')
+
+    it('lands with the name field focused on the new row, ready for the rename', async () => {
+      const { el, bridge } = await mount()
+      growsTree(bridge)
+      await newDrawing(el)
+      const input = el.querySelector<HTMLInputElement>('.create-inline__input')
+      expect(input?.value).toBe('Untitled')
+      expect(document.activeElement).toBe(input)
+    })
+
+    it('counts up beside its siblings: a second one is `Untitled 2`', async () => {
+      const taken: TreeNode[] = [...TREE, { type: 'file', name: 'Untitled.excalidraw', path: '/v/Untitled.excalidraw', size: 1, mtime: 1, kind: 'drawing' }]
+      const { el, bridge } = await mount({}, (b) => b.tree.mockResolvedValue({ root: '/v', tree: taken, generatedAt: 1 }))
+      await newDrawing(el)
+      expect(bridge.createFile).toHaveBeenCalledExactlyOnceWith({ path: '/v/Untitled 2.excalidraw', content: EMPTY_SCENE_JSON })
+    })
+
+    it('never overwrites: a name lost to a race retries with the next number', async () => {
+      const { el, bridge } = await mount()
+      bridge.createFile.mockRejectedValueOnce(new BridgeRequestError('ALREADY_EXISTS', 'exists'))
+      await newDrawing(el)
+      expect(bridge.createFile.mock.calls.map((c) => (c[0] as { path: string }).path)).toEqual(['/v/Untitled.excalidraw', '/v/Untitled 2.excalidraw'])
+    })
+
+    it('reports a refusal through the passive notice and opens nothing', async () => {
+      const { el, props, bridge } = await mount()
+      bridge.createFile.mockRejectedValue(new BridgeRequestError('FORBIDDEN', 'read-only vault'))
+      await newDrawing(el)
+      expect(props.onNotice).toHaveBeenCalledWith(expect.stringContaining('read-only vault'), 'error')
+      expect(props.onOpenFile).not.toHaveBeenCalled()
+    })
+
+    it('creates inside the right-clicked FOLDER, not the vault root', async () => {
+      const { el, bridge } = await mount()
+      act(() => void el.querySelector('.tree__row--dir')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
+      await act(async () => itemByLabel(el, 'New drawing')?.click())
+      expect(bridge.createFile).toHaveBeenCalledExactlyOnceWith({ path: '/v/sub/Untitled.excalidraw', content: EMPTY_SCENE_JSON })
+    })
   })
 
   it('folder rows and blank space get no "Open in new window" item', async () => {
@@ -1616,15 +1669,15 @@ describe('favorites (YAZ-1766)', () => {
     expect(el.querySelector('.tree')).toBeNull()
   })
 
-  it('New drawing from a ROOT favorited FILE hops to Files — its parent dir is not on the tab; from a favorited FOLDER the input mounts in place (3B1)', async () => {
-    const { el, v, props } = await mountVault({ lens: 'favorites' }, { favorites: ['/Notes/n.excalidraw', '/Projects'] })
+  it('New drawing from a ROOT favorited FILE hops to Files — its parent dir is not on the tab; from a favorited FOLDER it stays put (3B1)', async () => {
+    const { el, v, props, bridge } = await mountVault({ lens: 'favorites' }, { favorites: ['/Notes/n.excalidraw', '/Projects'] })
     await pick(el, `${v}/Notes/n.excalidraw`, 'New drawing')
     expect(props.onLensChange).toHaveBeenCalledExactlyOnceWith('files')
-    expect(el.querySelector('.create-inline')).toBeNull() // the tab has no `Notes` node to mount it under
+    expect(bridge.createFile).toHaveBeenCalledWith({ path: `${v}/Notes/Untitled.excalidraw`, content: EMPTY_SCENE_JSON })
     vi.mocked(props.onLensChange).mockClear()
     await pick(el, `${v}/Projects`, 'New drawing')
     expect(props.onLensChange).not.toHaveBeenCalled()
-    expect(el.querySelector('.create-inline')).not.toBeNull()
+    expect(bridge.createFile).toHaveBeenLastCalledWith({ path: `${v}/Projects/Untitled.excalidraw`, content: EMPTY_SCENE_JSON })
   })
 
   it('"Add to favorites" is on file AND folder rows in Files, never on blank space; adding toasts, persists to the vault file and lists the row on the tab', async () => {

@@ -179,6 +179,10 @@
  *                                            `setCanvasBackground()`, the prefs push and the dock pref
  *   refresh()                        PORTED — a tab that was `visibility: hidden` may have been
  *                                            laid out at the wrong size
+ *   focusContainer()                 RE-IMPLEMENTED — the engine keeps it on its App class, not on
+ *                                            the imperative API, so the seam focuses the engine's
+ *                                            own `.excalidraw-container` (what `focusContainer`
+ *                                            does) for the tab-reveal handoff (🔒 YAZ-1812)
  *   toggleSidebar({name,tab,force})  PORTED — the hamburger and the two shortcuts
  *   getAppState / getSceneElements / getFiles / addFiles   PORTED — the 🔒 D3 hydrate/extract path
  *   updateFrameRendering             PORTED — the frames pref's one application path
@@ -259,6 +263,12 @@ export interface DrawingSnapshot {
 export interface DrawingSurfaceApi {
   /** Re-measure the canvas — a tab hidden by `visibility` may have been laid out at the wrong size. */
   refresh(): void
+  /**
+   * Put the keyboard in the canvas (🔒 focus handoff on tab reveal, YAZ-1812): the engine's own
+   * `focusContainer()`, so the tool hotkeys work without a click when a mounted tab comes back
+   * into view. The HOST decides WHETHER — `focusHandoff.ts` is the gate — this only does it.
+   */
+  focus(): void
   /**
    * File › Export Image… (🔒 D10): the engine's OWN export dialog, opened through its own
    * `appState.openDialog` door — the clean way in, found in demo round 4, with no keyboard-event hack.
@@ -360,6 +370,8 @@ export function ExcalidrawSurface({
   const panelRef = useRef(canvasPanel)
   /** The engine's raw handle, for the rail and the shortcuts; null until it has mounted. */
   const rawApiRef = useRef<ImperativeApi | null>(null)
+  /** This seam's own element — the handle's `focus()` reaches the engine's container through it. */
+  const rootRef = useRef<HTMLDivElement | null>(null)
   emitRef.current = onSnapshot
   failRef.current = onFailed
   apiRef.current = onApi
@@ -551,6 +563,9 @@ export function ExcalidrawSurface({
       rail.set({ ready: true })
       apiRef.current?.({
         refresh: () => api.refresh(),
+        // `focusContainer()` lives on the engine's App class, not on this handle — so do what it
+        // does: focus the engine's own container, the element it gives `tabIndex` for exactly this.
+        focus: () => rootRef.current?.querySelector<HTMLElement>('.excalidraw-container')?.focus(),
         openImageExport: () => api.updateScene({ appState: { openDialog: { name: 'imageExport' } } as unknown as EngineAppState }),
         setCanvasBackground: (color) => api.updateScene({ appState: { viewBackgroundColor: color } as unknown as EngineAppState }),
         replaceScene: (next) => {
@@ -588,7 +603,7 @@ export function ExcalidrawSurface({
   const { Excalidraw } = engine
   return (
     // The surface's own element, so ⌘F / ⌘C are heard here and nowhere else in the shell.
-    <div className="drawing-surface" onKeyDownCapture={onKeyDownCapture}>
+    <div ref={rootRef} className="drawing-surface" onKeyDownCapture={onKeyDownCapture}>
       <Excalidraw
         initialData={initialData}
         theme={theme}

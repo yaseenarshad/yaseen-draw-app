@@ -43,9 +43,9 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
   - [x] 2F — Canvas chrome: rail, panel shell, menus, full toolbar, parity checklist (YAZ-1812)
   - [x] 2G — Settings: canvas preferences, Library folder, trims (YAZ-1813)
   - [x] 2H — ⌘K search over the drawing catalog (YAZ-1814)
-- Now: [→] 2I — New drawing, naming, extension display, file association (YAZ-1815)
+  - [x] 2I — New drawing, naming, extension display, file association (YAZ-1815)
+- Now: [→] 3A — Library folder and secrets plumbing (YAZ-1817)
 - Remaining:
-  - [ ] 3A — Library folder and secrets plumbing (YAZ-1817)
   - [ ] 3B — Images tab: Image Studio with main-process providers (YAZ-1818)
   - [ ] 3C — Components tab: Saved Components as library files (YAZ-1819)
   - [ ] 3D — Present tab: presentation sidebar and player (YAZ-1820)
@@ -62,9 +62,11 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 - UNCONFIRMED: `desktop/build/icon.png` is the only icon asset; the stale docs-app `icon.icns`/`icon.ico` were deleted and electron-builder now derives both from the PNG. Confirm during the 4D packaging run.
 - UNCONFIRMED (2B leftover, for 2D/2G): the rename CONFIRM sheet survives without its reason. ⚡ YAZ-888 made a name change ask first *because* the rename chained into every `[[wikilink]]`; with links gone the sheet now only says "Rename 'x' to 'y'?". Kept rather than removed — deleting a confirm is a product decision, not a strip — but it may want to go.
 - RESOLVED (🔒 "Dead asset pipe deleted" on YAZ-1775): the image half of the asset pipe is gone — module, tests, channels, preload methods, types and CONTRACTS rows — in 2F's first commit.
-- UNCONFIRMED (posted on YAZ-1812, awaiting Yasin): `focusOpenDocument`. A tab that becomes visible LATER still gets no focus — `autoFocus` only fires at mount. Whether the canvas should claim focus when its layer becomes visible is a product call, so 2F left it alone.
+- RESOLVED (🔒 "Focus handoff on tab reveal" on YAZ-1812, built in 2I): a revealed drawing tab takes the keyboard through `DrawingSurfaceApi.focus()`, gated by `drawings/focusHandoff.ts` — never from the sidebar search, the vault switcher or a dialog.
+- UNCONFIRMED (posted on YAZ-1815, awaiting Yasin): where a drawing outside EVERY open vault should open. 2I kept the shipped E1 rule — a NEW window rooted at the file's parent folder — rather than repointing the focused window's vault, which would discard its tabs and would need a main→renderer "switch vault and open this" message that does not exist. Documented in CONTRACTS as built.
+- UNCONFIRMED (2B leftover, still open after 2I): the rename CONFIRM sheet. "New drawing" now lands on the inline rename field, so the FIRST thing a user does to a new board trips the sheet ("Rename 'Untitled' to 'Plan'?"). 2I deliberately did not touch `ConfirmRename` — a separate decision is pending with Yasin.
 
-## Learnings (2D / 2E / 2F / 2G / 2H)
+## Learnings (2D / 2E / 2F / 2G / 2H / 2I)
 
 - **⌘K is derived, never indexed.** The vault index died with markdown; the catalog is one walk of
   the tree the Sidebar already holds, which the structural watcher already refreshes. Nothing new
@@ -73,6 +75,17 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
   not built until the first non-empty query — and once built it stays, or the second query would
   pay for the walk again. The latch is written during render on purpose: an effect would show one
   empty frame of results on the very first keystroke.
+- **The file association has THREE doors, not one.** macOS fires `open-file`; Windows and Linux
+  put the path in argv and fire nothing — in this process's argv on a cold launch, in the
+  `second-instance` argv when the app is already up. All three encode to `yaseendraw://` so the
+  routing, the kind guard and the exists guard are written once.
+- **`focusContainer()` is not on the engine's imperative handle.** It lives on the App class; the
+  seam does what it does — focus the engine's own `.excalidraw-container`, the element it gives a
+  `tabIndex` for exactly this.
+- **The new drawing's rename field needs the tree to have caught up.** The birth refreshes the
+  tree and then marks the new path as renaming; the field mounts when the row does. Fine in
+  production (the refresh is awaited by the render), and the reason the test has to grow the
+  mocked tree.
 
 - **The toolbar-mode names read backwards.** The fully built-out `ContextualPropertiesToolbar` is the engine's `full` desktop mode; `compact` is upstream's vertical strip. `YASEEN_FULL_TOOLBAR_MODE` exists so no one ever writes the bare string and inverts it again (rounds 3–4 did).
 - **`getFormFactor` is the other half of that gate.** Without it a canvas pane narrowed by the shell sidebar falls into the engine's ≤ 1180 px tablet band and is forced to `compact` before the localStorage key is ever consulted.
