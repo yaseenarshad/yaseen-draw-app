@@ -1,5 +1,5 @@
 /**
- * THE RAIL (YAZ-1775 🔒 YAZ-1775 D10): the canvas's top-left row, where the engine's own menu trigger used
+ * THE RAIL (🔒 YAZ-1775 D10): the canvas's top-left row, where the engine's own menu trigger used
  * to be (`drawingEditor.css` hides that, the web app's rule). Three controls and nothing else:
  *
  * - the HAMBURGER, which toggles the in-canvas workspace panel (`CanvasSidebar.tsx`) — open on the

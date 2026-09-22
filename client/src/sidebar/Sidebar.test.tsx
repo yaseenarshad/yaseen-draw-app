@@ -950,7 +950,7 @@ describe('search results (YAZ-803)', () => {
     expect(el.querySelector('.search-results__folder')?.textContent).toBe('Docs')
   })
 
-  it('a NON-drawing file is never a result row (YAZ-1814, YAZ-1814) — it still lists in the tree', async () => {
+  it('a NON-drawing file is never a result row (YAZ-1814) — it still lists in the tree', async () => {
     const withPng: TreeNode[] = [...SEARCH_TREE, { type: 'file', name: 'alpaca.png', path: '/v/alpaca.png', size: 1, mtime: 1, kind: null }]
     const m = await mount({}, (b) => b.tree.mockResolvedValue({ root: '/v', tree: withPng, generatedAt: 1 }))
     expect(m.el.querySelector('.tree__row--file[title="/v/alpaca.png"]')).not.toBeNull()
@@ -972,7 +972,7 @@ describe('search results (YAZ-803)', () => {
     expect(rowLabels(el)).toEqual(['Alpha', 'Anchor', 'Abacus'])
   })
 
-  it('the top row starts selected; ArrowDown/ArrowUp WRAP at both ends (YAZ-1814, YAZ-1814)', async () => {
+  it('the top row starts selected; ArrowDown/ArrowUp WRAP at both ends (YAZ-1814)', async () => {
     const { el, input } = await search('a')
     expect(activeLabel(el)).toBe('Alpha')
     await press(input, 'ArrowUp')

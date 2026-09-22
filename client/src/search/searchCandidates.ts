@@ -7,7 +7,7 @@
  * kept fresh by the structural watcher (the docs-app `viewOnlyCatalog` pattern: one cheap walk of
  * a tree somebody else is already refreshing, never a second read of the vault).
  *
- * What is in it (🔒 YAZ-1814, YAZ-1814):
+ * What is in it (🔒 YAZ-1814):
  * - one row per `.excalidraw` FILE, named the way the tree and the tab strip spell it — without
  *   the extension — carrying its absolute path and its root-relative folder as the row's label;
  * - one row per FOLDER, matched by its own name (🔒 D2, YAZ-1491), labelled by ITS parent.

@@ -1,5 +1,5 @@
 /**
- * THE CANVAS PREFS ↔ ENGINE appState MAPPING (YAZ-1775 🔒 YAZ-1775 D9).
+ * THE CANVAS PREFS ↔ ENGINE appState MAPPING (🔒 YAZ-1775 D9).
  *
  * `SettingsState.canvas` holds the engine's `browser: true, export: false` appState — grid,
  * snapping, binding, selection mode, tool lock, zen, writing mode, the two pen widths, the three

@@ -67,7 +67,7 @@
   height: 100%;
 }
 
-/* ---------- The rail (YAZ-1775 🔒 YAZ-1775 D10): `excalidraw-app/components/AppSidebar.scss`, ported ----------
+/* ---------- The rail (🔒 YAZ-1775 D10): `excalidraw-app/components/AppSidebar.scss`, ported ----------
    Scoped under the engine's root so its own tokens (island background, primary colour, button
    sizes) apply unchanged. The rail sits in the top-left row, where the engine's own menu trigger
    used to be. */

@@ -1,5 +1,5 @@
 /**
- * WHAT THE ENGINE IS TOLD ABOUT ITS OWN SIZE (YAZ-1775 ⚡ YAZ-1775 R5).
+ * WHAT THE ENGINE IS TOLD ABOUT ITS OWN SIZE (⚡ YAZ-1775 R5).
  *
  * Left to itself the engine calls any editor whose LARGER side is ≤ 1180 px a "tablet"
  * (`isTabletBreakpoint`, `packages/common/src/editorInterface.ts:72-79`), and a tablet is forced
@@ -9,15 +9,11 @@
  * width, which is exactly why the strip kept appearing. The web app never hit it: its canvas
  * filled the browser window.
  *
- * The engine offers `UIOptions.getFormFactor(editorWidth, editorHeight)` (`types.ts:1066-1073`)
- * for a host to answer instead. This app answers `desktop` for anything that is not phone-sized
- * and NEVER `tablet`, so the fork's `full` mode is the one layout a drawing ever gets.
- *
- * The phone rule is the engine's own `isMobileBreakpoint` (`editorInterface.ts:64-70`): width ≤
- * `MQ_MAX_MOBILE` (599), or a landscape sliver shorter than `MQ_MAX_HEIGHT_LANDSCAPE` (500) and
- * narrower than `MQ_MAX_WIDTH_LANDSCAPE` (1000). The numbers are COPIED rather than imported:
- * `@excalidraw/common` is part of the engine tree, and a static import would drag the whole
- * package into the renderer's entry chunk (the LAZY rule in `engine.ts`).
+ * `UIOptions.getFormFactor` lets a host answer instead: this app answers `desktop` for anything
+ * that is not phone-sized and NEVER `tablet`, so the fork's `full` mode is the one layout a
+ * drawing ever gets. The phone numbers below are the engine's own `isMobileBreakpoint`, COPIED
+ * rather than imported — a static import of `@excalidraw/common` would drag the whole engine into
+ * the renderer's entry chunk (`engine.ts`'s lazy rule).
  */
 
 export const MQ_MAX_MOBILE = 599
