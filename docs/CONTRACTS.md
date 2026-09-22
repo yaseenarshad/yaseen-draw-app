@@ -260,7 +260,10 @@ ping-pong; the engine's own read-back is 300 ms debounced. The guard is STRICT a
 (a renderer hands over a whole `CanvasPrefs` or nothing) and LENIENT on load (field by field over
 the defaults, so a state file written before a key existed keeps every key it does have). Per BOARD
 there is only what the engine writes into the file itself — `viewBackgroundColor`, `gridSize`,
-`gridStep`. None of the web app's localStorage keys are carried over; the one engine key this app
+`gridStep`. The VIEW is never kept, per board or anywhere (🔒 YAZ-1855 D2/D3): the engine exports
+no zoom or scroll, and every fresh mount opens fitted to the board's live elements (🔒 YAZ-1855 D1 —
+`initialState.viewport` with `fit: 'scale-down'`: never past 100%, floored at the engine's 10%; an
+empty board stays at 100%). A tab already mounted keeps its live zoom; a reload from disk keeps it too. None of the web app's localStorage keys are carried over; the one engine key this app
 touches is `excalidraw.desktopUIMode`, WRITTEN before every mount and never read (⚡ YAZ-1775 R4/R5).
 
 Invariants: `file ∈ tabs` whenever `file` is non-null, and `tabs: []` ⇔ `file: null`.
@@ -691,6 +694,11 @@ pictures intact. Sharing links and view-only tokens are not ported; this is the 
   it, and does not flush the autosave: exporting a dirty board exports what is on the canvas, and
   the board's own save timer carries on. Where it landed, or why it did not, is the window's one
   passive notice.
+
+**A hidden tab shows nothing** (🔒 YAZ-1862). Background tab layers are `visibility: hidden` (so they
+keep their size), and the rule reaches EVERY descendant with `!important`: the engine forces its footer
+buttons back to `visibility: visible`, and without the override a background tab's zoom label and
+buttons painted over the active tab and took its clicks.
 
 **Focus on tab reveal** (🔒 the focus-handoff decision on YAZ-1812). Several tabs are mounted at
 once; the canvas has `autoFocus`, but that fires only at mount, so switching to an
