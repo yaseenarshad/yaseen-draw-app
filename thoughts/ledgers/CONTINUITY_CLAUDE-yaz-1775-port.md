@@ -324,3 +324,8 @@ Verify with `git worktree list` and `ls ~/Desktop`.
 - Full handoff for a future agent: the "Handoff" comment on YAZ-1775 (mirrored on the phase parents).
 - Cleanup done: prototype worktree `yaseen-docs-app-draw-demo` + branch `demo/yaz-1775-draw-prototype` removed; `yaseen-draw-app-port` worktree and the three `yaz-1775-*` branches removed (all merged); demo vault + bare origin on the Desktop and the scratchpad profiles deleted. `tools/seedDemoVault.mjs --vault <dir>` regenerates the test vault.
 - Follow-ups live as their own issues: YAZ-1834 (board metadata), YAZ-1835 (sidebar sort), YAZ-1800 (previews), YAZ-1830 / YAZ-1831 (Future).
+
+## YAZ-1842 (2026-09-22) — Pixabay key storage
+
+- 🔒 YAZ-1842 D1 amends YAZ-1775 D4: `secrets.json` is plain text, mode 0600, `version: 2`; `safeStorage` removed (ad-hoc-signed builds are new Keychain identities per release, so a key saved by 0.1.0 was unreadable by 0.1.1). Version-1 files are quarantined; the next paste starts clean. `ENCRYPTION_UNAVAILABLE` gone from the contract.
+- Shipped in v0.1.2.

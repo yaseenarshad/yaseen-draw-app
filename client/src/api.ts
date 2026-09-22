@@ -106,7 +106,7 @@ export const api = {
     preview: (req: ComponentSlugRequest) => call<string>(() => window.yaseenDraw.components.preview(req)),
     onChanged: (listener: () => void) => window.yaseenDraw.components.onChanged(listener),
   },
-  /** The secrets door (🔒 YAZ-1775 D4): write and ask, never read. `set` rejects ENCRYPTION_UNAVAILABLE without an OS keychain. */
+  /** The secrets door (🔒 YAZ-1775 D4): write and ask, never read. */
   secrets: {
     set: (req: SecretSetRequest) => call<void>(() => window.yaseenDraw.secrets.set(req)),
     has: (req: SecretHasRequest) => call<boolean>(() => window.yaseenDraw.secrets.has(req)),

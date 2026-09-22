@@ -1,20 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { ipcMain, safeStorage } from 'electron'
+import { ipcMain } from 'electron'
 import { CH, type Envelope } from '../../channels'
 import type { Secrets } from '../secrets'
 import { registerSecretsIpc } from './secrets'
 
-vi.mock('electron', () => ({
-  ipcMain: { handle: vi.fn(), on: vi.fn() },
-  safeStorage: {
-    isEncryptionAvailable: vi.fn(() => true),
-    encryptString: vi.fn((s: string) => Buffer.from(`enc:${s}`)),
-    decryptString: vi.fn((b: Buffer) => b.toString().slice(4)),
-  },
-}))
+vi.mock('electron', () => ({ ipcMain: { handle: vi.fn(), on: vi.fn() } }))
 
 type Handler = (event: unknown, ...args: unknown[]) => Promise<Envelope<unknown>>
 
@@ -32,7 +25,6 @@ let userData: string
 let secrets: Secrets
 beforeEach(async () => {
   vi.mocked(ipcMain.handle).mockClear()
-  vi.mocked(safeStorage.isEncryptionAvailable).mockReturnValue(true)
   userData = await mkdtemp(path.join(tmpdir(), 'yd-secrets-ipc-'))
   secrets = registerSecretsIpc(userData)
 })
@@ -46,13 +38,13 @@ describe('registerSecretsIpc (🔒 YAZ-1775 D4, YAZ-1817)', () => {
     expect(vi.mocked(ipcMain.handle).mock.calls.map(([ch]) => ch).sort()).toEqual([CH.secretsHas, CH.secretsSet].sort())
   })
 
-  it('set stores through safeStorage into `<userData>/secrets.json`; has flips; null clears; main reads the plaintext', async () => {
+  it('set stores into `<userData>/secrets.json` owner-only; has flips; null clears; main reads the value', async () => {
     expect(await has({ name: 'pixabayApiKey' })).toEqual(ok(false))
     expect(await set({ name: 'pixabayApiKey', value: 'abc123' })).toEqual(ok(undefined))
     expect(await has({ name: 'pixabayApiKey' })).toEqual(ok(true))
-    const raw = await readFile(path.join(userData, 'secrets.json'), 'utf8')
-    expect(raw).not.toContain('abc123')
-    expect(safeStorage.encryptString).toHaveBeenCalledWith('abc123')
+    const file = path.join(userData, 'secrets.json')
+    expect(JSON.parse(await readFile(file, 'utf8'))).toEqual({ version: 2, values: { pixabayApiKey: 'abc123' } })
+    expect((await stat(file)).mode & 0o777).toBe(0o600)
     expect(await secrets.read('pixabayApiKey')).toBe('abc123')
     expect(await set({ name: 'pixabayApiKey', value: null })).toEqual(ok(undefined))
     expect(await has({ name: 'pixabayApiKey' })).toEqual(ok(false))
@@ -64,13 +56,6 @@ describe('registerSecretsIpc (🔒 YAZ-1775 D4, YAZ-1817)', () => {
     expect(await set({ name: 'a', value: '' })).toEqual(bad('BAD_REQUEST'))
     expect(await set({ name: 'a', value: 7 })).toEqual(bad('BAD_REQUEST'))
     expect(await has({ name: 3 })).toEqual(bad('BAD_REQUEST'))
-    expect(await has({ name: 'a' })).toEqual(ok(false))
-  })
-
-  it('without a keychain, set answers ENCRYPTION_UNAVAILABLE and has answers false', async () => {
-    await set({ name: 'a', value: 'x' })
-    vi.mocked(safeStorage.isEncryptionAvailable).mockReturnValue(false)
-    expect(await set({ name: 'b', value: 'y' })).toEqual(bad('ENCRYPTION_UNAVAILABLE'))
     expect(await has({ name: 'a' })).toEqual(ok(false))
   })
 })

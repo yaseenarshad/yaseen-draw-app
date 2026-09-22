@@ -13,7 +13,6 @@ export type BridgeErrorCode =
   | 'IO_ERROR' // any other fs error
   | 'PICKER_FAILED' // native folder dialog could not be run
   | 'INVALID_CONFIG' // a vault config file (e.g. .yaseendraw/github.json) is unusable; the mutation is refused, the file never touched
-  | 'ENCRYPTION_UNAVAILABLE' // 🔒 YAZ-1775 D4: the OS keychain cannot encrypt on this machine, so no secret can be stored
   | 'UNSUPPORTED_TYPE' // 🔒 YAZ-1775 D4: a media provider answered with something that is not an image (the worker's 415)
   | 'PROVIDER_FAILED' // 🔒 YAZ-1775 D4: a media provider was REACHED and refused, or answered nonsense (the worker's 502)
   | 'OFFLINE' // 🔒 YAZ-1775 D4: the provider could not be reached at all — a passive state in the UI, never an error banner

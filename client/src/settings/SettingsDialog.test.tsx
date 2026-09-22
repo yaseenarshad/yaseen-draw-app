@@ -483,7 +483,7 @@ describe('Settings › Images › Pixabay API key (🔒 YAZ-1775 D4)', () => {
     expect(keyInput(el).type).toBe('password')
     expect(rowButtons(el, 'pixabayApiKey').map((b) => b.textContent)).toEqual(['Save', 'Clear'])
     expect(rowButtons(el, 'pixabayApiKey').map((b) => b.disabled)).toEqual([true, true])
-    expect(row(el, 'pixabayApiKey')?.querySelector('.setting__hint')?.textContent).toBe('Stored encrypted on this machine and never shown again. Iconify needs no key.')
+    expect(row(el, 'pixabayApiKey')?.querySelector('.setting__hint')?.textContent).toBe("Stored in this app's data folder, readable only by your user, and never shown again. Iconify needs no key.")
   })
 
   it('a set key reads "Key set" with Clear enabled; Clear writes null and the row says "No key"', async () => {
@@ -518,8 +518,8 @@ describe('Settings › Images › Pixabay API key (🔒 YAZ-1775 D4)', () => {
     expect(rowButtons(el, 'pixabayApiKey').map((b) => b.disabled)).toEqual([true, false])
   })
 
-  it('a machine with no keychain is told so in the status line, and the key stays unset', async () => {
-    secretSet.mockRejectedValue(new BridgeRequestError('ENCRYPTION_UNAVAILABLE', 'this machine cannot encrypt secrets'))
+  it('a save that fails is told so in the status line, and the key stays unset', async () => {
+    secretSet.mockRejectedValue(new BridgeRequestError('IO_ERROR', 'disk went away'))
     const { el } = mount()
     await flush()
     type(keyInput(el), 'k')
@@ -527,7 +527,7 @@ describe('Settings › Images › Pixabay API key (🔒 YAZ-1775 D4)', () => {
       rowButtons(el, 'pixabayApiKey')[0].click()
       await Promise.resolve()
     })
-    expect(statusText(el)).toBe("This machine can't encrypt secrets, so the key can't be stored.")
+    expect(statusText(el)).toBe('The key could not be saved.')
     expect(rowButtons(el, 'pixabayApiKey')[1].disabled).toBe(true)
   })
 })
