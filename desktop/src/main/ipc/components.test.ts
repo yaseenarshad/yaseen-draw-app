@@ -4,7 +4,7 @@
  * window gets whichever vault it is on.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rm, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { BrowserWindow, ipcMain } from 'electron'
@@ -94,6 +94,8 @@ describe('registerComponentsIpc (🔒 YAZ-1775 D5, YAZ-1819)', () => {
     const saved = await save({ name: 'A card', fragmentJson: fragment(), previewPng: PNG })
     expect(saved).toEqual(ok(expect.objectContaining({ slug: 'a-card', name: 'A card', elementCount: 1 })))
     expect(await readdir(path.join(userData, 'library', LIBRARY_COMPONENTS_DIR))).toContain('a-card.excalidraw')
+    // A component is a fragment in the LIBRARY, not a board: no `yaseendraw` block (🔒 YAZ-1834 D7).
+    expect(await readFile(path.join(userData, 'library', LIBRARY_COMPONENTS_DIR, 'a-card.excalidraw'), 'utf8')).toBe(`${fragment()}\n`)
     expect(await list()).toEqual(ok([expect.objectContaining({ slug: 'a-card' })]))
     expect(await read({ slug: 'a-card' })).toEqual(ok({ fragmentJson: `${fragment()}\n` }))
     expect(await preview({ slug: 'a-card' })).toEqual(ok(PNG))

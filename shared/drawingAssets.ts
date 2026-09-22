@@ -1,3 +1,5 @@
+import type { BoardMeta } from './types/files'
+
 /**
  * THE IMAGE STORE'S PURE RULES (🔒 YAZ-1775 D3 on YAZ-1775, built in YAZ-1811).
  *
@@ -12,7 +14,8 @@
  * the canvas's files a save still has to ship — so they live in `shared/` once, with no fs, no
  * Electron and no engine import, and `drawingAssets.test.ts` pins them. The doors that USE them
  * are `desktop/src/main/fs/drawing.ts`, `desktop/src/main/drawings/orphanSweep.ts` and
- * `client/src/drawings/DrawingEditor.tsx`.
+ * `client/src/drawings/DrawingEditor.tsx`; the board's own dates (🔒 YAZ-1834, at the end of this
+ * file) add `desktop/src/main/fs/create.ts`, `boardHead.ts` and `fsUtils.ts`.
  */
 
 /** Mime → extension for the images the store keeps. Nothing else is an asset. */
@@ -42,8 +45,6 @@ const MIME_BY_EXT: Readonly<Record<string, string>> = {
  * `assets/`, and the board that names it has not saved yet — an eager sweep would eat exactly
  * the file the user is looking at.
  */
-import type { BoardMeta } from './types'
-
 export const ORPHAN_MAX_AGE_MS = 24 * 60 * 60 * 1000
 
 /** The vault-relative folder the store lives in; the sidebar tree hides it (🔒 YAZ-1775 D3). */
@@ -153,12 +154,16 @@ const isEpochMs = (v: unknown): v is number => typeof v === 'number' && Number.i
 /** A block as it sits in a file: the two dates, plus whatever the backfill put beside them (D5). */
 export type BoardMetaBlock = BoardMeta & Record<string, unknown>
 
+/** `{ "yaseendraw": {` at the very start of a file — the only place a block is read from. */
+const BLOCK_OPENS = new RegExp(`^\\s*\\{\\s*"${BOARD_META_KEY}"\\s*:\\s*\\{`)
+
 /**
  * Place and stamp the block on a scene that is on its way to disk (🔒 YAZ-1834 D3). `json` is the
- * lean text `stripEmbeddedFiles` produced, or a fresh `EMPTY_SCENE_JSON`; `at` carries the dates
- * the caller has decided on; `prior` is the block the FILE currently holds (the save door reads it
- * off the head), which wins over any block inside `json` because the disk is the block's truth —
- * the engine's serializer never sends it back. The result is re-serialized the way every board
+ * lean text `stripEmbeddedFiles` produced, or the empty scene a create ships; `at` carries the
+ * dates the caller has decided on; `prior` is the block the FILE currently holds (the save door
+ * reads it off the head), which wins over any block inside `json` because the disk is the block's
+ * truth — the engine's serializer never sends it back. The cloud importer (YAZ-1832) is a caller
+ * too: its `prior` is the cloud row's dates, and this is what keeps the block first. The result is re-serialized the way every board
  * main writes it (2-space, trailing newline) with `yaseendraw` as the FIRST key, so the tree can
  * read it back from the file head alone.
  *
@@ -170,26 +175,26 @@ export type BoardMetaBlock = BoardMeta & Record<string, unknown>
  *
  * Throws when the text is not a JSON object; the save door has validated the scene before this.
  */
-export function stampBoardMeta(json: string, at: { createdAt: number; updatedAt: number }, prior: Record<string, unknown> | null = null): string {
+export function stampBoardMeta(json: string, at: { createdAt: number; updatedAt: number }, prior: BoardMetaBlock | null = null): string {
   const parsed: unknown = JSON.parse(json)
   if (!isPlainObject(parsed)) throw new Error('not an Excalidraw scene')
   const { [BOARD_META_KEY]: own, ...rest } = parsed
   const existing = prior ?? own
-  const { createdAt, updatedAt, ...extras } = isPlainObject(existing) ? existing : {}
-  void updatedAt // always replaced
+  // `_stale` is pulled out so the old `updatedAt` cannot ride along inside `...extras`.
+  const { createdAt, updatedAt: _stale, ...extras } = isPlainObject(existing) ? existing : {}
   const block = { createdAt: isEpochMs(createdAt) ? createdAt : at.createdAt, updatedAt: at.updatedAt, ...extras }
   return `${JSON.stringify({ [BOARD_META_KEY]: block, ...rest }, null, 2)}\n`
 }
 
 /**
- * The block off the HEAD of a file — the first `BOARD_META_HEAD_BYTES` decoded as text, which is
- * a truncated document and must never be `JSON.parse`d whole. Answers the block only when the
- * text is an object whose first key is `yaseendraw` and whose value parses to a plain object with
- * two finite numbers; anything else (no block, block not first, malformed, cut short) is `null`
- * (🔒 YAZ-1834 D7). Extra keys come back with it, so a save can carry them forward (D5).
+ * The block parsed off the HEAD of a file — the first `BOARD_META_HEAD_BYTES` decoded as text,
+ * which is a truncated document and must never be `JSON.parse`d whole. Answers the block only
+ * when the text is an object whose first key is `yaseendraw` and whose value parses to a plain
+ * object with two finite numbers; anything else (no block, block not first, malformed, cut short)
+ * is `null` (🔒 YAZ-1834 D7). Extra keys come back with it, so a save can carry them forward (D5).
  */
-export function readBoardMetaHead(head: string): BoardMetaBlock | null {
-  const open = /^\s*\{\s*"yaseendraw"\s*:\s*\{/.exec(head)
+export function parseBoardMetaBlock(head: string): BoardMetaBlock | null {
+  const open = BLOCK_OPENS.exec(head)
   if (open === null) return null
   const end = closingBrace(head, open[0].length - 1)
   if (end === null) return null

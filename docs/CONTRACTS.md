@@ -114,7 +114,7 @@ calls that go through it; `state`, `window`, `menu`, `link` and `watch` are call
 |---|---|---|
 | `tree(root)` | `fs:tree` | the folder tree; dot-entries and `node_modules` are invisible; a drawing carries `meta` (its dates) when its head has a trustworthy block (🔒 YAZ-1834 D6) |
 | `createDir(path)` | `fs:create-dir` | never overwrites (`ALREADY_EXISTS`) |
-| `createFile(req)` | `fs:create-file` | `.excalidraw` only; content-at-create, `wx` flag; the content must be a scene object and is born stamped with `createdAt = updatedAt = now` (🔒 YAZ-1834 D3) |
+| `createFile(req)` | `fs:create-file` | `.excalidraw` only; `{ path, content }`, content-at-create under `wx`; the content must be a JSON object (else `BAD_REQUEST`) and is born stamped with `createdAt = updatedAt = now` (🔒 YAZ-1834 D3) |
 | `drawing.load(req)` | `drawing:load` | one `.excalidraw` AS A DOCUMENT: its bytes, its mtime, and the images it names |
 | `drawing.save(req)` | `drawing:save` | images first, then the scene, atomically; `expectedMtime` → `CONFLICT` with NOTHING written; the scene lands with its `yaseendraw` block first, `createdAt` carried from the file, `updatedAt` = now (🔒 YAZ-1834 D3) |
 | `drawing.libraryFolder()` | `drawing:library-folder` | the RESOLVED library folder — the setting, or `<userData>/library` (🔒 YAZ-1775 D5) |
@@ -601,21 +601,25 @@ and nothing else; the scene below the block stays byte-identical.
 **🔒 D5 — the block is the backfill contract** (YAZ-1832). `createdAt` is never rewritten once
 it is a finite number, and every other key inside the block is preserved verbatim, so an importer
 may add `"cloudId"` beside the dates and it survives every save. The importer must write the
-block FIRST: a block anywhere else is not read (D7) and is replaced on the next save.
+block FIRST: a block anywhere else is not read (D7) and is replaced on the next save. It does not
+have to spell that itself — `stampBoardMeta(sceneJson, dates, cloudBlock)` is the one writer of
+the block, and the importer calls it like the save door does.
 
 **🔒 D6 — no new bridge.** `TreeNode` (file) carries `meta?: { createdAt, updatedAt }` when the
-head holds a trustworthy block. For sorting (YAZ-1835) the block WINS over `mtime`: a clone
-resets mtimes, the block travels. Boards without one sort by `mtime`.
+head holds a trustworthy block. For sorting, YAZ-1835 will take the block over `mtime`: a clone
+resets mtimes, the block travels. Boards without one will sort by `mtime`.
 
 **🔒 D7 — a missing, misplaced or malformed block is simply "no metadata".** The tree shows
 none, nothing is moved aside, no save or create is ever blocked by it, and the next save births a
-fresh block. `drawing:load` passes the block through untouched inside `json`; the engine ignores
-it. Export Drawing… (below) writes NO block — an export is a snapshot, not a board. Neither
-does `fs:write` or the saved-components store. A copy (Finder or in-app) keeps its origin's
+fresh block. A board main cannot even OPEN (permissions) is still listed, from its stat, without
+dates — no metadata is never no board. `drawing:load` passes the block through untouched inside
+`json`; the engine ignores it. Export Drawing… (below) writes NO block — an export is a snapshot,
+not a board — and neither does the saved-components store (`library/componentStore.ts`, whose
+`.excalidraw` fragments live outside any vault). A copy (Finder or in-app) keeps its origin's
 dates. Dropped from the design on purpose: `openedAt`, an id, tags, description (🔒 D2).
 
-Pure rules and readers: `shared/drawingAssets.ts` (`stampBoardMeta`, `readBoardMetaHead`);
-the one open that serves both the tree and the save: `desktop/src/main/fs/boardHead.ts`.
+Pure rules: `shared/drawingAssets.ts` (`stampBoardMeta`, `parseBoardMetaBlock`); the one open
+that serves both the tree and the save: `desktop/src/main/fs/boardHead.ts` (`readBoardHead`).
 
 ### Export Drawing… (🔒 YAZ-1775 D3, YAZ-1821)
 

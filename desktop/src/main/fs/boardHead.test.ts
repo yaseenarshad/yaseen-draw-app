@@ -36,8 +36,8 @@ describe('readBoardHead (🔒 YAZ-1834 D6)', () => {
     expect((await readBoardHead(file))?.block).toEqual({ createdAt: 1, updatedAt: 2 })
   })
 
-  it('is null for a missing file and rethrows anything else', async () => {
+  it('is null for a missing file and for a directory wearing the extension', async () => {
     expect(await readBoardHead(path.join(root, 'nope.excalidraw'))).toBeNull()
-    await expect(readBoardHead(root)).rejects.toMatchObject({ code: 'EISDIR' })
+    expect(await readBoardHead(root)).toBeNull()
   })
 })

@@ -5,18 +5,9 @@ import { stampBoardMeta } from '@shared/drawingAssets'
 import { BridgeFailure, fsCall, requireAbsPath } from './fsUtils'
 
 /**
- * Creation calls for the sidebar's "New folder" / "New drawing" (GRO-2022).
- * The object form's `content` (Bible B, GRO-2202) rides the same `wx` write — content-at-create,
- * no create-then-write race, which is how "New drawing" is born with an EMPTY SCENE rather than
- * as a zero-byte file (🔒 YAZ-1810: an empty `.excalidraw` is the corrupt case, not a new
- * board). Omitting `content` still writes an empty file; nothing in the app does. Existence races resolve at
- * the fs layer: mkdir and `wx` writes throw EEXIST, which `toBridgeFailure` maps to
+ * Creation calls for the sidebar's "New folder" / "New drawing" (GRO-2022). Existence races
+ * resolve at the fs layer: mkdir and `wx` writes throw EEXIST, which `toBridgeFailure` maps to
  * ALREADY_EXISTS — nothing is ever overwritten.
- *
- * A drawing is BORN STAMPED (🔒 YAZ-1834 D3): its `yaseendraw` block — `createdAt` and
- * `updatedAt`, both "now" — is placed first in the content before the same `wx` write, so no
- * board main creates ever exists without its dates. Content that is not a JSON object is refused
- * `BAD_REQUEST` before anything is touched. Empty content stays empty (nothing sends it).
  */
 export async function createDir(path: string): Promise<CreateDirResponse> {
   const p = requireAbsPath(path, 'path')
@@ -24,22 +15,28 @@ export async function createDir(path: string): Promise<CreateDirResponse> {
   return { path: p }
 }
 
-export async function createFile(req: string | CreateFileRequest): Promise<CreateFileResponse> {
-  // Crosses IPC from a sandboxed renderer: shape-checked like a request body (writeFile's posture).
+/**
+ * "New drawing" is born with its scene inside it, in ONE atomic `wx` write (Bible B, GRO-2202) —
+ * no create-then-write race, and never a zero-byte `.excalidraw`, which 🔒 YAZ-1810 calls the
+ * corrupt case rather than a new board. It is born STAMPED too (🔒 YAZ-1834 D3): its
+ * `yaseendraw` block — `createdAt` and `updatedAt`, both "now" — goes first, so no board main
+ * creates ever exists without its dates. Content that is not a JSON object is refused
+ * `BAD_REQUEST` before the disk is touched.
+ */
+export async function createFile(req: CreateFileRequest): Promise<CreateFileResponse> {
+  // Crosses IPC from a sandboxed renderer: shape-checked like a request body.
   const raw: unknown = req
-  const isReq = typeof raw === 'object' && raw !== null
-  const p = requireAbsPath(isReq ? (raw as Record<string, unknown>).path : raw, 'path')
+  if (typeof raw !== 'object' || raw === null) throw new BridgeFailure('BAD_REQUEST', 'request must be an object')
+  const { path, content } = raw as Record<string, unknown>
+  const p = requireAbsPath(path, 'path')
   if (!isDrawing(p)) throw new BridgeFailure('UNSUPPORTED_EXTENSION', 'only .excalidraw files can be created', { path: p })
-  const content = isReq ? (raw as Record<string, unknown>).content : undefined
-  if (content !== undefined && typeof content !== 'string') throw new BridgeFailure('BAD_REQUEST', "'content' must be a string", { path: p })
+  if (typeof content !== 'string') throw new BridgeFailure('BAD_REQUEST', "'content' must be a string", { path: p })
   const now = Date.now()
-  let body = ''
-  if (content !== undefined && content !== '') {
-    try {
-      body = stampBoardMeta(content, { createdAt: now, updatedAt: now })
-    } catch {
-      throw new BridgeFailure('BAD_REQUEST', "'content' must be an Excalidraw scene", { path: p })
-    }
+  let body: string
+  try {
+    body = stampBoardMeta(content, { createdAt: now, updatedAt: now })
+  } catch {
+    throw new BridgeFailure('BAD_REQUEST', "'content' must be an Excalidraw scene", { path: p })
   }
   return fsCall(p, async () => {
     await writeFile(p, body, { flag: 'wx' })
