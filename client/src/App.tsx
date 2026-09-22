@@ -13,7 +13,7 @@ import { fileClipboardVerb } from './lib/fileClipboardHotkey'
 import { LINK_NOTICE_MS, type Notice, type NoticeKind } from './lib/notice'
 import { NoticeIcon } from './components/NoticeIcon'
 import { basename } from './lib/paths'
-import { carryEditorAcrossRename, carryEditorsAcrossDirRename, flushRenamedDir, flushRenamedPath, retireDeletedDir, retireDeletedPath } from './lib/renameContinuity'
+import { flushRenamedDir, flushRenamedPath, retireDir, retirePath } from './lib/renameContinuity'
 import { EMPTY_SELECTION } from './lib/selection'
 import { storage } from './lib/storage'
 import { ownsSidebarHotkey } from './lib/sidebarHotkey'
@@ -346,25 +346,25 @@ export function App() {
   }, [])
 
   // In-app rename (Links E1 GRO-2194, folders E1b GRO-2241). `file:renamed` reaches EVERY
-  // window (originator included): BEFORE the workspace remap unmounts the old-path editor(s), a
-  // dirty buffer is carried into the new path and the old controller retired (no flush to
-  // the old path — see lib/renameContinuity.ts); then its main/right owner follows in place,
-  // and title/URL-hash track the active main tab through the existing effects above. A `dir`
-  // event is a PREFIX remap: every open editor and workspace path under the folder follows, and a window
-  // ROOTED at (or under) the folder — a subfolder opened as a vault — follows too (main's
-  // store repair already moved its WindowEntry.root; setRoot only mirrors it locally, so
-  // no identity write that could clobber the repaired file/tabs).
+  // window (originator included): BEFORE the workspace remap unmounts the old-path editor(s),
+  // the old controller is retired so nothing can flush to the old path (see
+  // lib/renameContinuity.ts); then its tab follows in place, and title/URL-hash track the
+  // active tab through the existing effects above. A `dir` event is a PREFIX remap: every open
+  // editor and workspace path under the folder follows, and a window ROOTED at (or under) the
+  // folder — a subfolder opened as a vault — follows too (main's store repair already moved
+  // its WindowEntry.root; setRoot only mirrors it locally, so no identity write that could
+  // clobber the repaired file/tabs).
   useEffect(
     () =>
       window.yaseenDraw.file.onRenamed(({ oldPath, newPath, kind }) => {
         if (kind === 'dir') {
-          carryEditorsAcrossDirRename(oldPath, newPath)
+          retireDir(oldPath)
           const movedRoot = root !== null && (root === oldPath || root.startsWith(`${oldPath}/`)) ? newPath + root.slice(oldPath.length) : undefined
           renameWorkspaceDir(oldPath, newPath, movedRoot)
           if (movedRoot !== undefined) setRoot(movedRoot)
           return
         }
-        carryEditorAcrossRename(oldPath, newPath)
+        retirePath(oldPath)
         renameWorkspacePath(oldPath, newPath)
       }),
     [renameWorkspacePath, renameWorkspaceDir, root],
@@ -399,10 +399,10 @@ export function App() {
   /**
    * In-app delete landed (GRO-2272). Reaches EVERY window, originator included.
    *
-   * ORDER IS NOT NEGOTIABLE: retire the editor, THEN remap the workspace. Removing a page owner unmounts its
-   * editor, and `useAutosave`'s unmount cleanup flushes the live buffer to disk — which would
-   * recreate the file that was just trashed. Retiring first makes that flush a no-op. Reverse
-   * these two lines and the delete silently fails a second later.
+   * ORDER IS NOT NEGOTIABLE: retire the editor, THEN remap the workspace. Removing a tab
+   * unmounts its editor, and `DrawingEditor`'s unmount cleanup flushes the live scene to disk
+   * — which would recreate the file that was just trashed. Retiring first makes that flush a
+   * no-op. Reverse these two lines and the delete silently fails a second later.
    *
    * A window ROOTED at (or under) a deleted folder is deliberately not repaired here: the
    * sidebar's existing `onRootMissing` probe owns that, and it also drops the dead MRU entry.
@@ -411,11 +411,11 @@ export function App() {
     () =>
       window.yaseenDraw.file.onDeleted(({ path, kind }) => {
         if (kind === 'dir') {
-          retireDeletedDir(path)
+          retireDir(path)
           deleteWorkspaceDir(path)
           return
         }
-        retireDeletedPath(path)
+        retirePath(path)
         deleteWorkspacePath(path)
       }),
     [deleteWorkspacePath, deleteWorkspaceDir],
