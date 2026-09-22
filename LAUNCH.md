@@ -88,11 +88,13 @@ The env var is read before the single-instance lock, so the installed app and th
 by side. Do NOT add `--watch` while agents are editing main-process files: every rebuild relaunches
 the window on the user's screen.
 
-The vault itself is generated — `node tools/seedDemoVault.mjs --vault <dir> --origin <bare-dir>`
-writes 63 boards plus a content-addressed `assets/` folder covering every awkward case (missing
-asset, legacy embedded dataURLs, corrupt and empty files, a 40-image board, a ~10 MB PNG, unicode
-and nested paths, two orphans) and a bare origin for the sync chip. It WIPES both paths, so point
-it at a scratch dir. It writes no profile: open the vault with ⌘O.
+The vault itself is generated — `node tools/seedDemoVault.mjs --vault <dir>` writes 63 boards plus
+a content-addressed `assets/` folder covering every awkward case (missing asset, legacy embedded
+dataURLs, corrupt and empty files, a 40-image board, a ~10 MB PNG, unicode and nested paths, two
+orphans) and, at `<dir> (origin).git` unless `--origin` says otherwise, a bare origin for the sync
+chip. `--vault` is REQUIRED and has no default, because the script WIPES what it is given; a path
+that already exists is refused unless you add `--force`. It writes no profile: open the vault with
+⌘O.
 
 Then run the scenario list by hand (or by computer-use). The standing list, from the demo Yasin
 approved on YAZ-1775, is: external disk edit hot-reloads a clean tab · paste → one asset, small

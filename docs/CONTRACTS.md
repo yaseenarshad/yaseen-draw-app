@@ -34,7 +34,7 @@ nothing to do with each other. A bare `D3` would be unresolvable, so there are n
 | `client/vendor/` | the five vendored `yaseendraw-*-<forkCommit>.tgz` engine tarballs (🔒 YAZ-1775 D2) |
 | `desktop/` | the Electron shell: `src/main` (files, state, windows, menu, git sync), `src/preload` (the bridge) |
 | `shared/` | types and pure helpers imported by BOTH sides (`@shared/*`) |
-| `tools/` | `packEngine.mjs` (bump the vendored engine), `packDesktop.mjs` (electron-builder), `seedDemoVault.mjs` (the stress-test vault the behaviour checks run against) |
+| `tools/` | `packEngine.mjs` (bump the vendored engine), `packDesktop.mjs` (electron-builder), `seedDemoVault.mjs` (the stress-test vault the behaviour checks run against); the pure halves of the last two live in `tools/lib/` beside their tests |
 | `docs/` | this file |
 | `thoughts/ledgers/` | continuity ledgers for in-flight work |
 
@@ -45,6 +45,7 @@ nothing to do with each other. A bare `D3` would be unresolvable, so there are n
 | `npm install` | installs the workspaces and unpacks the vendored engine tarballs |
 | `npm run dev` | `electron-vite dev` in `desktop/`: main + preload built, renderer served with HMR |
 | `npm test` | vitest, three projects — `client` (jsdom), `desktop` (node), `tools` (node) |
+| `npm run test:watch` | the same suites, re-run on save |
 | `npm run typecheck` | `tsc --noEmit` over client, shared and desktop |
 | `npm run build` | `electron-vite build` into `desktop/out` |
 | `npm run desktop:build` | build + electron-builder → `desktop/dist-app` (`--win` variant for Windows) |
@@ -76,8 +77,8 @@ One kind, one extension.
   always written with `files: {}`; a legacy file that still embeds its images is extracted on its
   first save. `assets/` is hidden from the sidebar tree (the TOP-LEVEL one only: a folder the
   user called `assets` inside a subfolder is theirs and shows).
-- There is ONE door that makes a drawing, and it is the sidebar's context menu (🔒 YAZ-1775 R1 on
-  YAZ-1775): the Create group is **New drawing**, New folder, New dated folder, in that order, on
+- There is ONE door that makes a drawing, and it is the sidebar's context menu (🔒 YAZ-1775 R1):
+  the Create group is **New drawing**, New folder, New dated folder, in that order, on
   a row or on blank space. Nowhere else in the app creates a file.
   - "New drawing" does not ask for a name. The board is born `Untitled.excalidraw` — then
     `Untitled 2`, `Untitled 3`… beside its siblings, filling a gap rather than running past it,
@@ -87,9 +88,8 @@ One kind, one extension.
     overwriting: a name lost to a race retries with the next number.
   - It then opens in the CURRENT tab and lands with the tree's inline rename field focused, so the
     first thing typed is its name.
-- A `.excalidraw` has ONE door per direction (🔒 YAZ-1810): `drawing:load` and `drawing:save`.
-  Not `fs:read` / `fs:write` (a text buffer capped at 10 MiB), and not the image pipe — which
-  stopped accepting drawings in YAZ-1810, because a second writer with different rules about the
+- A `.excalidraw` has ONE door per direction (🔒 YAZ-1810): `drawing:load` and `drawing:save`, and
+  no other channel reads or writes a scene — a second writer with different rules about the
   scene's images is a race with no upside. `fs:create-file` is the one exception and only for
   BIRTH: "New drawing" writes the empty scene with the file, under `wx`.
 - `client/src/Editor.tsx` dispatches on the kind: "Select a file from the sidebar." with no file,
@@ -102,14 +102,14 @@ Its ONLY door to the machine is `window.yaseenDraw`, defined by `desktop/src/pre
 over the channels in `desktop/src/channels.ts`, typed by `YaseenDrawApi` in `shared/types.ts`.
 Every `ipcMain.handle` answers with an `Envelope<T>`: `{ ok: true, value }` or
 `{ ok: false, error }` carrying a structured `BridgeError` (`code`, `message`, optional `path` /
-`mtime`), which the preload rethrows and `client/src/api.ts` wraps as `BridgeRequestError`.
-Electron flattens a thrown Error to its message, which is why failure travels as data.
+`mtime`), which the preload rethrows. Electron flattens a thrown Error to its message, which is
+why failure travels as data. `client/src/api.ts` re-wraps it as a `BridgeRequestError` for the
+calls that go through it; `state`, `window`, `menu`, `link` and `watch` are called straight off
+`window.yaseenDraw` and reject with the plain object.
 
 | `window.yaseenDraw` | Channel | What it does |
 |---|---|---|
 | `tree(root)` | `fs:tree` | the folder tree; dot-entries and `node_modules` are invisible |
-| `readFile(path)` | `fs:read` | UTF-8 bytes of a supported file, with `mtime` + `size` |
-| `writeFile(req)` | `fs:write` | atomic write (tmp + rename); `expectedMtime` rejects `CONFLICT` |
 | `createDir(path)` | `fs:create-dir` | never overwrites (`ALREADY_EXISTS`) |
 | `createFile(req)` | `fs:create-file` | `.excalidraw` only; content-at-create, `wx` flag |
 | `drawing.load(req)` | `drawing:load` | one `.excalidraw` AS A DOCUMENT: its bytes, its mtime, and the images it names |
@@ -123,11 +123,11 @@ Electron flattens a thrown Error to its message, which is why failure travels as
 | `file.delete(req)` | `fs:delete` | `shell.trashItem` ONLY — never `fs.rm`, no permanent fallback |
 | `file.clip` / `paste` / `clipState` | `fs:clip*`, `fs:paste` | main owns the ONE app-wide file clipboard |
 | `file.onRenamed` / `onDeleted` / `onClipChanged` | `file:*`, `clip:changed` | pushes to EVERY window |
-| `shell.reveal` / `openVsCode` / `openDefault` / `openLink` | `shell:*` | OS hand-offs |
+| `shell.reveal` / `openVsCode` / `openDefault` | `shell:*` | OS hand-offs |
 | `state.get` / `setSettings` / `setSidebarWidth` / `pushRecent` / `removeRecent` / `setFolder` | `state:*` | the app state file |
 | `state.onChange` | `state:changed` | a change in any window replaces the cache in all of them |
 | `window.identity` / `setIdentity` | `window:*` | THIS window's `WindowEntry`, by the `?win=<id>` in its URL |
-| `window.open` / `duplicate` / `openRecent` / `closeSelf` / `zoom` | `window:*` | window lifecycle |
+| `window.open` / `openRecent` / `closeSelf` | `window:*` | window lifecycle |
 | `window.onFlush` | `app:flush` / `app:flushed` | the close/quit handshake (main waits, 5s cap) |
 | `menu.on*` | `menu:*` | Open Folder…, Open Recent, Search Vault, Switch Vault…, Settings…, Toggle Sidebar, Close Tab, Next/Previous Tab, Export Image…, Export Drawing…, Canvas Background |
 | `link.onOpenFile` / `onNotice` | `link:*` | a routed `yaseendraw://` link |
@@ -138,7 +138,7 @@ Electron flattens a thrown Error to its message, which is why failure travels as
 | `media.search(req)` | `media:search` | `{ q, source: 'all' \| 'iconify' \| 'pixabay', cursor? }` → `{ items, nextCursor, pixabayAvailable, warnings }` (🔒 YAZ-1775 D4) |
 | `media.preview(req)` | `media:preview` | `{ provider: 'pixabay' \| 'iconify', id }` → `{ mimeType, dataURL }`, from the 24 h disk cache when it is there |
 | `media.import(req)` | `media:import` | the same request → `{ mimeType, dataURL, item }`; NEVER cached, capped at `MAX_IMPORT_BYTES` 20 MB |
-| `components.list()` | `components:list` | the saved-component index over `<library>/components/` (🔒 YAZ-1775 D5); a missing or corrupt index is rebuilt from the folder |
+| `components.list()` | `components:list` | the saved-component index over `<library>/components/` (🔒 YAZ-1775 D5), reconciled against the folder on every read — a fragment the index does not know is adopted, a row whose file went drops out, and a missing or corrupt index is rebuilt |
 | `components.save(req)` | `components:save` | `{ name, fragmentJson, previewPng }` → the `ComponentItem` it made; writes `<slug>.excalidraw` + `<slug>.png` |
 | `components.read(req)` | `components:read` | `{ slug }` → `{ fragmentJson }` — the bytes an insert needs |
 | `components.rename(req)` | `components:rename` | `{ slug, name }` → the row; the LABEL only, both files keep their names |
@@ -146,7 +146,6 @@ Electron flattens a thrown Error to its message, which is why failure travels as
 | `components.preview(req)` | `components:preview` | `{ slug }` → the stored PNG as a dataURL |
 | `components.onChanged` | `components:changed` | pushed to EVERY window when the components library changes — any vault, any writer, no payload |
 | `secrets.set(req)` / `has(req)` | `secrets:set` / `secrets:has` | `{ name, value \| null }` writes or clears an encrypted secret; `{ name }` → boolean. NO channel answers a value (🔒 YAZ-1775 D4) |
-| `vaultConfig.read` / `write` / `onChanged` | `vaultConfig:*` | any file in `<vault>/.yaseendraw/` |
 | `github.status` / `syncNow` / `setEnabled` / `onStatus` | `github:*` | per-vault GitHub sync |
 
 Rules that hold across the whole surface:
@@ -403,8 +402,11 @@ file), `SavedComponents.tsx` and `savedComponents.css`. **Insert makes an indepe
 elements go through the engine's own `insertElements`, which duplicates ids and centres on the
 viewport, so two inserts of one component are two unrelated sets of elements. Search is the app's
 ONE ranking matcher (`search/matchCandidates.ts`, the same one ⌘K uses) over the names, paged by
-`PAGE_SIZE` 24. Rename and delete are inline in the card rather than `window.prompt` /
+`PAGE_SIZE` 24, grown by a sentinel at the end of the grid — the Images tab's gesture, so one panel
+does not have two. Rename and delete are inline in the card rather than `window.prompt` /
 `window.confirm`, and 🔒 `confirmDelete` (Settings › Files) decides whether the delete asks first.
+A rename shows the name the STORE answered with, never an optimistic one: a refusal leaves the old
+name on the card beside the reason.
 
 **Import JSON** (YAZ-1833) is the same library through a different door: the button opens the
 native open-file dialog (`dialog:open-file`, `.excalidraw` filter), `componentImport.ts` parses
@@ -623,8 +625,8 @@ this exists at all.
 The dialog (`client/src/settings/`) is one scrolling page of sections plus a standalone Hotkeys
 page, driven entirely by the registry in `registry.tsx`: a setting is declared once — id, label,
 hint, search keywords, how it renders — and appears in its section, in the nav and in search from
-that one entry. The row's `id` IS its `SettingsState` field name, so a spec that knows the field
-knows the row.
+that one entry. A row's `id` IS its `SettingsState` field name wherever the setting has one; the
+two that do not — the Pixabay key and the GitHub switch — are marked below.
 
 | Section | Rows |
 |---|---|
@@ -635,8 +637,9 @@ knows the row.
 | Sync | the per-vault GitHub switch — the other setting NOT in `SettingsState` (it lives in `.yaseendraw/github.json`) |
 | Hotkeys | its own page: the Window, Canvas and Mouse tables, from `hotkeys.ts` |
 
-`hotkeys.ts` is the single source of truth for every binding the app advertises, and
-`hotkeys.test.ts` pins the expected set so a keymap change anywhere fails loudly here.
+`hotkeys.ts` is the single source of truth for every binding the app advertises — Settings ›
+Hotkeys renders it and nothing else — and `hotkeys.test.ts` pins the expected set, the Canvas
+table included, so a keymap change anywhere fails loudly here.
 
 ## Multi-window
 
