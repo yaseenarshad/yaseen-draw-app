@@ -1,4 +1,4 @@
-import type { DrawingLoadRequest, DrawingLoadResponse, DrawingSaveRequest, DrawingSaveResponse, BridgeError, BridgeErrorCode, CreateDirResponse, CreateFileRequest, CreateFileResponse, DeleteRequest, DeleteResponse, FileClipRequest, FileClipState, FileResponse, FileWriteRequest, FileWriteResponse, GithubSyncStatus, OpenLinkRequest, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, RevealRequest, RevealResponse, TreeResponse } from '@shared/types'
+import type { ComponentItem, ComponentReadResponse, ComponentRenameRequest, ComponentSaveRequest, ComponentSlugRequest, DrawingLoadRequest, DrawingLoadResponse, DrawingSaveRequest, DrawingSaveResponse, BridgeError, BridgeErrorCode, CreateDirResponse, CreateFileRequest, CreateFileResponse, DeleteRequest, DeleteResponse, FileClipRequest, FileClipState, FileResponse, FileWriteRequest, FileWriteResponse, GithubSyncStatus, MediaFavoritesRequest, MediaImportRequest, MediaImportResponse, MediaPreviewRequest, MediaPreviewResponse, MediaRecentRequest, MediaSearchRequest, MediaSearchResponse, OpenDrawingResponse, OpenLinkRequest, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, RevealRequest, RevealResponse, SaveDrawingRequest, SaveDrawingResponse, SecretHasRequest, SecretSetRequest, StoredMediaItem, TreeResponse } from '@shared/types'
 
 /** Typed failure from the main process (see docs/CONTRACTS.md "Bridge API"). */
 export class BridgeRequestError extends Error {
@@ -69,11 +69,51 @@ export const api = {
   },
   /** Native open-directory dialog parented to this window; resolves when the user picks or cancels. */
   pickFolder: () => call<PickFolderResponse>(() => window.yaseenDraw.pickFolder()),
+  /** Native file dialogs (YAZ-1833): `openDrawing()` picks one `.excalidraw` and answers its bytes. */
+  dialog: {
+    openDrawing: () => call<OpenDrawingResponse>(() => window.yaseenDraw.dialog.openDrawing()),
+    /** Pick a destination and write a standalone `.excalidraw` there — dialog AND write in one call (🔒 D3). */
+    saveDrawing: (req: SaveDrawingRequest) => call<SaveDrawingResponse>(() => window.yaseenDraw.dialog.saveDrawing(req)),
+  },
   /** The Favorites list over `.yaseendraw/favorites.json` (YAZ-1766 6A): absolute paths in the user's order; a malformed file rejects `set` with INVALID_CONFIG. */
   favorites: {
     get: (root: string) => call<string[]>(() => window.yaseenDraw.favorites.get(root)),
     set: (root: string, paths: readonly string[]) => call<void>(() => window.yaseenDraw.favorites.set(root, paths)),
     onChanged: (listener: (change: { root: string }) => void) => window.yaseenDraw.favorites.onChanged(listener),
+  },
+  /** The cross-vault media library over `<library>/media.json` (🔒 D4 / D5, YAZ-1817): pointers only; every verb answers the list it produced. */
+  media: {
+    favorites: (req: MediaFavoritesRequest) => call<StoredMediaItem[]>(() => window.yaseenDraw.media.favorites(req)),
+    recent: (req: MediaRecentRequest) => call<StoredMediaItem[]>(() => window.yaseenDraw.media.recent(req)),
+    /** Fired in EVERY window when `media.json` changes — this app's write, another vault's window, or a synced edit. */
+    onChanged: (listener: () => void) => window.yaseenDraw.media.onChanged(listener),
+    /** Federated provider search (🔒 D4, YAZ-1818): Iconify always, Pixabay when a key is set — `pixabayAvailable` says which. */
+    search: (req: MediaSearchRequest) => call<MediaSearchResponse>(() => window.yaseenDraw.media.search(req)),
+    /** One tile's picture as a dataURL, served from main's 24 h disk cache when it is there. */
+    preview: (req: MediaPreviewRequest) => call<MediaPreviewResponse>(() => window.yaseenDraw.media.preview(req)),
+    /** The full-size bytes to insert — never cached, because they are about to become an `assets/` file (🔒 D3). */
+    import: (req: MediaImportRequest) => call<MediaImportResponse>(() => window.yaseenDraw.media.import(req)),
+  },
+  /**
+   * The cross-vault saved-component library over `<library>/components/` (🔒 D5, YAZ-1819): a
+   * component is a whole `.excalidraw` fragment with its image bytes embedded, plus a PNG preview,
+   * indexed by `<library>/components.json`. Every mutation answers what it produced, and
+   * `onChanged` fires in every window whichever vault it is on.
+   */
+  components: {
+    list: () => call<ComponentItem[]>(() => window.yaseenDraw.components.list()),
+    save: (req: ComponentSaveRequest) => call<ComponentItem>(() => window.yaseenDraw.components.save(req)),
+    read: (req: ComponentSlugRequest) => call<ComponentReadResponse>(() => window.yaseenDraw.components.read(req)),
+    rename: (req: ComponentRenameRequest) => call<ComponentItem>(() => window.yaseenDraw.components.rename(req)),
+    delete: (req: ComponentSlugRequest) => call<void>(() => window.yaseenDraw.components.delete(req)),
+    /** The stored `<slug>.png` as a dataURL — the grid's tile picture; NOT_FOUND when it is gone. */
+    preview: (req: ComponentSlugRequest) => call<string>(() => window.yaseenDraw.components.preview(req)),
+    onChanged: (listener: () => void) => window.yaseenDraw.components.onChanged(listener),
+  },
+  /** The secrets door (🔒 D4): write and ask, never read. `set` rejects ENCRYPTION_UNAVAILABLE without an OS keychain. */
+  secrets: {
+    set: (req: SecretSetRequest) => call<void>(() => window.yaseenDraw.secrets.set(req)),
+    has: (req: SecretHasRequest) => call<boolean>(() => window.yaseenDraw.secrets.has(req)),
   },
   /** Per-vault GitHub sync (YAZ-1081): off by default, toggled through `.yaseendraw/github.json`; every call answers the same status the push carries. */
   github: {

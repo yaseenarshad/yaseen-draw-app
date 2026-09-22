@@ -141,7 +141,8 @@
  * §4 AppMainMenu ITEMS, ONE BY ONE — where each one went
  *   LoadScene                     DROPPED — `loadScene: false`; the file is the document
  *   SaveToActiveFile              DROPPED — autosave owns the file
- *   Export                        PORTED via 3E — the shell's own Export menu (PNG / SVG / .excalidraw)
+ *   Export                        PORTED via 3E — File › Export Drawing… ⌘⇧S → `menu:export-drawing`
+ *                                           → `exportScene()` below → the main save dialog
  *   SaveAsImage                   PORTED via 🔒 D10 — File › Export Image… ⌘⇧E → `menu:export-image`
  *                                           → `openImageExport()` below
  *   LiveCollaborationTrigger      DROPPED — collab
@@ -202,7 +203,8 @@
  *     `.is-collaborating [data-testid=clear-canvas-button]`, `.plus-banner`,
  *     `.board-preview-overlay*`, `.yaseen-welcome-lockup*`, `.collab-errors-button`,
  *     `.ShareDialog`                                    DROPPED — footer, collab, Excalidraw+, Boards, share
- *   presentation-active chrome hiding                   PORTED via 3D
+ *   presentation-active chrome hiding                   PORTED (3D) — on `.drawing-surface`, not
+ *                                            `body`: several tabs are mounted, one is in front
  *   `.image-studio__footer`, PresentationSidebar footer  PORTED with their panels (3A / 3D)
  *   `.ToolIcon__keybinding` override                    DROPPED (⚡ R5) — the fork hides key hints only
  *                                            under `.App-toolbar--compact`, which this app never shows
@@ -242,6 +244,8 @@ import { applyToolbarMode, loadExcalidraw, YASEEN_FULL_TOOLBAR_MODE, type Excali
 import { yaseenFormFactor } from './formFactor'
 import { applyFramesVisibility } from './framesVisibility'
 import { createLauncherStore, LauncherRail } from './LauncherRail'
+import { assembleStandaloneScene } from './exportDrawing'
+import { PresentationPlayer } from './presentation/PresentationPlayer'
 
 type ExcalidrawProps = ComponentProps<ExcalidrawModule['Excalidraw']>
 type ChangeArgs = Parameters<NonNullable<ExcalidrawProps['onChange']>>
@@ -279,6 +283,12 @@ export interface DrawingSurfaceApi {
    * writes into the file. The one canvas value that is per BOARD rather than per user.
    */
   setCanvasBackground(color: string): void
+  /**
+   * File › Export Drawing… (🔒 D3, YAZ-1821): the canvas as a STANDALONE `.excalidraw` — the whole
+   * live files map, minus what only deleted elements name, embedded in the JSON. This is the one
+   * place this app embeds; `serialize()` above is the lean vault form and is untouched by it.
+   */
+  exportScene(): string
   /**
    * Replace what the canvas shows (the file changed on disk under a clean editor). Returns the
    * version the engine will report for it — the host's new clean baseline. Computed from the
@@ -370,8 +380,30 @@ export function ExcalidrawSurface({
   const panelRef = useRef(canvasPanel)
   /** The engine's raw handle, for the rail and the shortcuts; null until it has mounted. */
   const rawApiRef = useRef<ImperativeApi | null>(null)
+  /**
+   * The same handle as STATE, because the Images tab is a child of `<Excalidraw>` that has to
+   * re-render when it arrives (YAZ-1818) — a ref alone would leave the tab's insert button
+   * disabled for the life of the mount.
+   */
+  const [imperativeApi, setImperativeApi] = useState<ImperativeApi | null>(null)
+  /** ⌘F's counter: every press is a fresh request to focus the Images tab's search field. */
+  const [searchFocusRequest, setSearchFocusRequest] = useState(0)
+  /**
+   * Whether the canvas holds a selection, for the Components tab's "Save selection" (YAZ-1819).
+   * The web app read it with the engine's `useUIAppState()` hook inside the panel; here it is read
+   * off the SAME `onChange` the rest of this seam is driven by, so the tab needs no engine hook —
+   * and because it is a boolean, the memoized panel is re-made only when it actually flips.
+   */
+  const [hasSelection, setHasSelection] = useState(false)
   /** This seam's own element — the handle's `focus()` reaches the engine's container through it. */
   const rootRef = useRef<HTMLDivElement | null>(null)
+  /**
+   * The presentation, if one is running (YAZ-1820): the player is a SIBLING of `<Excalidraw>`, not
+   * a child of the Present tab, because a tab's body is unmounted the moment the panel closes and
+   * closing the panel must not end a presentation. It covers this pane and no other, which is why
+   * it is here rather than portalled to `document.body` as the web app's was.
+   */
+  const [presenting, setPresenting] = useState<{ initialFrameId: string | null } | null>(null)
   emitRef.current = onSnapshot
   failRef.current = onFailed
   apiRef.current = onApi
@@ -439,6 +471,25 @@ export function ExcalidrawSurface({
   }, [])
 
   const closePanel = useCallback(() => rawApiRef.current?.toggleSidebar({ name: null, force: false }), [])
+  // Play (YAZ-1820): the panel closes, because it would otherwise sit on top of the deck. Stable
+  // identities, so the memoized panel and the memoized `<Excalidraw>` are untouched by them.
+  const startPresentation = useCallback(
+    (initialFrameId: string | null) => {
+      rawApiRef.current?.toggleSidebar({ name: null, force: false })
+      setPresenting({ initialFrameId })
+    },
+    [],
+  )
+  const endPresentation = useCallback(() => setPresenting(null), [])
+  /**
+   * The player hid the frame outlines to present; this puts back what the USER's preference says
+   * (🔒 D9: `SettingsState.canvas.framesVisible`, read off the one ref that knows what the engine
+   * is believed to hold — where the web app read a localStorage key).
+   */
+  const restoreFrames = useCallback(() => {
+    const api = rawApiRef.current
+    if (api !== null) applyFramesVisibility(api, appliedRef.current.framesVisible)
+  }, [])
   const onDock = useCallback((docked: boolean) => rememberPanel({ docked }), [rememberPanel])
 
   /**
@@ -470,6 +521,9 @@ export function ExcalidrawSurface({
       event.preventDefault()
       event.stopPropagation()
       rail.openTab(tab)
+      // ⌘F does not just open the tab, it puts the caret in the search field — the web app's
+      // `onRequestImageStudioSearch` (`AppSidebar.tsx:1071-1072`), as a counter the tab watches.
+      if (tab === 'image-studio') setSearchFocusRequest((request) => request + 1)
     },
     [rail],
   )
@@ -534,6 +588,7 @@ export function ExcalidrawSurface({
       if (mod !== null) emitRef.current(snapshotOf(mod, elements, appState, files))
       // The canvas panel's open tab: the rail's emphasis, the triggers' opacity, and the memory
       // the hamburger opens on next time.
+      setHasSelection(Object.keys((appState as unknown as { selectedElementIds?: Record<string, unknown> }).selectedElementIds ?? {}).length > 0)
       const activeTab = openCanvasTab((appState as unknown as { openSidebar?: { name?: string; tab?: string } | null }).openSidebar)
       if (activeTab !== null) rememberPanel({ tab: activeTab })
       rail.set({ activeTab })
@@ -555,6 +610,7 @@ export function ExcalidrawSurface({
       // never calls after its own unmount.
       if (mod === null || api === null) return
       rawApiRef.current = api
+      setImperativeApi(api)
       // Frames are never appState (🔒 D9): applied the moment the engine can take them.
       applyFramesVisibility(api, appliedRef.current.framesVisible)
       // The dock preference the web app kept per cloud username, kept in the shell store here.
@@ -568,6 +624,15 @@ export function ExcalidrawSurface({
         focus: () => rootRef.current?.querySelector<HTMLElement>('.excalidraw-container')?.focus(),
         openImageExport: () => api.updateScene({ appState: { openDialog: { name: 'imageExport' } } as unknown as EngineAppState }),
         setCanvasBackground: (color) => api.updateScene({ appState: { viewBackgroundColor: color } as unknown as EngineAppState }),
+        // The FULL files map, straight off the engine: everything 2E hydrated out of `assets/` at
+        // load plus anything pasted or inserted since and not yet saved. The store's copy would be
+        // missing the second half.
+        exportScene: () =>
+          assembleStandaloneScene(mod, {
+            elements: api.getSceneElements() as readonly unknown[],
+            appState: api.getAppState() as unknown as Record<string, unknown>,
+            files: api.getFiles() as unknown as Record<string, unknown>,
+          }),
         replaceScene: (next) => {
           const restored = mod.restoreElements(next.elements as ChangeArgs[0], null)
           api.updateScene({ elements: restored })
@@ -595,8 +660,20 @@ export function ExcalidrawSurface({
   const [activeTab, setActiveTab] = useState<CanvasPanelTab | null>(null)
   useEffect(() => rail.subscribe(() => setActiveTab(rail.getState().activeTab)), [rail])
   const canvasSidebar = useMemo(
-    () => (engine === null ? null : <CanvasSidebar engine={engine} activeTab={activeTab} onClose={closePanel} onDock={onDock} />),
-    [engine, activeTab, closePanel, onDock],
+    () =>
+      engine === null ? null : (
+        <CanvasSidebar
+          engine={engine}
+          activeTab={activeTab}
+          onClose={closePanel}
+          onDock={onDock}
+          excalidrawAPI={imperativeApi}
+          searchFocusRequest={searchFocusRequest}
+          hasSelection={hasSelection}
+          onStartPresentation={startPresentation}
+        />
+      ),
+    [engine, activeTab, closePanel, onDock, imperativeApi, searchFocusRequest, hasSelection, startPresentation],
   )
 
   if (engine === null) return <div className="drawing-editor__loading" />
@@ -620,6 +697,15 @@ export function ExcalidrawSurface({
       >
         {canvasSidebar}
       </Excalidraw>
+      {presenting !== null && imperativeApi !== null && (
+        <PresentationPlayer
+          engine={engine}
+          excalidrawAPI={imperativeApi}
+          initialFrameId={presenting.initialFrameId}
+          onExit={endPresentation}
+          onRestoreFrames={restoreFrames}
+        />
+      )}
     </div>
   )
 }

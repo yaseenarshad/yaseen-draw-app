@@ -19,6 +19,9 @@ marks an amendment to an earlier locked decision; the amendment wins.
 |---|---|
 | `client/` | the renderer: React 19, Vite. Talks to nothing but `window.yaseenDraw`. |
 | `client/src/drawings/` | the drawing document: the engine seam (`ExcalidrawSurface`, the ONE importer of the package), its host, and what a scene is |
+| `client/src/drawings/presentation/` | the canvas panel's Present tab: the slide rules, the panel and the full-pane player |
+| `client/src/media/` | the canvas panel's Images tab: the Image Studio, the shapes catalog, both insert paths |
+| `client/src/components-library/` | the canvas panel's Components tab: the saved-component library, its capture, import, preview and insert (named so it is never confused with `client/src/components/`) |
 | `client/src/sidebar/` | the file tree, its context menu, rename/move/trash, favorites, vault switcher |
 | `client/src/tabs/` | the tab strip |
 | `client/src/workspace/` | the tab model (`tabsReducer`) and its per-tab history |
@@ -109,6 +112,8 @@ Electron flattens a thrown Error to its message, which is why failure travels as
 | `drawing.save(req)` | `drawing:save` | images first, then the scene, atomically; `expectedMtime` → `CONFLICT` with NOTHING written |
 | `drawing.libraryFolder()` | `drawing:library-folder` | the RESOLVED library folder — the setting, or `<userData>/library` (🔒 D5) |
 | `pickFolder()` | `dialog:pick-folder` | the native open-directory dialog |
+| `dialog.openDrawing()` | `dialog:open-file` | the native OPEN-FILE dialog, `.excalidraw` filter → `{ path, name, content }` or `{ cancelled: true }`; the bytes come back because the picked file is outside the vault |
+| `dialog.saveDrawing(req)` | `dialog:save-file` | the native SAVE sheet AND the atomic write behind it → `{ path }` or `{ cancelled: true }`; the only path ever written is the one the user just typed |
 | `watch(root, cb)` | `watch:*` | chokidar under the root; `ready` / `change` / `add` / `unlink` / `error` |
 | `file.rename(req)` | `fs:rename` | same-parent rename or a move; never overwrites |
 | `file.delete(req)` | `fs:delete` | `shell.trashItem` ONLY — never `fs.rm`, no permanent fallback |
@@ -120,9 +125,23 @@ Electron flattens a thrown Error to its message, which is why failure travels as
 | `window.identity` / `setIdentity` | `window:*` | THIS window's `WindowEntry`, by the `?win=<id>` in its URL |
 | `window.open` / `duplicate` / `openRecent` / `closeSelf` / `zoom` | `window:*` | window lifecycle |
 | `window.onFlush` | `app:flush` / `app:flushed` | the close/quit handshake (main waits, 5s cap) |
-| `menu.on*` | `menu:*` | Open Folder…, Open Recent, Search Vault, Switch Vault…, Settings…, Toggle Sidebar, Close Tab, Next/Previous Tab, Export Image…, Canvas Background |
+| `menu.on*` | `menu:*` | Open Folder…, Open Recent, Search Vault, Switch Vault…, Settings…, Toggle Sidebar, Close Tab, Next/Previous Tab, Export Image…, Export Drawing…, Canvas Background |
 | `link.onOpenFile` / `onNotice` | `link:*` | a routed `yaseendraw://` link |
 | `favorites.get` / `set` / `onChanged` | `favorites:*` | `<vault>/.yaseendraw/favorites.json` |
+| `media.favorites(req)` | `media:favorites` | `{ op: 'list' }` · `{ op: 'add', item }` · `{ op: 'remove', itemKey }` over `<library>/media.json` (🔒 D5); every verb answers the resulting list |
+| `media.recent(req)` | `media:recent` | `{ op: 'list' }` · `{ op: 'record', item }` — the MRU, `RECENT_LIMIT` 60 |
+| `media.onChanged` | `media:changed` | pushed to EVERY window when `media.json` changes — any vault, any writer, no payload |
+| `media.search(req)` | `media:search` | `{ q, source: 'all' \| 'iconify' \| 'pixabay', cursor? }` → `{ items, nextCursor, pixabayAvailable, warnings }` (🔒 D4) |
+| `media.preview(req)` | `media:preview` | `{ provider: 'pixabay' \| 'iconify', id }` → `{ mimeType, dataURL }`, from the 24 h disk cache when it is there |
+| `media.import(req)` | `media:import` | the same request → `{ mimeType, dataURL, item }`; NEVER cached, capped at `MAX_IMPORT_BYTES` 20 MB |
+| `components.list()` | `components:list` | the saved-component index over `<library>/components/` (🔒 D5); a missing or corrupt index is rebuilt from the folder |
+| `components.save(req)` | `components:save` | `{ name, fragmentJson, previewPng }` → the `ComponentItem` it made; writes `<slug>.excalidraw` + `<slug>.png` |
+| `components.read(req)` | `components:read` | `{ slug }` → `{ fragmentJson }` — the bytes an insert needs |
+| `components.rename(req)` | `components:rename` | `{ slug, name }` → the row; the LABEL only, both files keep their names |
+| `components.delete(req)` | `components:delete` | `{ slug }`; both files to the OS trash (`shell.trashItem`) and the row out of the index |
+| `components.preview(req)` | `components:preview` | `{ slug }` → the stored PNG as a dataURL |
+| `components.onChanged` | `components:changed` | pushed to EVERY window when the components library changes — any vault, any writer, no payload |
+| `secrets.set(req)` / `has(req)` | `secrets:set` / `secrets:has` | `{ name, value \| null }` writes or clears an encrypted secret; `{ name }` → boolean. NO channel answers a value (🔒 D4) |
 | `vaultConfig.read` / `write` / `onChanged` | `vaultConfig:*` | any file in `<vault>/.yaseendraw/` |
 | `github.status` / `syncNow` / `setEnabled` / `onStatus` | `github:*` | per-vault GitHub sync |
 
@@ -142,6 +161,12 @@ Rules that hold across the whole surface:
   embed their images as base64.
 - **Assets are immutable and append-only.** A save writes an asset with `wx` and treats EEXIST as
   success; nothing but the orphan sweep ever removes one.
+- **The renderer never reaches a provider** (🔒 D4). Iconify and Pixabay are fetched by MAIN, which
+  holds the key, does the curation, keeps the cache and enforces the import cap. The renderer's
+  whole knowledge of the key is the boolean `pixabayAvailable`.
+- **A secret never crosses the bridge outward** (🔒 D4). The renderer may `set` one and ask `has`;
+  there is no channel, no state field and no push that carries a value, so a key cannot reach a
+  devtools console, a `state:get` answer or a renderer crash dump. Main reads it itself.
 
 ### The orphan sweep (🔒 D3)
 
@@ -236,11 +261,223 @@ them by value and then diverges; a global `state:changed` broadcast never moves 
 Settings and `sidebarWidth` are global and every window follows a change live.
 
 `SettingsState.libraryFolder` (🔒 D5) is the ONE folder every vault shares, where media favorites
-and saved components will live (3A / 3B / 3C fill it): an absolute path the user picked, or null
+and saved components live (3A / 3B filled it; 3C adds `components/`): an absolute path the user picked, or null
 for `<userData>/library`. Only main can resolve null, so Settings asks through
 `drawing:library-folder`; main also `mkdir -p`s the folder at startup, so the row always names a
 directory that exists. A folder that cannot be created is still the answer — a launch must not
 fail because a picked path has gone read-only.
+
+### The Library folder (🔒 D5)
+
+```
+<library>/
+  media.json                      the media library — 3A (YAZ-1817)
+  components.json                 the saved-component index — 3C (YAZ-1819)
+  components/
+    <slug>.excalidraw             one component: a whole Excalidraw document, images EMBEDDED
+    <slug>.png                    its preview, bounded at 800 × 600
+```
+
+`media.json` is `{ version: 1, favorites: StoredMediaItem[], recent: StoredMediaItem[] }`, both
+lists newest-first, de-duplicated by `itemKey`, and capped on the tail — `favorites` at 500
+(`MAX_MEDIA_FAVORITES`), `recent` at `RECENT_LIMIT` 60 as an MRU. A `StoredMediaItem` is the web
+app's (`convex/mediaTypes.ts`, field for field, so a library written by either app reads in the
+other): `itemKey` (the identity), `provider` (`pixabay` | `iconify` | `shape`), `providerId`,
+`kind`, `title`, the optional attribution and layout fields (`previewUrl`, `creator`,
+`creatorUrl`, `collectionName`, `sourceUrl`, `licenseName`, `licenseUrl`, `attribution`, `width`,
+`height`, `trademarkNotice`), and `updatedAt`, which MAIN stamps on every write — a renderer's own
+is dropped. `previewUrl` is stored but NEVER trusted: a CDN URL expires, and the Images tab
+re-derives every preview from `provider` + `providerId` over `media:preview`. Pointers only — the BYTES never live in the library (they
+go through `media:import` into the vault's `assets/`).
+
+The rules are pure (`shared/mediaLibrary.ts`); the disk half (`desktop/src/main/library/mediaStore.ts`)
+follows the app's file idioms: a read never creates the file, a mutation that changes nothing does
+not write, writes are tmp + rename and serialised, a file that is not a version-1 library is moved
+aside as `media.json.corrupt-<epoch>`, and a bad ROW in a good file is dropped rather than costing
+the rest. ONE chokidar watches the library folder (depth 0, `media.json` only), re-pointed when
+`settings.libraryFolder` changes; an own write notifies every window synchronously and its echo is
+dropped by mtime, an external write (the other machine, through a synced vault) notifies as usual.
+`media:changed` carries no payload because every window re-lists regardless of its vault — that is
+the cross-vault promise.
+
+### The Image Studio's providers (🔒 D4)
+
+The canvas panel's **Images** tab is the web app's Image Studio, and everything behind it is the
+main process. `worker/imageStudio.ts` — the Cloudflare Worker that used to serve
+`draw.yaseenarshad.com` — was PORTED, not simplified, into `desktop/src/main/media/`:
+
+| Module | What it is |
+|---|---|
+| `curation.ts` | the pure rules: normalisation, ranking, the interleave, the opaque cursor, every constant |
+| `cachePolicy.ts` | the pure cache policy: key scheme, 24 h, the sweep plan |
+| `cache.ts` | the disk half of the cache; never throws at a caller |
+| `providers.ts` | the fetching: the Iconify walk, the Pixabay pages, the refill, the image proxy |
+
+The numbers are the Worker's own and are locked: `SEARCH_LIMIT` 18, `ICONIFY_ALL_RESULT_LIMIT` 14
+and `PIXABAY_ALL_RESULT_LIMIT` 4 in `all`, `ICONIFY_COLOR_BATCH_LIMIT` 6, `PIXABAY_PAGE_SIZE` 4,
+`SEARCH_CACHE_VERSION` `'2'`, `MAX_IMPORT_BYTES` 20 MB, `COLOR_COLLECTION_PRIORITY` and
+`LOW_PRIORITY_COLLECTIONS` verbatim. Iconify is searched twice — a colour-collection batch, then a
+general pass with those collections filtered OUT — and the page is three icons to one graphic.
+Pixabay serves `vector` and `illustration` only, alternating, de-duplicated by the cursor's
+`seenIds`. The cursor is opaque base64url and carries the query and the source: one minted for
+another search is `BAD_REQUEST`, never a silent restart.
+
+- **No key, no provider.** `secrets.read('pixabayApiKey')` is main's alone. With no key Pixabay is
+  SKIPPED — not warned about, not shown failing — and the answer says `pixabayAvailable: false`,
+  which is the only thing the renderer ever learns about it.
+- **One provider failing is not the request failing.** In `all`, a dead Pixabay still answers with
+  the icons plus a `warnings` line, and its half of the cursor is untouched so the next page
+  retries it from where it was. Only when EVERY requested provider failed does the call reject.
+- **Failure is typed.** A `fetch` that threw is `OFFLINE` (the machine never reached the provider);
+  a provider that answered and refused is `PROVIDER_FAILED`; a non-image is `UNSUPPORTED_TYPE`;
+  past 20 MB is `TOO_LARGE`, checked on `Content-Length` AND on the bytes that actually arrived.
+- **Previews travel as dataURLs.** No custom protocol, no renderer fetch. A stored `previewUrl` is
+  never read: every tile asks `media:preview` by `provider` + `providerId`.
+- **An import is not cached and does not touch the disk here.** Its bytes go to the engine's
+  `insertImages`, and the SAVE path (🔒 D3, 2E) writes them into `<vault>/assets/` before the scene
+  names them.
+
+```
+<userData>/media-cache/
+  <sha256 of the cache key>.json     search answers, Pixabay pages and records, previews
+```
+
+One flat folder of JSON, named by the hash of the Worker's own key strings (`search?_iscv=2&q=…`,
+`pixabay/search/<q>/<type>/<page>/<perPage>`, `pixabay/item/<id>`, `image/<provider>/<id>/preview`);
+the search key also carries whether a key was set, so adding one never keeps serving yesterday's
+Iconify-only page. Freshness is the FILE's mtime, so the 24 h read guard and the startup sweep are
+one rule. The sweep runs once at registration, detached, and removes only `*.json` past 24 h —
+which is exactly what a read would have refused. Imports are never written here. A cache that
+cannot read or write is a miss, never an error.
+
+The renderer half is `client/src/media/`: `ImageStudio.tsx` (Search / Shapes / Favorites / Recent),
+`shapes.ts` (7 basic shapes plus the engine's 12 Smart Shapes as NATIVE elements — the smart half
+needs `@excalidraw/element`, which arrives on its own lazy promise so the basics render at once),
+`insertShape.ts` (both insert paths, and `IMAGE_STUDIO_INSERTION` = 320 px capped at 55 % of the
+viewport) and `imageStudio.css`. ⌘F opens the tab AND focuses its search field; offline, Search
+shows a passive line while Shapes, Favorites and Recent keep working — previews from the cache
+where main still has them, a placeholder where it does not.
+
+### Saved components (🔒 D5)
+
+The canvas panel's **Components** tab is the web app's Saved Components, and the library is a
+folder rather than a Convex table. One component is TWO files named after its slug —
+`<library>/components/<slug>.excalidraw` and `<slug>.png` — plus a row in
+`<library>/components.json`, which is `{ version: 1, items: ComponentItem[] }` with
+`ComponentItem = { slug, name, elementCount, createdAt, updatedAt }`, newest-updated first.
+
+**The fragment embeds its images**, which is the one place this app deliberately does not follow
+🔒 D3: it is a whole `{ type: 'excalidraw', version: 2, source, elements, appState: {}, files }`
+document whose `files` map carries the component's bytes as dataURLs. A component is small and has
+to insert into ANY vault on ANY machine, so it cannot point at a `<vault>/assets/` file. On insert
+those bytes are handed to the canvas as files; the board's next save extracts them into THIS
+vault's `assets/` through 2E, deduped by `fileId`.
+
+**The slug is the identity, the name is only the label.** The slug is the kebab of the name, uniqued
+with `-2`, `-3` (Finder's counting, never `-1`), capped at 60 characters, and validated as a path
+segment — lowercase words joined by single hyphens and nothing else, so a slug out of a hand-edited
+index can never name a file outside the folder. A rename therefore moves no file.
+
+**The folder is the truth; the index is a cache.** Every read reconciles them: a fragment the index
+does not know is adopted (named after its own slug, counted by reading it once), a row whose file
+has gone drops out, an unreadable fragment is skipped rather than offered as a tile that cannot be
+inserted, and an index that is missing or is not a version-1 index is rebuilt from the folder — the
+bad one moved aside as `components.json.corrupt-<epoch>`. A READ NEVER WRITES: the reconciliation is
+in memory and only a mutation puts it on disk, so listing costs a read-only disk nothing and does
+not churn a synced folder. One chokidar watches the library folder at depth 1 (the index, and the
+two files a component is — an `atomicWrite` tmp file is silence), own writes are echo-suppressed by
+path + mtime, and `components:changed` carries no payload because every window re-lists regardless
+of its vault. A delete is `shell.trashItem`, never `fs.rm`, and a trash that fails leaves the row.
+
+The rules are pure (`shared/savedComponents.ts`); the disk half is
+`desktop/src/main/library/componentStore.ts`, guarded by `desktop/src/main/ipc/components.ts`.
+
+The renderer half is `client/src/components-library/`: `componentData.ts` (the web app's
+`SavedComponentsData.ts` — the capture with its four assertions, the fragment, and the insert),
+`componentPreview.ts` (`SavedComponentPreview.ts`, PNG instead of WebP so every reader can open the
+file), `SavedComponents.tsx` and `savedComponents.css`. **Insert makes an independent copy**: the
+elements go through the engine's own `insertElements`, which duplicates ids and centres on the
+viewport, so two inserts of one component are two unrelated sets of elements. Search is the app's
+ONE ranking matcher (`search/matchCandidates.ts`, the same one ⌘K uses) over the names, paged by
+`PAGE_SIZE` 24. Rename and delete are inline in the card rather than `window.prompt` /
+`window.confirm`, and 🔒 `confirmDelete` (Settings › Files) decides whether the delete asks first.
+
+**Import JSON** (YAZ-1833) is the same library through a different door: the button opens the
+native open-file dialog (`dialog:open-file`, `.excalidraw` filter), `componentImport.ts` parses
+what comes back — the web app's `parseImportedComponentJson` envelope table
+(`growprofit/saved-component` with its schema-version and element-count checks, `excalidraw`,
+`excalidraw/clipboard`, `excalidraw-api/clipboard`, and a ONE-item `excalidrawlib`), then
+`restoreElements(…, { repairBindings: true })`, the soft-deleted filter, a second assertion pass
+and the 750 000-byte element ceiling — and the result goes through `components:save` exactly as a
+captured selection does. Two differences from the web app, both deliberate: it is a FILE PICKER
+rather than a paste box (a desktop app has a dialog; a browser tab did not), and IMAGES ARE KEPT,
+because the picked file carries its own `files` map, so importing a legacy embedded board yields a
+component with its pictures. An image id with no bytes behind it in that file is a refusal. The
+component is named after the file's base name and its preview is drawn from the fragment and
+bounded like every other, so importing a board-sized scene is allowed and still yields a tile.
+Every refusal throws BEFORE `components:save` is called and shows as a PASSIVE notice
+(`role="status"`, not the assertive error line) — nothing is written.
+
+### Presenting (YAZ-1820)
+
+The canvas panel's **Present** tab is the web app's `PresentationSidebar`, and ▶ Start
+presentation mounts its `PresentationPlayer` over the canvas pane. The whole of it is
+`client/src/drawings/presentation/`: `slides.ts` (the rules), `camera.ts` (the offsets),
+`PresentationSidebar.tsx`, `PresentationPlayer.tsx`, `presentationIcons.tsx`, `presentation.css`.
+
+**A slide is a top-level frame, and the deck's order lives in the FILE.** The position is
+`frame.customData.presentationOrder`, with `customData.yaseenPresentation.presentationOrder` read
+as a fallback so a deck generated against the in-package contract
+(`packages/excalidraw/presentation/CONTRACT.md`) and a deck a human dragged into shape are the
+same deck. Nothing about a presentation is in `SettingsState` or in any store: a board carries its
+own deck. A frame nested in another frame is a shape in a slide, not a slide; a deleted one is not
+a slide either.
+
+**The order is a request, not a guarantee.** A file is user data, so a claim is honoured only when
+it is in range AND is the only claim for its slot; everything else fills the gaps in scene order.
+The answer is therefore always exactly the top-level frames, numbered 1..n with no holes. A
+reorder — drag the handle, or Alt+↑ / Alt+↓ — writes the new numbers back through `updateScene`
+with `CaptureUpdateAction.IMMEDIATELY`, so it is one undo step and it lands in the file on the next
+autosave. A reorder request is completed rather than trusted: unknown ids are dropped, duplicates
+taken once, and a frame the caller forgot keeps its place at the end, so a stale list can reshuffle
+the deck but can never lose a slide out of it. A rename writes the frame's own `name`.
+
+**The player covers the PANE, not the window.** The web app portalled to `document.body`, hid the
+chrome with a `body` class and measured `window.innerWidth`; this shell keeps several drawing tabs
+mounted at once, each with its own engine, so the overlay is a child of `.drawing-surface`, the two
+chrome classes (`--presenting`, `--presentation-tools`) go on that element, and the camera reserve
+(0.32 of the width, always on) is a fraction of the pane. The keyboard and double-click handlers
+are still document-wide — the canvas has the keyboard while presenting, and it is not inside the
+overlay — so both stand down unless the overlay is in the visible tab layer, the same test
+`drawingCommand.ts` makes for the menu's canvas items.
+
+**Keys:** → / PageDown / Space (Space only while the tools are hidden) next, ← / PageUp previous,
+Home / End the ends, **Esc zooms out to the whole deck and never leaves** (restarting a deck by
+accident is worse than reaching for ✕), ⇧T shows or hides the editor chrome, Tab is trapped in the
+control bar while the chrome is hidden. Double-clicking the canvas presents the smallest slide
+under the pointer. Presenting is free-form: the camera is never locked, the hand tool pans while
+the chrome is hidden, and the tool the presenter had before is put back on exit. Frame outlines are
+hidden for the duration and restored to `SettingsState.canvas.framesVisible` — never to a
+hardcoded value — whether the presenter left through ✕, the deck emptied under them, or the
+component was simply unmounted.
+
+**Not ported** (locked exclusion on 🔒 YAZ-1775): hosted HTML animations and everything that served
+them — `PresentationAnimationController`, `animationOrchestrator`, `animationDomAdapter`, the
+CSP-sandboxed iframe assets, and the `yaseendraw:presentation-frame` lifecycle event they were the
+only subscriber to. What that event DROVE is kept, because it is the camera behaving itself rather
+than an animation protocol: the transition token that stops a stale landing, and the rule that an
+in-flight transition must not land while the deck is zoomed out.
+
+### Secrets (🔒 D4)
+
+`<userData>/secrets.json` = `{ version: 1, values: Record<name, base64(safeStorage.encryptString(value))> }`,
+owned by `desktop/src/main/secrets.ts`. It is NOT part of the app state file and never rides
+`state:changed`. `has` means "stored AND decryptable on this machine": a file copied from another
+Mac is full of blobs this keychain cannot open, and the honest answer is then no. Without an OS
+keychain at all (`safeStorage.isEncryptionAvailable()` false) `set` refuses with
+`ENCRYPTION_UNAVAILABLE` rather than falling back to plaintext, and `has` is false. The one name so
+far is `pixabayApiKey` (`PIXABAY_SECRET`), typed once in Settings › Images and read by main when it
+builds a Pixabay request.
 
 Two things live in the VAULT instead, because they are the user's own data:
 `<vault>/.yaseendraw/favorites.json` (YAZ-1794: vault-relative paths, so favorites travel with the
@@ -297,6 +534,7 @@ never silently do nothing).
 | File | Open Recent ▸ | — (⌥-click an entry opens it beside this window) |
 | File | Search Vault | ⌘K |
 | File | Export Image… (a drawing tab only) | ⌘⇧E |
+| File | Export Drawing… (a drawing tab only) | ⌘⇧S |
 | File | Close Tab | ⌘W |
 | File | Close Window | ⌘⇧W |
 | Edit | Undo / Redo / Cut / Copy / Paste / Select All | stock roles |
@@ -310,15 +548,46 @@ never silently do nothing).
 Zoom is deliberately NOT the stock roles: a registered accelerator never reaches the page on
 macOS, so main applies the step to the focused window's `webContents` itself.
 
-Export Image… and Canvas Background are the canvas's own two items, moved out of the engine's main
-menu by 🔒 D10 (there is no `<MainMenu>` in a drawing and the engine's stock trigger is hidden).
-Main enables them only while the window a menu action would target has a `.excalidraw` in front,
-rebuilding the menu when any window's active file changes and when focus moves between windows.
-Each is pushed to that window's renderer, which dispatches it as a DOM event on the VISIBLE
-drawing layer (`client/src/drawings/drawingCommand.ts`) — several tabs are mounted at once, each
-with its own engine, so a prop or a `window` listener would reach the wrong canvas. The drawing
-then calls the engine's own door: `openDialog: { name: 'imageExport' }`, or `viewBackgroundColor`,
-which the engine writes into the file.
+Export Image…, Export Drawing… and Canvas Background are the canvas's own three items, moved out
+of the engine's main menu by 🔒 D10 (there is no `<MainMenu>` in a drawing and the engine's stock
+trigger is hidden). Main enables them only while the window a menu action would target has a
+`.excalidraw` in front, rebuilding the menu when any window's active file changes and when focus
+moves between windows. Each is pushed to that window's renderer, which dispatches it as a DOM
+event on the VISIBLE drawing layer (`client/src/drawings/drawingCommand.ts`) — several tabs are
+mounted at once, each with its own engine, so a prop or a `window` listener would reach the wrong
+canvas. The drawing then calls the engine's own door: `openDialog: { name: 'imageExport' }` (the
+engine's PNG / SVG export dialog), or `viewBackgroundColor`, which the engine writes into the
+file — or, for Export Drawing…, the assembly below.
+
+### Export Drawing… (🔒 D3, YAZ-1821)
+
+**🔒 D3 says the vault file never embeds, and that export is the one place that does.** A board in
+a vault is a lean scene (`files: {}`) beside a shared `<vault>/assets/` folder, because embedding
+base64 makes multi-MB files that git rewrites on every save. A file being handed to someone else
+has no `assets/` folder to point at, so Export Drawing… writes a STANDALONE `.excalidraw` with
+every image it uses embedded — the file upstream Excalidraw and excalidraw.com open with its
+pictures intact. Sharing links and view-only tokens are not ported; this is the sharing story.
+
+- **The renderer assembles it** (`client/src/drawings/exportDrawing.ts`):
+  `serializeAsJSON(elements, appState, files, 'local')` — the library's own writer, the same one
+  the vault save uses — over the **full canvas files map**: everything 2E hydrated out of `assets/`
+  at load, plus anything pasted, imported or inserted since and not yet saved. The engine's live
+  map is the only place all of it is in one piece.
+- **Files only deleted elements name are not sent.** An undo can leave an image's bytes in the
+  engine's map long after the element is gone, and shipping them would put a deleted picture inside
+  a file about to be handed to someone. The filter is `referencedFileIds`, the same rule 2E's save
+  path uses; `serializeAsJSON(…, 'local')` filters again (`filterOutDeletedFiles`) — belt and
+  braces, and idempotent.
+- **Main owns the sheet and the write.** `dialog:save-file` shows the save dialog (default name
+  `<board name>.excalidraw`, `.excalidraw` filter) and then writes atomically, in the same call.
+  One door rather than "pick a path, then write it": a renderer holding an arbitrary absolute path
+  it may write to is what the fs layer's root-relative rules exist to prevent, so the only path
+  ever written is the one the user has just typed into a native sheet. The extension is enforced
+  after the sheet, because a name can be typed freely.
+- **The vault file is not touched.** An export reads nothing from the vault, writes nothing into
+  it, and does not flush the autosave: exporting a dirty board exports what is on the canvas, and
+  the board's own save timer carries on. Where it landed, or why it did not, is the window's one
+  passive notice.
 
 **Focus on tab reveal** (🔒 the focus-handoff decision on YAZ-1812). Several tabs are mounted at
 once; the canvas has `autoFocus`, but that fires only at mount, so switching to an
@@ -333,10 +602,13 @@ unconditional — only the focus is gated.
 Renderer-owned chords (`client/src/lib/*Hotkey.ts`, all gated by `ownsWindowChord` so a text field
 or an open modal keeps the key): ⌘B toggles the sidebar (YAZ-1280); ⌘X / ⌘C / ⌘V drive the
 sidebar's file clipboard when the selection owns them. Inside a focused canvas, ⌘F and ⌘C open the
-canvas panel's Images and Components tabs — bound on the drawing's own element in the capture
+canvas panel's Images and Components tabs — and ⌘F additionally puts the caret in the Images tab's
+search field (YAZ-1818, the web app's `onRequestImageStudioSearch`, as a counter the tab watches)
+— bound on the drawing's own element in the capture
 phase, never `window`, and suppressed whenever the keystroke could have meant something else (an
 editable target, a live selection, a gesture in flight, a dialog, or anything selected on the
-canvas). Settings › Hotkeys lists every one of them and is the single place that copy lives.
+canvas). That last gate is why ⌘C with a selection is still the engine's COPY and nothing else
+(YAZ-1819): the Components tab is what ⌘C means only when there is nothing to copy. Settings › Hotkeys lists every one of them and is the single place that copy lives.
 
 The right-click menu inside the renderer is Electron's (`buildContextMenuTemplate`): spelling
 suggestions, Add to Dictionary, and cut/copy/paste. Electron ships no default one, which is why
@@ -355,7 +627,8 @@ knows the row.
 | Appearance | Theme (the only one — 🔒 D9 put everything else about the canvas in Canvas) |
 | Canvas | the fourteen `CanvasPrefs` (🔒 D9) in three groups: Drawing aids, Modes, New elements |
 | Files | Confirm before deleting · Library folder (🔒 D5: resolved path, Choose…, Reset to default) |
-| Sync | the per-vault GitHub switch — the one setting NOT in `SettingsState` (it lives in `.yaseendraw/github.json`) |
+| Images | Pixabay API key (🔒 D4: a password field, Save / Clear, "Key set" / "No key" from `secrets:has`, never echoed) — NOT in `SettingsState`, it lives in main's encrypted `secrets.json` |
+| Sync | the per-vault GitHub switch — the other setting NOT in `SettingsState` (it lives in `.yaseendraw/github.json`) |
 | Hotkeys | its own page: the Window, Canvas and Mouse tables, from `hotkeys.ts` |
 
 `hotkeys.ts` is the single source of truth for every binding the app advertises, and

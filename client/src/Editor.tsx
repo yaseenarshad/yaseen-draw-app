@@ -2,6 +2,7 @@ import type { CanvasPanelState, CanvasPrefs, GithubSyncStatus } from '@shared/ty
 import { fileKind } from '@shared/fileKind'
 import { DrawingEditor } from './drawings/DrawingEditor'
 import type { WatchSource } from './hooks/useWatch'
+import type { NoticeKind } from './lib/notice'
 
 /**
  * The document pane: one dispatcher on the active file's KIND and nothing else. Every kind's
@@ -27,9 +28,11 @@ export interface EditorProps {
   /** 🔒 D10: `SettingsState.canvasPanel` — the panel's last-used tab and its dock preference. */
   canvasPanel?: CanvasPanelState
   onCanvasPanelChange?: (next: CanvasPanelState) => void
+  /** The window's ONE passive notice: how an export says where it landed, or why it did not. */
+  onNotice?: (text: string, icon?: NoticeKind) => void
 }
 
-export function Editor({ path, root, watch, sync, onSyncNow, canvasPrefs, onCanvasPrefsChange, canvasPanel, onCanvasPanelChange }: EditorProps) {
+export function Editor({ path, root, watch, sync, onSyncNow, canvasPrefs, onCanvasPrefsChange, canvasPanel, onCanvasPanelChange, onNotice }: EditorProps) {
   if (path === null || root === null) {
     return (
       <section className="editor">
@@ -55,6 +58,7 @@ export function Editor({ path, root, watch, sync, onSyncNow, canvasPrefs, onCanv
       onCanvasPrefsChange={onCanvasPrefsChange}
       canvasPanel={canvasPanel}
       onCanvasPanelChange={onCanvasPanelChange}
+      onNotice={onNotice}
     />
   )
 }
