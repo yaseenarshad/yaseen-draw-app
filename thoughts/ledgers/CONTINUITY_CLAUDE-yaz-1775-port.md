@@ -316,3 +316,11 @@ Yasin is still using the test vault, so none of this is deleted yet. When 4A/4B/
 - `/tmp/draw-profile` (or whichever `YASEEN_DRAW_USER_DATA_DIR` the checks used) — the isolated profiles.
 
 Verify with `git worktree list` and `ls ~/Desktop`.
+
+## Closeout (2026-09-22)
+
+- YAZ-1775 closed: phases 1–5 merged to `main` via PRs #1 (`e85c89d`), #2 (`51e21b1`), #3 (`1c28130`). 4A/4D verified by Yasin in daily use on `~/Documents/GitHub/yaseen-draw-vault`.
+- First release: `v0.1.1` (tag pushed from `main`; `.github/workflows/release.yml` builds the DMG/EXE). Later releases: Yasin batches them; bump with `npm version` on main only when he says so.
+- Full handoff for a future agent: the "Handoff" comment on YAZ-1775 (mirrored on the phase parents).
+- Cleanup done: prototype worktree `yaseen-docs-app-draw-demo` + branch `demo/yaz-1775-draw-prototype` removed; `yaseen-draw-app-port` worktree and the three `yaz-1775-*` branches removed (all merged); demo vault + bare origin on the Desktop and the scratchpad profiles deleted. `tools/seedDemoVault.mjs --vault <dir>` regenerates the test vault.
+- Follow-ups live as their own issues: YAZ-1834 (board metadata), YAZ-1835 (sidebar sort), YAZ-1800 (previews), YAZ-1830 / YAZ-1831 (Future).
