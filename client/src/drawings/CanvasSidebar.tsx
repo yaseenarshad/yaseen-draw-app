@@ -10,7 +10,8 @@
  * — the rail's hamburger being the other way. The engine's stock `DefaultSidebar.Trigger` is
  * rendered `hidden`: the panel's doors are the rail and ⌘F / ⌘C, never a floating trigger.
  *
- * The bodies are placeholders until phase 3 — a real label and an honest line, not a blank pane.
+ * The Images tab is the Image Studio (`client/src/media/`, YAZ-1818); Components and Present are
+ * still placeholders — a real label and an honest line, not a blank pane — until 3C and 3D.
  *
  * ENGINE-BOUND BY DESIGN: this renders the engine's own components, so it takes the LOADED module
  * as a prop rather than importing the package (`engine.ts`'s lazy rule), and it is rendered only
@@ -18,6 +19,8 @@
  */
 import type { ReactNode } from 'react'
 import { CANVAS_PANEL_TABS, type CanvasPanelTab } from '@shared/types'
+import { ImageStudio } from '../media/ImageStudio'
+import type { InsertTarget } from '../media/insertShape'
 import type { ExcalidrawModule } from './engine'
 import { hamburgerIcon, imageIcon, libraryIcon, presentationIcon } from './launcherIcons'
 
@@ -31,7 +34,7 @@ export const CANVAS_SIDEBAR_TABS: ReadonlyArray<{ tab: CanvasPanelTab; label: st
   { tab: 'presentation', label: 'Presentation', shortLabel: 'Present', icon: presentationIcon },
 ]
 
-/** What every tab body says until 3B / 3C / 3D fill it. */
+/** What a tab body says until 3C / 3D fill it. */
 export const PHASE_3 = 'Coming in phase 3'
 
 /** The engine's sidebar state, narrowed to the tab this app recognises (anything else = closed). */
@@ -49,9 +52,13 @@ export interface CanvasSidebarProps {
   onClose: () => void
   /** The dock/pin gesture; the surface stores it in `SettingsState.canvasPanel` (🔒 D10). */
   onDock: (docked: boolean) => void
+  /** The engine's imperative handle, for the Images tab's inserts; null until it has mounted. */
+  excalidrawAPI: InsertTarget | null
+  /** Bumped by ⌘F: the Images tab switches to Search and focuses the field (YAZ-1818). */
+  searchFocusRequest: number
 }
 
-export function CanvasSidebar({ engine, activeTab, onClose, onDock }: CanvasSidebarProps) {
+export function CanvasSidebar({ engine, activeTab, onClose, onDock, excalidrawAPI, searchFocusRequest }: CanvasSidebarProps) {
   const { DefaultSidebar, Sidebar } = engine
   return (
     <>
@@ -76,10 +83,14 @@ export function CanvasSidebar({ engine, activeTab, onClose, onDock }: CanvasSide
         </DefaultSidebar.TabTriggers>
         {CANVAS_SIDEBAR_TABS.map(({ tab, label }) => (
           <Sidebar.Tab key={tab} tab={tab}>
-            <div className="canvas-sidebar__placeholder" role="status">
-              <strong>{label}</strong>
-              <span>{PHASE_3}</span>
-            </div>
+            {tab === 'image-studio' ? (
+              <ImageStudio engine={engine} excalidrawAPI={excalidrawAPI} searchFocusRequest={searchFocusRequest} />
+            ) : (
+              <div className="canvas-sidebar__placeholder" role="status">
+                <strong>{label}</strong>
+                <span>{PHASE_3}</span>
+              </div>
+            )}
           </Sidebar.Tab>
         ))}
       </DefaultSidebar>

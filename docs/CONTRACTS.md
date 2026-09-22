@@ -19,6 +19,7 @@ marks an amendment to an earlier locked decision; the amendment wins.
 |---|---|
 | `client/` | the renderer: React 19, Vite. Talks to nothing but `window.yaseenDraw`. |
 | `client/src/drawings/` | the drawing document: the engine seam (`ExcalidrawSurface`, the ONE importer of the package), its host, and what a scene is |
+| `client/src/media/` | the canvas panel's Images tab: the Image Studio, the shapes catalog, both insert paths |
 | `client/src/sidebar/` | the file tree, its context menu, rename/move/trash, favorites, vault switcher |
 | `client/src/tabs/` | the tab strip |
 | `client/src/workspace/` | the tab model (`tabsReducer`) and its per-tab history |
@@ -126,6 +127,9 @@ Electron flattens a thrown Error to its message, which is why failure travels as
 | `media.favorites(req)` | `media:favorites` | `{ op: 'list' }` · `{ op: 'add', item }` · `{ op: 'remove', itemKey }` over `<library>/media.json` (🔒 D5); every verb answers the resulting list |
 | `media.recent(req)` | `media:recent` | `{ op: 'list' }` · `{ op: 'record', item }` — the MRU, `RECENT_LIMIT` 60 |
 | `media.onChanged` | `media:changed` | pushed to EVERY window when `media.json` changes — any vault, any writer, no payload |
+| `media.search(req)` | `media:search` | `{ q, source: 'all' \| 'iconify' \| 'pixabay', cursor? }` → `{ items, nextCursor, pixabayAvailable, warnings }` (🔒 D4) |
+| `media.preview(req)` | `media:preview` | `{ provider: 'pixabay' \| 'iconify', id }` → `{ mimeType, dataURL }`, from the 24 h disk cache when it is there |
+| `media.import(req)` | `media:import` | the same request → `{ mimeType, dataURL, item }`; NEVER cached, capped at `MAX_IMPORT_BYTES` 20 MB |
 | `secrets.set(req)` / `has(req)` | `secrets:set` / `secrets:has` | `{ name, value \| null }` writes or clears an encrypted secret; `{ name }` → boolean. NO channel answers a value (🔒 D4) |
 | `vaultConfig.read` / `write` / `onChanged` | `vaultConfig:*` | any file in `<vault>/.yaseendraw/` |
 | `github.status` / `syncNow` / `setEnabled` / `onStatus` | `github:*` | per-vault GitHub sync |
@@ -146,6 +150,9 @@ Rules that hold across the whole surface:
   embed their images as base64.
 - **Assets are immutable and append-only.** A save writes an asset with `wx` and treats EEXIST as
   success; nothing but the orphan sweep ever removes one.
+- **The renderer never reaches a provider** (🔒 D4). Iconify and Pixabay are fetched by MAIN, which
+  holds the key, does the curation, keeps the cache and enforces the import cap. The renderer's
+  whole knowledge of the key is the boolean `pixabayAvailable`.
 - **A secret never crosses the bridge outward** (🔒 D4). The renderer may `set` one and ask `has`;
   there is no channel, no state field and no push that carries a value, so a key cannot reach a
   devtools console, a `state:get` answer or a renderer crash dump. Main reads it itself.
@@ -243,7 +250,7 @@ them by value and then diverges; a global `state:changed` broadcast never moves 
 Settings and `sidebarWidth` are global and every window follows a change live.
 
 `SettingsState.libraryFolder` (🔒 D5) is the ONE folder every vault shares, where media favorites
-and saved components will live (3A / 3B / 3C fill it): an absolute path the user picked, or null
+and saved components live (3A / 3B filled it; 3C adds `components/`): an absolute path the user picked, or null
 for `<userData>/library`. Only main can resolve null, so Settings asks through
 `drawing:library-folder`; main also `mkdir -p`s the folder at startup, so the row always names a
 directory that exists. A folder that cannot be created is still the answer — a launch must not
@@ -265,9 +272,9 @@ other): `itemKey` (the identity), `provider` (`pixabay` | `iconify` | `shape`), 
 `kind`, `title`, the optional attribution and layout fields (`previewUrl`, `creator`,
 `creatorUrl`, `collectionName`, `sourceUrl`, `licenseName`, `licenseUrl`, `attribution`, `width`,
 `height`, `trademarkNotice`), and `updatedAt`, which MAIN stamps on every write — a renderer's own
-is dropped. `previewUrl` is stored but NEVER trusted: a CDN URL expires, and 3B re-derives every
-preview from `provider` + `providerId`. Pointers only — the BYTES never live in the library (they
-go through 3B's import into the vault's `assets/`).
+is dropped. `previewUrl` is stored but NEVER trusted: a CDN URL expires, and the Images tab
+re-derives every preview from `provider` + `providerId` over `media:preview`. Pointers only — the BYTES never live in the library (they
+go through `media:import` into the vault's `assets/`).
 
 The rules are pure (`shared/mediaLibrary.ts`); the disk half (`desktop/src/main/library/mediaStore.ts`)
 follows the app's file idioms: a read never creates the file, a mutation that changes nothing does
@@ -279,6 +286,64 @@ dropped by mtime, an external write (the other machine, through a synced vault) 
 `media:changed` carries no payload because every window re-lists regardless of its vault — that is
 the cross-vault promise.
 
+### The Image Studio's providers (🔒 D4)
+
+The canvas panel's **Images** tab is the web app's Image Studio, and everything behind it is the
+main process. `worker/imageStudio.ts` — the Cloudflare Worker that used to serve
+`draw.yaseenarshad.com` — was PORTED, not simplified, into `desktop/src/main/media/`:
+
+| Module | What it is |
+|---|---|
+| `curation.ts` | the pure rules: normalisation, ranking, the interleave, the opaque cursor, every constant |
+| `cachePolicy.ts` | the pure cache policy: key scheme, 24 h, the sweep plan |
+| `cache.ts` | the disk half of the cache; never throws at a caller |
+| `providers.ts` | the fetching: the Iconify walk, the Pixabay pages, the refill, the image proxy |
+
+The numbers are the Worker's own and are locked: `SEARCH_LIMIT` 18, `ICONIFY_ALL_RESULT_LIMIT` 14
+and `PIXABAY_ALL_RESULT_LIMIT` 4 in `all`, `ICONIFY_COLOR_BATCH_LIMIT` 6, `PIXABAY_PAGE_SIZE` 4,
+`SEARCH_CACHE_VERSION` `'2'`, `MAX_IMPORT_BYTES` 20 MB, `COLOR_COLLECTION_PRIORITY` and
+`LOW_PRIORITY_COLLECTIONS` verbatim. Iconify is searched twice — a colour-collection batch, then a
+general pass with those collections filtered OUT — and the page is three icons to one graphic.
+Pixabay serves `vector` and `illustration` only, alternating, de-duplicated by the cursor's
+`seenIds`. The cursor is opaque base64url and carries the query and the source: one minted for
+another search is `BAD_REQUEST`, never a silent restart.
+
+- **No key, no provider.** `secrets.read('pixabayApiKey')` is main's alone. With no key Pixabay is
+  SKIPPED — not warned about, not shown failing — and the answer says `pixabayAvailable: false`,
+  which is the only thing the renderer ever learns about it.
+- **One provider failing is not the request failing.** In `all`, a dead Pixabay still answers with
+  the icons plus a `warnings` line, and its half of the cursor is untouched so the next page
+  retries it from where it was. Only when EVERY requested provider failed does the call reject.
+- **Failure is typed.** A `fetch` that threw is `OFFLINE` (the machine never reached the provider);
+  a provider that answered and refused is `PROVIDER_FAILED`; a non-image is `UNSUPPORTED_TYPE`;
+  past 20 MB is `TOO_LARGE`, checked on `Content-Length` AND on the bytes that actually arrived.
+- **Previews travel as dataURLs.** No custom protocol, no renderer fetch. A stored `previewUrl` is
+  never read: every tile asks `media:preview` by `provider` + `providerId`.
+- **An import is not cached and does not touch the disk here.** Its bytes go to the engine's
+  `insertImages`, and the SAVE path (🔒 D3, 2E) writes them into `<vault>/assets/` before the scene
+  names them.
+
+```
+<userData>/media-cache/
+  <sha256 of the cache key>.json     search answers, Pixabay pages and records, previews
+```
+
+One flat folder of JSON, named by the hash of the Worker's own key strings (`search?_iscv=2&q=…`,
+`pixabay/search/<q>/<type>/<page>/<perPage>`, `pixabay/item/<id>`, `image/<provider>/<id>/preview`);
+the search key also carries whether a key was set, so adding one never keeps serving yesterday's
+Iconify-only page. Freshness is the FILE's mtime, so the 24 h read guard and the startup sweep are
+one rule. The sweep runs once at registration, detached, and removes only `*.json` past 24 h —
+which is exactly what a read would have refused. Imports are never written here. A cache that
+cannot read or write is a miss, never an error.
+
+The renderer half is `client/src/media/`: `ImageStudio.tsx` (Search / Shapes / Favorites / Recent),
+`shapes.ts` (7 basic shapes plus the engine's 12 Smart Shapes as NATIVE elements — the smart half
+needs `@excalidraw/element`, which arrives on its own lazy promise so the basics render at once),
+`insertShape.ts` (both insert paths, and `IMAGE_STUDIO_INSERTION` = 320 px capped at 55 % of the
+viewport) and `imageStudio.css`. ⌘F opens the tab AND focuses its search field; offline, Search
+shows a passive line while Shapes, Favorites and Recent keep working — previews from the cache
+where main still has them, a placeholder where it does not.
+
 ### Secrets (🔒 D4)
 
 `<userData>/secrets.json` = `{ version: 1, values: Record<name, base64(safeStorage.encryptString(value))> }`,
@@ -287,7 +352,7 @@ owned by `desktop/src/main/secrets.ts`. It is NOT part of the app state file and
 Mac is full of blobs this keychain cannot open, and the honest answer is then no. Without an OS
 keychain at all (`safeStorage.isEncryptionAvailable()` false) `set` refuses with
 `ENCRYPTION_UNAVAILABLE` rather than falling back to plaintext, and `has` is false. The one name so
-far is `pixabayApiKey` (`PIXABAY_SECRET`), typed once in Settings › Images and read by main when 3B
+far is `pixabayApiKey` (`PIXABAY_SECRET`), typed once in Settings › Images and read by main when it
 builds a Pixabay request.
 
 Two things live in the VAULT instead, because they are the user's own data:
@@ -381,7 +446,9 @@ unconditional — only the focus is gated.
 Renderer-owned chords (`client/src/lib/*Hotkey.ts`, all gated by `ownsWindowChord` so a text field
 or an open modal keeps the key): ⌘B toggles the sidebar (YAZ-1280); ⌘X / ⌘C / ⌘V drive the
 sidebar's file clipboard when the selection owns them. Inside a focused canvas, ⌘F and ⌘C open the
-canvas panel's Images and Components tabs — bound on the drawing's own element in the capture
+canvas panel's Images and Components tabs — and ⌘F additionally puts the caret in the Images tab's
+search field (YAZ-1818, the web app's `onRequestImageStudioSearch`, as a counter the tab watches)
+— bound on the drawing's own element in the capture
 phase, never `window`, and suppressed whenever the keystroke could have meant something else (an
 editable target, a live selection, a gesture in flight, a dialog, or anything selected on the
 canvas). Settings › Hotkeys lists every one of them and is the single place that copy lives.

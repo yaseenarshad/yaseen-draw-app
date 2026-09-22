@@ -135,6 +135,18 @@ describe('api', () => {
     expect(media.onChanged).toHaveBeenCalledWith(listener)
   })
 
+  it('the studio doors delegate, and a provider failure arrives with its typed code (🔒 D4)', async () => {
+    const media = { favorites: vi.fn(), recent: vi.fn(), onChanged: vi.fn(), search: vi.fn(), preview: vi.fn(), import: vi.fn() }
+    Object.defineProperty(window.yaseenDraw, 'media', { value: media, configurable: true })
+    media.search.mockResolvedValue({ items: [], nextCursor: null, pixabayAvailable: false, warnings: [] })
+    await expect(api.media.search({ q: 'money bag', source: 'all' })).resolves.toMatchObject({ pixabayAvailable: false })
+    expect(media.search).toHaveBeenCalledWith({ q: 'money bag', source: 'all' })
+    media.preview.mockResolvedValue({ mimeType: 'image/svg+xml', dataURL: 'data:image/svg+xml;base64,x' })
+    await expect(api.media.preview({ provider: 'iconify', id: 'noto:money-bag' })).resolves.toMatchObject({ mimeType: 'image/svg+xml' })
+    media.import.mockRejectedValue({ code: 'OFFLINE', message: 'could not reach api.iconify.design' })
+    await expect(api.media.import({ provider: 'iconify', id: 'noto:money-bag' })).rejects.toMatchObject({ name: 'BridgeRequestError', code: 'OFFLINE' })
+  })
+
   it('secrets: set and has delegate, and ENCRYPTION_UNAVAILABLE arrives as a typed BridgeRequestError (🔒 D4)', async () => {
     const secrets = { set: vi.fn(), has: vi.fn() }
     Object.defineProperty(window.yaseenDraw, 'secrets', { value: secrets, configurable: true })
