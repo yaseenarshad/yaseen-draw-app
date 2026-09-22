@@ -9,10 +9,12 @@ interface ContextMenuSurfaceProps {
   width?: number
   /** Extra class beside `ctx-menu` (YAZ-1767 D5): `ctx-menu--panel` restyles the surface as a flush drop-down panel. */
   className?: string
+  /** What the surface announces: a `menu` by default; the Info popover is a `dialog` (🔒 YAZ-1835 D6). */
+  role?: 'menu' | 'dialog'
 }
 
 /** Action-free context-menu mechanics shared by menus whose commands stay domain-owned. */
-export function ContextMenuSurface({ x, y, onClose, children, width, className }: ContextMenuSurfaceProps) {
+export function ContextMenuSurface({ x, y, onClose, children, width, className, role = 'menu' }: ContextMenuSurfaceProps) {
   const menuRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
   const [position, setPosition] = useState({ left: x, top: y })
@@ -44,7 +46,7 @@ export function ContextMenuSurface({ x, y, onClose, children, width, className }
     <div
       ref={menuRef}
       className={['ctx-menu', className].filter(Boolean).join(' ')}
-      role="menu"
+      role={role}
       style={{ left: position.left, top: position.top, width }}
       onMouseDown={(event) => event.stopPropagation()}
     >

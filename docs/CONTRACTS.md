@@ -227,6 +227,7 @@ WindowEntry {
 FolderState {
   expanded: string[]                       // SESSION only: never written to disk (YAZ-1642)
   lastFile: string | null
+  sortOrder: 'name' | 'updated' | 'created'   // the Files lens's order for this vault (🔒 YAZ-1835 D3); persisted, default 'name'
 }
 ```
 
@@ -569,6 +570,46 @@ mounted at once, each with its own engine, so a prop or a `window` listener woul
 canvas. The drawing then calls the engine's own door: `openDialog: { name: 'imageExport' }` (the
 engine's PNG / SVG export dialog), or `viewBackgroundColor`, which the engine writes into the
 file — or, for Export Drawing…, the assembly below.
+
+### Sidebar sort and Info (🔒 YAZ-1835)
+
+**🔒 D1 — the order is a VIEW, applied in the renderer.** `fs:tree` keeps handing over the tree in
+name order; `sortTree` (`shared/treeSort.ts`, a pure rule) returns a re-ordered COPY that the
+Files lens renders. ⌘K reads the unsorted tree (its "input order inside a bucket" tie-break is
+therefore untouched by the sort), and the Favorites lens keeps the user's hand order.
+
+**🔒 D2 — three orders.** Name (case-insensitive `localeCompare`) · Last updated · Created. A date
+reads the board's block first and its mtime when it has none (🔒 YAZ-1834 D6); newest first; a tie
+falls back to the name so the order is stable across refreshes. Folders ALWAYS lead and are ALWAYS
+by name — a folder has no dates — and a folder's contents use the same order at every depth. There
+is no "last opened" (🔒 YAZ-1834 D2).
+
+**🔒 D3 — per vault, in the app state.** `FolderState.sortOrder`, default `name`, persisted; a
+pre-1835 file loads `name`. Every window on the vault follows a change: the Sidebar subscribes to
+the store cache, which `state:changed` refreshes.
+
+**🔒 D4 — the tree refreshes on EVERY watcher event.** A save is a `change`, and a save is what
+moves `updatedAt`; the Sidebar used to skip `change`. One tree walk per save (one stat and a 1 KB
+head read per board), with no own-write echo guard on purpose: our own save is the reorder we want.
+Walks overlap, so an answer older than the tree on screen is dropped by `generatedAt`.
+
+**🔒 D5 — the control.** One button (`.sidebar__sort`) in the lens row, Files lens only, hidden
+while a query is typed; it opens the same `ContextMenu` the rows use with three items and a `✓`
+hint on the current one.
+
+**🔒 D6 — Info.** A board row's context menu offers `Info` directly above `Delete`, in Delete's
+group, on either lens — for ONE board only: never blank space, a folder, a non-board file or a
+2+ selection (`MenuTargets.infoPath`, its own field). Selecting it closes the menu and opens a
+`ContextMenuSurface` popover (`role="dialog"`) at the click point; click-away or Escape closes it,
+and so does the board vanishing.
+
+**🔒 D7 — Info reads the live tree, nothing else.** The popover keeps the board's PATH and resolves
+the node off the current tree on every render, so a save in any window moves its dates and a
+deletion closes it. Rows: Name · Folder (vault-relative, `/` at the root) · Size · Created ·
+Updated · On disk (mtime); dates as "Sep 22, 2026, 3:14 PM · 2 hours ago" (`formatDateTime`,
+`relativeTime`); a board with no trustworthy block reads "Not stamped yet · written on the next
+save" for the two dates (🔒 YAZ-1834 D7). No new IPC. The demo vault behind these rules is
+`tools/seedSortDemoVault.mjs`, proved by `sortVault.integration.test.ts`.
 
 ### Board metadata (🔒 YAZ-1834)
 

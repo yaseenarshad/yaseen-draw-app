@@ -13,6 +13,7 @@ import {
   defaultFolderState,
   isCanvasPanelTab,
   isSidebarLens,
+  isSortOrder,
   type AppState,
   type CanvasPanelState,
   type FolderState,
@@ -40,7 +41,7 @@ export interface Store {
   setSidebarWidth(width: number): void
   pushRecent(path: string, now?: number): void
   removeRecent(path: string): void
-  setFolder(root: string, patch: Partial<Pick<FolderState, 'expanded' | 'lastFile'>>): void
+  setFolder(root: string, patch: Partial<Pick<FolderState, 'expanded' | 'lastFile' | 'sortOrder'>>): void
   upsertWindow(entry: WindowEntry): void
   removeWindow(id: string): void
   /**
@@ -186,6 +187,7 @@ function sanitizeFolder(raw: unknown): FolderState | null {
     // A relaunch starts every tree collapsed; a pre-1642 file's leftover lists are ignored.
     expanded: [],
     lastFile: typeof raw.lastFile === 'string' ? raw.lastFile : null,
+    sortOrder: isSortOrder(raw.sortOrder) ? raw.sortOrder : defaultFolderState().sortOrder,
   }
 }
 
@@ -316,6 +318,7 @@ export function createStore(filePath: string): Store {
         ...cur,
         ...(patch.expanded !== undefined ? { expanded: [...patch.expanded] } : {}),
         ...(patch.lastFile !== undefined ? { lastFile: patch.lastFile } : {}),
+        ...(patch.sortOrder !== undefined ? { sortOrder: patch.sortOrder } : {}),
       }
       commit({ ...state, folders: { ...state.folders, [root]: next } })
     },

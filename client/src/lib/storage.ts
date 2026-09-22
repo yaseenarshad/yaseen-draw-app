@@ -7,6 +7,7 @@ import {
   type RecentRoots,
   type SettingsState,
   type SidebarLens,
+  type SortOrder,
   type WindowIdentity,
 } from '@shared/types'
 
@@ -55,7 +56,7 @@ export const storage = {
     })
   },
 
-  /** Called after a change made in ANY window landed in the cache (never for this window's own optimistic writes). */
+  /** Called after a `state:changed` push landed in the cache — from any window, this one's own writes included. */
   subscribe(listener: () => void): () => void {
     listeners.add(listener)
     return () => {
@@ -88,6 +89,13 @@ export const storage = {
   removeRecentRoot(path: string): void {
     state = { ...state, recents: state.recents.filter((r) => r.path !== path) }
     send('state.removeRecent', () => window.yaseenDraw.state.removeRecent(path))
+  },
+
+  /** The Files lens's order for this vault (🔒 YAZ-1835 D3); another window's change lands through `subscribe`. */
+  getSortOrder: (root: string): SortOrder => folderOf(root).sortOrder,
+  setSortOrder(root: string, sortOrder: SortOrder): void {
+    patchFolder(root, { sortOrder })
+    send('state.setFolder', () => window.yaseenDraw.state.setFolder(root, { sortOrder }))
   },
 
   getExpanded: (root: string): string[] => folderOf(root).expanded,

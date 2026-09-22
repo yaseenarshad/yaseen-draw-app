@@ -543,7 +543,7 @@ button {
 
 /* Focus Mode's eye (YAZ-1605) — the expand-all look, one slot to its LEFT, in the accent so a lit
    eye reads as "you are in a focus" and not as one more grey chrome button. It takes the push to
-   the far end when present; the chevrons then sit flush beside it. */
+   the far end when no sort button precedes it (🔒 YAZ-1835 D5); the chevrons then sit flush beside it. */
 .sidebar__focus-off {
   flex: none;
   margin-left: auto;
@@ -556,8 +556,51 @@ button {
   background: var(--bg-hover);
 }
 
+/* The sort control (🔒 YAZ-1835 D5): the same chrome look, and it takes the push to the far end when
+   present — whichever of the three right-side buttons comes first carries it, the rest sit flush. */
+.sidebar__sort {
+  flex: none;
+  margin-left: auto;
+  padding: 0 8px;
+  color: var(--fg-muted);
+}
+
+.sidebar__sort:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+.sidebar__sort + .sidebar__focus-off,
+.sidebar__sort + .sidebar__expand-all,
 .sidebar__focus-off + .sidebar__expand-all {
   margin-left: 0;
+}
+
+/* The Info popover (🔒 YAZ-1835 D6/D7): a two-column definition list on the menu surface. */
+.board-info {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.board-info dt {
+  color: var(--fg-muted);
+}
+
+.board-info dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.board-info__name {
+  font-weight: 600;
+}
+
+.board-info__ago {
+  color: var(--fg-muted);
 }
 
 /* Persistent search bar (YAZ-801) — its OWN row, never fused into the header or into the lens
