@@ -48,13 +48,17 @@ export const EMPTY_SCENE = {
  */
 export const EMPTY_SCENE_JSON = `${JSON.stringify(EMPTY_SCENE, null, 2)}\n`
 
+const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+
 /** Scene JSON → the canvas's opening scene; throws on anything that is not one (see the module doc). */
 export function parseSceneText(text: string): DrawingScene {
   const parsed: unknown = JSON.parse(text)
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error('not an Excalidraw scene')
-  const scene = parsed as Record<string, unknown>
+  if (!isPlainObject(parsed)) throw new Error('not an Excalidraw scene')
+  const scene = parsed
   if (!Array.isArray(scene.elements)) throw new Error('not an Excalidraw scene: no elements')
-  const appState = typeof scene.appState === 'object' && scene.appState !== null ? (scene.appState as Record<string, unknown>) : {}
-  const files = typeof scene.files === 'object' && scene.files !== null ? (scene.files as Record<string, unknown>) : {}
+  // `typeof [] === 'object'`, so the array check is part of "is this a plain object" — the same
+  // test `parsed` gets above. A file whose `appState` is an array carries no prefs, not a list.
+  const appState = isPlainObject(scene.appState) ? scene.appState : {}
+  const files = isPlainObject(scene.files) ? scene.files : {}
   return { elements: scene.elements, appState, files }
 }

@@ -12,41 +12,36 @@ function fakeStorage(initial: string | null = null) {
   }
 }
 
-describe('YASEEN_FULL_TOOLBAR_MODE (⚡ R4/R5)', () => {
-  it('is `full` — the fork`s ContextualPropertiesToolbar, NOT upstream`s compact strip', () => {
-    // The names read backwards; rounds 3-4 had them inverted. This assertion is the correction.
-    expect(YASEEN_FULL_TOOLBAR_MODE).toBe('full')
-    expect(DESKTOP_UI_MODE_STORAGE_KEY).toBe('excalidraw.desktopUIMode')
-  })
-})
-
-describe('applyToolbarMode', () => {
-  it('writes the mode where the engine reads it', () => {
+describe('applyToolbarMode (⚡ YAZ-1775 R4/R5)', () => {
+  it("writes `full` — the fork's ContextualPropertiesToolbar, NOT upstream's compact strip", () => {
+    // The names read backwards; demo rounds 3-4 had them inverted. This is the correction.
     const storage = fakeStorage()
-    expect(applyToolbarMode(YASEEN_FULL_TOOLBAR_MODE, storage)).toBe(true)
-    expect(storage.read()).toBe('full')
+    applyToolbarMode(storage)
+    expect(storage.read()).toBe(YASEEN_FULL_TOOLBAR_MODE)
+    expect(storage.setItem).toHaveBeenCalledWith('excalidraw.desktopUIMode', 'full')
   })
 
   it('OVERWRITES a stray stored value — the guard this call exists for', () => {
     const storage = fakeStorage('compact')
-    applyToolbarMode(YASEEN_FULL_TOOLBAR_MODE, storage)
+    applyToolbarMode(storage)
     expect(storage.read()).toBe('full')
   })
 
   it('does not rewrite a value that is already right', () => {
     const storage = fakeStorage('full')
-    expect(applyToolbarMode(YASEEN_FULL_TOOLBAR_MODE, storage)).toBe(true)
+    applyToolbarMode(storage)
     expect(storage.setItem).not.toHaveBeenCalled()
   })
 
   it('a storage that is absent or throws is not an error — the engine falls back on its own', () => {
-    expect(applyToolbarMode(YASEEN_FULL_TOOLBAR_MODE, null)).toBe(false)
-    const throwing = {
-      getItem: () => {
-        throw new Error('denied')
-      },
-      setItem: () => undefined,
-    }
-    expect(applyToolbarMode(YASEEN_FULL_TOOLBAR_MODE, throwing)).toBe(false)
+    expect(() => applyToolbarMode(null)).not.toThrow()
+    expect(() =>
+      applyToolbarMode({
+        getItem: () => {
+          throw new Error('denied')
+        },
+        setItem: () => undefined,
+      }),
+    ).not.toThrow()
   })
 })

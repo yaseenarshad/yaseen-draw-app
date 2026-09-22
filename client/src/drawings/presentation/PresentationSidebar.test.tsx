@@ -147,6 +147,84 @@ describe('reordering writes the order into the FILE', () => {
     expect(button(el, 'Move slide 2 down')?.disabled).toBe(true)
   })
 
+  /**
+   * The pointer drag: the same reorder the arrows do, plus three things only it can go wrong at —
+   * Escape abandoning a held slide, and a slide vanishing from the scene mid-drag.
+   */
+  describe('dragging a slide by its handle', () => {
+    /** jsdom lays nothing out, so each row states where it is: 20 px tall, stacked from y=0. */
+    function layOutRows(el: HTMLElement) {
+      ;[...el.querySelectorAll('[data-testid^="presentation-slide-"]')].forEach((row, i) => {
+        row.getBoundingClientRect = () => ({ top: i * 20, bottom: i * 20 + 20, height: 20, left: 0, right: 100, width: 100, x: 0, y: i * 20, toJSON: () => ({}) })
+      })
+    }
+    const handle = (el: HTMLElement, order: number) => button(el, `Reorder slide ${order}`)!
+    /** jsdom has no PointerEvent; React reads these four fields off whatever is dispatched. */
+    const pointer = (node: Element, type: string, clientY: number, button = 0) =>
+      act(async () => {
+        const event = new MouseEvent(type, { bubbles: true, clientY, button })
+        Object.defineProperty(event, 'pointerId', { value: 1 })
+        Object.defineProperty(event, 'pointerType', { value: 'mouse' })
+        node.dispatchEvent(event)
+      })
+
+    it('drops the slide where the pointer let go, and the scene is what changed', async () => {
+      const { canvas, el } = await mount([frame('a'), frame('b'), frame('c')])
+      layOutRows(el)
+      const grip = handle(el, 1)
+      await pointer(grip, 'pointerdown', 5)
+      await pointer(grip, 'pointermove', 45) // past the middle of row 3
+      await pointer(grip, 'pointerup', 45)
+      expect(canvas.deck()).toEqual(['b:1', 'c:2', 'a:3'])
+      expect(el.querySelector('.presentation-sidebar__live')?.textContent).toBe('Slide moved to position 3')
+    })
+
+    it('a drop that never left its own slot writes nothing', async () => {
+      const { canvas, el } = await mount([frame('a'), frame('b')])
+      layOutRows(el)
+      const grip = handle(el, 1)
+      await pointer(grip, 'pointerdown', 5)
+      await pointer(grip, 'pointerup', 5)
+      expect(canvas.updateScene).not.toHaveBeenCalled()
+    })
+
+    it('Escape abandons the drag, and the drop that follows writes nothing', async () => {
+      const { canvas, el } = await mount([frame('a'), frame('b'), frame('c')])
+      layOutRows(el)
+      const grip = handle(el, 1)
+      await pointer(grip, 'pointerdown', 5)
+      await pointer(grip, 'pointermove', 45)
+      await act(async () => void window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+      await pointer(grip, 'pointerup', 45)
+      expect(canvas.updateScene).not.toHaveBeenCalled()
+      expect(canvas.deck()).toEqual(['a:1', 'b:2', 'c:3'])
+    })
+
+    it('a slide that vanishes from the scene mid-drag drops the drag instead of moving a ghost', async () => {
+      const { canvas, el } = await mount([frame('a'), frame('b'), frame('c')])
+      layOutRows(el)
+      const grip = handle(el, 1)
+      await pointer(grip, 'pointerdown', 5)
+      await pointer(grip, 'pointermove', 45)
+      // Someone deleted the held frame on the canvas; the panel re-derives from the scene.
+      await act(async () => void canvas.updateScene({ elements: [frame('b'), frame('c')] }))
+      canvas.updateScene.mockClear()
+      await pointer(grip, 'pointerup', 45)
+      expect(canvas.updateScene).not.toHaveBeenCalled()
+      expect(canvas.deck()).toEqual(['b:1', 'c:2'])
+    })
+
+    it('a right-click on the handle is not a drag', async () => {
+      const { canvas, el } = await mount([frame('a'), frame('b')])
+      layOutRows(el)
+      const grip = handle(el, 1)
+      await pointer(grip, 'pointerdown', 5, 2)
+      await pointer(grip, 'pointermove', 45)
+      await pointer(grip, 'pointerup', 45)
+      expect(canvas.updateScene).not.toHaveBeenCalled()
+    })
+  })
+
   it('a reorder announces itself for a screen reader', async () => {
     const { el } = await mount([frame('a'), frame('b')])
     await click(button(el, 'Move slide 1 down'))
