@@ -4,8 +4,6 @@ import path from 'node:path'
 import type { BridgeError, TreeNode } from '@shared/types'
 import { fileKind, isDrawing } from '@shared/fileKind'
 
-export { isDrawing, isSupportedFile } from '@shared/fileKind'
-
 /**
  * Thrown by the fs layer; `ipc/envelope.ts` turns it into the `BridgeError` the renderer sees.
  * Carries a `BridgeError` code plus the optional `path` / `mtime` the renderer shows.
@@ -43,11 +41,6 @@ export function requireAbsPath(p: unknown, param: string): string {
 /** Throws unless `p` has the only editable/creatable extension kind. */
 export function requireDrawingFile(p: string): void {
   if (!isDrawing(p)) throw new BridgeFailure('UNSUPPORTED_EXTENSION', 'only .excalidraw files are editable', { path: p })
-}
-
-/** Throws unless `p` can cross the UTF-8 text bridge. */
-export function requireTextReadableFile(p: string): void {
-  if (fileKind(p) === null) throw new BridgeFailure('UNSUPPORTED_EXTENSION', 'only .excalidraw files can be read as text', { path: p })
 }
 
 /** Dot-entries and node_modules are invisible to every call. */

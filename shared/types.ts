@@ -17,7 +17,7 @@ export type BridgeErrorCode =
   | 'UNSUPPORTED_EXTENSION' // file extension is not supported by the requested capability
   | 'ALREADY_EXISTS' // create target already exists
   | 'FORBIDDEN' // OS permission denied
-  | 'TOO_LARGE' // file exceeds MAX_FILE_BYTES, or a media import exceeds MAX_IMPORT_BYTES (🔒 D4)
+  | 'TOO_LARGE' // a drawing exceeds MAX_DRAWING_BYTES, or a media import exceeds MAX_IMPORT_BYTES (🔒 D4)
   | 'IO_ERROR' // any other fs error
   | 'PICKER_FAILED' // native folder dialog could not be run
   | 'INVALID_CONFIG' // a vault config file (e.g. .yaseendraw/github.json) is unusable; the mutation is refused, the file never touched
@@ -31,14 +31,11 @@ export const DRAWING_VIEW_EXTENSIONS = ['.excalidraw'] as const
 
 /** The file kinds the app can open in-app. A file of no kind still lists (YAZ-1577). */
 export type FileKind = 'drawing'
-export const MAX_FILE_BYTES = 10 * 1024 * 1024
-
 /**
- * The ceiling on ONE drawing document read through `drawing:load` (🔒 YAZ-1810). Deliberately
- * 20× `MAX_FILE_BYTES`: that cap guards a text editor's buffer, while a LEGACY `.excalidraw`
- * (an upstream export, or one this app wrote before 🔒 D3) embeds its images as base64 and is
- * routinely past 10 MiB before it has been opened once. 200 MiB is the size at which a scene
- * has stopped being a document; the store (🔒 D3) keeps every saved file far below it.
+ * The ceiling on ONE drawing document read through `drawing:load` (🔒 YAZ-1810). A LEGACY
+ * `.excalidraw` (an upstream export, or one this app wrote before 🔒 D3) embeds its images as
+ * base64 and is routinely past 10 MiB before it has been opened once. 200 MiB is the size at
+ * which a scene has stopped being a document; the store (🔒 D3) keeps every saved file far below it.
  */
 export const MAX_DRAWING_BYTES = 200 * 1024 * 1024
 
@@ -69,16 +66,6 @@ export interface TreeResponse {
   tree: TreeNode[]
   /** Main-process time (epoch ms) when the tree was computed. */
   generatedAt: number
-}
-
-// ---------- readFile(path) ----------
-
-export interface FileResponse {
-  path: string
-  /** UTF-8 file contents, strictly decoded. */
-  content: string
-  mtime: number
-  size: number
 }
 
 // ---------- drawing:load / drawing:save (🔒 YAZ-1810, the drawing DOCUMENT's two doors) ----------
@@ -160,26 +147,6 @@ export interface DrawingApi {
    * always names a real directory. Its CONTENTS (`media.json`, `components/`) are 3A/3B/3C's.
    */
   libraryFolder(): Promise<string>
-}
-
-// ---------- writeFile(req) ----------
-
-export interface FileWriteRequest {
-  path: string
-  /** Full file contents to write. Written atomically (tmp + rename). */
-  content: string
-  /**
-   * Optional optimistic-concurrency guard: the mtime the renderer last read.
-   * If provided and the file's current mtime differs, the call rejects with a
-   * `BridgeError` whose code is `CONFLICT` (carrying the disk `mtime`) and does NOT write.
-   */
-  expectedMtime?: number
-}
-
-export interface FileWriteResponse {
-  path: string
-  mtime: number
-  size: number
 }
 
 // ---------- createDir(path) ----------
@@ -664,20 +631,6 @@ export interface VaultConfigChange {
   name: string
 }
 
-/**
- * Per-vault config in `<root>/.yaseendraw/` — the Obsidian-`.obsidian/` analogue: travels with
- * the folder. Created lazily on first write; reading never creates it. The folder is invisible
- * everywhere (tree/sidebar, vault index, shared watcher).
- */
-export interface VaultConfigApi {
-  /** Parsed `<root>/.yaseendraw/<name>`, or null when the folder/file is missing or the JSON is malformed. */
-  read(root: string, name: string): Promise<unknown>
-  /** Creates `.yaseendraw/` on first write; atomic tmp+rename; pretty-printed JSON. `name` must be a plain `<stem>.json`. */
-  write(root: string, name: string, value: unknown): Promise<void>
-  /** Fired in every window after any vault's config change; returns an unsubscribe. */
-  onChange(listener: (change: VaultConfigChange) => void): () => void
-}
-
 // ---------- GitHub sync (`<root>/.yaseendraw/github.json` — YAZ-1081) ----------
 
 /**
@@ -1074,11 +1027,9 @@ export interface RevealResponse {
   path: string
 }
 
-/** An external-link intent from the canvas; main validates and resolves it before any OS side effect. */
+/** An external-link intent from the canvas; main re-validates the protocol before any OS side effect. */
 export interface OpenLinkRequest {
   href: string
-  /** Absolute current-note path, required only when `href` is relative. */
-  sourcePath?: string
 }
 
 /** In-app delete (GRO-2272): the absolute path of the entry to move to the system Trash. */
@@ -1144,8 +1095,6 @@ export interface WindowApi {
    */
   setIdentity(patch: Partial<Pick<WindowIdentity, 'root' | 'file' | 'tabs' | 'sidebarCollapsed' | 'sidebarLens' | 'focusDirs' | 'focusFavorites'>>): Promise<void>
   open(opts: OpenWindowOptions): Promise<void>
-  /** `⌘⇧N`: same folder, same file, new window (GRO-2167). */
-  duplicate(): Promise<void>
   /**
    * The vault switcher's one door (YAZ-1767 🔒 D1): bring a recent vault to the front and bump it
    * to the top of the MRU. Already open in some window(s) → those are RAISED, most recently
@@ -1160,8 +1109,6 @@ export interface WindowApi {
    * so the close/flush handshake runs; never a bare destroy (GRO-2232, e.g. closing the last tab).
    */
   closeSelf(): Promise<void>
-  /** App-wide zoom for THIS window (YAZ-1710): what the stock `zoomIn` / `zoomOut` / `resetZoom` roles did — level ± 0.5, or back to 0. */
-  zoom(step: ZoomStep): Promise<void>
   /**
    * The close/quit flush handshake (GRO-2160): main is about to close this window and holds it
    * until every registered listener settled (hard 5s cap in main). Returns an unsubscribe.
@@ -1241,10 +1188,8 @@ export interface FileApi {
    *
    * On success the same handler drops every stored reference (`store.removePath`: window
    * `file` — promoted to an heir tab rather than nulled when other tabs survive — plus tabs,
-   * recents and folder state) and pushes `file:deleted` to EVERY
-   * window. The vault index needs no push: the watcher's `unlink` / `unlinkDir` echo heals it
-   * (trashItem is a MOVE at the fs layer). Notes linking to a deleted page are left
-   * BYTE-IDENTICAL — their `[[links]]` simply go unresolved (LOCKED decision C).
+   * recents and folder state) and pushes `file:deleted` to EVERY window. The tree needs no
+   * push: the watcher's `unlink` / `unlinkDir` echo heals it (trashItem is a MOVE at the fs layer).
    */
   delete(req: DeleteRequest): Promise<DeleteResponse>
   /** Fired in every window after a successful delete; returns an unsubscribe. */
@@ -1306,8 +1251,6 @@ export interface ShellApi {
    * an OS refusal (`shell.openPath`'s returned message) rejects `IO_ERROR` carrying that message.
    */
   openDefault(req: RevealRequest): Promise<RevealResponse>
-  /** Open a validated link target through the OS; never creates an Electron window. */
-  openLink(req: OpenLinkRequest): Promise<void>
 }
 
 /**
@@ -1328,8 +1271,6 @@ export interface LinkApi {
  */
 export interface YaseenDrawApi {
   tree(root: string): Promise<TreeResponse>
-  readFile(path: string): Promise<FileResponse>
-  writeFile(req: FileWriteRequest): Promise<FileWriteResponse>
   createDir(path: string): Promise<CreateDirResponse>
   createFile(req: string | CreateFileRequest): Promise<CreateFileResponse>
   /** The drawing DOCUMENT's two doors (🔒 YAZ-1810): the only way a `.excalidraw` tab reads and writes. */
@@ -1348,8 +1289,6 @@ export interface YaseenDrawApi {
   file: FileApi
   /** OS-level actions: Reveal in Finder (GRO-2274) and Open in VS Code (YAZ-963). */
   shell: ShellApi
-  /** Vault-local config in `<root>/.yaseendraw/` (Desktop J, GRO-2188). */
-  vaultConfig: VaultConfigApi
   /** The Favorites list over `.yaseendraw/favorites.json` (YAZ-1766 6A) — absolute paths in, relative on disk. */
   favorites: FavoritesApi
   /** The cross-vault media library over `<library>/media.json` (🔒 D4 / D5, YAZ-1817). */

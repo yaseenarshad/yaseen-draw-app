@@ -39,7 +39,7 @@ function optionalSidebarCollapsed(raw: Record<string, unknown>): boolean | undef
   return v
 }
 
-/** `sidebarLens` (YAZ-1628; three lenses since YAZ-1766): absent (untouched), or one of the lenses. */
+/** `sidebarLens` (YAZ-1628; Favorites added by YAZ-1766): absent (untouched), or one of the two lenses. */
 function optionalSidebarLens(raw: Record<string, unknown>): SidebarLens | undefined {
   const v = raw.sidebarLens
   if (v === undefined) return undefined
@@ -49,9 +49,8 @@ function optionalSidebarLens(raw: Record<string, unknown>): SidebarLens | undefi
 
 /**
  * The `window.*` half of `window.yaseenDraw`. The caller is resolved through the window lookup
- * (`webContents.id` → window id) and answered from `AppState.windows`. `open` / `duplicate`
- * are D6 plumbing into the window manager (GRO-2160; the gestures land in D-), and
- * `app:flushed` is the renderer's half of the close/quit flush handshake.
+ * (`webContents.id` → window id) and answered from `AppState.windows`; `app:flushed` is the
+ * renderer's half of the close/quit flush handshake.
  */
 export function registerWindowIpc(store: Store, windows: WindowManagerIpc): void {
   const entryFor = (e: IpcMainInvokeEvent): WindowEntry => {
@@ -102,21 +101,9 @@ export function registerWindowIpc(store: Store, windows: WindowManagerIpc): void
     windows.closeWindow(id)
   })
 
-  // `window:zoom` (YAZ-1710): the app-wide zoom the stock roles used to do, on the caller's own
-  // window — level ± 0.5 per step, 0 for Actual Size. The renderer calls this only when no note
-  // has focus; a focused note zooms itself.
-  handleWithEvent(CH.windowZoom, async (e, step: unknown) => {
-    if (step !== -1 && step !== 0 && step !== 1) throw new BridgeFailure('BAD_REQUEST', 'step must be -1, 0 or 1')
-    e.sender.setZoomLevel(step === 0 ? 0 : e.sender.getZoomLevel() + 0.5 * step)
-  })
-
   handle(CH.windowOpen, async (opts: unknown) => {
     if (!isRecord(opts)) throw new BridgeFailure('BAD_REQUEST', 'options must be an object')
     windows.openWindow({ root: optionalPath(opts, 'root') ?? null, file: optionalPath(opts, 'file') ?? null })
-  })
-
-  handleWithEvent(CH.windowDuplicate, async (e) => {
-    windows.duplicateWindow(entryFor(e))
   })
 
   // `window:open-recent` (YAZ-1767 D1): the vault switcher's door — an absolute path in, and the

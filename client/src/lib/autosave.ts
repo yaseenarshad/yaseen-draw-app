@@ -2,13 +2,10 @@
  * Pure debounced auto-save state machine (no DOM, no React) so the dirty /
  * debounce / conflict rules can be unit-tested.
  *
- * GENERIC OVER THE CONTENT KEY `C` (🔒 YAZ-1810). A text editor hands it the serialised string,
- * so "differs from the baseline" is a string compare and `save` gets the bytes for free. A
- * DRAWING hands it the engine's cheap scene VERSION (an integer) and serialises inside `save()`
- * only when the timer fires: the canvas reports a change per pointer move, and serialising every
- * one of them is precisely the cost the version exists to avoid. The debounce, conflict and
- * flush rules are identical either way — only what "the content" means changes, and comparing
- * with `===` is honest for both (a string's value, a version's number).
+ * GENERIC OVER THE CONTENT KEY `C` (🔒 YAZ-1775 D3): the drawing editor hands it the engine's
+ * cheap scene VERSION (an integer) and serialises inside `save()` only when the timer fires —
+ * the canvas reports a change per pointer move, and serialising every one of them is precisely
+ * the cost the version exists to avoid. `===` is the whole comparison, so any value type works.
  *
  * Rules (docs/CONTRACTS.md "Bridge API" — atomic writes and mtime echo suppression):
  *  - only content that differs from the last saved/loaded content is dirty
@@ -27,7 +24,7 @@ export class SaveConflict extends Error {
   }
 }
 
-export interface AutosaveOptions<C = string> {
+export interface AutosaveOptions<C> {
   /** Baseline content KEY (what is on disk, as the editor serialises it — or a drawing's scene version). */
   content: C
   /** mtime of the baseline. */
@@ -39,7 +36,7 @@ export interface AutosaveOptions<C = string> {
   delayMs?: number
 }
 
-export class Autosave<C = string> {
+export class Autosave<C> {
   private baseline: C
   private pending: C | null = null
   private timer: ReturnType<typeof setTimeout> | null = null

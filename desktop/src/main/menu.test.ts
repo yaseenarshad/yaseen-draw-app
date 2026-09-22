@@ -276,6 +276,14 @@ describe('buildMenuTemplate', () => {
     expect(handlers.openHelp).toHaveBeenCalledTimes(1)
   })
 
+  it('⌘⇧N is the ONE duplicate-window door: the File item clicks straight through to newWindow', () => {
+    const handlers = noopHandlers()
+    const item = menuOf(build(RECENTS, false, handlers), 'File').find((i) => i.id === 'menu.file.new-window')
+    expect(item?.accelerator).toBe('CmdOrCtrl+Shift+N')
+    click(item)
+    expect(handlers.newWindow).toHaveBeenCalledTimes(1)
+  })
+
   it('actionable items carry stable ids so a live check can drive them', () => {
     const file = menuOf(build(), 'File')
     expect(file.find((i) => i.label === 'New Window')?.id).toBe('menu.file.new-window')

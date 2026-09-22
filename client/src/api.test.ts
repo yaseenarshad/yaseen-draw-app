@@ -6,8 +6,6 @@ import { api, BridgeRequestError } from './api'
 function installBridge(): { [K in keyof YaseenDrawApi]: ReturnType<typeof vi.fn> } {
   const bridge = {
     tree: vi.fn(),
-    readFile: vi.fn(),
-    writeFile: vi.fn(),
     createDir: vi.fn(),
     createFile: vi.fn(),
     drawing: vi.fn(),
@@ -20,7 +18,6 @@ function installBridge(): { [K in keyof YaseenDrawApi]: ReturnType<typeof vi.fn>
     link: vi.fn(),
     file: vi.fn(),
     shell: vi.fn(),
-    vaultConfig: vi.fn(),
     favorites: vi.fn(),
     media: vi.fn(),
     components: vi.fn(),
@@ -40,17 +37,12 @@ afterEach(() => {
 describe('api', () => {
   it('delegates to window.yaseenDraw with the same arguments and resolves its value', async () => {
     bridge.tree.mockResolvedValue({ root: '/v', tree: [], generatedAt: 1 })
-    bridge.writeFile.mockResolvedValue({ path: '/v/a.excalidraw', mtime: 2, size: 3 })
     bridge.pickFolder.mockResolvedValue({ cancelled: true })
     await expect(api.tree('/v')).resolves.toEqual({ root: '/v', tree: [], generatedAt: 1 })
     expect(bridge.tree).toHaveBeenCalledWith('/v')
-    await expect(api.writeFile({ path: '/v/a.excalidraw', content: 'x', expectedMtime: 1 })).resolves.toEqual({ path: '/v/a.excalidraw', mtime: 2, size: 3 })
-    expect(bridge.writeFile).toHaveBeenCalledWith({ path: '/v/a.excalidraw', content: 'x', expectedMtime: 1 })
     await expect(api.pickFolder()).resolves.toEqual({ cancelled: true })
-    await api.readFile('/v/a.excalidraw')
     await api.createDir('/v/d')
     await api.createFile('/v/n.excalidraw')
-    expect(bridge.readFile).toHaveBeenCalledWith('/v/a.excalidraw')
     expect(bridge.createDir).toHaveBeenCalledWith('/v/d')
     expect(bridge.createFile).toHaveBeenCalledWith('/v/n.excalidraw')
   })
@@ -107,8 +99,8 @@ describe('api', () => {
   })
 
   it('a rejected plain BridgeError becomes a thrown BridgeRequestError with code / message / path / mtime', async () => {
-    bridge.writeFile.mockRejectedValue({ code: 'CONFLICT', message: 'newer on disk', path: '/v/a.excalidraw', mtime: 42 })
-    const err = await api.writeFile({ path: '/v/a.excalidraw', content: '' }).catch((e: unknown) => e)
+    bridge.tree.mockRejectedValue({ code: 'CONFLICT', message: 'newer on disk', path: '/v/a.excalidraw', mtime: 42 })
+    const err = await api.tree('/v').catch((e: unknown) => e)
     expect(err).toBeInstanceOf(BridgeRequestError)
     const e = err as BridgeRequestError
     expect(e.code).toBe('CONFLICT')
@@ -205,8 +197,8 @@ describe('api', () => {
   })
 
   it('a BridgeError without path / mtime leaves those fields undefined', async () => {
-    bridge.readFile.mockRejectedValue({ code: 'NOT_FOUND', message: 'path does not exist' })
-    const err = (await api.readFile('/v/missing.excalidraw').catch((e: unknown) => e)) as BridgeRequestError
+    bridge.tree.mockRejectedValue({ code: 'NOT_FOUND', message: 'path does not exist' })
+    const err = (await api.tree('/v/missing').catch((e: unknown) => e)) as BridgeRequestError
     expect(err).toBeInstanceOf(BridgeRequestError)
     expect(err.code).toBe('NOT_FOUND')
     expect(err.mtime).toBeUndefined()

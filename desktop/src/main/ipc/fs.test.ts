@@ -61,7 +61,7 @@ describe('registerFsIpc', () => {
   it('registers every fs channel the preload invokes (and nothing else)', () => {
     registerFsIpc(store, windows)
     const channels = vi.mocked(ipcMain.handle).mock.calls.map(([ch]) => ch).sort()
-    expect(channels).toEqual([CH.fsCreateDir, CH.fsCreateFile, CH.fsDelete, CH.fsClip, CH.fsPaste, CH.fsClipState, CH.fsRead, CH.fsRename, CH.fsTree, CH.fsWrite, CH.shellReveal, CH.shellOpenVsCode, CH.shellOpenDefault, CH.shellOpenLink].sort())
+    expect(channels).toEqual([CH.fsCreateDir, CH.fsCreateFile, CH.fsDelete, CH.fsClip, CH.fsPaste, CH.fsClipState, CH.fsRename, CH.fsTree, CH.shellReveal, CH.shellOpenVsCode, CH.shellOpenDefault].sort())
   })
 
   it('answers with an envelope: a tree on success, a BridgeError on failure', async () => {
@@ -69,8 +69,8 @@ describe('registerFsIpc', () => {
     expect(ok.ok).toBe(true)
     if (!ok.ok) throw new Error('expected ok')
     expect((ok.value as { root: string }).root).toBe(root)
-    const missing = path.join(root, 'missing.excalidraw')
-    expect(await registered(CH.fsRead)({ sender: {} }, missing)).toEqual({
+    const missing = path.join(root, 'missing')
+    expect(await registered(CH.fsTree)({ sender: {} }, missing)).toEqual({
       ok: false,
       error: { code: 'NOT_FOUND', message: 'path does not exist', path: missing },
     })

@@ -80,9 +80,9 @@ export interface WindowHost {
 export interface WindowManager extends WindowLookup {
   /** One window per stored entry, bounds clamped; an empty state seeds a single Welcome window (D3). */
   restoreAll(): void
-  /** D6 plumbing: an independent window on `root`/`file` (the gestures land in D-). */
+  /** An independent window on `root`/`file`; the gesture is File › New Window on the Welcome screen. */
   openWindow(opts: OpenWindowOptions): void
-  /** D6 plumbing: same folder + file as `from`, cascaded bounds, fresh id (the ⌘⇧N gesture is GRO-2167). */
+  /** ⌘⇧N (GRO-2167): same folder + file as `from`, cascaded bounds, fresh id. Called straight from the menu. */
   duplicateWindow(from: WindowEntry): void
   /**
    * The ONE back-end door for "open a recent vault" (YAZ-1767 🔒 D1): the sidebar's vault
@@ -110,7 +110,7 @@ export interface WindowManager extends WindowLookup {
 }
 
 /** What the IPC layer (`ipc/window.ts`) needs from the manager; tests fake just this slice. */
-export type WindowManagerIpc = Pick<WindowManager, 'idFor' | 'openWindow' | 'duplicateWindow' | 'openRecentBeside' | 'closeWindow' | 'handleFlushed'>
+export type WindowManagerIpc = Pick<WindowManager, 'idFor' | 'openWindow' | 'openRecentBeside' | 'closeWindow' | 'handleFlushed'>
 
 // ---------- bounds clamping (pure) ----------
 
@@ -343,21 +343,21 @@ export function createWindowManager(store: Store, host: WindowHost): WindowManag
 
     openWindow,
 
-      duplicateWindow(from) {
-        const cascaded = { ...from.bounds, x: from.bounds.x + WINDOW_CASCADE_PX, y: from.bounds.y + WINDOW_CASCADE_PX }
-        // Clone every ordered path list so the new window's durable identity cannot alias the source;
-        // sidebar visibility, the lens and the three Focus Mode lists (YAZ-1628, YAZ-1766) are copied by value and then persist independently.
-        open({
-          id: randomUUID(),
-          root: from.root,
-          file: from.file,
-          tabs: [...from.tabs],
-          sidebarCollapsed: from.sidebarCollapsed,
-          sidebarLens: from.sidebarLens,
-          focusDirs: [...from.focusDirs],
-          focusFavorites: [...from.focusFavorites],
-          bounds: clampBounds(cascaded, host.workAreas()),
-        })
+    duplicateWindow(from) {
+      const cascaded = { ...from.bounds, x: from.bounds.x + WINDOW_CASCADE_PX, y: from.bounds.y + WINDOW_CASCADE_PX }
+      // Clone every ordered path list so the new window's durable identity cannot alias the source;
+      // sidebar visibility, the lens and both Focus Mode lists (YAZ-1628, YAZ-1766) are copied by value and then persist independently.
+      open({
+        id: randomUUID(),
+        root: from.root,
+        file: from.file,
+        tabs: [...from.tabs],
+        sidebarCollapsed: from.sidebarCollapsed,
+        sidebarLens: from.sidebarLens,
+        focusDirs: [...from.focusDirs],
+        focusFavorites: [...from.focusFavorites],
+        bounds: clampBounds(cascaded, host.workAreas()),
+      })
     },
 
     openRecentBeside(path) {
