@@ -56,7 +56,7 @@ export const storage = {
     })
   },
 
-  /** Called after a change made in ANY window landed in the cache (never for this window's own optimistic writes). */
+  /** Called after a `state:changed` push landed in the cache — from any window, this one's own writes included. */
   subscribe(listener: () => void): () => void {
     listeners.add(listener)
     return () => {

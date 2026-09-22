@@ -24,7 +24,7 @@ import type { MenuTargets } from './Sidebar'
 interface MenuItemBase {
   id: string
   label: string
-  /** Right-aligned shortcut hint (⌘X …), drawn from `data-hint` by CSS — never part of the label. */
+  /** Right-aligned hint — a shortcut (⌘X …) or a state mark (the sort menu's ✓, 🔒 YAZ-1835 D5) — drawn from `data-hint` by CSS, never part of the label. */
   hint?: string
   danger?: boolean
 }
@@ -279,13 +279,14 @@ const openIn: Item = (t, h) => {
   return { id: 'open-in', label: 'Open in', children }
 }
 
-// ---- (6) Delete: LAST, alone (GRO-2272 `C1a-`, LOCKED) ----
+// ---- (6) Delete's group: Info, then Delete — LAST (GRO-2272 `C1a-`, LOCKED; Info above it, 🔒 YAZ-1835 D6) ----
 
 /**
  * Delete renders LAST (GRO-2272 `C1a-`, LOCKED): VS Code's Explorer puts it at the bottom, and
  * destructive-last is safer on its own merits — Delete used to sit directly under Rename, the
  * misclick pair that matters most; 🔒 YAZ-1337 D7 now puts a whole group ("Open in ▸") and two
- * separators between them.
+ * separators between them. Its one neighbour is now Info (🔒 YAZ-1835 D6), a read-only item —
+ * the safest thing a misclick can land on.
  * Delete opens the confirm sheet; it must NEVER delete directly. Null on blank space: no target,
  * and main refuses the vault root anyway.
  */

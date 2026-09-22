@@ -1,10 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import type { TreeNode } from '@shared/types'
+import type { FileNode } from '@shared/treeSort'
 import { BoardInfo } from './BoardInfo'
-
-type FileNode = Extract<TreeNode, { type: 'file' }>
 const NOW = Date.UTC(2026, 8, 22, 12, 0)
 const board = (over: Partial<FileNode> = {}): FileNode => ({ type: 'file', name: 'Plan.excalidraw', path: '/v/Projects/Plan.excalidraw', size: 1536, mtime: NOW - 3_600_000, kind: 'drawing', ...over })
 

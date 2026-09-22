@@ -2605,7 +2605,8 @@ describe('Cut / Copy / Paste (YAZ-1674)', () => {
  * the tree so a saved board can rise.
  */
 const SORTABLE: TreeNode[] = [
-  { type: 'dir', name: 'sub', path: '/v/sub', children: [{ type: 'file', name: 'inner-old.excalidraw', path: '/v/sub/inner-old.excalidraw', size: 1, mtime: 1, kind: 'drawing', meta: { createdAt: 1, updatedAt: 1 } }, { type: 'file', name: 'inner-new.excalidraw', path: '/v/sub/inner-new.excalidraw', size: 1, mtime: 1, kind: 'drawing', meta: { createdAt: 2, updatedAt: 2 } }] },
+  // Inside `sub`, name order and date order DISAGREE, so a recursion test can tell them apart.
+  { type: 'dir', name: 'sub', path: '/v/sub', children: [{ type: 'file', name: 'a-first.excalidraw', path: '/v/sub/a-first.excalidraw', size: 1, mtime: 1, kind: 'drawing', meta: { createdAt: 1, updatedAt: 1 } }, { type: 'file', name: 'b-second.excalidraw', path: '/v/sub/b-second.excalidraw', size: 1, mtime: 1, kind: 'drawing', meta: { createdAt: 2, updatedAt: 2 } }] },
   { type: 'file', name: 'Apple.excalidraw', path: '/v/Apple.excalidraw', size: 1, mtime: 10, kind: 'drawing', meta: { createdAt: 400, updatedAt: 900 } },
   { type: 'file', name: 'Banana.excalidraw', path: '/v/Banana.excalidraw', size: 1, mtime: 10, kind: 'drawing', meta: { createdAt: 990, updatedAt: 991 } },
   { type: 'file', name: 'Cherry.excalidraw', path: '/v/Cherry.excalidraw', size: 1, mtime: 10, kind: 'drawing', meta: { createdAt: 300, updatedAt: 950 } },
@@ -2648,12 +2649,13 @@ describe('sort control (🔒 YAZ-1835)', () => {
   })
 
   it('folder contents follow the order once the folder is open', async () => {
+    vi.spyOn(storage, 'getSortOrder').mockReturnValue('name') // the real `storage` still holds the previous test's pick
     const { el } = await mountSortable()
     act(() => el.querySelector<HTMLButtonElement>('.tree__row--dir')?.click())
-    expect(rowPaths(el, true).slice(0, 2)).toEqual(['sub/inner-new.excalidraw', 'sub/inner-old.excalidraw'])
+    expect(rowPaths(el, true).slice(0, 2)).toEqual(['sub/a-first.excalidraw', 'sub/b-second.excalidraw'])
     act(() => sortButton(el)?.click())
     await act(async () => itemByLabel(el, 'Last updated')?.click())
-    expect(rowPaths(el, true).slice(0, 2)).toEqual(['sub/inner-new.excalidraw', 'sub/inner-old.excalidraw'])
+    expect(rowPaths(el, true).slice(0, 2)).toEqual(['sub/b-second.excalidraw', 'sub/a-first.excalidraw'])
     act(() => el.querySelector<HTMLButtonElement>('.tree__row--dir')?.click()) // fold it back: `storage` remembers expansion across mounts
   })
 
@@ -2666,6 +2668,50 @@ describe('sort control (🔒 YAZ-1835)', () => {
     get.mockReturnValue('name')
     await act(async () => wake?.())
     expect(rowPaths(el)[0]).toBe('Apple.excalidraw')
+  })
+
+  it('sorts inside Focus Mode too — the focused folder`s children, in the order', async () => {
+    vi.spyOn(storage, 'getFocusDirs').mockReturnValue(['/v/sub'])
+    vi.spyOn(storage, 'getSortOrder').mockReturnValue('updated')
+    const { el } = await mountSortable()
+    // The focused folder IS the top row; open it and its children come in the order.
+    act(() => el.querySelector<HTMLButtonElement>('.tree__row--dir')?.click())
+    expect(rowPaths(el, true)).toEqual(['sub/b-second.excalidraw', 'sub/a-first.excalidraw'])
+    act(() => el.querySelector<HTMLButtonElement>('.tree__row--dir')?.click()) // fold it back for the tests after
+  })
+
+  it('the Favorites lens keeps the hand order and ⌘K keeps its ranking, whatever the sort (D1)', async () => {
+    vi.spyOn(storage, 'getSortOrder').mockReturnValue('updated')
+    const { el } = await mount({ lens: 'favorites' }, (b) => {
+      b.tree.mockResolvedValue({ root: '/v', tree: SORTABLE, generatedAt: 1 })
+      b.favorites.get.mockResolvedValue(['/v/Cherry.excalidraw', '/v/Apple.excalidraw', '/v/Banana.excalidraw'])
+    })
+    expect(rowPaths(el)).toEqual(['Cherry.excalidraw', 'Apple.excalidraw', 'Banana.excalidraw']) // NOT Banana, Cherry, Apple
+    // Info is offered on a board row here as well (either lens, D6).
+    act(() => void [...el.querySelectorAll<HTMLElement>('.tree__row--file')][0]?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
+    expect(itemByLabel(el, 'Info')).toBeDefined()
+    const files = await mountSortable()
+    const input = searchInput(files.el)
+    if (input === null) throw new Error('no search input')
+    await type(input, 'an')
+    expect([...files.el.querySelectorAll('.search-results__row .search-results__label')].map((n) => n.textContent)).toEqual(['Banana']) // ranked, not sorted
+    await type(input, 'a')
+    const labels = [...files.el.querySelectorAll('.search-results__row .search-results__label')].map((n) => n.textContent)
+    expect(labels.indexOf('Apple')).toBeLessThan(labels.indexOf('Banana')) // the catalog's own order, though "updated" would flip them
+  })
+
+  it('an older tree walk that lands AFTER a newer one is dropped (D4 — walks overlap now)', async () => {
+    let notify: ((ev: WatchEvent) => void) | null = null
+    const { el, bridge } = await mountSortable({ watch: { subscribe: (l) => ((notify = l), () => (notify = null)) } })
+    const resolvers: Array<(v: { root: string; tree: TreeNode[]; generatedAt: number }) => void> = []
+    bridge.tree.mockImplementation(() => new Promise((r) => resolvers.push(r)))
+    await act(async () => notify?.({ type: 'change', path: '/v/Apple.excalidraw', mtime: 1 }))
+    await act(async () => notify?.({ type: 'change', path: '/v/Apple.excalidraw', mtime: 2 }))
+    expect(resolvers).toHaveLength(2)
+    const renamed = (name: string, at: number) => ({ root: '/v', tree: [{ type: 'file' as const, name, path: `/v/${name}`, size: 1, mtime: 1, kind: 'drawing' as const }], generatedAt: at })
+    await act(async () => resolvers[1]?.(renamed('newer.excalidraw', 20)))
+    await act(async () => resolvers[0]?.(renamed('older.excalidraw', 10)))
+    expect(rowPaths(el)).toEqual(['newer.excalidraw'])
   })
 
   it('a watcher `change` event refreshes the tree, so a saved board can rise (D4)', async () => {
@@ -2735,16 +2781,35 @@ describe('Info popover (🔒 YAZ-1835 D6/D7)', () => {
     expect(popover(el)).toBeNull()
   })
 
-  it('a legacy board reads "Not stamped yet"; Escape closes the popover', async () => {
-    const { el } = await mountSortable()
-    rightClick(rowFor(el, 'notes.txt')) // no Info here — a board without a block is a drawing that has none
+  it('a legacy board reads "Not stamped yet"; Escape closes the popover, and so does a click away', async () => {
     const legacy = [...SORTABLE, { type: 'file' as const, name: 'Legacy.excalidraw', path: '/v/Legacy.excalidraw', size: 2048, mtime: 7, kind: 'drawing' as const }]
-    const { el: el2 } = await mount({}, (b) => b.tree.mockResolvedValue({ root: '/v', tree: legacy, generatedAt: 1 }))
-    rightClick(rowFor(el2, 'Legacy.excalidraw'))
-    await act(async () => itemByLabel(el2, 'Info')?.click())
-    expect(row(el2, 'Created')).toBe('Not stamped yet · written on the next save')
-    expect(row(el2, 'Size')).toBe('2.0 KB')
+    const { el } = await mount({}, (b) => b.tree.mockResolvedValue({ root: '/v', tree: legacy, generatedAt: 1 }))
+    const open = async () => {
+      rightClick(rowFor(el, 'Legacy.excalidraw'))
+      await act(async () => itemByLabel(el, 'Info')?.click())
+    }
+    await open()
+    expect(el.querySelector('[role="dialog"] .board-info')).not.toBeNull()
+    expect(row(el, 'Created')).toBe('Not stamped yet · written on the next save')
+    expect(row(el, 'Size')).toBe('2.0 KB')
     act(() => void window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
-    expect(popover(el2)).toBeNull()
+    expect(popover(el)).toBeNull()
+    await open()
+    act(() => void window.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })))
+    expect(popover(el)).toBeNull()
+  })
+
+  it('a board that comes BACK after vanishing does not reopen its popover', async () => {
+    let notify: ((ev: WatchEvent) => void) | null = null
+    const { el, bridge } = await mountSortable({ watch: { subscribe: (l) => ((notify = l), () => (notify = null)) } })
+    rightClick(rowFor(el, 'Apple.excalidraw'))
+    await act(async () => itemByLabel(el, 'Info')?.click())
+    expect(popover(el)).not.toBeNull()
+    bridge.tree.mockResolvedValue({ root: '/v', tree: SORTABLE.filter((n) => n.name !== 'Apple.excalidraw'), generatedAt: 2 })
+    await act(async () => notify?.({ type: 'unlink', path: '/v/Apple.excalidraw' }))
+    expect(popover(el)).toBeNull()
+    bridge.tree.mockResolvedValue({ root: '/v', tree: SORTABLE, generatedAt: 3 })
+    await act(async () => notify?.({ type: 'add', path: '/v/Apple.excalidraw', mtime: 3 }))
+    expect(popover(el)).toBeNull()
   })
 })

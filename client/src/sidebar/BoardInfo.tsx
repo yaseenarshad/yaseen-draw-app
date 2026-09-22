@@ -1,8 +1,6 @@
-import type { TreeNode } from '@shared/types'
+import type { FileNode } from '@shared/treeSort'
 import { formatBytes, formatDateTime } from '../lib/format'
 import { relativeTime } from '../lib/relativeTime'
-
-type FileNode = Extract<TreeNode, { type: 'file' }>
 
 /**
  * The "Info" popover's body (🔒 YAZ-1835 D6/D7): the board as the tree already knows it — no fetch of

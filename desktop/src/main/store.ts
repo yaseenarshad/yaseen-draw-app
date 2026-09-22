@@ -187,7 +187,7 @@ function sanitizeFolder(raw: unknown): FolderState | null {
     // A relaunch starts every tree collapsed; a pre-1642 file's leftover lists are ignored.
     expanded: [],
     lastFile: typeof raw.lastFile === 'string' ? raw.lastFile : null,
-    sortOrder: isSortOrder(raw.sortOrder) ? raw.sortOrder : 'name',
+    sortOrder: isSortOrder(raw.sortOrder) ? raw.sortOrder : defaultFolderState().sortOrder,
   }
 }
 

@@ -591,15 +591,17 @@ the store cache, which `state:changed` refreshes.
 **🔒 D4 — the tree refreshes on EVERY watcher event.** A save is a `change`, and a save is what
 moves `updatedAt`; the Sidebar used to skip `change`. One tree walk per save (one stat and a 1 KB
 head read per board), with no own-write echo guard on purpose: our own save is the reorder we want.
+Walks overlap, so an answer older than the tree on screen is dropped by `generatedAt`.
 
 **🔒 D5 — the control.** One button (`.sidebar__sort`) in the lens row, Files lens only, hidden
 while a query is typed; it opens the same `ContextMenu` the rows use with three items and a `✓`
 hint on the current one.
 
 **🔒 D6 — Info.** A board row's context menu offers `Info` directly above `Delete`, in Delete's
-group — for ONE board only: never blank space, a folder, a non-board file or a 2+ selection
-(`MenuTargets.infoPath`, its own field). Selecting it closes the menu and opens a
-`ContextMenuSurface` popover at the click point; click-away or Escape closes it.
+group, on either lens — for ONE board only: never blank space, a folder, a non-board file or a
+2+ selection (`MenuTargets.infoPath`, its own field). Selecting it closes the menu and opens a
+`ContextMenuSurface` popover (`role="dialog"`) at the click point; click-away or Escape closes it,
+and so does the board vanishing.
 
 **🔒 D7 — Info reads the live tree, nothing else.** The popover keeps the board's PATH and resolves
 the node off the current tree on every render, so a save in any window moves its dates and a
