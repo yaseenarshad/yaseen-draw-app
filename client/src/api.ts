@@ -1,4 +1,4 @@
-import type { DrawingLoadRequest, DrawingLoadResponse, DrawingSaveRequest, DrawingSaveResponse, BridgeError, BridgeErrorCode, CreateDirResponse, CreateFileRequest, CreateFileResponse, DeleteRequest, DeleteResponse, FileClipRequest, FileClipState, FileResponse, FileWriteRequest, FileWriteResponse, GithubSyncStatus, MediaFavoritesRequest, MediaImportRequest, MediaImportResponse, MediaPreviewRequest, MediaPreviewResponse, MediaRecentRequest, MediaSearchRequest, MediaSearchResponse, OpenLinkRequest, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, RevealRequest, RevealResponse, SecretHasRequest, SecretSetRequest, StoredMediaItem, TreeResponse } from '@shared/types'
+import type { ComponentItem, ComponentReadResponse, ComponentRenameRequest, ComponentSaveRequest, ComponentSlugRequest, DrawingLoadRequest, DrawingLoadResponse, DrawingSaveRequest, DrawingSaveResponse, BridgeError, BridgeErrorCode, CreateDirResponse, CreateFileRequest, CreateFileResponse, DeleteRequest, DeleteResponse, FileClipRequest, FileClipState, FileResponse, FileWriteRequest, FileWriteResponse, GithubSyncStatus, MediaFavoritesRequest, MediaImportRequest, MediaImportResponse, MediaPreviewRequest, MediaPreviewResponse, MediaRecentRequest, MediaSearchRequest, MediaSearchResponse, OpenLinkRequest, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, RevealRequest, RevealResponse, SecretHasRequest, SecretSetRequest, StoredMediaItem, TreeResponse } from '@shared/types'
 
 /** Typed failure from the main process (see docs/CONTRACTS.md "Bridge API"). */
 export class BridgeRequestError extends Error {
@@ -87,6 +87,22 @@ export const api = {
     preview: (req: MediaPreviewRequest) => call<MediaPreviewResponse>(() => window.yaseenDraw.media.preview(req)),
     /** The full-size bytes to insert — never cached, because they are about to become an `assets/` file (🔒 D3). */
     import: (req: MediaImportRequest) => call<MediaImportResponse>(() => window.yaseenDraw.media.import(req)),
+  },
+  /**
+   * The cross-vault saved-component library over `<library>/components/` (🔒 D5, YAZ-1819): a
+   * component is a whole `.excalidraw` fragment with its image bytes embedded, plus a PNG preview,
+   * indexed by `<library>/components.json`. Every mutation answers what it produced, and
+   * `onChanged` fires in every window whichever vault it is on.
+   */
+  components: {
+    list: () => call<ComponentItem[]>(() => window.yaseenDraw.components.list()),
+    save: (req: ComponentSaveRequest) => call<ComponentItem>(() => window.yaseenDraw.components.save(req)),
+    read: (req: ComponentSlugRequest) => call<ComponentReadResponse>(() => window.yaseenDraw.components.read(req)),
+    rename: (req: ComponentRenameRequest) => call<ComponentItem>(() => window.yaseenDraw.components.rename(req)),
+    delete: (req: ComponentSlugRequest) => call<void>(() => window.yaseenDraw.components.delete(req)),
+    /** The stored `<slug>.png` as a dataURL — the grid's tile picture; NOT_FOUND when it is gone. */
+    preview: (req: ComponentSlugRequest) => call<string>(() => window.yaseenDraw.components.preview(req)),
+    onChanged: (listener: () => void) => window.yaseenDraw.components.onChanged(listener),
   },
   /** The secrets door (🔒 D4): write and ask, never read. `set` rejects ENCRYPTION_UNAVAILABLE without an OS keychain. */
   secrets: {

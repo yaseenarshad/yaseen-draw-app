@@ -22,6 +22,7 @@ function installBridge(): { [K in keyof YaseenDrawApi]: ReturnType<typeof vi.fn>
     vaultConfig: vi.fn(),
     favorites: vi.fn(),
     media: vi.fn(),
+    components: vi.fn(),
     secrets: vi.fn(),
     github: vi.fn(),
   }
@@ -145,6 +146,30 @@ describe('api', () => {
     await expect(api.media.preview({ provider: 'iconify', id: 'noto:money-bag' })).resolves.toMatchObject({ mimeType: 'image/svg+xml' })
     media.import.mockRejectedValue({ code: 'OFFLINE', message: 'could not reach api.iconify.design' })
     await expect(api.media.import({ provider: 'iconify', id: 'noto:money-bag' })).rejects.toMatchObject({ name: 'BridgeRequestError', code: 'OFFLINE' })
+  })
+
+  it('components calls pass the request through and answer what main made; onChanged is a pass-through (🔒 D5)', async () => {
+    const components = { list: vi.fn(), save: vi.fn(), read: vi.fn(), rename: vi.fn(), delete: vi.fn(), preview: vi.fn(), onChanged: vi.fn() }
+    Object.defineProperty(window.yaseenDraw, 'components', { value: components, configurable: true })
+    const item = { slug: 'a-card', name: 'A card', elementCount: 2, createdAt: 1, updatedAt: 1 }
+    components.list.mockResolvedValue([item])
+    await expect(api.components.list()).resolves.toEqual([item])
+    components.save.mockResolvedValue(item)
+    await expect(api.components.save({ name: 'A card', fragmentJson: '{}', previewPng: 'data:image/png;base64,AA==' })).resolves.toEqual(item)
+    expect(components.save).toHaveBeenCalledWith({ name: 'A card', fragmentJson: '{}', previewPng: 'data:image/png;base64,AA==' })
+    components.read.mockResolvedValue({ fragmentJson: '{}' })
+    await expect(api.components.read({ slug: 'a-card' })).resolves.toEqual({ fragmentJson: '{}' })
+    components.rename.mockResolvedValue(item)
+    await expect(api.components.rename({ slug: 'a-card', name: 'B' })).resolves.toEqual(item)
+    components.preview.mockResolvedValue('data:image/png;base64,AA==')
+    await expect(api.components.preview({ slug: 'a-card' })).resolves.toBe('data:image/png;base64,AA==')
+    components.delete.mockRejectedValue({ code: 'NOT_FOUND', message: 'no such component' })
+    await expect(api.components.delete({ slug: 'gone' })).rejects.toMatchObject({ name: 'BridgeRequestError', code: 'NOT_FOUND' })
+    const off = () => undefined
+    components.onChanged.mockReturnValue(off)
+    const listener = () => undefined
+    expect(api.components.onChanged(listener)).toBe(off)
+    expect(components.onChanged).toHaveBeenCalledWith(listener)
   })
 
   it('secrets: set and has delegate, and ENCRYPTION_UNAVAILABLE arrives as a typed BridgeRequestError (🔒 D4)', async () => {

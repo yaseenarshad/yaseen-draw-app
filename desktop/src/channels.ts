@@ -75,6 +75,15 @@ export const CH = {
   mediaSearch: 'media:search',
   mediaPreview: 'media:preview',
   mediaImport: 'media:import',
+  // The saved-component library in `<library>/components/` (🔒 D5, YAZ-1819): six doors and one
+  // payload-free push, so a component saved in one vault appears in every other vault's window.
+  componentsList: 'components:list',
+  componentsSave: 'components:save',
+  componentsRead: 'components:read',
+  componentsRename: 'components:rename',
+  componentsDelete: 'components:delete',
+  componentsPreview: 'components:preview',
+  componentsChanged: 'components:changed',
   // The secrets door (🔒 D4): write and ask, never read — no channel answers a value.
   secretsSet: 'secrets:set',
   secretsHas: 'secrets:has',
