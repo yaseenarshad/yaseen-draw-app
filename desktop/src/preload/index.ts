@@ -41,6 +41,8 @@ const api: YaseenDrawApi = {
     libraryFolder: () => call(CH.drawingLibraryFolder),
   },
   pickFolder: () => call(CH.dialogPickFolder),
+  // The import picker (YAZ-1833): a native open-file dialog that answers the picked file's bytes.
+  dialog: { openDrawing: () => call(CH.dialogOpenFile) },
   watch: (root, listener) => {
     const id = crypto.randomUUID()
     const onEvent = (_e: unknown, msg: { id: string; ev: WatchEvent }) => {

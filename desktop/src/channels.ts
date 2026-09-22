@@ -27,6 +27,10 @@ export const CH = {
   shellOpenDefault: 'shell:openDefault',
   shellOpenLink: 'shell:open-link',
   dialogPickFolder: 'dialog:pick-folder',
+  // The native OPEN-FILE dialog, filtered to `.excalidraw` (YAZ-1833): the Components tab's
+  // Import JSON. It answers the picked file's BYTES, because that file lives outside the vault
+  // and no other channel reads an arbitrary absolute path.
+  dialogOpenFile: 'dialog:open-file',
   watchSubscribe: 'watch:subscribe',
   watchUnsubscribe: 'watch:unsubscribe',
   watchEvent: 'watch:event',

@@ -20,7 +20,7 @@ marks an amendment to an earlier locked decision; the amendment wins.
 | `client/` | the renderer: React 19, Vite. Talks to nothing but `window.yaseenDraw`. |
 | `client/src/drawings/` | the drawing document: the engine seam (`ExcalidrawSurface`, the ONE importer of the package), its host, and what a scene is |
 | `client/src/media/` | the canvas panel's Images tab: the Image Studio, the shapes catalog, both insert paths |
-| `client/src/components-library/` | the canvas panel's Components tab: the saved-component library, its capture, preview and insert (named so it is never confused with `client/src/components/`) |
+| `client/src/components-library/` | the canvas panel's Components tab: the saved-component library, its capture, import, preview and insert (named so it is never confused with `client/src/components/`) |
 | `client/src/sidebar/` | the file tree, its context menu, rename/move/trash, favorites, vault switcher |
 | `client/src/tabs/` | the tab strip |
 | `client/src/workspace/` | the tab model (`tabsReducer`) and its per-tab history |
@@ -111,6 +111,7 @@ Electron flattens a thrown Error to its message, which is why failure travels as
 | `drawing.save(req)` | `drawing:save` | images first, then the scene, atomically; `expectedMtime` → `CONFLICT` with NOTHING written |
 | `drawing.libraryFolder()` | `drawing:library-folder` | the RESOLVED library folder — the setting, or `<userData>/library` (🔒 D5) |
 | `pickFolder()` | `dialog:pick-folder` | the native open-directory dialog |
+| `dialog.openDrawing()` | `dialog:open-file` | the native OPEN-FILE dialog, `.excalidraw` filter → `{ path, name, content }` or `{ cancelled: true }`; the bytes come back because the picked file is outside the vault |
 | `watch(root, cb)` | `watch:*` | chokidar under the root; `ready` / `change` / `add` / `unlink` / `error` |
 | `file.rename(req)` | `fs:rename` | same-parent rename or a move; never overwrites |
 | `file.delete(req)` | `fs:delete` | `shell.trashItem` ONLY — never `fs.rm`, no permanent fallback |
@@ -398,6 +399,22 @@ viewport, so two inserts of one component are two unrelated sets of elements. Se
 ONE ranking matcher (`search/matchCandidates.ts`, the same one ⌘K uses) over the names, paged by
 `PAGE_SIZE` 24. Rename and delete are inline in the card rather than `window.prompt` /
 `window.confirm`, and 🔒 `confirmDelete` (Settings › Files) decides whether the delete asks first.
+
+**Import JSON** (YAZ-1833) is the same library through a different door: the button opens the
+native open-file dialog (`dialog:open-file`, `.excalidraw` filter), `componentImport.ts` parses
+what comes back — the web app's `parseImportedComponentJson` envelope table
+(`growprofit/saved-component` with its schema-version and element-count checks, `excalidraw`,
+`excalidraw/clipboard`, `excalidraw-api/clipboard`, and a ONE-item `excalidrawlib`), then
+`restoreElements(…, { repairBindings: true })`, the soft-deleted filter, a second assertion pass
+and the 750 000-byte element ceiling — and the result goes through `components:save` exactly as a
+captured selection does. Two differences from the web app, both deliberate: it is a FILE PICKER
+rather than a paste box (a desktop app has a dialog; a browser tab did not), and IMAGES ARE KEPT,
+because the picked file carries its own `files` map, so importing a legacy embedded board yields a
+component with its pictures. An image id with no bytes behind it in that file is a refusal. The
+component is named after the file's base name and its preview is drawn from the fragment and
+bounded like every other, so importing a board-sized scene is allowed and still yields a tile.
+Every refusal throws BEFORE `components:save` is called and shows as a PASSIVE notice
+(`role="status"`, not the assertive error line) — nothing is written.
 
 ### Secrets (🔒 D4)
 

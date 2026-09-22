@@ -292,6 +292,39 @@ export type PickFolderResponse =
       cancelled: true
     }
 
+// ---------- dialog.openDrawing() ----------
+
+/**
+ * The native OPEN-FILE dialog, filtered to `.excalidraw`, parented to the calling window
+ * (YAZ-1833). Same one-in-flight-per-window guard as `pickFolder()`, and the same
+ * `{ cancelled: true }` answer for a dismissal.
+ *
+ * WHY IT ANSWERS THE BYTES AND NOT JUST A PATH: the file an import reaches for is by definition
+ * OUTSIDE the vault, and the renderer has no door that reads an arbitrary absolute path. Rather
+ * than opening one, the dialog reads what the user has just chosen — bounded by
+ * `MAX_DRAWING_BYTES`, as `drawing:load` is — so the only foreign bytes that ever cross the bridge
+ * are the ones a native dialog gesture asked for.
+ */
+export type OpenDrawingResponse =
+  | {
+      /** Absolute path of the chosen file. */
+      path: string
+      /** Its base name WITHOUT the `.excalidraw` extension — what an import names the component. */
+      name: string
+      /** Its UTF-8 bytes. */
+      content: string
+    }
+  | {
+      /** The user dismissed the dialog. */
+      cancelled: true
+    }
+
+/** Native file dialogs that answer a DOCUMENT rather than a folder (`pickFolder()` predates this namespace). */
+export interface DialogApi {
+  /** Pick one `.excalidraw` and get its bytes back; `{ cancelled: true }` when dismissed (YAZ-1833). */
+  openDrawing(): Promise<OpenDrawingResponse>
+}
+
 // ---------- watch(root, listener) ----------
 
 /**
@@ -1270,6 +1303,8 @@ export interface YaseenDrawApi {
   drawing: DrawingApi
   /** Native open-directory dialog parented to the calling window (GRO-2163). */
   pickFolder(): Promise<PickFolderResponse>
+  /** Native file dialogs: pick a `.excalidraw` to import (YAZ-1833). */
+  dialog: DialogApi
   /** One chokidar watcher per root in main, shared by every window; late joiners get `ready` at once. */
   watch(root: string, listener: (ev: WatchEvent) => void): () => void
   state: StateApi

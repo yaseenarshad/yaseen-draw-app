@@ -47,6 +47,7 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
   - [x] 3A — Library folder and secrets plumbing (YAZ-1817)
   - [x] 3B — Images tab: Image Studio with main-process providers (YAZ-1818)
   - [x] 3C — Components tab: Saved Components as library files (YAZ-1819)
+  - [x] 3C1 — Import JSON into the components library (YAZ-1833)
 - Now: [→] 3D — Present tab: presentation sidebar and player (YAZ-1820)
 - Remaining:
   - [ ] 3E — Export menu: PNG, SVG, standalone `.excalidraw` (YAZ-1821)
@@ -65,8 +66,23 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 - UNCONFIRMED (posted on YAZ-1815, awaiting Yasin): where a drawing outside EVERY open vault should open. 2I kept the shipped E1 rule — a NEW window rooted at the file's parent folder — rather than repointing the focused window's vault, which would discard its tabs and would need a main→renderer "switch vault and open this" message that does not exist. Documented in CONTRACTS as built.
 - RESOLVED (🔒 on YAZ-1775, with the phase-2 merge): the rename CONFIRM sheet is **deleted** — with wikilinks gone it warned about nothing, and "New drawing" landing on the inline rename field made every new `Untitled` board trip it. `ConfirmRename.tsx`/`.test.tsx` and App's `requestRename` detour are gone; rename commits on Enter. Delete and move keep their confirms. First commit of phase 3.
 
-## Learnings (2D / 2E / 2F / 2G / 2H / 2I / 3A / 3B / 3C)
+## Learnings (2D / 2E / 2F / 2G / 2H / 2I / 3A / 3B / 3C / 3C1)
 
+- **A native dialog is the only place an arbitrary path may be read.** Import JSON needed the bytes
+  of a file OUTSIDE the vault, and the bridge has no read-any-path door. Rather than open one,
+  `dialog:open-file` reads what the user has just picked, bounded by `MAX_DRAWING_BYTES` and
+  re-checked for the extension (a filter is defeated by typing a name) — so the door's reach is
+  exactly one native gesture wide.
+- **`parseImportedComponentJson` ported with its one flag inverted.** The web app passed
+  `allowImages: false` because an imported payload had no bytes in its object store; a picked
+  `.excalidraw` carries its own `files` map, so images are kept and travel into the fragment. The
+  envelope table, the restore, the deleted filter and the size ceiling are verbatim.
+- **A refusal that writes nothing is a PASSIVE notice.** `role="status"` for the import, not the
+  tab's assertive `role="alert"` — the error line means "your save failed", the notice means
+  "nothing happened".
+- **A preview settles on a TASK.** `FileReader` is how the blob becomes a dataURL, so a test that
+  flushes one turn records the call against the NEXT test under full-suite load; the import tests
+  poll until the call lands.
 - **The folder is the truth; the index is a cache.** `components.json` is rebuilt from
   `<library>/components/` on every read — adopted, dropped and repaired — not just when it is
   missing. That is what makes a component arriving through a synced folder, or a file deleted in
