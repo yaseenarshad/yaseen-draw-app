@@ -28,7 +28,6 @@ const media = vi.mocked(api.media)
 const secrets = vi.mocked(api.secrets)
 const loadElement = vi.mocked(loadExcalidrawElement)
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const item = (over: Partial<StudioItem> = {}): StudioItem => ({ itemKey: 'iconify:noto:money-bag', provider: 'iconify', providerId: 'noto:money-bag', kind: 'icon', title: 'money bag', ...over })
 const stored = (over: Partial<StoredMediaItem> = {}): StoredMediaItem => ({ ...item(), updatedAt: 1, ...over })

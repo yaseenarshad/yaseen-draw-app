@@ -15,7 +15,7 @@ export type SelectionAction =
   /**
    * D9 (YAZ-1674, reversing YAZ-1336's plain-click-clears): a PLAIN click — and ⌘-click, and a
    * right-click on a row outside the selection (Finder) — makes the selection EXACTLY that row,
-   * so ⌘C / ⌘X / ⌘V and ⌘⇧C always have a target after a click. Shift keeps its toggle.
+   * so ⌘C / ⌘X / ⌘V always have a target after a click. Shift keeps its toggle.
    */
   | { type: 'set'; path: string }
   | { type: 'clear' }

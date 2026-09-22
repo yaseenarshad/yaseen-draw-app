@@ -280,10 +280,10 @@ const openIn: Item = (t, h) => {
 // ---- (6) Delete: LAST, alone (GRO-2272 `C1a-`, LOCKED) ----
 
 /**
- * Rename and Delete render LAST (GRO-2272 `C1a-`, LOCKED): VS Code's Explorer puts both at the
- * bottom, and destructive-last is safer on its own merits — Delete used to sit directly under
- * Rename, which is the misclick pair that matters most; 🔒 D7 now puts a whole group ("Open in ▸")
- * and two separators between them.
+ * Delete renders LAST (GRO-2272 `C1a-`, LOCKED): VS Code's Explorer puts it at the bottom, and
+ * destructive-last is safer on its own merits — Delete used to sit directly under Rename, the
+ * misclick pair that matters most; 🔒 YAZ-1337 D7 now puts a whole group ("Open in ▸") and two
+ * separators between them.
  * Delete opens the confirm sheet; it must NEVER delete directly. Null on blank space: no target,
  * and main refuses the vault root anyway.
  */

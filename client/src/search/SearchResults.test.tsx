@@ -10,7 +10,6 @@ import { createRoot, type Root } from 'react-dom/client'
 import type { SearchCandidate } from './searchCandidates'
 import { SearchResults } from './SearchResults'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const cand = (name: string, folder = ''): SearchCandidate => ({
   kind: 'file',

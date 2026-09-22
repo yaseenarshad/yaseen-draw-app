@@ -32,7 +32,6 @@ const dialog = vi.mocked(api.dialog)
 const loadElement = vi.mocked(loadExcalidrawElement)
 const store = vi.mocked(storage)
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const item = (over: Partial<ComponentItem> = {}): ComponentItem => ({ slug: 'a-card', name: 'A card', elementCount: 2, createdAt: 1, updatedAt: 1, ...over })
 const rect = (id: string) => ({ id, type: 'rectangle' })

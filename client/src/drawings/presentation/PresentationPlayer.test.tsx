@@ -10,7 +10,6 @@ import { createRoot, type Root } from 'react-dom/client'
 import { PRESENTATION_ACTIVE_CLASS, PRESENTATION_TOOLS_CLASS, PRESENTATION_TRANSITION_DURATION, PresentationPlayer, type PresentationPlayerEngine, type PresentationPlayerTarget } from './PresentationPlayer'
 import { PRESENTATION_CAMERA_RESERVE } from './camera'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const frame = (id: string, order: number, over: Record<string, unknown> = {}) => ({
   id,

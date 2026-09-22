@@ -7,7 +7,6 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { useLinkEvents } from './useLinkEvents'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 function installBridge() {
   const openFileListeners = new Set<(path: string) => void>()

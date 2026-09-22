@@ -6,7 +6,7 @@ describe('HOTKEYS source of truth', () => {
     const keys = WINDOW_HOTKEYS.map((h) => h.keys)
     // ⌘⇧N / ⌘⇧O / ⌘W (Close Tab) / ⌘⇧W (Close Window), the tab-switch pairs and the zoom trio
     // live in the menu (menu.ts, GRO-2161/2232, YAZ-1710); ⌥-click Open Recent = open beside (GRO-2211).
-    for (const expected of ['⌘⇧N', '⌘⇧O', '⌘O', '⌘K', '⌘,', '⌘B', '⌘+ / ⌘− / ⌘0', '⌘X / ⌘C', '⌘V', '⌘S', '⌘W', '⌘⇧W', '⌃Tab / ⌃⇧Tab', '⌘⇧] / ⌘⇧[', '⌥ Open Recent']) {
+    for (const expected of ['⌘⇧N', '⌘⇧O', '⌘O', '⌘K', '⌘,', '⌘B', '⌘+ / ⌘− / ⌘0', '⌘X / ⌘C', '⌘V', '⌘W', '⌘⇧W', '⌃Tab / ⌃⇧Tab', '⌘⇧] / ⌘⇧[', '⌥ Open Recent']) {
       expect(keys).toContain(expected)
     }
     expect(WINDOW_HOTKEYS.find((h) => h.keys === '⌘B')?.label).toMatch(/outside editing surfaces/i)
@@ -52,18 +52,20 @@ describe('HOTKEYS source of truth', () => {
     expect(HOTKEY_GROUPS.map((g) => g.entries)).toEqual([WINDOW_HOTKEYS, CANVAS_HOTKEYS, MOUSE_TIPS])
   })
 
-  it('the Canvas table carries the drawing`s own keys (YAZ-1812), and says what gates ⌘C', () => {
-    expect(CANVAS_HOTKEYS.map((h) => h.keys)).toEqual(['⌘⇧E', '⌘F', '⌘C'])
+  it("the Canvas table carries every key that needs a drawing in front (YAZ-1812), and says what gates ⌘C", () => {
+    // The menu's two drawing-only items (menu.ts) plus the three bound on the canvas host itself.
+    expect(CANVAS_HOTKEYS.map((h) => h.keys)).toEqual(['⌘⇧E', '⌘⇧S', '⌘S', '⌘F', '⌘C'])
     expect(CANVAS_HOTKEYS.find((h) => h.keys === '⌘⇧E')?.label).toMatch(/export image/i)
+    expect(CANVAS_HOTKEYS.find((h) => h.keys === '⌘⇧S')?.label).toMatch(/export drawing/i)
+    expect(CANVAS_HOTKEYS.find((h) => h.keys === '⌘S')?.label).toMatch(/autosaves/i)
     expect(CANVAS_HOTKEYS.find((h) => h.keys === '⌘C')?.label).toMatch(/nothing is selected/i)
-    // ⌘S is a window-level key, listed with the rest (🔒 YAZ-1810 autosave still owns the file).
-    expect(WINDOW_HOTKEYS.find((h) => h.keys === '⌘S')?.label).toMatch(/autosaves/i)
   })
 
-  it('every entry is renderable (non-empty keys and label)', () => {
-    for (const entry of [...WINDOW_HOTKEYS, ...MOUSE_TIPS]) {
+  it('every entry is renderable (non-empty keys and label) and free of the backtick-for-apostrophe typo', () => {
+    for (const entry of HOTKEY_GROUPS.flatMap((group) => group.entries)) {
       expect(entry.keys.length).toBeGreaterThan(0)
       expect(entry.label.length).toBeGreaterThan(0)
+      expect(entry.label).not.toContain('`')
     }
   })
 })

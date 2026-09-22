@@ -11,7 +11,6 @@ import type { TreeNode } from '@shared/types'
 import * as catalog from './searchCandidates'
 import { useSearchResults } from './useSearchResults'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const file = (name: string, folder = ''): TreeNode => ({
   type: 'file',

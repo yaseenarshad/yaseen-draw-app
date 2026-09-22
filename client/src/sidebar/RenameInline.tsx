@@ -22,7 +22,7 @@ export function RenameInline({ initial, indent, onSubmit, onCancel }: RenameInli
   const [error, setError] = useState<string | null>(null)
   // ONE door (YAZ-1553): leaving the field is the commit, so `onBlur` is `leave`'s only caller.
   // `settled` flips the moment the edit is over — Chromium fires one last blur when a focused
-  // field is removed, and that blur must do nothing. Same verbs as `PageTitle`.
+  // field is removed, and that blur must do nothing.
   const settled = useRef(false)
 
   const discard = () => {

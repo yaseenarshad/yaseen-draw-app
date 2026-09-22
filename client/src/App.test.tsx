@@ -36,7 +36,6 @@ interface SidebarStubProps {
    * The read-only window onto the sidebar's selection (🔒 D4): App owns the box (the sidebar
    * unmounts on collapse), the Sidebar owns the state (🔒 D1) and writes it here.
    */
-  selectionRef: { current: ReadonlySet<string> }
   onNotice: (message: string, icon?: NoticeKind) => void
   /** ⌘C / ⌘X / ⌘V's handle (D6 amended, YAZ-1674): App asks, the Sidebar (here a stub) answers. */
   clipboardRef: { current: { cutOrCopy: (op: 'copy' | 'cut') => boolean; paste: () => boolean } | null }
@@ -58,7 +57,6 @@ vi.mock('./sidebar/Sidebar', () => ({
 
 import { App } from './App'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 /** The `window.yaseenDraw` surface the App tree touches, all observable. */
 type IdentityFixture = Omit<WindowIdentity, 'sidebarCollapsed' | 'sidebarLens' | 'focusDirs' | 'focusFavorites'> & Partial<Pick<WindowIdentity, 'sidebarCollapsed' | 'sidebarLens' | 'focusDirs' | 'focusFavorites'>>

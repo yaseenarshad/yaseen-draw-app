@@ -15,7 +15,6 @@ import { getOrderedPresentationFrames, type SlideElementApi } from './slides'
 
 const loadElement = vi.mocked(loadExcalidrawElement)
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const frame = (id: string, over: Record<string, unknown> = {}) => ({ id, type: 'frame', frameId: null, name: null, x: 0, y: 0, width: 100, height: 100, ...over })
 const ordered = (id: string, order: number, over: Record<string, unknown> = {}) => frame(id, { customData: { presentationOrder: order }, ...over })

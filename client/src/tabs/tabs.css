@@ -1,6 +1,6 @@
 /* Window tab strip + per-tab editor stack (Tabs I2, GRO-2234). Owned by TabBar.tsx (the
-   feature-CSS convention); .workspace/.tabstack are rendered by App around it. Follows the
-   ViewTabs look (views.css): an underline-active tablist on the app theme tokens. */
+   feature-CSS convention); .workspace/.tabstack are rendered by App around it: an
+   underline-active tablist on the app theme tokens. */
 
 /* The editor half of the app row: tab strip on top, editor stack below. */
 .workspace {
@@ -123,8 +123,8 @@
   line-height: 1;
   color: var(--fg-muted);
   border-radius: 4px;
-  /* Shown on hover/active only (the ViewTabs affordance pattern); visibility (not display)
-     so the tab never changes width when the ✕ appears. */
+  /* Shown on hover/active only; visibility (not display) so the tab never changes width
+     when the ✕ appears. */
   visibility: hidden;
 }
 

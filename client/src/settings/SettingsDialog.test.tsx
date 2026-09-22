@@ -28,7 +28,6 @@ const pickFolder = vi.mocked(api.pickFolder)
 const secretHas = vi.mocked(api.secrets.has)
 const secretSet = vi.mocked(api.secrets.set)
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 let root: Root | null = null
 let container: HTMLElement | null = null
@@ -282,7 +281,7 @@ describe('SettingsDialog rows write through the popover contracts', () => {
 
   it('Confirm before deleting: On · Off with the guard ON by default, its hint in the row, and Off writing the whole object', () => {
     const { el, onChange } = mount()
-    expect(row(el, 'confirmDelete')?.querySelector('.setting__hint')?.textContent).toBe('Deleted notes and folders move to the Trash either way.')
+    expect(row(el, 'confirmDelete')?.querySelector('.setting__hint')?.textContent).toBe('Deleted drawings and folders move to the Trash either way.')
     const buttons = rowButtons(el, 'confirmDelete')
     expect(buttons.map((b) => b.textContent)).toEqual(['On', 'Off'])
     expect(buttons.map((b) => b.classList.contains('settings__option--active'))).toEqual([true, false])

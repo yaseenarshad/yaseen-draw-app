@@ -13,7 +13,6 @@ import { createRoot, type Root } from 'react-dom/client'
 import { ContextMenu } from './ContextMenu'
 import type { MenuAction, MenuParent, MenuSection } from './menuSections'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 type Box = { width?: number; height?: number; left?: number; top?: number }
 

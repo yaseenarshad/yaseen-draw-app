@@ -392,7 +392,7 @@ describe('createStore: mutations', () => {
     expect(store.get().folders['/r1']).toEqual({ expanded: ['/r1/a'], lastFile: null })
     store.setFolder('/r1', { lastFile: '/r1/a/x.excalidraw' })
     expect(store.get().folders['/r1']).toEqual({ expanded: ['/r1/a'], lastFile: '/r1/a/x.excalidraw' })
-    store.setFolder('/r1', { lastFile: null, folds: { '/r1/a.excalidraw': ['k'] } } as never)
+    store.setFolder('/r1', { lastFile: null, sortOrder: 'name' } as never)
     expect(store.get().folders['/r1']).toEqual({ expanded: ['/r1/a'], lastFile: null })
     store.setFolder('/r2', {})
     expect(store.get().folders['/r2']).toEqual({ expanded: [], lastFile: null })

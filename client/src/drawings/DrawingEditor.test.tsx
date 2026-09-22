@@ -81,7 +81,6 @@ import { BROKEN_DRAWING_DOCUMENT, DrawingEditor } from './DrawingEditor'
 const load = vi.mocked(api.drawing.load)
 const save = vi.mocked(api.drawing.save)
 const saveDrawing = vi.mocked(api.dialog.saveDrawing)
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const ROOT = '/vault'
 const PATH = '/vault/Board.excalidraw'

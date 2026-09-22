@@ -10,10 +10,9 @@ const VERBS: readonly (readonly [string, FileClipboardVerb])[] = [
 
 /**
  * Renderer ownership for the sidebar's file clipboard chords — ⌘C / ⌘X / ⌘V (D6 amended,
- * YAZ-1674) — `ownsCopyPathHotkey`'s sibling, and the same ONE boundary (`ownsWindowChord`): a
- * field, a contenteditable (the ProseMirror editor is one — text copy/paste keeps working) or an
- * open modal keeps the key, and Shift / ⌥ variants are never ours (⌘⇧C is Copy path). These are
- * WINDOW chords, like ⌘⇧C, because focus after a click on the open file sits in the editor
+ * YAZ-1674) — through the ONE boundary (`ownsWindowChord`): a field, a contenteditable or an
+ * open modal keeps the key, so text copy/paste is untouched, and Shift / ⌥ variants are never
+ * ours. These are WINDOW chords because focus after a click on the open file sits in the canvas
  * (YAZ-961's handoff) and blank space is not focusable at all — a listener on the panel never
  * heard them. ⌘ only, like every renderer chord here: the Ctrl spellings are the platform menu's.
  */

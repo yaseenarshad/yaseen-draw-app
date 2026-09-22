@@ -8,7 +8,6 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { createLauncherStore, LauncherRail, type LauncherActions, type LauncherState } from './LauncherRail'
 
-;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const actions = (): LauncherActions & { [K in keyof LauncherActions]: ReturnType<typeof vi.fn> } => ({
   togglePanel: vi.fn(),
