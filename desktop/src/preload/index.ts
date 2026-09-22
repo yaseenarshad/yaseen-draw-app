@@ -137,6 +137,10 @@ const api: YaseenDrawApi = {
     favorites: (req) => call(CH.mediaFavorites, req),
     recent: (req) => call(CH.mediaRecent, req),
     onChanged: on<void>(CH.mediaChanged),
+    // The provider doors (🔒 D4, YAZ-1818): main holds the key, does the fetching and caches.
+    search: (req) => call(CH.mediaSearch, req),
+    preview: (req) => call(CH.mediaPreview, req),
+    import: (req) => call(CH.mediaImport, req),
   },
   // The secrets door (🔒 D4): write and ask, never read — there is no channel that answers a value.
   secrets: {

@@ -70,6 +70,11 @@ export const CH = {
   mediaFavorites: 'media:favorites',
   mediaRecent: 'media:recent',
   mediaChanged: 'media:changed',
+  // The Image Studio's providers (🔒 D4, YAZ-1818): main fetches, curates, caches and enforces the
+  // 20 MB import cap, so the renderer never holds an API key and never reaches a provider itself.
+  mediaSearch: 'media:search',
+  mediaPreview: 'media:preview',
+  mediaImport: 'media:import',
   // The secrets door (🔒 D4): write and ask, never read — no channel answers a value.
   secretsSet: 'secrets:set',
   secretsHas: 'secrets:has',

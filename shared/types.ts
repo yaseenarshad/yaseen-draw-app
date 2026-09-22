@@ -17,11 +17,14 @@ export type BridgeErrorCode =
   | 'UNSUPPORTED_EXTENSION' // file extension is not supported by the requested capability
   | 'ALREADY_EXISTS' // create target already exists
   | 'FORBIDDEN' // OS permission denied
-  | 'TOO_LARGE' // file exceeds MAX_FILE_BYTES
+  | 'TOO_LARGE' // file exceeds MAX_FILE_BYTES, or a media import exceeds MAX_IMPORT_BYTES (🔒 D4)
   | 'IO_ERROR' // any other fs error
   | 'PICKER_FAILED' // native folder dialog could not be run
   | 'INVALID_CONFIG' // a vault config file (e.g. .yaseendraw/github.json) is unusable; the mutation is refused, the file never touched
   | 'ENCRYPTION_UNAVAILABLE' // 🔒 D4: the OS keychain cannot encrypt on this machine, so no secret can be stored
+  | 'UNSUPPORTED_TYPE' // 🔒 D4: a media provider answered with something that is not an image (the worker's 415)
+  | 'PROVIDER_FAILED' // 🔒 D4: a media provider was REACHED and refused, or answered nonsense (the worker's 502)
+  | 'OFFLINE' // 🔒 D4: the provider could not be reached at all — a passive state in the UI, never an error banner
 
 /** The one document extension the app opens, edits and creates (🔒 D1). */
 export const DRAWING_VIEW_EXTENSIONS = ['.excalidraw'] as const
@@ -805,6 +808,79 @@ export interface MediaApi {
   recent(req: MediaRecentRequest): Promise<StoredMediaItem[]>
   /** Fired in EVERY window whenever `media.json` changes, this app's write or an external one. Returns an unsubscribe. */
   onChanged(listener: () => void): () => void
+  /** Federated provider search (🔒 D4, YAZ-1818) — main fetches, curates and caches; the renderer never reaches a provider. */
+  search(req: MediaSearchRequest): Promise<MediaSearchResponse>
+  /** One tile's picture as a dataURL, disk-cached 24 h. The ONLY way a preview reaches the renderer. */
+  preview(req: MediaPreviewRequest): Promise<MediaPreviewResponse>
+  /** The full-size bytes, NEVER cached: they are about to become an `assets/` file (🔒 D3). */
+  import(req: MediaImportRequest): Promise<MediaImportResponse>
+}
+
+// ---------- Image Studio: the provider doors (🔒 D4, YAZ-1818) ----------
+
+/**
+ * Which providers a search asks. The web app's `ImageStudioSearchSource` exactly: `all` is the
+ * federated mix (Iconify 14 + Pixabay 4 of `SEARCH_LIMIT` 18), the other two are one provider each.
+ */
+export type MediaSearchSource = 'all' | 'iconify' | 'pixabay'
+export const MEDIA_SEARCH_SOURCES: readonly MediaSearchSource[] = ['all', 'iconify', 'pixabay']
+export const isMediaSearchSource = (v: unknown): v is MediaSearchSource => MEDIA_SEARCH_SOURCES.includes(v as MediaSearchSource)
+
+/**
+ * A search RESULT — the same pointer `media.json` stores, so favoriting one is a copy rather than
+ * a conversion. It carries NO `previewUrl`: in the web app that field held the Worker route that
+ * would serve the picture, and this app has no routes — a preview is asked for by `provider` +
+ * `providerId` over `media:preview`, which is also why a stored `previewUrl` is never trusted.
+ */
+export type StudioItem = MediaItem
+
+/** The two providers that serve BYTES; `shape` is drawn by the renderer and never fetched. */
+export type MediaBytesProvider = 'pixabay' | 'iconify'
+export const MEDIA_BYTES_PROVIDERS: readonly MediaBytesProvider[] = ['pixabay', 'iconify']
+export const isMediaBytesProvider = (v: unknown): v is MediaBytesProvider => MEDIA_BYTES_PROVIDERS.includes(v as MediaBytesProvider)
+
+/** `media:search` — the query, the providers, and the opaque cursor of the page before this one. */
+export interface MediaSearchRequest {
+  q: string
+  source: MediaSearchSource
+  /** The `nextCursor` of the previous page; absent or null starts over. Opaque: main minted it, main reads it. */
+  cursor?: string | null
+}
+
+/**
+ * `media:search`'s answer. `nextCursor` is null when the providers are exhausted — that is what
+ * stops the infinite scroll. `pixabayAvailable` is the ONE thing the renderer learns about the
+ * key (🔒 D4: never the value): false hides the Pixabay section instead of showing an error.
+ */
+export interface MediaSearchResponse {
+  items: StudioItem[]
+  nextCursor: string | null
+  pixabayAvailable: boolean
+  /** A provider that was reached and failed while ANOTHER answered — the web app's warning banner. */
+  warnings: string[]
+}
+
+/** `media:preview` / `media:import` — a provider and its own id for the item. */
+export interface MediaBytesRequest {
+  provider: MediaBytesProvider
+  id: string
+}
+export type MediaPreviewRequest = MediaBytesRequest
+export type MediaImportRequest = MediaBytesRequest
+
+/** The tile picture. A dataURL because the renderer is sandboxed and there is no custom protocol. */
+export interface MediaPreviewResponse {
+  mimeType: string
+  dataURL: string
+}
+
+/**
+ * The full-size bytes, plus the item as the PROVIDER describes it now — which is how a Recent row
+ * gets a fresh size and attribution even when the caller's copy came out of an old `media.json`.
+ * Only the fields main can actually know are set; the caller's own item supplies the rest.
+ */
+export interface MediaImportResponse extends MediaPreviewResponse {
+  item: StudioItem
 }
 
 // ---------- Secrets (`userData/secrets.json` — 🔒 D4) ----------
