@@ -60,11 +60,10 @@ All locked on YAZ-1775; the 🔒 comments there hold the reasoning.
 ## Open Questions
 
 - UNCONFIRMED: `desktop/build/icon.png` is the only icon asset; the stale docs-app `icon.icns`/`icon.ico` were deleted and electron-builder now derives both from the PNG. Confirm during the 4D packaging run.
-- UNCONFIRMED (2B leftover, for 2D/2G): the rename CONFIRM sheet survives without its reason. ⚡ YAZ-888 made a name change ask first *because* the rename chained into every `[[wikilink]]`; with links gone the sheet now only says "Rename 'x' to 'y'?". Kept rather than removed — deleting a confirm is a product decision, not a strip — but it may want to go.
 - RESOLVED (🔒 "Dead asset pipe deleted" on YAZ-1775): the image half of the asset pipe is gone — module, tests, channels, preload methods, types and CONTRACTS rows — in 2F's first commit.
 - RESOLVED (🔒 "Focus handoff on tab reveal" on YAZ-1812, built in 2I): a revealed drawing tab takes the keyboard through `DrawingSurfaceApi.focus()`, gated by `drawings/focusHandoff.ts` — never from the sidebar search, the vault switcher or a dialog.
 - UNCONFIRMED (posted on YAZ-1815, awaiting Yasin): where a drawing outside EVERY open vault should open. 2I kept the shipped E1 rule — a NEW window rooted at the file's parent folder — rather than repointing the focused window's vault, which would discard its tabs and would need a main→renderer "switch vault and open this" message that does not exist. Documented in CONTRACTS as built.
-- UNCONFIRMED (2B leftover, still open after 2I): the rename CONFIRM sheet. "New drawing" now lands on the inline rename field, so the FIRST thing a user does to a new board trips the sheet ("Rename 'Untitled' to 'Plan'?"). 2I deliberately did not touch `ConfirmRename` — a separate decision is pending with Yasin.
+- RESOLVED (🔒 on YAZ-1775, with the phase-2 merge): the rename CONFIRM sheet is **deleted** — with wikilinks gone it warned about nothing, and "New drawing" landing on the inline rename field made every new `Untitled` board trip it. `ConfirmRename.tsx`/`.test.tsx` and App's `requestRename` detour are gone; rename commits on Enter. Delete and move keep their confirms. First commit of phase 3.
 
 ## Learnings (2D / 2E / 2F / 2G / 2H / 2I)
 
