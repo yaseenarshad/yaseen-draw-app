@@ -31,6 +31,8 @@ const surface = {
   nextReplaceVersion: 0,
   replaced: [] as unknown[],
   refreshes: 0,
+  /** How many times the tab-reveal handoff (🔒 YAZ-1812) put the keyboard in this canvas. */
+  focuses: 0,
   /** What the application menu's two items (🔒 D10) reached this canvas as. */
   commands: [] as DrawingCommand[],
 }
@@ -44,6 +46,9 @@ vi.mock('./ExcalidrawSurface', () => ({
     props.onApi?.({
       refresh: () => {
         surface.refreshes += 1
+      },
+      focus: () => {
+        surface.focuses += 1
       },
       replaceScene: (scene) => {
         surface.replaced.push(scene)
@@ -125,6 +130,7 @@ beforeEach(() => {
   surface.fail = null
   surface.replaced = []
   surface.refreshes = 0
+  surface.focuses = 0
   surface.nextReplaceVersion = 0
   surface.commands = []
   flushListener = null
@@ -502,29 +508,80 @@ describe('chips and the canvas frame', () => {
     expect(chips()).toContain('Pending')
   })
 
-  it('re-measures the canvas when its tab comes back into view', async () => {
-    const observers: Array<(entries: Array<{ isIntersecting: boolean }>) => void> = []
-    const original = globalThis.IntersectionObserver
-    class Spy {
-      constructor(cb: (entries: Array<{ isIntersecting: boolean }>) => void) {
-        observers.push(cb)
+  /**
+   * The reveal effect: one `IntersectionObserver`, two jobs — re-measure, and the gated focus
+   * handoff (🔒 "Focus handoff on tab reveal", YAZ-1812).
+   */
+  describe('the tab becoming visible again', () => {
+    /** Run the body with a stubbed observer, and hand back the "this tab is now visible" trigger. */
+    const withObserver = async (body: (reveal: () => void) => Promise<void> | void) => {
+      const observers: Array<(entries: Array<{ isIntersecting: boolean }>) => void> = []
+      const original = globalThis.IntersectionObserver
+      class Spy {
+        constructor(cb: (entries: Array<{ isIntersecting: boolean }>) => void) {
+          observers.push(cb)
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+        takeRecords() {
+          return []
+        }
       }
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-      takeRecords() {
-        return []
+      globalThis.IntersectionObserver = Spy as unknown as typeof IntersectionObserver
+      try {
+        await body(() => act(() => observers.forEach((cb) => cb([{ isIntersecting: true }]))))
+      } finally {
+        globalThis.IntersectionObserver = original
       }
     }
-    globalThis.IntersectionObserver = Spy as unknown as typeof IntersectionObserver
-    try {
-      render()
-      await flush()
-      act(() => observers.forEach((cb) => cb([{ isIntersecting: true }])))
-      expect(surface.refreshes).toBe(1)
-    } finally {
-      globalThis.IntersectionObserver = original
-    }
+
+    it('re-measures the canvas', async () => {
+      await withObserver(async (reveal) => {
+        render()
+        await flush()
+        reveal()
+        expect(surface.refreshes).toBe(1)
+      })
+    })
+
+    it('takes the keyboard when nothing else holds it, so the tool hotkeys work without a click', async () => {
+      await withObserver(async (reveal) => {
+        render()
+        await flush()
+        expect(document.activeElement).toBe(document.body)
+        reveal()
+        expect(surface.focuses).toBe(1)
+      })
+    })
+
+    it('takes it from the tab being LEFT — the other canvas is inside the same tab layer', async () => {
+      container.className = 'tabstack__layer'
+      await withObserver(async (reveal) => {
+        render()
+        await flush()
+        const inLayer = document.createElement('input')
+        container.appendChild(inLayer)
+        inLayer.focus()
+        reveal()
+        expect(surface.focuses).toBe(1)
+      })
+    })
+
+    it('NEVER takes it from the sidebar search bar, the vault switcher or a dialog', async () => {
+      await withObserver(async (reveal) => {
+        render()
+        await flush()
+        const chrome = document.createElement('input')
+        document.body.appendChild(chrome)
+        chrome.focus()
+        expect(document.activeElement).toBe(chrome)
+        reveal()
+        expect(surface.focuses).toBe(0)
+        expect(surface.refreshes).toBe(1) // the re-measure is unconditional; only the focus is gated
+        chrome.remove()
+      })
+    })
   })
 
   it('claims the application menu`s two canvas commands on its own section (🔒 D10)', async () => {

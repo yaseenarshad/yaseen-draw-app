@@ -8,6 +8,7 @@ import type { WindowEntry } from '@shared/types'
 import type { GitSyncManager } from './git/manager'
 import { registerIpc } from './ipc'
 import { ensureLibraryFolder } from './library'
+import { openableFileArgs } from './fileArgs'
 import { createLinkQueue } from './linkQueue'
 import { openLink } from './fs/openLink'
 import { buildContextMenuTemplate, buildMenuTemplate, createMenuHandlers, pickMenuTargetWindow, subscribeMenuRebuild, subscribeMenuRebuildOnActiveFile } from './menu'
@@ -25,8 +26,10 @@ applyUserDataOverride(app, process.env.YASEEN_DRAW_USER_DATA_DIR)
 const isPrimaryInstance = app.requestSingleInstanceLock()
 if (!isPrimaryInstance) app.quit()
 app.on('second-instance', (_event, argv) => {
-  // Windows/Linux deliver a clicked yaseendraw:// link as an argv entry of the second launch.
-  const urls = argv.filter((arg) => arg.startsWith('yaseendraw://'))
+  // Windows/Linux deliver a clicked yaseendraw:// link as an argv entry of the second launch —
+  // and a double-clicked `.excalidraw` as a bare PATH in the same place (2I): off macOS there is
+  // no `open-file` event, so argv is the only door the file association has.
+  const urls = [...argv.filter((arg) => arg.startsWith('yaseendraw://')), ...openableFileArgs(argv, argsSkip()).map(fileLink)]
   if (urls.length > 0) {
     for (const url of urls) links.push(url)
     return // routing focuses (or opens) the right window itself
@@ -57,14 +60,18 @@ app.on('open-url', (event, url) => {
   links.push(url)
 })
 
-// Finder "Open With" (E2, GRO-2172) hands a plain absolute path — also before `ready` on cold
-// start. Encoding it as a yaseendraw:// link reuses the whole E1 pipeline (queue, parse, routing,
-// kind/exists guards); fileLink ↔ parseFileLink is lossless (links.test.ts round trips). The
-// packaged bundle's `fileAssociations` (role Alternate) declaration is F1's job.
+// macOS hands a double-clicked (or `open`ed, or "Open With"-ed) file to `open-file` as a plain
+// absolute path — also before `ready` on a cold start. Encoding it as a yaseendraw:// link reuses
+// the whole E1 pipeline (queue, parse, routing, kind/exists guards); fileLink ↔ parseFileLink is
+// lossless (links.test.ts round trips). The bundle claims `.excalidraw` as an Owner association
+// in `desktop/package.json`, which is what makes the event fire at all (🔒 D1, YAZ-1775).
 app.on('open-file', (event, path) => {
   event.preventDefault()
   links.push(fileLink(path))
 })
+
+/** How many leading argv entries belong to the launcher: the executable, plus the app dir in dev. */
+const argsSkip = (): number => (app.isPackaged ? 1 : 2)
 
 // Privileged scheme: `standard` gives a real origin (history API, relative URLs), `secure` treats it
 // like https. VS Code (vscode-file://) and Obsidian (app://obsidian.md) do the same.
@@ -201,6 +208,9 @@ app.whenReady().then(() => {
   powerMonitor.on('resume', () => sync.notifyWake())
   powerMonitor.on('unlock-screen', () => sync.notifyWake())
   manager.restoreAll()
+  // A COLD launch from a Finder / Explorer double-click: macOS has already queued its `open-file`
+  // path above, Windows and Linux put it in this process's own argv and fire nothing (2I).
+  for (const path of openableFileArgs(process.argv, argsSkip())) links.push(fileLink(path))
   links.flush()
 })
 

@@ -26,6 +26,29 @@ export function entryPath(parentDir: string, name: string, kind: EntryKind): str
   return `${parentDir}/${final}`
 }
 
+/** The name a new drawing is born with (🔒 R1 on YAZ-1775), before the user renames it. */
+export const UNTITLED_DRAWING = 'Untitled'
+
+/**
+ * The next free "New drawing" name in a folder (🔒 R1 on YAZ-1775, 2I): `Untitled`, then
+ * `Untitled 2`, `Untitled 3`… — never a name the folder already holds, because the birth must not
+ * overwrite anything (`fs:create-file` writes `wx` and would refuse anyway; this is so the user
+ * sees a new board rather than an error). `taken` is the folder's existing entry names WITH their
+ * extensions, compared case-insensitively: the Mac's own filesystem is, so `untitled.excalidraw`
+ * and `Untitled.excalidraw` are the same file and the second one must not be offered.
+ */
+export function untitledDrawingName(taken: readonly string[]): string {
+  const used = new Set(taken.map((n) => n.toLowerCase()))
+  const free = (name: string): boolean => !used.has(`${name}${DRAWING_VIEW_EXTENSIONS[0]}`.toLowerCase())
+  if (free(UNTITLED_DRAWING)) return UNTITLED_DRAWING
+  // At most one more than the names in the way can be taken, so this always terminates.
+  for (let n = 2; n <= used.size + 2; n++) {
+    const candidate = `${UNTITLED_DRAWING} ${n}`
+    if (free(candidate)) return candidate
+  }
+  return `${UNTITLED_DRAWING} ${used.size + 2}`
+}
+
 /** Seed for "New dated folder" (YAZ-1604): `09_14- ` — today's MM_DD, then `- ` so the title lands one space after the dash. */
 export function datedFolderSeed(now: Date = new Date()): string {
   const p = (n: number) => String(n).padStart(2, '0')
