@@ -1,9 +1,9 @@
 /**
- * SHARE LINK (YAZ-1799, PROTOTYPE): one board, uploaded to the user's OWN Cloudflare (one R2
+ * SHARE LINK (YAZ-1799): one board, uploaded to the user's OWN Cloudflare (one R2
  * bucket + one small Worker), reachable by anyone with its long random link. ALWAYS LIVE (Yasin's
  * amendment of D3): every save of a shared board re-uploads it to the same link (`liveShare.ts`).
  *
- * WHO OWNS WHAT (the production shape, kept in the prototype):
+ * WHO OWNS WHAT:
  *  - MAIN owns Cloudflare: the API token and the Worker's upload password live in `secrets.json`
  *    (the secrets door — the renderer can never read either), and every HTTP call is main's.
  *  - The RENDERER assembles the bytes (the same standalone `.excalidraw` Export Drawing writes,
@@ -105,6 +105,11 @@ export interface ShareBoardRequest {
 export interface SharePublishRequest extends ShareBoardRequest {
   /** The standalone `.excalidraw` text (images embedded). */
   content: string
+  /**
+   * A re-upload's link: main finds the record by it even if a rename moved the board since the
+   * save, and refuses (NOT_FOUND) if it was stopped. Absent: share `path` (or re-upload it if shared).
+   */
+  id?: string
 }
 
 export interface SharePermissionRequest extends ShareBoardRequest {
@@ -124,7 +129,7 @@ export interface ShareApi {
   openLink(req: { url: string }): Promise<void>
   get(req: ShareBoardRequest): Promise<ShareEntry | null>
   list(req: { root: string }): Promise<ShareListEntry[]>
-  /** First share (new id), or an automatic re-upload after a save (same id): the object is replaced in place. */
+  /** First share (new id), or an automatic re-upload after a save (same id): the object is replaced in place, its permission untouched. */
   publish(req: SharePublishRequest): Promise<ShareEntry>
   /** Flip "view and download" / "view only" on the SAME link — no re-upload. */
   setPermission(req: SharePermissionRequest): Promise<ShareEntry>

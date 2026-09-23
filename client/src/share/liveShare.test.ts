@@ -7,7 +7,7 @@ vi.mock('../api', () => ({ api: { share: { publish: (...a: unknown[]) => publish
 const build = vi.fn()
 vi.mock('./shareContent', () => ({ buildShareContent: (...a: unknown[]) => build(...a) }))
 
-const { noteBoardSaved, isPending, resetLiveShareForTests, SETTLE_MS } = await import('./liveShare')
+const { noteBoardSaved, noteBoardRenamed, isPending, resetLiveShareForTests, SETTLE_MS } = await import('./liveShare')
 
 const ROOT = '/v'
 const P = '/v/Board.excalidraw'
@@ -15,7 +15,7 @@ const flush = async () => {
   for (let i = 0; i < 10; i++) await Promise.resolve()
 }
 
-describe('always-live share links (YAZ-1799 amendment)', () => {
+describe('always-live share links (YAZ-1799 D3, YAZ-1886)', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     publish.mockReset().mockResolvedValue({})
@@ -28,8 +28,8 @@ describe('always-live share links (YAZ-1799 amendment)', () => {
     vi.useRealTimers()
   })
 
-  it('waits for the saves to settle: five quick saves are ONE upload, 10 s after the last', async () => {
-    for (let i = 0; i < 5; i++) {
+  it('waits for the saves to settle: three quick saves are ONE upload, 10 s after the last', async () => {
+    for (let i = 0; i < 3; i++) {
       noteBoardSaved(ROOT, P)
       await vi.advanceTimersByTimeAsync(2_000)
     }
@@ -39,6 +39,8 @@ describe('always-live share links (YAZ-1799 amendment)', () => {
     await flush()
     expect(publish).toHaveBeenCalledTimes(1)
     expect(build).toHaveBeenCalledWith(ROOT, P, { flush: false })
+    // The upload names the link it is for, so main never mistakes it for a new share.
+    expect(publish).toHaveBeenCalledWith({ root: ROOT, path: P, content: 'v1', id: 'abc' })
     expect(isPending(P)).toBe(false)
   })
 
@@ -82,5 +84,51 @@ describe('always-live share links (YAZ-1799 amendment)', () => {
     await vi.advanceTimersByTimeAsync(SETTLE_MS)
     await flush()
     expect(publish).toHaveBeenCalledTimes(2)
+  })
+
+  it('an edit saved just before an in-app rename still uploads, under the new path', async () => {
+    const Q = '/v/Renamed.excalidraw'
+    noteBoardSaved(ROOT, P)
+    await vi.advanceTimersByTimeAsync(3_000)
+    noteBoardRenamed(P, Q)
+    expect([isPending(P), isPending(Q)]).toEqual([false, true])
+    await vi.advanceTimersByTimeAsync(SETTLE_MS)
+    await flush()
+    expect(get).toHaveBeenCalledWith({ root: ROOT, path: Q })
+    expect(publish).toHaveBeenCalledTimes(1)
+    expect(publish.mock.calls[0][0]).toMatchObject({ path: Q })
+  })
+
+  it('a folder rename carries every pending board under it; an in-flight upload\'s queued re-run follows too', async () => {
+    let finish!: () => void
+    publish.mockImplementationOnce(() => new Promise<void>((r) => (finish = r)))
+    const inDir = '/v/Dir/Board.excalidraw'
+    noteBoardSaved(ROOT, inDir)
+    await vi.advanceTimersByTimeAsync(SETTLE_MS)
+    await flush()
+    expect(publish).toHaveBeenCalledTimes(1) // in flight under the old path
+    noteBoardSaved(ROOT, inDir)
+    await vi.advanceTimersByTimeAsync(SETTLE_MS)
+    noteBoardRenamed('/v/Dir', '/v/Moved')
+    finish()
+    await flush()
+    await flush()
+    expect(publish).toHaveBeenCalledTimes(2)
+    expect(publish.mock.calls[1][0]).toMatchObject({ path: '/v/Moved/Board.excalidraw' })
+    expect(isPending(inDir)).toBe(false)
+  })
+
+  it('an upload that failed because the board was renamed under it runs again under the new path', async () => {
+    const Q = '/v/Renamed.excalidraw'
+    build.mockImplementationOnce(async () => {
+      noteBoardRenamed(P, Q) // the rename lands while the board is being read
+      throw new Error('NOT_FOUND')
+    })
+    noteBoardSaved(ROOT, P)
+    await vi.advanceTimersByTimeAsync(SETTLE_MS)
+    await flush()
+    await flush()
+    expect(publish).toHaveBeenCalledTimes(1)
+    expect(publish.mock.calls[0][0]).toMatchObject({ path: Q })
   })
 })

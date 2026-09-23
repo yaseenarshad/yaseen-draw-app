@@ -9,14 +9,16 @@
  * vault moving on disk. Read through `vaultConfig.ts`, so it is lazy (reading creates nothing) and
  * written atomically like `favorites.json` and `github.json`.
  *
- * ⚠ OPEN QUESTION (prototype call): a board renamed or moved OUTSIDE the app keeps its old key
- * here, so its record looks orphaned (Settings flags it) while its link stays live. An in-app
- * rename does not follow it either yet — see the report.
+ * Every write is a read-modify-write on one per-vault chain (`updateShares`), so two windows
+ * sharing, renaming or stopping at once never lose each other's entry. An in-app rename rewrites
+ * the key (`fsHooks.ts`); one made OUTSIDE the app keeps its old key, so Settings flags the record
+ * "no board at this path" while its link stays live.
  */
 import path from 'node:path'
 import { isFiniteNumber, isRecord } from '@shared/guards'
 import { BridgeFailure } from '../fs/fsUtils'
 import { readConfigDetailed, writeConfig } from '../vaultConfig'
+import { createChain } from '../watchedFolder'
 
 export const SHARES_FILE = 'shares.json'
 const VERSION = 1
@@ -50,7 +52,22 @@ export async function readShares(root: string): Promise<ShareMap> {
   return out
 }
 
-export const writeShares = (root: string, shares: ShareMap): Promise<void> => writeConfig(root, SHARES_FILE, { version: VERSION, shares })
+/** One chain per vault root: every write to its shares.json queues here. */
+const chains = new Map<string, ReturnType<typeof createChain>>()
+const chainFor = (root: string) => chains.get(root) ?? chains.set(root, createChain()).get(root)!
+const write = (root: string, shares: ShareMap) => writeConfig(root, SHARES_FILE, { version: VERSION, shares })
+
+export const writeShares = (root: string, shares: ShareMap): Promise<void> => chainFor(root).run(() => write(root, shares))
+
+/**
+ * Read, change and write back as one step on the vault's chain. `change` edits the map in place
+ * and returns whether it changed anything — nothing is written (or created) when it did not.
+ */
+export const updateShares = (root: string, change: (shares: ShareMap) => boolean): Promise<void> =>
+  chainFor(root).run(async () => {
+    const shares = await readShares(root)
+    if (change(shares)) await write(root, shares)
+  })
 
 /** The key for `abs` under `root` — POSIX separators, and refused when it escapes the vault. */
 export function relKey(root: string, abs: string): string {

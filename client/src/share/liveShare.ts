@@ -13,6 +13,11 @@
  * A failed upload (offline, too large, refused) keeps the share record; main records the reason
  * (the Share dialog and Settings › Sharing show it) and the next save simply tries again. Nothing
  * here retries on a timer.
+ *
+ * RENAMES: a board is keyed by path, so an in-app rename (`file:renamed`, via `noteBoardRenamed`)
+ * re-keys whatever is pending, queued or in flight — an edit saved seconds before the rename
+ * still uploads, under the new path. The upload names its link (`id`), so main lands it on the
+ * record even when the rename overtakes it.
  */
 import { api } from '../api'
 import { buildShareContent } from './shareContent'
@@ -21,6 +26,8 @@ export const SETTLE_MS = 10_000
 
 interface BoardState {
   root: string
+  /** Where the board is now — rewritten by a rename while a timer or an upload holds this state. */
+  path: string
   timer: ReturnType<typeof setTimeout> | null
   inFlight: boolean
   again: boolean
@@ -44,20 +51,31 @@ export function onLiveShareChange(listener: () => void): () => void {
 
 /** Called by `DrawingEditor` after every successful save. Cheap: it only (re)arms a timer. */
 export function noteBoardSaved(root: string, path: string, settleMs = SETTLE_MS): void {
-  const b = boards.get(path) ?? { root, timer: null, inFlight: false, again: false }
+  const b = boards.get(path) ?? { root, path, timer: null, inFlight: false, again: false }
   b.root = root
   if (b.timer !== null) clearTimeout(b.timer)
   b.timer = setTimeout(() => {
     b.timer = null
-    void run(path)
+    void run(b)
   }, settleMs)
   boards.set(path, b)
   emit()
 }
 
-async function run(path: string): Promise<void> {
-  const b = boards.get(path)
-  if (b === undefined) return
+/** An in-app rename or move of `oldPath` (a board, or a folder holding some): pending uploads follow it. */
+export function noteBoardRenamed(oldPath: string, newPath: string): void {
+  let moved = false
+  for (const [path, b] of [...boards]) {
+    if (path !== oldPath && !path.startsWith(`${oldPath}/`)) continue
+    boards.delete(path)
+    b.path = newPath + path.slice(oldPath.length)
+    boards.set(b.path, b)
+    moved = true
+  }
+  if (moved) emit()
+}
+
+async function run(b: BoardState): Promise<void> {
   if (b.inFlight) {
     b.again = true
     emit()
@@ -66,6 +84,7 @@ async function run(path: string): Promise<void> {
   b.inFlight = true
   b.again = false
   emit()
+  const path = b.path
   try {
     // Only boards that are shared, and only once sharing is set up; everything else is a no-op.
     const entry = await api.share.get({ root: b.root, path })
@@ -75,17 +94,18 @@ async function run(path: string): Promise<void> {
     // No flush: this run was triggered BY a save, so the disk is at least that new. Main checks
     // the size (TOO_LARGE is recorded as the board's error) and records every outcome.
     const built = await buildShareContent(b.root, path, { flush: false })
-    await api.share.publish({ root: b.root, path, content: built.content })
+    await api.share.publish({ root: b.root, path, content: built.content, id: entry.id })
   } catch {
-    // Recorded by main (the dialog and Settings show it); the next save retries.
+    // Recorded by main (the dialog and Settings show it); the next save retries. A rename that
+    // pulled the board out from under this run is not a failure: run again where it went.
+    if (b.path !== path) b.again = true
   } finally {
     b.inFlight = false
-    if (b.again) void run(path)
-    else if (b.timer === null) boards.delete(path)
+    if (b.again) void run(b)
+    else if (b.timer === null && boards.get(b.path) === b) boards.delete(b.path)
     emit()
   }
 }
-
 /** Test seam: forget every board (timers included). */
 export function resetLiveShareForTests(): void {
   for (const b of boards.values()) if (b.timer !== null) clearTimeout(b.timer)

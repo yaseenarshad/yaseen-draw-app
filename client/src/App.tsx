@@ -25,6 +25,7 @@ import { windowTitle } from './lib/windowTitle'
 import { SettingsDialog } from './settings/SettingsDialog'
 import type { SettingsSectionId } from './settings/registry'
 import { ShareDialog } from './share/ShareDialog'
+import { noteBoardRenamed } from './share/liveShare'
 import { type SidebarClipboard, Sidebar } from './sidebar/Sidebar'
 import type { SidebarRevealRequest } from './sidebar/revealRow'
 import { TabBar } from './tabs/TabBar'
@@ -378,6 +379,8 @@ export function App() {
   useEffect(
     () =>
       window.yaseenDraw.file.onRenamed(({ oldPath, newPath, kind }) => {
+        // A shared board's pending live-link upload follows it (YAZ-1886); by prefix, so both kinds.
+        noteBoardRenamed(oldPath, newPath)
         if (kind === 'dir') {
           retireDir(oldPath)
           const movedRoot = root !== null && (root === oldPath || root.startsWith(`${oldPath}/`)) ? newPath + root.slice(oldPath.length) : undefined
