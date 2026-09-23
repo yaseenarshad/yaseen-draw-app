@@ -1149,6 +1149,15 @@ button {
   white-space: nowrap;
 }
 
+/* YAZ-1801 D3: a file sync held back as over GitHub's 100 MB limit — a red cloud-off right of the
+   name. `flex: none` so a long name ellipses before the icon ever does. */
+.tree__too-large {
+  flex: none;
+  display: inline-flex;
+  margin-left: 2px;
+  color: var(--danger);
+}
+
 .tree__chevron {
   flex: none;
   width: 14px;

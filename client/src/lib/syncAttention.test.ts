@@ -20,6 +20,7 @@ describe('attentionCopy', () => {
       title: "Git isn't installed on this computer.",
       body: 'Copy the setup prompt into any LLM and it will walk you through installing it.',
       showSetupPrompt: true,
+      dismissible: true,
     })
   })
 
@@ -28,6 +29,7 @@ describe('attentionCopy', () => {
       title: "Git doesn't know who you are yet.",
       body: 'One-time setup: a name and email for your commits. The setup prompt walks you through it.',
       showSetupPrompt: true,
+      dismissible: true,
     })
   })
 
@@ -36,6 +38,7 @@ describe('attentionCopy', () => {
       title: "GitHub didn't accept this computer's credentials.",
       body: 'Copy the setup prompt into any LLM and it will walk you through signing in.',
       showSetupPrompt: true,
+      dismissible: true,
     })
   })
 
@@ -44,6 +47,7 @@ describe('attentionCopy', () => {
       title: 'Both machines changed the same lines.',
       body: 'Nothing was lost — your local version is untouched. Resolve in GitHub Desktop, then sync again.',
       showSetupPrompt: false,
+      dismissible: true,
     })
   })
 
@@ -52,6 +56,7 @@ describe('attentionCopy', () => {
       title: 'Sync hit a problem.',
       body: 'fatal: unable to access remote',
       showSetupPrompt: false,
+      dismissible: true,
     })
   })
 
@@ -59,12 +64,28 @@ describe('attentionCopy', () => {
     expect(attentionCopy(status({ attention: 'error' }))?.body).toBe('git reported an error.')
   })
 
+  it('too-large names the file, says it is safe here and everything else synced, and cannot be dismissed (YAZ-1801 D3)', () => {
+    const copy = attentionCopy(status({ attention: 'too-large', tooLarge: ['Folder/Huge board.excalidraw'] }))
+    expect(copy?.title).toBe('A file is too big for GitHub.')
+    expect(copy?.body).toContain('Huge board.excalidraw is over GitHub')
+    expect(copy?.body).toContain('It stays on this Mac only. Everything else is synced. Shrink it (Settings › Storage) or move it out of the vault.')
+    expect(copy?.dismissible).toBe(false)
+    expect(copy?.showSetupPrompt).toBe(false)
+  })
+
+  it('too-large with several files counts them in the title and names them all', () => {
+    const copy = attentionCopy(status({ attention: 'too-large', tooLarge: ['a.excalidraw', 'b/Big video.mov'] }))
+    expect(copy?.title).toBe('2 files are too big for GitHub.')
+    expect(copy?.body).toContain('a.excalidraw and Big video.mov are over')
+    expect(copy?.body).toContain('They stay on this Mac only.')
+  })
+
   it('attention with no reason at all falls back to error copy — a real problem is never silenced', () => {
     expect(attentionCopy(status())?.title).toBe('Sync hit a problem.')
   })
 })
 
-const REASONS: GithubSyncAttention[] = ['no-git', 'no-identity', 'auth', 'conflict', 'error']
+const REASONS: GithubSyncAttention[] = ['no-git', 'no-identity', 'auth', 'conflict', 'error', 'too-large']
 
 describe('buildSetupPrompt', () => {
   it.each(REASONS)('%s names the folder and lists all four checks in order', (reason) => {

@@ -372,3 +372,26 @@ describe('flushForQuit', () => {
     expect(h.passes).toHaveLength(2)
   })
 })
+
+describe('files held back as too large (YAZ-1801 D3)', () => {
+  it('carries the held-back list through pending and syncing, arms no retry, and a later clean pass clears it', async () => {
+    const h = harness({
+      quietMs: 10,
+      retryMs: 10,
+      pass: async (root, n) => (n === 1 ? { root, state: 'attention', attention: 'too-large', tooLarge: ['Huge.excalidraw'] } : { root, state: 'synced' }),
+    })
+    h.enabled.set(ROOT, true)
+    const manager = createGitSync(h.host)
+    manager.setOpenRoots([ROOT])
+    await until(() => h.statuses.at(-1)?.attention === 'too-large')
+    // Not `pending`, so no retry clock: nothing loops while the file stays too big.
+    await sleep(80)
+    expect(h.passes).toEqual([ROOT])
+
+    h.emitVault(ROOT, change('a.md', 1))
+    await until(() => h.statuses.at(-1)?.state === 'synced')
+    const transitional = h.statuses.filter((s) => s.state === 'pending' || s.state === 'syncing').slice(-2)
+    expect(transitional.map((s) => s.tooLarge)).toEqual([['Huge.excalidraw'], ['Huge.excalidraw']])
+    expect(h.statuses.at(-1)?.tooLarge).toBeUndefined()
+  })
+})

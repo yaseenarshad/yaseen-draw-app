@@ -16,10 +16,16 @@ export interface AttentionCopy {
   body: string
   /** Whether the banner offers "Copy setup prompt" — true only for the machine-setup reasons. */
   showSetupPrompt: boolean
+  /**
+   * Whether the banner offers Dismiss. False only for `too-large` (YAZ-1801 D3): a file that is
+   * silently not backed up is exactly what a dismissed banner would hide, so it stays until the
+   * status clears (the file shrinks, moves out, or goes).
+   */
+  dismissible: boolean
 }
 
 /** Fixed copy per reason; `error` alone is dynamic, carrying the engine's own message. */
-const COPY: Record<GithubSyncAttention, Omit<AttentionCopy, 'body'> & { body: string | null }> = {
+const COPY: Record<GithubSyncAttention, Omit<AttentionCopy, 'body' | 'dismissible'> & { body: string | null }> = {
   'no-git': {
     title: "Git isn't installed on this computer.",
     body: 'Copy the setup prompt into any LLM and it will walk you through installing it.',
@@ -46,6 +52,29 @@ const COPY: Record<GithubSyncAttention, Omit<AttentionCopy, 'body'> & { body: st
     body: null, // filled from `status.message`
     showSetupPrompt: false,
   },
+  // YAZ-1801 D3: the body names the file(s), so it is built in `attentionCopy` from `status.tooLarge`.
+  'too-large': {
+    title: 'A file is too big for GitHub.',
+    body: null,
+    showSetupPrompt: false,
+  },
+}
+
+/** Base names for the banner: "a, b and c" — the full paths are on the sidebar rows' icons. */
+function nameList(paths: readonly string[]): string {
+  const names = paths.map((p) => p.slice(p.lastIndexOf('/') + 1))
+  return names.length <= 1 ? (names[0] ?? 'A file') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+/**
+ * The `too-large` body (YAZ-1801 D3): WHICH file, and the three facts that make it calm rather
+ * than alarming — it is safe on this Mac, nothing else is held up, and here is how to fix it.
+ */
+function tooLargeBody(status: GithubSyncStatus): string {
+  const paths = status.tooLarge ?? []
+  const verb = paths.length > 1 ? 'are' : 'is'
+  const subject = paths.length === 0 ? 'A file' : nameList(paths)
+  return `${subject} ${verb} over GitHub's 100 MB limit. ${paths.length > 1 ? 'They stay' : 'It stays'} on this Mac only. Everything else is synced. Shrink it (Settings › Storage) or move it out of the vault.`
 }
 
 /**
@@ -58,7 +87,9 @@ const COPY: Record<GithubSyncAttention, Omit<AttentionCopy, 'body'> & { body: st
 export function attentionCopy(status: GithubSyncStatus): AttentionCopy | null {
   if (status.state !== 'attention') return null
   const entry = COPY[status.attention ?? 'error']
-  return { title: entry.title, body: entry.body ?? status.message ?? 'git reported an error.', showSetupPrompt: entry.showSetupPrompt }
+  const count = status.tooLarge?.length ?? 0
+  if (status.attention === 'too-large') return { title: count > 1 ? `${count} files are too big for GitHub.` : entry.title, body: tooLargeBody(status), showSetupPrompt: false, dismissible: false }
+  return { title: entry.title, body: entry.body ?? status.message ?? 'git reported an error.', showSetupPrompt: entry.showSetupPrompt, dismissible: true }
 }
 
 /** One short clause naming what went wrong, for the prompt's "It reported:" slot. */
@@ -68,6 +99,7 @@ const REASON: Record<GithubSyncAttention, string> = {
   auth: "GitHub did not accept this computer's credentials",
   conflict: 'both machines changed the same lines and the merge conflicted',
   error: 'git reported an error',
+  'too-large': 'a file in the folder is over GitHub\'s 100 MB per-file limit',
 }
 
 /**

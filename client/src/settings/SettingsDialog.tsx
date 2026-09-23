@@ -27,7 +27,7 @@
  */
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { SearchIcon } from '../components/icons'
-import { availableSections, resolveHint, resolveWide, type SettingDef, type SettingsCtx, type SettingsGroup, type SettingsSection, type SettingsSectionId } from './registry'
+import { availableGroups, availableSections, resolveHint, resolveWide, type SettingDef, type SettingsCtx, type SettingsGroup, type SettingsSection, type SettingsSectionId } from './registry'
 import { searchSettings, settingCandidates } from './searchSettings'
 import { SettingRow } from './SettingRow'
 import './settings.css'
@@ -130,7 +130,7 @@ export function SettingsDialog({ ctx, onClose }: SettingsDialogProps) {
   }
 
   const row = (item: SettingDef) => (
-    <SettingRow key={item.id} id={item.id} label={item.label} hint={resolveHint(item, ctx)} wide={resolveWide(item)}>
+    <SettingRow key={item.id} id={item.id} label={item.label} hint={resolveHint(item, ctx)} wide={resolveWide(item)} bare={item.bare === true}>
       {item.render(ctx)}
     </SettingRow>
   )
@@ -146,7 +146,7 @@ export function SettingsDialog({ ctx, onClose }: SettingsDialogProps) {
     <section key={s.id} id={anchorId(s.id)} data-section={s.id} className="settings-section">
       <h2 className="settings-section__title">{s.title}</h2>
       {s.note !== undefined && <p className="settings-section__note">{s.note}</p>}
-      {s.groups.map((g, i) => group(g, g.items, i))}
+      {availableGroups(s, ctx).map((g, i) => group(g, g.items, i))}
     </section>
   )
 

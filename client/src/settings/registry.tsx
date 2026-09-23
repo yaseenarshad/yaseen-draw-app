@@ -15,18 +15,21 @@
  * through `secrets:set` and reads back only "set" / "not set".
  */
 import type { ReactNode } from 'react'
-import type { GithubSyncStatus, SettingsState } from '@shared/types'
+import type { GithubSyncStatus, SettingsState, ShrinkResult, VaultStorageStats } from '@shared/types'
 import { CANVAS_SECTION } from './canvasSection'
 import { Segmented } from './controls'
 import { HOTKEY_GROUPS, type HotkeyEntry } from './hotkeys'
 import { LibraryFolderControl, LibraryFolderHint } from './LibraryFolderControl'
 import { ON_OFF_OPTIONS, repoHint, THEME_OPTIONS } from './options'
 import { PixabayKeyControl } from './PixabayKeyControl'
+import { STORAGE_SECTION } from './storageSection'
 
 export interface SettingsCtx {
   settings: SettingsState
   onChange: (next: SettingsState) => void
   sync?: { status: GithubSyncStatus | null; setEnabled: (enabled: boolean) => void }
+  /** Settings › Storage (YAZ-1801): App's `useVaultStorage`; undefined with no vault open, which hides the section. */
+  storage?: { stats: VaultStorageStats | null; refresh: () => void; shrink: () => Promise<ShrinkResult>; lastShrink: ShrinkResult | null }
 }
 
 export interface SettingDef {
@@ -37,15 +40,22 @@ export interface SettingDef {
   keywords?: readonly string[]
   /** The control stacks full-width under the text instead of sitting beside it (D7). */
   wide?: boolean
+  /**
+   * No text column at all: the control IS the row, full-width (YAZ-1801 — Settings › Storage's
+   * lists and its one action, which carry their own words). The label and hint still feed search.
+   */
+  bare?: true
   render: (ctx: SettingsCtx) => ReactNode
 }
 
-export type SettingsSectionId = 'appearance' | 'canvas' | 'files' | 'images' | 'sync' | 'hotkeys'
+export type SettingsSectionId = 'appearance' | 'canvas' | 'files' | 'images' | 'sync' | 'storage' | 'hotkeys'
 
 /** Rows that belong together under one sub-heading; no title = plain rows straight under the section. */
 export interface SettingsGroup {
   title?: string
   hint?: string
+  /** A group that only exists while it has something to say (YAZ-1801's "Needs attention"); absent = always. Search follows it. */
+  available?: (ctx: SettingsCtx) => boolean
   items: readonly SettingDef[]
 }
 
@@ -189,6 +199,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
       },
     ],
   },
+  // YAZ-1801: what this vault weighs against GitHub's limits, and "Move pictures out of boards".
+  STORAGE_SECTION,
   {
     id: 'hotkeys',
     title: 'Hotkeys',
@@ -216,6 +228,9 @@ export const availableSections = (ctx: SettingsCtx): SettingsSection[] => SETTIN
 
 /** A hint resolved against the context: plain text, or the live-state kind. */
 export const resolveHint = (item: SettingDef, ctx: SettingsCtx): string | undefined => (typeof item.hint === 'function' ? item.hint(ctx) : item.hint)
+
+/** The groups of a section this context can show. */
+export const availableGroups = (section: SettingsSection, ctx: SettingsCtx): SettingsGroup[] => section.groups.filter((group) => group.available?.(ctx) ?? true)
 
 /** Whether the row stacks its control. */
 export const resolveWide = (item: SettingDef): boolean => item.wide === true

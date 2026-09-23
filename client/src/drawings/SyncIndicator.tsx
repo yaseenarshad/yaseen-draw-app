@@ -34,7 +34,26 @@ function title(status: GithubSyncStatus): string {
   }
 }
 
+/**
+ * YAZ-1801 D3: files held back as over GitHub's limit outrank every other label — "Synced" or
+ * "Attention" would both undersell "this file is not backed up". Red, counted, and the hover names
+ * them. While a pass runs the list rides along (the manager carries it), so the chip does not
+ * blink back to "Syncing…" and lose the warning for the length of every pass.
+ */
+function tooLargeTitle(paths: readonly string[]): string {
+  return `Not synced — over GitHub's 100 MB limit, only on this Mac: ${paths.join(', ')}`
+}
+
 export function SyncIndicator({ status, onSyncNow }: { status: GithubSyncStatus; onSyncNow: () => void }) {
+  const held = status.tooLarge ?? []
+  if (held.length > 0) {
+    return (
+      <button type="button" className="sync-indicator sync-indicator--attention sync-indicator--too-large" title={tooLargeTitle(held)} aria-live="polite" onClick={onSyncNow}>
+        <span className="sync-indicator__dot" />
+        {held.length === 1 ? '1 file not synced' : `${held.length} files not synced`}
+      </button>
+    )
+  }
   return (
     <button type="button" className={`sync-indicator sync-indicator--${status.state}`} title={title(status)} aria-live="polite" onClick={onSyncNow}>
       <span className="sync-indicator__dot" />

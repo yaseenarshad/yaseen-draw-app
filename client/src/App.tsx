@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { SIDEBAR_MAX_W, SIDEBAR_MIN_W, type CanvasPanelState, type CanvasPrefs, type SettingsState, type SidebarLens } from '@shared/types'
 import { prefsEqual } from '@shared/canvasPrefs'
 import { api, BridgeRequestError } from './api'
 import { requestDrawingCommand } from './drawings/drawingCommand'
 import { Editor } from './Editor'
 import { useGithubSync } from './hooks/useGithubSync'
+import { useVaultStorage } from './hooks/useVaultStorage'
 import { useLinkEvents } from './hooks/useLinkEvents'
 import { useMenuEvents } from './hooks/useMenuEvents'
 import { usePickFolder } from './hooks/usePickFolder'
@@ -76,6 +77,11 @@ export function App() {
     setSyncDismissed(false)
   }, [syncState, syncReason])
   const syncCopy = githubSync.status === null ? null : attentionCopy(githubSync.status)
+  // YAZ-1801 D3: the files the last pass held back (over GitHub's limit), as ABSOLUTE paths for the
+  // sidebar's cloud-off icons. Read off the ONE status above — never a second subscription — so
+  // the banner, the chip and the tree always agree about which files are stuck.
+  const tooLargeList = githubSync.status?.tooLarge
+  const tooLargePaths = useMemo<ReadonlySet<string>>(() => new Set(root === null ? [] : (tooLargeList ?? []).map((rel) => `${root}/${rel}`)), [root, tooLargeList])
   // ⌘K's half of the search-bar focus handshake (YAZ-801, wired in YAZ-804): `openSearch` sets it
   // (including the collapsed case, which un-collapses and mounts the sidebar with the flag already
   // true); the sidebar focuses its input and clears it through the callback.
@@ -277,6 +283,9 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const openSettings = useCallback(() => setSettingsOpen(true), [])
   const closeSettings = useCallback(() => setSettingsOpen(false), [])
+  // Settings › Storage (YAZ-1801 D1): measured on open, on a root change, and after every finished
+  // sync pass (a commit moves the git numbers). App's, beside `githubSync`, for the same one-per-window reason.
+  const vaultStorage = useVaultStorage(root, settingsOpen, syncState)
 
   // File › Open Folder… / Open Recent (GRO-2161) reuse the same flows as the in-app buttons;
   // File › Close Tab and Window › Next/Previous Tab (GRO-2232) drive the tab model.
@@ -458,7 +467,12 @@ export function App() {
       {/* YAZ-1679: unmounted when closed, never hidden. ONE useGithubSync per window (above): the
           dialog's Sync page and the editor's chip read the same status, so they can never
           disagree about what this vault is doing. */}
-      {settingsOpen && <SettingsDialog ctx={{ settings, onChange: changeSettings, sync: { status: githubSync.status, setEnabled: githubSync.setEnabled } }} onClose={closeSettings} />}
+      {settingsOpen && (
+        <SettingsDialog
+          ctx={{ settings, onChange: changeSettings, sync: { status: githubSync.status, setEnabled: githubSync.setEnabled }, storage: root === null ? undefined : vaultStorage }}
+          onClose={closeSettings}
+        />
+      )}
       {/* YAZ-1818: sync needs attention. Two of the five reasons are things this app cannot fix from
           inside itself (git missing, credentials rejected), so the offer is a prompt to paste
           into any LLM — an assistant that CAN drive the terminal — rather than a wizard. */}
@@ -472,9 +486,13 @@ export function App() {
               Copy setup prompt
             </button>
           )}
-          <button type="button" onClick={() => setSyncDismissed(true)}>
-            Dismiss
-          </button>
+          {/* YAZ-1801 D3: a file that is not backed up is not a banner to wave away — `too-large` has
+              no Dismiss and stays until a pass stops finding it. */}
+          {syncCopy.dismissible && (
+            <button type="button" onClick={() => setSyncDismissed(true)}>
+              Dismiss
+            </button>
+          )}
         </div>
       )}
       {root !== null && !sidebarCollapsed && (
@@ -502,6 +520,8 @@ export function App() {
           onRenameFile={renameFile}
           onDeleteFile={deleteFile}
           onNotice={notify}
+          // YAZ-1801 D3: rows over GitHub's limit wear a cloud-off icon — from the one sync status above.
+          tooLarge={tooLargePaths}
           // ⌘C / ⌘X / ⌘V's handle (D6 amended, YAZ-1674): the panel fills it, the listener above asks it.
           clipboardRef={sidebarClipboard}
           pendingSearchFocus={pendingSearchFocus}

@@ -86,3 +86,17 @@ describe('SyncIndicator (YAZ-1081 3A)', () => {
     expect(onSyncNow).toHaveBeenCalledOnce()
   })
 })
+
+describe('SyncIndicator — files over GitHub\'s limit (YAZ-1801 D3)', () => {
+  it('outranks the state label: red, counted, and the hover names every held-back file', () => {
+    const { chip } = mount({ state: 'attention', attention: 'too-large', tooLarge: ['Too big.excalidraw', 'Big video.mov'] })
+    expect(chip.textContent).toBe('2 files not synced')
+    expect(chip.classList.contains('sync-indicator--attention')).toBe(true)
+    expect(chip.title).toContain('Too big.excalidraw, Big video.mov')
+  })
+
+  it('stays up while a pass is running (the list rides a syncing status)', () => {
+    const { chip } = mount({ state: 'syncing', tooLarge: ['Too big.excalidraw'] })
+    expect(chip.textContent).toBe('1 file not synced')
+  })
+})

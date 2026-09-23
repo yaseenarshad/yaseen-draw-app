@@ -41,7 +41,25 @@ export interface GithubSyncConfig {
  * "two machines edited the same lines" (the lossless rule: the working tree was put back exactly
  * as it was — see `git/sync.ts`), and `error` is the honest catch-all that carries a message.
  */
-export type GithubSyncAttention = 'no-git' | 'no-identity' | 'auth' | 'conflict' | 'error'
+export type GithubSyncAttention = 'no-git' | 'no-identity' | 'auth' | 'conflict' | 'error' | 'too-large'
+
+/**
+ * YAZ-1801 D3: the size past which a sync pass holds a file back instead of committing it.
+ * GitHub REFUSES any file over 100 MiB, and one such file inside a commit rejects the whole push —
+ * so every other edit in the vault would stop syncing behind it. 95 MiB leaves a margin for a
+ * file that grows between the check and the push. `too-large` is the attention that says so.
+ */
+export const GITHUB_FILE_LIMIT_BYTES = 95 * 1024 * 1024
+/**
+ * GitHub warns on a push past 50 MiB (YAZ-1801): from here a file is listed under Settings ›
+ * Storage's "Needs attention" — amber below `GITHUB_FILE_LIMIT_BYTES`, red at or above it (the
+ * same line the sync guard holds files back at, so the page's colour and sync never disagree).
+ */
+export const GITHUB_FILE_WARN_BYTES = 50 * 1024 * 1024
+/** GitHub: ideally under 1 GB, strongly under 5 GB, and 10 GB is its stated maximum — the bar's three steps. */
+export const GITHUB_REPO_SOFT_BYTES = 1024 * 1024 * 1024
+export const GITHUB_REPO_HARD_BYTES = 5 * 1024 * 1024 * 1024
+export const GITHUB_REPO_MAX_BYTES = 10 * 1024 * 1024 * 1024
 
 /**
  * What a vault's sync is doing right now — one object per root, pushed on every transition.
@@ -66,6 +84,13 @@ export interface GithubSyncStatus {
    * on statuses that never passed through it (a bare `syncPass` call in tests).
    */
   enabled?: boolean
+  /**
+   * YAZ-1801 D3: vault-relative POSIX paths the last pass held back because each is over
+   * `GITHUB_FILE_LIMIT_BYTES`. They stay on this machine only; everything else synced. Present
+   * (and non-empty) only while there is at least one — the sidebar's cloud-off icon, the chip's
+   * "N files not synced" and the `too-large` banner all read this one list.
+   */
+  tooLarge?: readonly string[]
 }
 
 /**
@@ -94,6 +119,59 @@ export interface GithubApi {
   onStatus(listener: (status: GithubSyncStatus) => void): () => void
 }
 
+// ---------- Storage (Settings › Storage — YAZ-1801) ----------
+
+/** One file in "Needs attention" (YAZ-1801): any file in the vault at or over `GITHUB_FILE_WARN_BYTES`. */
+export interface VaultStorageFile {
+  /** Vault-relative POSIX path. */
+  path: string
+  bytes: number
+}
+
+/**
+ * What a vault weighs, from the disk and the LOCAL git only (YAZ-1801 D2) — never the network.
+ * Every number is bytes. `git` is null when the vault is not a git repo (or there is no git).
+ */
+export interface VaultStorageStats {
+  root: string
+  /** Every `.excalidraw` under the vault (dot-folders skipped). */
+  boards: { bytes: number; count: number }
+  /** The top-level `assets/` store (🔒 YAZ-1775 D3). */
+  pictures: { bytes: number; count: number }
+  /** Everything else that is not a dot-entry: a video, a PDF someone dropped in. */
+  other: { bytes: number; count: number }
+  git: {
+    /** `git count-objects -v`: loose + packed, i.e. everything `.git` holds for this repo. */
+    historyBytes: number
+    /** The compressed size of the objects HEAD's tree needs — the current snapshot. */
+    headBytes: number
+    /** `max(0, history − head)`: what a history reset would free (YAZ-1801 D6 shows it, never does it). */
+    oldVersionsBytes: number
+  } | null
+  /** Every file — board, picture in `assets/`, anything else — at or over `GITHUB_FILE_WARN_BYTES`, biggest first. */
+  large: VaultStorageFile[]
+  /** Pictures still inside boards: their total `dataURL` bytes and how many boards carry any. */
+  embedded: { bytes: number; boards: number }
+}
+
+/** What "Move pictures out of boards" did (YAZ-1801 D5). `bytesMoved` is how much lighter the boards got. */
+export interface ShrinkResult {
+  shrunk: number
+  skipped: number
+  bytesMoved: number
+}
+
+/** Settings › Storage's door (YAZ-1801): the numbers, and the one action. */
+export interface StorageApi {
+  /** Walks the vault and asks the local git; answers in seconds on a big vault, never touches the network. */
+  stats(root: string): Promise<VaultStorageStats>
+  /**
+   * Rewrites every legacy board lean — its pictures into `assets/`, its `yaseendraw` block kept
+   * verbatim (`updatedAt` does NOT move). `skip` = absolute paths not to touch (boards with
+   * unsaved edits in a tab). Never throws per board: an unreadable one counts as skipped.
+   */
+  shrink(root: string, skip: readonly string[]): Promise<ShrinkResult>
+}
 
 // ---------- Favorites (`<root>/.yaseendraw/favorites.json` — YAZ-1766 6A, D11) ----------
 
