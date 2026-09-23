@@ -108,7 +108,8 @@ Every `ipcMain.handle` answers with an `Envelope<T>`: `{ ok: true, value }` or
 `mtime`), which the preload rethrows. Electron flattens a thrown Error to its message, which is
 why failure travels as data. `client/src/api.ts` re-wraps it as a `BridgeRequestError` for the
 calls that go through it; `state`, `window`, `menu`, `link` and `watch` are called straight off
-`window.yaseenDraw` and reject with the plain object.
+`window.yaseenDraw` and reject with the plain object. The codes are `BridgeErrorCode`
+(`shared/types/errors.ts`); sharing added `NOT_SET_UP` (Settings › Sharing has not been set up).
 
 | `window.yaseenDraw` | Channel | What it does |
 |---|---|---|
@@ -132,7 +133,7 @@ calls that go through it; `state`, `window`, `menu`, `link` and `watch` are call
 | `window.identity` / `setIdentity` | `window:*` | THIS window's `WindowEntry`, by the `?win=<id>` in its URL |
 | `window.open` / `openRecent` / `closeSelf` | `window:*` | window lifecycle |
 | `window.onFlush` | `app:flush` / `app:flushed` | the close/quit handshake (main waits, 5s cap) |
-| `menu.on*` | `menu:*` | Open Folder…, Open Recent, Search Vault, Switch Vault…, Settings…, Toggle Sidebar, Close Tab, Next/Previous Tab, Export Image…, Export Drawing…, Canvas Background |
+| `menu.on*` | `menu:*` | Open Folder…, Open Recent, Search Vault, Switch Vault…, Settings…, Toggle Sidebar, Close Tab, Next/Previous Tab, Export Image…, Export Drawing…, Canvas Background, Share Link (`menu.onShareLink`) |
 | `link.onOpenFile` / `onNotice` | `link:*` | a routed `yaseendraw://` link |
 | `favorites.get` / `set` / `onChanged` | `favorites:*` | `<vault>/.yaseendraw/favorites.json` |
 | `media.favorites(req)` | `media:favorites` | `{ op: 'list' }` · `{ op: 'add', item }` · `{ op: 'remove', itemKey }` over `<library>/media.json` (🔒 YAZ-1775 D5); every verb answers the resulting list |
@@ -148,8 +149,11 @@ calls that go through it; `state`, `window`, `menu`, `link` and `watch` are call
 | `components.delete(req)` | `components:delete` | `{ slug }`; both files to the OS trash (`shell.trashItem`) and the row out of the index |
 | `components.preview(req)` | `components:preview` | `{ slug }` → the stored PNG as a dataURL |
 | `components.onChanged` | `components:changed` | pushed to EVERY window when the components library changes — any vault, any writer, no payload |
-| `secrets.set(req)` / `has(req)` | `secrets:set` / `secrets:has` | `{ name, value \| null }` writes or clears a secret; `{ name }` → boolean. NO channel answers a value (🔒 YAZ-1775 D4, YAZ-1842 D1) |
+| `secrets.set(req)` / `has(req)` | `secrets:set` / `secrets:has` | `{ name, value \| null }` writes or clears a secret — `pixabayApiKey` only, any other name is `BAD_REQUEST`; `{ name }` → boolean. NO channel answers a value (🔒 YAZ-1775 D4, YAZ-1842 D1) |
 | `github.status` / `syncNow` / `setEnabled` / `onStatus` | `github:*` | per-vault GitHub sync |
+| `share.status` / `accounts` / `setup` / `onSetupProgress` / `openCloudflare` | `share:status` / `share:accounts` / `share:setup` / `share:setup-progress` / `share:open-cloudflare` | Share links (YAZ-1799, below): the setup status (no secret), the accounts a pasted key sees, set up from `{ token, accountId? }` with progress pushed to the asking window, and the pre-filled token page in the browser |
+| `share.get` / `list` / `publish` / `setPermission` / `stop` | `share:get` / `share:list` / `share:publish` / `share:set-permission` / `share:stop` | one board's record; the vault's records (`{ root, check? }` — `check: false` skips the live check); share or re-upload `{ root, path, content, id? }`; flip the download flag on the same link; stop. `NOT_SET_UP` before setup, `TOO_LARGE` over 100 MB |
+| `share.setDomain` / `disconnect` / `onChanged` | `share:set-domain` / `share:disconnect` / `share:changed` | attach or remove the custom domain; forget the key (or delete everything first); any status or shares.json change, pushed to EVERY window |
 | `storage.stats(root)` / `storage.shrink(root, skip)` | `storage:stats` / `storage:shrink` | Settings › Storage (YAZ-1801): the vault's sizes from the disk and the LOCAL git (never the network), measured on a worker thread (D8), and "Move pictures out of boards" (on the same worker, 🔒 D11) — every legacy board rewritten lean, pictures into `assets/`, its `yaseendraw` block kept verbatim (`updatedAt` does not move); `skip` = absolute paths with unsaved edits in a tab → `{ shrunk, skipped, bytesMoved }` |
 
 Rules that hold across the whole surface:
@@ -544,12 +548,16 @@ The demo vault for this is `tools/seedStorageDemoVault.mjs`.
 encrypted values with Electron's `safeStorage`, which on macOS binds a Keychain item to the app's
 code identity — and an ad-hoc-signed app (locked: no Developer ID) is a new identity on every
 build, so a key saved by one release was unreadable by the next. A version-1 file is moved aside as
-corrupt and the next paste starts clean. The one name so far is `pixabayApiKey` (`PIXABAY_SECRET`),
-typed once in Settings › Images and read by main when it builds a Pixabay request.
+corrupt and the next paste starts clean. The names: `pixabayApiKey` (`PIXABAY_SECRET`), typed once
+in Settings › Images and read by main when it builds a Pixabay request; and sharing's
+`cloudflareApiToken` and `shareUploadPassword` (YAZ-1799), written by MAIN at share setup and
+forgotten on disconnect. `secrets:set` accepts `pixabayApiKey` ONLY (`RENDERER_WRITABLE_SECRETS`), so
+a renderer can never overwrite sharing's two.
 
 Two things live in the VAULT instead, because they are the user's own data:
 `<vault>/.yaseendraw/favorites.json` (YAZ-1794: vault-relative paths, so favorites travel with the
-vault) and `<vault>/.yaseendraw/github.json` (the per-vault sync switch). Nothing else is ever
+vault), `<vault>/.yaseendraw/github.json` (the per-vault sync switch) and
+`<vault>/.yaseendraw/shares.json` (which boards are shared, YAZ-1799). Nothing else is ever
 written into a vault except the drawings and `assets/`. A board's own dates live INSIDE the
 drawing, not in the dotfolder — see "Board metadata" below.
 
@@ -604,6 +612,7 @@ never silently do nothing).
 | File | Search Vault | ⌘K |
 | File | Export Image… (a drawing tab only) | ⌘⇧E |
 | File | Export Drawing… (a drawing tab only) | ⌘⇧S |
+| File | Share Link (a drawing tab only) | ⌘⇧L |
 | File | Close Tab | ⌘W |
 | File | Close Window | ⌘⇧W |
 | Edit | Undo / Redo / Cut / Copy / Paste / Select All | stock roles |
@@ -752,7 +761,7 @@ a vault is a lean scene (`files: {}`) beside a shared `<vault>/assets/` folder, 
 base64 makes multi-MB files that git rewrites on every save. A file being handed to someone else
 has no `assets/` folder to point at, so Export Drawing… writes a STANDALONE `.excalidraw` with
 every image it uses embedded — the file upstream Excalidraw and excalidraw.com open with its
-pictures intact. Sharing links and view-only tokens are not ported; this is the sharing story.
+pictures intact. It is also exactly what a share link uploads (Share links, below).
 
 - **The renderer assembles it** (`client/src/drawings/exportDrawing.ts`):
   `serializeAsJSON(elements, appState, files, 'local')` — the library's own writer, the same one
@@ -820,6 +829,7 @@ two that do not — the Pixabay key and the GitHub switch — are marked below.
 | Files | Confirm before deleting · Library folder (🔒 YAZ-1775 D5: resolved path, Choose…, Reset to default) |
 | Images | Pixabay API key (🔒 YAZ-1775 D4: a password field, Save / Clear, "Key set" / "No key" from `secrets:has`, never echoed) — NOT in `SettingsState`, it lives in main's owner-only `secrets.json` (YAZ-1842 D1) |
 | Sync | the per-vault GitHub switch — the other setting NOT in `SettingsState` (it lives in `.yaseendraw/github.json`) |
+| Sharing | its own page (YAZ-1799 🔒 D7): Status · Set up sharing (Open Cloudflare, the pasted key, the account picker, the step list) · Your shared boards (permission, Copy link, Stop sharing, the one status line; live-checked) · Custom domain · How sharing works · Turn off sharing (Forget key / Delete all shared links, each behind an in-page confirm). Nothing here is in `SettingsState` — see Share links |
 | Storage | its own page, like Hotkeys (YAZ-1801), present only while a vault is open — a report, not settings: **GitHub** (a bar of the git history on a fixed scale ending at 10 GB, marked at 1 GB and 5 GB; green to 1 GB, amber to 5 GB, red past it, "10 GB — over GitHub's max" past 10 GB; "Not synced with git" for a plain folder) with two muted lines, "Your files N" and "Old versions N" · **Needs attention** (only when non-empty: every file ≥ 50 MiB, red "Stays on this Mac" at the sync guard's 95 MiB, amber "Close to the limit" below) · **Make boards smaller** (only while pictures are inside boards, or a result from this session is showing: one sentence, "Move pictures out", the result line). Measured only while Settings is open (🔒 D13): on the page's open, a sync pass finishing, and after a shrink — one measure at a time, a trigger mid-measure queuing one re-run; a failed first measure reads "Couldn't measure this vault" |
 | Hotkeys | its own page: the Window, Canvas and Mouse tables, from `hotkeys.ts` |
 
@@ -829,6 +839,115 @@ A group may declare `available(ctx)` (Storage's two conditional groups), and a r
 `hotkeys.ts` is the single source of truth for every binding the app advertises — Settings ›
 Hotkeys renders it and nothing else — and `hotkeys.test.ts` pins the expected set, the Canvas
 table included, so a keymap change anywhere fails loudly here.
+
+## Share links (YAZ-1799)
+
+A board can be shared as ONE read-only link anyone can open in a browser, with no account and no
+app. The link is served from the user's OWN Cloudflare account — one R2 bucket and one small
+Worker the app provisions (🔒 YAZ-1799 D1) — so nothing goes through anyone else's server. There
+is no encryption (🔒 YAZ-1799 D2): the link's random id is its only secret, 144 bits
+(`newShareId`), and the Worker checks only its shape.
+
+**Who owns what.**
+- MAIN owns Cloudflare: the API token, the Worker's upload password and every HTTP call
+  (`desktop/src/main/share/`: `sharing.ts` wires `config.ts` — sharing.json, link origin, the Worker
+  request —, `setup.ts` — the Cloudflare API: set up, domain, disconnect — and `boards.ts` — the
+  shared boards). The token crosses the bridge exactly once, renderer → main in `share:setup`, and
+  no `share:*` answer or push carries it or the password.
+- The RENDERER assembles the bytes (`client/src/share/shareContent.ts`): the same standalone
+  `.excalidraw` Export Drawing… writes, images embedded, read from DISK (Share can start from the
+  sidebar on a board that is not open; an open one is flushed first). Main checks the size and
+  uploads; it never assembles.
+
+**Storage.**
+- `<userData>/sharing.json` — which account, bucket and Worker, the workers.dev address, the custom
+  domain. App-wide (the Cloudflare account is the user's, not a vault's), not a secret, never in
+  app state.
+- `secrets.json` — `cloudflareApiToken` and `shareUploadPassword` (see Secrets). The password is
+  generated by main at every setup and uploaded as the Worker's secret binding; nobody sees it.
+- `<vault>/.yaseendraw/shares.json` — `{ version: 1, shares: { "<vault-relative path>": { id,
+  allowDownload, sharedAt, updatedAt } } }`, written on the vault's own chain
+  (`shareLinks.updateShares`). A malformed file is `INVALID_CONFIG`, never overwritten.
+
+**The Worker** (`share/worker.js`, plain JS: the exact file Cloudflare runs, main uploads verbatim
+and `tools/fakeCloudflare.mjs` runs under Node). Boards live at `boards/<id>.excalidraw`; each
+link's download flag is its OWN object, `perm/<id>` (`"0"` | `"1"`, missing = allowed —
+🔒 YAZ-1799 D15), so a re-upload never resets it and flipping it never rewrites the board.
+- `PUT /api/boards/:id` — bearer; `Content-Length` required, over 100 MB (`MAX_BODY_BYTES`, the
+  Workers free plan's body cap, = `MAX_SHARE_BYTES`) refused 413 before a byte is read; streamed into
+  R2. `x-allow-download` writes the flag only when present (a first share, or a stale one coming back).
+- `PATCH /api/boards/:id` — bearer, `{ allowDownload }`: the flag alone, same link, no re-upload.
+- `DELETE /api/boards/:id` — bearer: the board and its flag; the link dies at once.
+- `POST /api/wipe` — bearer: ONE page (≤ 1,000 objects, one list + one batched delete) per call,
+  answering `{ done }`, so every call stays under the free plan's 50 subrequests; main calls until done.
+- `GET /b/:id` — the viewer page; `/scene/:id` — what it draws; `/raw/:id` — the download, 403
+  when downloads are off (🔒 YAZ-1799 D5/D9: one link, the permission enforced server-side, not
+  just hidden); `/assets/*` — the viewer's static assets. A stopped, unknown or malformed id gets
+  the same "stopped or never existed" page.
+- Auth is `Authorization: Bearer <password>`, compared in constant time. The board name rides
+  `x-board-name` (URI-encoded, capped at 300) and is HTML-escaped in the page; the page's JSON data
+  block is `<`-escaped; the download's `filename*` is RFC 5987.
+
+**Always live** (🔒 YAZ-1799 D3). Every successful save of a shared board re-uploads it to the SAME
+id (`client/src/share/liveShare.ts`), per board in the window that saved it: after 10 s with no
+further save (SETTLE), never two uploads at once (ONE IN FLIGHT), and a save that lands mid-upload
+queues exactly one more, which re-reads the disk (LATEST WINS). Main records every outcome of an
+already-shared board in memory (`uploading` → ok | `failed` + reason) and the dialog, the
+sidebar mark and Settings show the one status line (`shareText.liveLine`); a failure keeps the
+record and the link's last good version, and the next save retries — nothing retries on a timer.
+Not set up, too large and offline are all refusals main records the same way.
+
+**Stale.** A link whose copy is gone from R2 (a Settings list check or a PATCH answered 404) is
+marked `stale`; the next save re-creates it on the same id, and that PUT carries the recorded
+permission. `share:list` checks every link with one HEAD of `/scene/<id>` — only Settings asks for
+that; the sidebar marks call it with `check: false` and send nothing.
+
+**Rename and delete** (🔒 YAZ-1799 D10). An in-app rename or move (drag, cut/paste, across open
+vaults too) moves the record, keyed by path, with the board — the link does not change, and a
+re-upload in flight names its link (`id`) so it lands on the moved record. An in-app delete stops
+the share (a failure keeps the record so Settings can stop it later). A rename in Finder is not
+seen: Settings lists the record as "No board at this path any more".
+
+**Setup** (Settings › Sharing, 🔒 YAZ-1799 D7). One pasted API token; "Open Cloudflare" opens the
+token page pre-filled with the five permissions sharing needs (🔒 YAZ-1799 D16: Workers Scripts:
+Edit, Workers R2 Storage: Edit, Account Settings: Read, Zone: Read, Workers Routes: Edit). An
+account-owned `cfat_…` key is verified at its account, not at `/user` (🔒 YAZ-1799 D18). A key that
+sees several accounts shows a picker first (🔒 YAZ-1799 D12). The steps, each reporting progress
+and naming its missing permission on a 403: verify · account · bucket · viewer (the static assets)
+· worker (code + password binding) · subdomain · test (a real upload, read-back and delete, backing
+off for up to ~90 s while a fresh workers.dev address comes up).
+- **Reuse** (🔒 YAZ-1799 D11): an existing bucket and Worker are found and reused, never recreated
+  or emptied, so a re-setup after "Forget key" brings every old link back (with its custom domain).
+- **Subdomain** (🔒 YAZ-1799 D17): an account with no workers.dev subdomain gets one claimed,
+  `<account-slug>-xxxx`, retrying a taken name.
+- **Custom domain**: attached as a Worker custom domain on the account's zone with the LONGEST
+  matching name; refused in plain English when the zone is missing, not yet active, or the name
+  already has a DNS record. The new domain is attached before the old one is detached.
+- **Turn off**: "Forget key on this Mac" forgets the token, password and sharing.json — links keep
+  their last version. "Delete all shared links" wipes the bucket, then the domain, the Worker and the
+  bucket, then forgets; it clears only the OPEN vault's shares.json (another vault's records stay
+  until that vault stops them).
+
+**The viewer** (🔒 YAZ-1799 D13). React and the SAME vendored Excalidraw the app draws with, bundled
+by `tools/buildShareViewer.mjs` into `share/dist/assets/` (part of `npm run build` and `npm run
+dev`), shipped as the `share-viewer` extraResource and uploaded as the Worker's static assets —
+fonts included, so nothing is fetched from a CDN at view time. View mode only; Download .excalidraw
+and Download PNG (2×) when allowed. Every page is sent with `script-src 'self'; connect-src 'self';
+frame-ancestors 'none'`, `nosniff` and `no-referrer`, and has no inline script (the board's details
+ride a JSON data block; `EXCALIDRAW_ASSET_PATH` is set by the bundle's first module).
+
+**The UI.** One Share dialog (🔒 YAZ-1799 D6, the Google Docs model) behind File › Share Link
+(⌘⇧L) and the sidebar's right-click Share: General access *Not shared* / *Anyone with the link*,
+and *View and download* (default) / *View only* on the same link. Shared boards wear a small link
+mark in the sidebar, red when the last update failed or the link is stale (🔒 YAZ-1799 D14).
+
+**The demo.** `tools/fakeCloudflare.mjs` fakes just the Cloudflare endpoints setup calls (with
+Cloudflare's real error codes, and magic tokens listed on its `/__fake/token-page`) and serves the
+real Worker over a disk bucket; `tools/seedShareDemoVault.mjs` seeds a vault of one board per
+scenario, an isolated profile and start/stop scripts. The app follows it only through two env vars,
+`YASEEN_DRAW_CLOUDFLARE_API` and `YASEEN_DRAW_SHARE_ORIGIN`, which `shareEndpoints` honours ONLY in
+an unpackaged (dev) build — a shipped app always sends the real token to the real Cloudflare.
+`desktop/src/main/share/fakeCloudflare.integration.test.ts` runs the scenarios against it.
 
 ## Multi-window
 
