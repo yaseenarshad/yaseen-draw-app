@@ -18,7 +18,8 @@
   - [x] 2- Build (YAZ-1916) — 67eeda1
   - [x] 3- Verify end-to-end (YAZ-1917) — 12/12 real-app checks via the main-process inspector
   - [x] 4A- Audit (YAZ-1919) — A1–A6
-- Now: [→] 4B- Apply, merge, release, install (YAZ-1920)
+  - [x] 4B- Applied A1–A6 (c2cdb5a); merged PR #12 (944c31f), released v0.1.7 (b59ed36), installed on Yasin's Mac
+- Now: nothing — closed.
 
 ## Open Questions
 - None.
