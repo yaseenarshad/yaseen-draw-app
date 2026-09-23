@@ -7,35 +7,11 @@ import { CLOUDFLARE_TOKEN_SECRET, SHARE_UPLOAD_PASSWORD_SECRET, type ShareSetupP
 // @ts-expect-error — untyped JS module
 import { handle as workerHandle } from '../../../../share/worker.js'
 import { createSecrets } from '../secrets'
+import { memoryBucket } from './memoryBucket'
 import { createSharing, type Sharing } from './sharing'
 
 const API = 'https://api.test/client/v4'
 const ORIGIN = 'https://share.test'
-
-/** A Map-backed R2 bucket: exactly the five calls the Worker makes. */
-function memoryBucket() {
-  const objects = new Map<string, { bytes: Uint8Array<ArrayBuffer>; customMetadata: Record<string, string> }>()
-  return {
-    objects,
-    async put(key: string, body: ArrayBuffer | string, opts: { customMetadata?: Record<string, string> }) {
-      objects.set(key, { bytes: typeof body === 'string' ? new TextEncoder().encode(body) : new Uint8Array(body), customMetadata: opts.customMetadata ?? {} })
-    },
-    async head(key: string) {
-      const o = objects.get(key)
-      return o === undefined ? null : { key, size: o.bytes.length, customMetadata: o.customMetadata }
-    },
-    async get(key: string) {
-      const o = objects.get(key)
-      return o === undefined ? null : { key, size: o.bytes.length, customMetadata: o.customMetadata, body: new Blob([o.bytes]).stream() }
-    },
-    async delete(key: string) {
-      objects.delete(key)
-    },
-    async list({ prefix = '' } = {}) {
-      return { objects: [...objects.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key })), truncated: false }
-    },
-  }
-}
 
 let dir: string
 let vault: string
@@ -88,7 +64,10 @@ const fakeFetch: typeof fetch = async (input, init) => {
     if (route.endsWith('/workers/subdomain')) return ok({ subdomain: 'me' })
     return ok({})
   }
-  const request = new Request(url, init as RequestInit)
+  // Off the wire, a body always carries its Content-Length (the Worker requires it).
+  const headers = new Headers(init?.headers)
+  if (typeof init?.body === 'string') headers.set('content-length', String(Buffer.byteLength(init.body)))
+  const request = new Request(url, { ...init, headers } as RequestInit)
   workerCalls.push({ method: request.method, route: url.pathname, allow: request.headers.get('x-allow-download') })
   return workerHandle(request, { BUCKET: bucket, UPLOAD_PASSWORD: workerSecret })
 }
@@ -164,7 +143,7 @@ describe('sharing (YAZ-1799) against the real Worker', () => {
     expect(await (await fakeFetch(`${ORIGIN}/raw/${first.id}`)).text()).toBe('{"v":2}')
     const onDisk = JSON.parse(await readFile(path.join(vault, '.yaseendraw', 'shares.json'), 'utf8'))
     expect(onDisk.shares['Sub/Board.excalidraw']).toMatchObject({ id: first.id, allowDownload: true })
-    expect([...bucket.objects.keys()]).toEqual([`boards/${first.id}.excalidraw`])
+    expect([...bucket.objects.keys()].sort()).toEqual([`boards/${first.id}.excalidraw`, `perm/${first.id}`])
 
     await sharing.stop(vault, board())
     expect((await fakeFetch(first.url)).status).toBe(404)
@@ -198,8 +177,7 @@ describe('sharing (YAZ-1799) against the real Worker', () => {
     expect((await sharing.get(vault, board()))?.allowDownload).toBe(false)
   })
 
-  // Needs the Worker to keep the stored flag on a PUT with no permission header (YAZ-1799 3A). Flip to `it` then.
-  it.fails('end to end: a view-only board is still view-only on the Worker after a re-upload', async () => {
+  it('end to end: a view-only board is still view-only on the Worker after a re-upload', async () => {
     await sharing.setup('tok', () => {})
     const first = await sharing.publish(vault, board(), '{"v":1}')
     await sharing.setPermission(vault, board(), false)
@@ -288,7 +266,7 @@ describe('sharing (YAZ-1799) against the real Worker', () => {
     const oldPassword = workerSecret
     await sharing.disconnect(vault, false) // "Forget key on this Mac": nothing on Cloudflare is touched
     expect((await sharing.status()).state).toBe('off')
-    expect(bucket.objects.size).toBe(1)
+    expect(bucket.objects.has(`boards/${first.id}.excalidraw`)).toBe(true)
 
     const steps: ShareSetupProgress[] = []
     const again = await sharing.setup('tok', (p) => steps.push(p))
@@ -302,6 +280,18 @@ describe('sharing (YAZ-1799) against the real Worker', () => {
     expect((await fakeFetch(`${ORIGIN}/raw/${first.id}`)).status).toBe(403)
     await sharing.stop(vault, board())
     expect((await fakeFetch(first.url)).status).toBe(404)
+  })
+
+  it('delete everything: wipes the bucket a page per request until the Worker says done, then deletes the Worker and bucket', async () => {
+    await sharing.setup('tok', () => {})
+    await sharing.publish(vault, board(), '{"v":1}')
+    for (let i = 0; i < 2500; i++) bucket.objects.set(`boards/old${String(i).padStart(16, '0')}.excalidraw`, { bytes: new Uint8Array([123, 125]), customMetadata: {} })
+    workerCalls = []
+    await sharing.disconnect(vault, true)
+    expect(workerCalls.map((c) => c.route)).toEqual(Array(3).fill('/api/wipe'))
+    expect(bucket.objects.size).toBe(0)
+    expect(await sharing.get(vault, board())).toBeNull()
+    expect((await sharing.status()).state).toBe('off')
   })
 
   it('several accounts: listed for a picker; setup refuses to guess and uses the picked one', async () => {

@@ -2,14 +2,14 @@
 /**
  * USAGE: node tools/fakeCloudflare.mjs --data <dir> [--port 8787]
  *
- * A LOCAL, FAKE Cloudflare for the Share-link prototype (YAZ-1799). Nothing here talks to the
+ * A LOCAL, FAKE Cloudflare for share links (YAZ-1799). Nothing here talks to the
  * real Cloudflare. One port serves two things:
  *
  *  1. /client/v4/…  — ONLY the handful of Cloudflare API endpoints the app's "Set up sharing" flow
  *     calls (verify token, list accounts, create/delete an R2 bucket, upload/delete a Worker, set
  *     a secret, the workers.dev subdomain, zones + custom domains). Point the app at it with
  *     `YASEEN_DRAW_CLOUDFLARE_API=http://127.0.0.1:<port>/client/v4`.
- *  2. everything else — the share Worker's own routes (/v/:id, /d/:id, /raw/…, /api/…), answered by
+ *  2. everything else — the share Worker's own routes (/b/:id, /scene/…, /raw/…, /api/…), answered by
  *     running the SAME `share/worker.js` handler against a disk-backed fake R2 bucket in
  *     `<data>/bucket/`. Point the app's links at it with `YASEEN_DRAW_SHARE_ORIGIN=http://localhost:<port>`.
  *
@@ -89,6 +89,7 @@ async function toBuffer(body) {
   if (ArrayBuffer.isView(body)) return Buffer.from(body.buffer, body.byteOffset, body.byteLength)
   return Buffer.from(await new Response(body).arrayBuffer())
 }
+const R2_PAGE = 1000
 const diskBucket = {
   async put(key, body, opts = {}) {
     const bytes = await toBuffer(body)
@@ -104,20 +105,28 @@ const diskBucket = {
   async get(key) {
     const meta = await this.head(key)
     if (meta === null) return null
-    return { ...meta, body: Readable.toWeb(fs.createReadStream(objectFile(key))) }
+    return { ...meta, body: Readable.toWeb(fs.createReadStream(objectFile(key))), text: async () => fs.readFileSync(objectFile(key), 'utf8') }
   },
-  async delete(key) {
-    fs.rmSync(objectFile(key), { force: true })
-    fs.rmSync(metaFile(key), { force: true })
+  /** One key or up to 1,000, as R2 takes them. */
+  async delete(keys) {
+    const list = Array.isArray(keys) ? keys : [keys]
+    if (list.length > R2_PAGE) throw new Error(`R2 deletes at most ${R2_PAGE} keys per call`)
+    for (const key of list) {
+      fs.rmSync(objectFile(key), { force: true })
+      fs.rmSync(metaFile(key), { force: true })
+    }
   },
-  async list({ prefix = '' } = {}) {
-    const objects = fs
+  /** At most 1,000 keys per page in key order; `cursor` continues after the last key of the previous page, as R2 pages. */
+  async list({ prefix = '', cursor, limit = R2_PAGE } = {}) {
+    const keys = fs
       .readdirSync(BUCKET_DIR)
       .filter((f) => !f.endsWith('.meta.json'))
       .map((f) => decodeURIComponent(f))
-      .filter((k) => k.startsWith(prefix))
-      .map((k) => ({ key: k }))
-    return { objects, truncated: false }
+      .filter((k) => k.startsWith(prefix) && (cursor === undefined || k > cursor))
+      .sort()
+    const page = keys.slice(0, Math.min(limit, R2_PAGE))
+    const truncated = keys.length > page.length
+    return { objects: page.map((key) => ({ key })), truncated, cursor: truncated ? page[page.length - 1] : undefined }
   },
 }
 

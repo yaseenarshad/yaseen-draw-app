@@ -482,9 +482,13 @@ export function createSharing(deps: SharingDeps): Sharing {
     if (deleteEverything && config !== null) {
       const password = await deps.secrets.read(SHARE_UPLOAD_PASSWORD_SECRET)
       const origin = linkOrigin(config)
-      if (password !== null && origin !== null) {
-        const res = await worker(origin, 'POST', '/api/wipe', password)
+      // The Worker deletes one page (≤1,000 objects) per request, so one request stays under the free
+      // plan's subrequest cap; it answers `done` once the bucket is empty. (A Worker from before paging
+      // answers no `done` — it deleted everything in one go.)
+      for (let done = password === null || origin === null; !done; ) {
+        const res = await worker(origin!, 'POST', '/api/wipe', password)
         if (!res.ok) throw new BridgeFailure('PROVIDER_FAILED', `Could not delete the shared boards (HTTP ${res.status}); nothing was disconnected. Try again.`)
+        done = ((await res.json().catch(() => ({}))) as { done?: unknown }).done !== false
       }
       const cf = await client()
       if (config.customDomain !== null) await cf.detachDomain(config.accountId, config.customDomain.id)
