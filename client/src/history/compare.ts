@@ -81,16 +81,3 @@ export function changesScene(engine: CompareEngine, now: readonly unknown[], cha
   const marks = [...changes.added.filter(own).map((e) => outline(e, MARK.added, false)), ...changes.changed.filter(own).map((e) => outline(e, MARK.changed, false)), ...changes.removed.filter(own).map((e) => outline(e, MARK.removed, true))]
   return [...ghosts, ...(now as unknown[]), ...(engine.restoreElements(marks as never, null) as unknown[])]
 }
-
-/** "2 added · 1 changed · 3 removed" — only the kinds there are, in the legend's order. */
-export function changesSummary(c: BoardChanges): string {
-  const parts = [
-    [c.added.length, 'added'],
-    [c.changed.length, 'changed'],
-    [c.removed.length, 'removed'],
-  ] as const
-  return parts
-    .filter(([n]) => n > 0)
-    .map(([n, word]) => `${n} ${word}`)
-    .join(' · ')
-}

@@ -4,8 +4,10 @@ import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefOb
  * THE MODAL-KEYS RULE, shared by the app's dialogs (YAZ-1799 Share, YAZ-1897 Version history):
  * nothing typed while a dialog is open reaches the sidebar tree or the canvas behind it.
  *
- * `useModalKeys` listens on the window in the CAPTURE phase: a key aimed outside the dialog is
- * swallowed and focus pulled back in; Escape — from anywhere — is the dialog's to answer.
+ * `useModalKeys` pulls focus into the dialog the moment it mounts (a key pressed while it loads
+ * must not land on the row or canvas behind) and hands it back to whatever had it on close. It
+ * listens on the window in the CAPTURE phase: a key aimed outside the dialog is swallowed and focus
+ * pulled back in; Escape — from anywhere — is the dialog's to answer.
  * `cycleTab` goes on the dialog's own `onKeyDown`: Tab and Shift-Tab wrap around inside it, and no
  * key typed in it travels on to the app.
  */
@@ -13,6 +15,8 @@ export function useModalKeys(dialog: RefObject<HTMLElement | null>, onEscape: ()
   const escape = useRef(onEscape)
   escape.current = onEscape
   useEffect(() => {
+    const previous = document.activeElement
+    dialog.current?.focus()
     const onKey = (e: KeyboardEvent) => {
       const inside = e.target instanceof Node && dialog.current?.contains(e.target) === true
       if (inside && e.key !== 'Escape') return
@@ -22,7 +26,10 @@ export function useModalKeys(dialog: RefObject<HTMLElement | null>, onEscape: ()
       else dialog.current?.focus()
     }
     window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      if (previous instanceof HTMLElement) previous.focus()
+    }
   }, [dialog])
 }
 

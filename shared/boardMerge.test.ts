@@ -141,6 +141,15 @@ describe('mergeBoards — the board around the shapes', () => {
     expect(out?.json).toBe(`${JSON.stringify(JSON.parse(out?.json ?? '{}'), null, 2)}\n`)
   })
 
+  it('keeps the YAZ-1834 dates block first: born at the earlier time, changed at the later, even when only one side has it', () => {
+    const withMeta = (meta: Record<string, number> | null, elements: El[]) => `${JSON.stringify({ ...(meta === null ? {} : { yaseendraw: meta }), type: 'excalidraw', elements, appState: {} }, null, 2)}\n`
+    const out = JSON.parse(mergeBoards(withMeta({ createdAt: 5, updatedAt: 5 }, [r1]), withMeta({ createdAt: 5, updatedAt: 90 }, [r1, r2]), withMeta({ createdAt: 3, updatedAt: 70 }, [r1, r3]))?.json ?? '{}')
+    expect(Object.keys(out)[0]).toBe('yaseendraw')
+    expect(out.yaseendraw).toEqual({ createdAt: 3, updatedAt: 90 })
+    const oneSided = JSON.parse(mergeBoards(withMeta(null, [r1]), withMeta({ createdAt: 1, updatedAt: 2 }, [r1, r2]), withMeta(null, [r1, r3]))?.json ?? '{}')
+    expect(Object.keys(oneSided)[0]).toBe('yaseendraw')
+  })
+
   it('S15: refuses to merge anything that is not a scene', () => {
     expect(mergeBoards('not json', board([]), board([]))).toBeNull()
     expect(mergeBoards(board([]), '{"elements": 3}', board([]))).toBeNull()

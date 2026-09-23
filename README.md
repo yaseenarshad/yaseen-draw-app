@@ -67,6 +67,17 @@ contract is in `docs/CONTRACTS.md` › Share links.
 
 Turn on **Settings › Sync** to push a vault to GitHub. It uses the computer's own git, found at a fixed set of locations rather than on `PATH` (`desktop/src/main/git/exec.ts`): on a Mac the Command Line Tools or Homebrew git, on Windows [Git for Windows](https://git-scm.com/download/win) (its installer bundles the Git Credential Manager, so a one-time GitHub sign-in sticks). Without one, the sync banner says so and offers a setup prompt to paste into an LLM. The switch lives per vault, in `<vault>/.yaseendraw/github.json`.
 
+Two computers can work on one vault. When both changed the same board, sync merges it shape by
+shape: everyone's shapes are kept, and if you both changed the same shape, the newest edit wins.
+Any other file changed on both keeps both copies (yours as `<name> (conflict, <date>)`). A small
+notice says what was merged, with **See changes**. Nothing needs a person to untangle it. The app
+also checks GitHub every minute while a vault is open, so the other computer's changes show up on
+their own.
+
+Right-click a board › **Version history** to see every version as a picture: the board now, with
+what changed since that version marked in green (added), amber (changed) and faded red (removed).
+**Restore** puts any version back.
+
 ## Drawings
 
 A drawing is one `.excalidraw` file — Excalidraw's own scene JSON, readable by excalidraw.com and

@@ -1,3 +1,4 @@
+import { BOARD_META_KEY } from './drawingAssets'
 import { isFiniteNumber, isRecord } from './guards'
 
 /**
@@ -19,7 +20,9 @@ import { isFiniteNumber, isRecord } from './guards'
  *    — ended up deleted gets the parent back from the side that still had it: deleting a box deletes
  *    its text too, so "the edit beats the delete" has to keep the edited text's box with it (S9).
  *    A parent neither side kept is let go of instead (the reference is cleared).
- * The board's own settings (`appState`) merge per key the same way, ours winning a clash.
+ * The board's own settings (`appState`) and any other top-level key merge per key the same way,
+ * ours winning a clash — except the `yaseendraw` dates block (🔒 YAZ-1834), which stays the file's
+ * FIRST key with the earlier `createdAt` and the later `updatedAt` of the two.
  *
  * Pure and engine-free: it runs in the main process in the middle of a rebase. Answers null for
  * anything it must not merge — a side that is not a scene — and the caller keeps both copies.
@@ -151,8 +154,19 @@ export function mergeBoards(baseText: string, theirsText: string, mineText: stri
     elements = elements.sort((x, y) => (x.index === y.index ? (x.id < y.id ? -1 : 1) : (x.index as string) < (y.index as string) ? -1 : 1))
   }
 
-  const doc: Record<string, unknown> = { ...mine, elements }
+  // The rest of the top level, per key — without the parts merged on their own (and without stringifying every shape again).
+  const rest = ({ elements: _e, appState: _a, files: _f, [BOARD_META_KEY]: _m, ...other }: Scene): Record<string, unknown> => other
+  const top = mergeRecord(rest(base), rest(theirs), rest(mine))
+  const meta = mergeMeta(theirs[BOARD_META_KEY], mine[BOARD_META_KEY])
+  const doc: Record<string, unknown> = { ...(meta === null ? {} : { [BOARD_META_KEY]: meta }), ...top, elements }
   if ('appState' in mine || 'appState' in theirs) doc.appState = mergeRecord(recordOf(base.appState), recordOf(theirs.appState), recordOf(mine.appState))
   if ('files' in mine || 'files' in theirs) doc.files = { ...recordOf(theirs.files), ...recordOf(mine.files) }
   return { json: `${JSON.stringify(doc, null, 2)}\n`, clashes: clashed.size }
+}
+
+/** The dates block both machines stamped: the board was born at the earlier time and last changed at the later one. */
+function mergeMeta(theirs: unknown, mine: unknown): Record<string, unknown> | null {
+  if (!isRecord(theirs) || !isRecord(mine)) return isRecord(mine) ? mine : isRecord(theirs) ? theirs : null
+  const pick = (f: (a: number, b: number) => number, key: string) => (isFiniteNumber(theirs[key]) && isFiniteNumber(mine[key]) ? f(theirs[key], mine[key]) : (mine[key] ?? theirs[key]))
+  return { ...theirs, ...mine, createdAt: pick(Math.min, 'createdAt'), updatedAt: pick(Math.max, 'updatedAt') }
 }
