@@ -94,6 +94,8 @@ interface SidebarProps {
   onDeleteFile: (path: string) => Promise<void>
   /** Right-click → "Share" (YAZ-1799 D6): App opens its one Share dialog for the board. */
   onShareFile: (path: string) => void
+  /** Right-click → "Version history" (YAZ-1897 D4): App opens the board's Version history. */
+  onHistoryFile: (path: string) => void
   /** Show a transient, unobtrusive message — never a dialog (E1, GRO-2171). App owns the banner. */
   onNotice: (message: string, kind?: NoticeKind) => void
   /**
@@ -294,6 +296,7 @@ export function Sidebar({
   onRenameFile,
   onDeleteFile,
   onShareFile,
+  onHistoryFile,
   onNotice,
   pendingSearchFocus,
   onSearchFocusHandled,
@@ -1465,6 +1468,7 @@ export function Sidebar({
               onRename: (path) => setRenamingEntry({ path, kind: menu.rowKind === 'file' ? 'file' : 'dir' }),
               onInfo: (path) => setInfoPopover({ x: menu.x, y: menu.y, path, now: Date.now() }),
               onShare: onShareFile,
+              onHistory: onHistoryFile,
               onDelete: askDelete,
             },
           )}

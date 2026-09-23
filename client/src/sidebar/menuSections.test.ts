@@ -52,6 +52,7 @@ const handlers = (over: Partial<MenuHandlers> = {}): MenuHandlers => ({
   onDelete: vi.fn(),
   onInfo: vi.fn(),
   onShare: vi.fn(),
+  onHistory: vi.fn(),
   ...over,
 })
 
@@ -428,7 +429,7 @@ describe('favorite toggle item (YAZ-1766 D3)', () => {
 describe('Info item (🔒 YAZ-1835 D6)', () => {
   it('is offered for a board row and sits directly above Delete, in the last group', () => {
     const sections = build({ ...FILE_ROW, infoPath: '/v/Note.excalidraw' })
-    expect(sections[5].map((i) => i.label)).toEqual(['Share', 'Info', 'Delete'])
+    expect(sections[5].map((i) => i.label)).toEqual(['Share', 'Version history', 'Info', 'Delete'])
     expect(labelsOf(sections).indexOf('Info')).toBe(labelsOf(sections).indexOf('Delete') - 1)
   })
 
