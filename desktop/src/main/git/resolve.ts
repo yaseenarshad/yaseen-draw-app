@@ -82,7 +82,8 @@ const abs = (root: string, rel: string): string => path.join(root, ...rel.split(
 
 /**
  * Settles a stopped rebase and continues it to the end. Answers what was merged, or null after
- * aborting (lossless) when something could not be settled. Parked saves are back on disk either way.
+ * aborting (lossless) when something could not be settled. Parked saves are back on disk either way,
+ * and only a merge that LANDED moves "before the merge" — a failed one leaves the last one's pointer.
  */
 export async function resolveRebase(bin: string, root: string, span: RebaseSpan): Promise<GithubSyncMerge[] | null> {
   const parked = new Map<string, Buffer | null>()
@@ -90,7 +91,6 @@ export async function resolveRebase(bin: string, root: string, span: RebaseSpan)
   const report = new Map<string, GithubSyncMerge>()
   let landed = false
   try {
-    await git(bin, root, ['update-ref', BEFORE_MERGE_REF, span.before])
     for (;;) {
       const conflicted = [...new Set(zList(await git(bin, root, ['ls-files', '-z', '--unmerged'])).map((line) => line.slice(line.indexOf('\t') + 1)))]
       if (conflicted.length === 0) return null // stopped for something that is not a conflict
@@ -102,11 +102,12 @@ export async function resolveRebase(bin: string, root: string, span: RebaseSpan)
         const prior = report.get(rel)
         report.set(rel, prior === undefined ? settled.report : { ...settled.report, clashes: prior.clashes + settled.report.clashes })
       }
-      const step = await nextStep(bin, root, [...report.values()].map((m) => m.author), parked)
+      const step = await nextStep(bin, root, await authorOf(bin, root, span), parked)
       if (step === 'done') break
       if (step === 'failed') return null
     }
     landed = true
+    await git(bin, root, ['update-ref', BEFORE_MERGE_REF, span.before])
     return [...report.values()]
   } finally {
     if (!landed) {
@@ -124,12 +125,11 @@ export async function resolveRebase(bin: string, root: string, span: RebaseSpan)
  * can carry a `Merged-with:` trailer — Version history marks merged versions by it. A resolution that
  * changed nothing (the merge equals the remote) is skipped: `--continue` refuses an empty pick.
  */
-async function nextStep(bin: string, root: string, authors: readonly string[], parked: Map<string, Buffer | null>): Promise<'done' | 'again' | 'failed'> {
+async function nextStep(bin: string, root: string, authors: string, parked: Map<string, Buffer | null>): Promise<'done' | 'again' | 'failed'> {
   const nothingStaged = (await git(bin, root, ['diff', '--cached', '--quiet'])).code === 0
   if (!nothingStaged) {
     const message = (await git(bin, root, ['log', '-1', '--format=%B', 'REBASE_HEAD'])).stdout.trim() || 'sync'
-    const trailer = `Merged-with: ${authors.length > 0 ? joinNames([...new Set(authors)]) : 'another machine'}`
-    if ((await git(bin, root, ['commit', '-q', '-m', message, '-m', trailer])).code !== 0) return 'failed'
+    if ((await git(bin, root, ['commit', '-q', '-m', message, '-m', `Merged-with: ${authors}`])).code !== 0) return 'failed'
   }
   await park(bin, root, parked) // as late as possible: a save landing after this is the abort path's to park
   const moved = await git(bin, root, ['-c', 'core.editor=true', 'rebase', nothingStaged ? '--skip' : '--continue'])
@@ -207,17 +207,17 @@ async function stagesOf(bin: string, root: string, rel: string): Promise<Stages 
   return { base, theirs, mine }
 }
 
-/** Who made the remote's side of a file, as the notice says it: "Sara", "Sara and Sam" — or everyone upstream when a rename hides the file's own log. */
-async function authorOf(bin: string, root: string, span: RebaseSpan, rel: string): Promise<string> {
-  const range = `${span.before}..${span.upstream}`
-  const names = async (extra: string[]) => [...new Set(zList(await git(bin, root, ['log', '-z', '--format=%an', range, ...extra])))]
-  const own = await names(['--', `:(literal)${rel}`])
-  return joinNames(own.length > 0 ? own : await names([])) || 'another machine'
-}
-
-function joinNames(names: readonly string[]): string {
-  if (names.length <= 1) return names[0] ?? ''
-  return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
+/**
+ * Who made the remote's side, as the notice and the `Merged-with:` trailer say it: "Sara", "Sara
+ * and Sam". Of one file when `rel` is given — falling back to everyone upstream when a rename hides
+ * that file's own log — else of the whole span.
+ */
+async function authorOf(bin: string, root: string, span: RebaseSpan, rel?: string): Promise<string> {
+  const names = async (only: string[]) => [...new Set(zList(await git(bin, root, ['log', '-z', '--format=%an', `${span.before}..${span.upstream}`, ...only])))]
+  const own = rel === undefined ? [] : await names(['--', `:(literal)${rel}`])
+  const all = own.length > 0 ? own : await names([])
+  if (all.length <= 1) return all[0] ?? 'another machine'
+  return `${all.slice(0, -1).join(', ')} and ${all.at(-1)}`
 }
 
 /** Dirty tracked files — a save that landed mid-rebase — held by copy and checked out, so nothing git does next can reset them away. */

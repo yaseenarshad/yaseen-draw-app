@@ -21,7 +21,7 @@
  */
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { BoardVersion, BoardVersionScene, DrawingFileEntry } from '@shared/types'
-import { api } from '../api'
+import { api, BridgeRequestError } from '../api'
 import { loadExcalidraw, type ExcalidrawModule } from '../drawings/engine'
 import { parseSceneText, type DrawingScene } from '../drawings/drawingScene'
 import { basename, stripExt } from '../lib/paths'
@@ -29,9 +29,8 @@ import { relativeTime } from '../lib/relativeTime'
 import { createScenePreviewPng, visibleElements, type PreviewBounds } from '../lib/scenePreview'
 import { cycleTab, useModalKeys } from '../lib/modalKeys'
 import { useAppliedTheme } from '../lib/theme'
-import { errorText } from '../share/shareText'
 import { noteBoardSaved } from '../share/liveShare'
-import { changesScene, compareBoards, hasChanges, type BoardChanges } from './compare'
+import { changesScene, compareBoards, hasChanges, MARK, type BoardChanges } from './compare'
 import './history.css'
 
 interface VersionHistoryProps {
@@ -67,6 +66,12 @@ function engineFiles(...maps: Record<string, DrawingFileEntry>[]): Record<string
   return out
 }
 
+/** A failure in this dialog's own words: the bridge's message, or "not a board" for a file that will not parse. */
+function problemText(err: unknown): string {
+  if (err instanceof BridgeRequestError) return err.message
+  return err instanceof SyntaxError ? "This board's file isn't valid JSON, so its history can't be compared." : err instanceof Error ? err.message : String(err)
+}
+
 export function versionLabel(v: BoardVersion): string {
   return v.localOnly ? 'Your version before the merge' : v.author
 }
@@ -97,7 +102,6 @@ export function VersionHistory({ root, path, fromMerge = false, onClose, onNotic
   })
 
   useEffect(() => {
-    dialogRef.current?.focus()
     let live = true
     Promise.all([api.github.history(root, path), api.drawing.load({ root, path }), loadExcalidraw()]).then(
       ([list, board, mod]) => {
@@ -108,7 +112,7 @@ export function VersionHistory({ root, path, fromMerge = false, onClose, onNotic
         setCurrent({ scene: parseSceneText(board.json), files: board.files })
         setEngine(mod)
       },
-      (err: unknown) => live && setProblem(errorText(err)),
+      (err: unknown) => live && setProblem(problemText(err)),
     )
     return () => {
       live = false
@@ -165,7 +169,7 @@ export function VersionHistory({ root, path, fromMerge = false, onClose, onNotic
       onNotice(`Restored “${name}” to the version from ${relativeTime(version.at, Date.now())}.`)
       onClose()
     } catch (err) {
-      setProblem(errorText(err))
+      setProblem(problemText(err))
       setBusy(false)
       setConfirming(false)
     }
@@ -289,7 +293,7 @@ function Legend({ changes }: { changes: BoardChanges }) {
         .filter(([, n]) => n > 0)
         .map(([kind, n]) => (
           <span key={kind} className={`history-legend history-legend--${kind}`}>
-            <span className="history-legend__dot" aria-hidden />
+            <span className="history-legend__dot" style={{ color: MARK[kind] }} aria-hidden />
             {n} {kind}
           </span>
         ))}

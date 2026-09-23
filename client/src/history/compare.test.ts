@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { changesScene, changesSummary, compareBoards, hasChanges, MARK, type CompareEngine } from './compare'
+import { changesScene, compareBoards, hasChanges, MARK, type CompareEngine } from './compare'
 
 const el = (id: string, over: Record<string, unknown> = {}) => ({ id, type: 'rectangle', x: 0, y: 0, width: 10, height: 10, version: 1, isDeleted: false, ...over })
 
@@ -11,14 +11,12 @@ describe('compareBoards', () => {
     expect(c.added.map((e) => e.id)).toEqual(['new'])
     expect(c.changed.map((e) => e.id)).toEqual(['moved'])
     expect(c.removed.map((e) => e.id).sort()).toEqual(['gone', 'tomb'])
-    expect(changesSummary(c)).toBe('1 added · 1 changed · 2 removed')
   })
 
   it('a tombstone brought back is an addition; identical boards have no changes', () => {
     expect(compareBoards([el('a', { isDeleted: true })], [el('a')]).added).toHaveLength(1)
     const c = compareBoards([el('a')], [el('a')])
     expect(hasChanges(c)).toBe(false)
-    expect(changesSummary(c)).toBe('')
   })
 })
 

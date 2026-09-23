@@ -11,7 +11,9 @@ import { syncPass } from './sync'
 
 /**
  * The five guarantees GitHub Sync stands on (YAZ-1081 — Fable-owned, see YAZ-1082 scope 4/4).
- * Implementation issues (YAZ-1085+) must make these pass UNMODIFIED:
+ * Implementation issues (YAZ-1085+) must make these pass UNMODIFIED. Guarantee 1 was amended once,
+ * on purpose, by YAZ-1897 D3 (Yasin-approved): conflicts are now settled rather than refused, so
+ * "lossless" means every byte survives, and the old byte-identical abort is its fallback half:
  *   1. a conflict is LOSSLESS — every byte from both machines survives (merged, or kept as two
  *      copies — YAZ-1897 D1/D3), and a pass that has to stop anyway leaves the working tree
  *      byte-identical, a save made while it was stopped included
@@ -115,6 +117,8 @@ describe('guarantee 1: a conflict is lossless', { timeout: REAL_GIT_TIMEOUT_MS }
     expect(status.state).toBe('attention')
     expect(status.attention).toBe('conflict')
     expect(snapshot(a.root)).toEqual(new Map([...before, ['other.md', 'saved mid-rebase\n']]))
+    // A merge that never landed does not move "your version before the merge" (Version history).
+    expect((await git(bin, a.root, ['rev-parse', '--verify', '-q', 'refs/yaseendraw/before-merge'])).code).not.toBe(0)
     const st = await git(bin, a.root, ['status'])
     expect(st.stdout).not.toMatch(/rebase in progress/i)
   })

@@ -16,16 +16,21 @@
 - Done:
   - [x] Scoping, decisions, Linear tree
   - [x] 1 Deep scope (YAZ-1898)
-- Now: [→] 2A board merge (YAZ-1900)
+  - [x] 2A board merge (79259b7) · [x] 2B resolve inside sync (e0f6796) · [x] 2C 60 s poll (639d07e) · [x] 2D history backend (7006768)
+  - [x] 3A merged notice + 3B Version history panel (9ebc09a)
+  - [x] 4A scenarios S1–S28 (34114bf: S9 parent revival, S12, S14) · [x] 4B live dev-app check via CDP + demo vault (d4c4250)
+  - [x] 5A audit (YAZ-1911)
+- Now: [→] 5B apply the audit, docs, merge, release (YAZ-1912)
 - Remaining:
-  - [ ] 2B resolve inside sync (YAZ-1901)
-  - [ ] 2C 60 s poll (YAZ-1902)
-  - [ ] 2D history backend (YAZ-1903)
-  - [ ] 3A merged notice (YAZ-1905)
-  - [ ] 3B version history panel (YAZ-1906)
-  - [ ] 4A merge scenarios on real git (YAZ-1908)
-  - [ ] 4B history / undo on a test vault (YAZ-1909)
-  - [ ] 5A audit (YAZ-1911) · [ ] 5B apply + docs + merge + release (YAZ-1912)
+  - [ ] Merge to main, cut the smallest version bump, replace the installed app
+
+## Gotchas learned
+- In a rebase, stage 2 is the UPSTREAM and stage 3 is ours. Read stages with `checkout-index --stage=all --temp` (no stdout buffer).
+- `rebase --abort` resets a save made mid-rebase, and an unstaged tracked file blocks `--continue`. Park by copy before both.
+- An empty resolution blocks `--continue`. Use `rebase --skip`.
+- `rev-parse --verify` takes exactly one name.
+- `git show --output=` does not redirect a blob.
+- The repo has no Prettier config and CI checks no formatting: match the surrounding style (long lines), never run Prettier over files.
 
 ## Open Questions
 - None blocking.
