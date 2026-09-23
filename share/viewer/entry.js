@@ -2,9 +2,10 @@
  * THE VIEWER'S SCRIPT (YAZ-1799), bundled by `tools/buildShareViewer.mjs` into
  * `share/dist/assets/viewer.js` + `viewer.css` — React and the SAME vendored Excalidraw fork the
  * desktop app draws with — and served by the Worker from its own static assets. Nothing is
- * fetched from a third-party CDN at view time: the fonts come from `/assets/fonts/` too (the
- * page sets `window.EXCALIDRAW_ASSET_PATH` before this module runs).
+ * fetched from a third-party CDN at view time: the fonts come from `/assets/fonts/` too.
  */
+// First import, so the asset path is set before Excalidraw's modules evaluate (the page may run no inline script).
+import './assetPath.js'
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { Excalidraw, exportToBlob } from '@excalidraw/excalidraw'
@@ -86,7 +87,6 @@ async function main() {
       name,
       // Open fitted to the drawing (never past 100%), like the desktop app does.
       onExcalidrawAPI: (api) => fit(api, elements),
-      excalidrawAPI: (api) => fit(api, elements),
       UIOptions: { canvasActions: { loadScene: false, saveToActiveFile: false, export: false, saveAsImage: false, clearCanvas: false, changeViewBackgroundColor: false, toggleTheme: false }, tools: { image: false } },
     }),
   )

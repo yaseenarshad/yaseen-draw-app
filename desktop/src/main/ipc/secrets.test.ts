@@ -53,9 +53,19 @@ describe('registerSecretsIpc (🔒 YAZ-1775 D4, YAZ-1817)', () => {
   it('refuses a missing name, an empty value, or a non-string value with BAD_REQUEST', async () => {
     expect(await set(undefined)).toEqual(bad('BAD_REQUEST'))
     expect(await set({ name: '', value: 'x' })).toEqual(bad('BAD_REQUEST'))
-    expect(await set({ name: 'a', value: '' })).toEqual(bad('BAD_REQUEST'))
-    expect(await set({ name: 'a', value: 7 })).toEqual(bad('BAD_REQUEST'))
+    expect(await set({ name: 'pixabayApiKey', value: '' })).toEqual(bad('BAD_REQUEST'))
+    expect(await set({ name: 'pixabayApiKey', value: 7 })).toEqual(bad('BAD_REQUEST'))
     expect(await has({ name: 3 })).toEqual(bad('BAD_REQUEST'))
     expect(await has({ name: 'a' })).toEqual(ok(false))
+  })
+
+  it("set refuses any name but the Pixabay key — sharing's token and upload password are main's to write", async () => {
+    await secrets.set('cloudflareApiToken', 'real-token')
+    for (const name of ['cloudflareApiToken', 'shareUploadPassword', 'anythingElse']) {
+      expect(await set({ name, value: 'overwritten' })).toEqual(bad('BAD_REQUEST'))
+      expect(await set({ name, value: null })).toEqual(bad('BAD_REQUEST'))
+    }
+    expect(await secrets.read('cloudflareApiToken')).toBe('real-token')
+    expect(await has({ name: 'shareUploadPassword' })).toEqual(ok(false))
   })
 })

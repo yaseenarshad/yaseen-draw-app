@@ -26,7 +26,7 @@ import { registerWindowIpc } from './window'
  * (🔒 YAZ-1775 D5) and where `secrets.json` lives (🔒 YAZ-1775 D4), and every module under `main/` that touches it
  * stays Electron-free and testable.
  */
-export function registerIpc(store: Store, windows: WindowManagerIpc, userData: string, viewerAssetsDir: string): GitSyncManager {
+export function registerIpc(store: Store, windows: WindowManagerIpc, userData: string, share: { viewerAssetsDir: string; isPackaged: boolean }): GitSyncManager {
   registerFsIpc(store, windows)
   registerDrawingIpc(store, userData)
   registerDialogIpc()
@@ -39,8 +39,8 @@ export function registerIpc(store: Store, windows: WindowManagerIpc, userData: s
   // request gets its key without the key ever leaving main.
   const secrets = registerSecretsIpc(userData)
   registerMediaStudioIpc(userData, secrets)
-  // YAZ-1799 (prototype): sharing reads the Cloudflare token and upload password from the same door — main only.
-  registerShareIpc(userData, secrets, viewerAssetsDir)
+  // YAZ-1799: sharing reads the Cloudflare token and upload password from the same door — main only.
+  registerShareIpc(userData, secrets, share)
   registerWindowIpc(store, windows)
   registerStorageIpc()
   return registerGithubIpc(store)

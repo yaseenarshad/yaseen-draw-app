@@ -67,7 +67,7 @@ const makeSharing = async () =>
     secrets: createSecrets(path.join(dir, 'userData', 'secrets.json')),
     configFile: path.join(dir, 'userData', 'sharing.json'),
     apiBase: `${origin}/client/v4`,
-    originOverride: origin,
+    demoOrigin: origin,
     modules: { 'worker.js': await readFile(path.join(REPO, 'share', 'worker.js'), 'utf8') },
     readAssets: async () => [{ path: '/assets/viewer.js', bytes: new TextEncoder().encode('// viewer') }],
     fetchImpl: (input, init) => {

@@ -62,7 +62,7 @@ export interface SharingDeps {
    * DEMO ONLY: the origin every Worker request and every link uses instead of the provisioned
    * address (the fake server can't be reached as `*.workers.dev`). Null in production.
    */
-  originOverride: string | null
+  demoOrigin: string | null
   /** The Worker's module files, uploaded verbatim (`worker.js` is the main module). */
   modules: Record<string, string>
   /** The viewer's static assets (`share/dist/assets/**` as `/assets/…`), read when setup needs them. */
@@ -191,7 +191,7 @@ export function createSharing(deps: SharingDeps): Sharing {
   const writeConfig = (config: SharingConfig) => atomicWrite(deps.configFile, `${JSON.stringify(config, null, 2)}\n`)
 
   /** Where links point: the demo override, else the custom domain, else workers.dev. Null before setup. */
-  const linkOrigin = (config: SharingConfig | null): string | null => deps.originOverride ?? (config === null ? null : config.customDomain !== null ? `https://${config.customDomain.hostname}` : config.workersDevUrl)
+  const linkOrigin = (config: SharingConfig | null): string | null => deps.demoOrigin ?? (config === null ? null : config.customDomain !== null ? `https://${config.customDomain.hostname}` : config.workersDevUrl)
   const linkFor = (origin: string | null, id: string): string => (origin === null ? '' : `${origin}/b/${id}`)
   const links = (origin: string | null, rec: ShareRecord) => ({ id: rec.id, url: linkFor(origin, rec.id), allowDownload: rec.allowDownload })
 
@@ -233,7 +233,7 @@ export function createSharing(deps: SharingDeps): Sharing {
       workerName: config?.workerName ?? null,
       bucketName: config?.bucketName ?? null,
       readyAt: config?.readyAt ?? null,
-      demo: deps.originOverride !== null,
+      demo: deps.demoOrigin !== null,
     }
   }
 

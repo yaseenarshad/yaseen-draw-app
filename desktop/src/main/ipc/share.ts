@@ -18,9 +18,7 @@ import { handle, handleWithEvent } from './envelope'
  * here; the token crosses the bridge exactly once (renderer → main, in `share:setup`) and is never
  * sent back. Progress goes to the window that asked; changes go to every window.
  *
- * DEMO SWITCHES (both absent in production):
- *  - `YASEEN_DRAW_CLOUDFLARE_API` — the Cloudflare API base (`tools/fakeCloudflare.mjs` in the demo).
- *  - `YASEEN_DRAW_SHARE_ORIGIN` — where Worker requests and links go instead of `*.workers.dev`.
+ * The demo switches are read by `shareEndpoints` and only in an unpackaged (dev) build.
  */
 const req = (v: unknown): Record<string, unknown> => {
   if (!isRecord(v)) throw new BridgeFailure('BAD_REQUEST', 'missing request')
@@ -54,24 +52,35 @@ async function readViewerAssets(dir: string): Promise<AssetFile[]> {
   )
 }
 
-export function registerShareIpc(userData: string, secrets: Secrets, viewerAssetsDir: string): void {
-  const apiBase = process.env.YASEEN_DRAW_CLOUDFLARE_API?.trim() || CLOUDFLARE_API
-  const originOverride = process.env.YASEEN_DRAW_SHARE_ORIGIN?.trim().replace(/\/+$/, '') || null
+/**
+ * Where sharing talks to. DEMO SWITCHES, honoured ONLY when the app is not packaged — a shipped app
+ * always sends the real token to the real Cloudflare, whatever the environment says:
+ *  - `YASEEN_DRAW_CLOUDFLARE_API` — the Cloudflare API base (`tools/fakeCloudflare.mjs` in the demo).
+ *  - `YASEEN_DRAW_SHARE_ORIGIN` — where Worker requests and links go instead of `*.workers.dev`.
+ * The token page follows the API: the demo's lives on the fake server, production opens Cloudflare's own.
+ */
+export function shareEndpoints(isPackaged: boolean, env: Record<string, string | undefined>): { apiBase: string; demoOrigin: string | null; tokenPage: string } {
+  const apiBase = (!isPackaged && env.YASEEN_DRAW_CLOUDFLARE_API?.trim()) || CLOUDFLARE_API
+  const demoOrigin = (!isPackaged && env.YASEEN_DRAW_SHARE_ORIGIN?.trim().replace(/\/+$/, '')) || null
+  const tokenPage = apiBase === CLOUDFLARE_API ? CLOUDFLARE_TOKEN_PAGE : `${new URL(apiBase).origin}/__fake/token-page`
+  return { apiBase, demoOrigin, tokenPage }
+}
+
+export function registerShareIpc(userData: string, secrets: Secrets, where: { viewerAssetsDir: string; isPackaged: boolean }): void {
+  const { apiBase, demoOrigin, tokenPage } = shareEndpoints(where.isPackaged, process.env)
   const sharing = createSharing({
     secrets,
     configFile: join(userData, 'sharing.json'),
     apiBase,
-    originOverride,
+    demoOrigin,
     // Uploaded verbatim: the same two files `tools/fakeCloudflare.mjs` imports and runs.
     modules: { 'worker.js': workerSource, 'viewer/page.js': viewerSource },
-    readAssets: () => readViewerAssets(viewerAssetsDir),
+    readAssets: () => readViewerAssets(where.viewerAssetsDir),
     onChanged: () => broadcastAll(CH.shareChanged),
   })
   // Shares follow in-app renames, moves and deletes (the fs IPC calls these beside its favorites repair).
   shareFsHooks.renamed = (roots, oldPath, newPath) => sharing.relocate(roots, oldPath, newPath)
   shareFsHooks.deleted = (roots, path) => sharing.forget(roots, path)
-  // The demo's token page lives on the fake server; production opens Cloudflare's own, pre-filled.
-  const tokenPage = apiBase === CLOUDFLARE_API ? CLOUDFLARE_TOKEN_PAGE : `${new URL(apiBase).origin}/__fake/token-page`
 
   handle(CH.shareStatus, () => sharing.status())
   handle(CH.shareAccounts, async (body: unknown) => sharing.accounts(str(req(body).token, 'token')))
@@ -81,11 +90,6 @@ export function registerShareIpc(userData: string, secrets: Secrets, viewerAsset
     return sharing.setup(str(r.token, 'token'), (p) => e.sender.isDestroyed() || e.sender.send(CH.shareSetupProgress, p), r.accountId)
   })
   handle(CH.shareOpenCloudflare, async () => void (await shell.openExternal(tokenPage)))
-  handle(CH.shareOpenLink, async (body: unknown) => {
-    const url = new URL(str(req(body).url, 'url'))
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new BridgeFailure('BAD_REQUEST', 'only web links open here')
-    await shell.openExternal(url.href)
-  })
   handle(CH.shareGet, async (body: unknown) => {
     const r = req(body)
     return sharing.get(str(r.root, 'root'), str(r.path, 'path'))

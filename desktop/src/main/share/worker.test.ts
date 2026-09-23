@@ -46,8 +46,8 @@ describe('share Worker: auth', () => {
     expect(bucket.ops.count).toBe(0)
   })
 
-  it('health needs no password; an unknown api route or a bad id is 404', async () => {
-    expect(await (await call('GET', '/api/health', { auth: null })).json()).toMatchObject({ ok: true })
+  it('an unknown api route (there is no health route) or a bad id is 404', async () => {
+    expect((await call('GET', '/api/health')).status).toBe(404)
     expect((await call('PUT', '/api/boards/short', { body: '{}' })).status).toBe(404)
     expect((await call('GET', '/api/nothing')).status).toBe(404)
   })
@@ -168,6 +168,21 @@ describe('share Worker: the download flag is its own object, perm/<id> (D15)', (
     await call('PATCH', `/api/boards/${ID}`, { body: JSON.stringify({ allowDownload: true }) })
     const on = await (await call('GET', `/b/${ID}`, { auth: null })).text()
     expect(on).toContain('id="dl-excalidraw"')
+  })
+
+  it('every page carries the CSP (same-origin scripts and fetches, never framed) and has no inline script', async () => {
+    await put('{"v":1}')
+    for (const route of [`/b/${ID}`, '/b/AbCdEfGhIjKlMnOpQrStUvWz', '/']) {
+      const res = await call('GET', route, { auth: null })
+      const csp = res.headers.get('content-security-policy') ?? ''
+      for (const rule of ["script-src 'self'", "connect-src 'self'", "frame-ancestors 'none'"]) expect(csp).toContain(rule)
+      expect(res.headers.get('x-content-type-options')).toBe('nosniff')
+      expect(res.headers.get('referrer-policy')).toBe('no-referrer')
+      const scripts = [...(await res.text()).matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)]
+      for (const [, attrs, body] of scripts) expect(/type="application\/json"/.test(attrs) || (/src="\/assets\//.test(attrs) && body === '')).toBe(true)
+    }
+    const scene = await call('GET', `/scene/${ID}`, { auth: null })
+    expect(scene.headers.get('access-control-allow-origin')).toBeNull()
   })
 
   it('a missing board is 404 on every public route, whatever its flag', async () => {

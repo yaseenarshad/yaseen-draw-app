@@ -1,5 +1,5 @@
 /**
- * THE VIEWER PAGE (YAZ-1799 D5 — PROPOSED, still open): what someone who opens a share link sees.
+ * THE VIEWER PAGE (YAZ-1799, 🔒 D5/D9/D13): what someone who opens a share link sees.
  * A read-only Excalidraw (pan and zoom only) and the board's name. ONE link per board; when the
  * owner allows downloads (the default) it adds Download .excalidraw and Download PNG, which the
  * Worker also enforces (`/raw/<id>` is 403 when off). No login, no editing, no app.
@@ -7,7 +7,8 @@
  * A template string, not a file on disk: the page itself ships inside the Worker bundle as this
  * module. Its script — React plus the app's own vendored Excalidraw — and the fonts are the
  * Worker's STATIC ASSETS (`share/dist/assets/`, built by `tools/buildShareViewer.mjs`, uploaded
- * at setup), served from `/assets/`. Nothing is fetched from a third-party CDN at view time.
+ * at setup), served from `/assets/`. Nothing is fetched from a third-party CDN at view time, and
+ * there is no inline script: the Worker's CSP allows scripts from `/assets/` only.
  */
 
 
@@ -53,7 +54,6 @@ export function viewerPage({ id, allowDownload, name, updatedAt }) {
 </header>
 <div id="canvas"><div class="note" id="note">Loading drawing…</div></div>
 <script id="board" type="application/json">${scriptJson({ id, allowDownload: downloads, name, updatedAt })}</script>
-<script>window.EXCALIDRAW_ASSET_PATH = '/assets/'</script>
 <script type="module" src="/assets/viewer.js"></script>
 </body>
 </html>`
