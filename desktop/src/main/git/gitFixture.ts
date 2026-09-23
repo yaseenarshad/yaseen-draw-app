@@ -1,6 +1,8 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { build } from 'esbuild'
 import { GIT_CANDIDATES, git, resolveGit } from './exec'
 
 /**
@@ -81,3 +83,27 @@ export async function wireOrigin(repo: GitRepo, remote: BareRemote): Promise<voi
  * so those two describes raise it — and nothing else in the project does.
  */
 export const REAL_GIT_TIMEOUT_MS = 20_000
+
+let workerBundle: Promise<string> | null = null
+
+/**
+ * `storageWorker.ts` bundled to one CJS file, the way electron-vite's `?modulePath` builds it —
+ * a worker thread runs plain JS, not vitest's transformed TS (YAZ-1801 D8). Built once per test
+ * process; the file lives in the temp dir with the rest of the fixtures.
+ */
+export function bundleStorageWorker(): Promise<string> {
+  workerBundle ??= (async () => {
+    const outfile = path.join(await mkdtemp(path.join(tmpdir(), 'yaseendraw-worker-')), 'storageWorker.cjs')
+    await build({
+      entryPoints: [fileURLToPath(new URL('./storageWorker.ts', import.meta.url))],
+      outfile,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+      alias: { '@shared': fileURLToPath(new URL('../../../../shared', import.meta.url)) },
+      logLevel: 'silent',
+    })
+    return outfile
+  })()
+  return workerBundle
+}
