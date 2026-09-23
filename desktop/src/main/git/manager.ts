@@ -23,6 +23,12 @@ import { isRecord } from '@shared/guards'
  *     back" case sooner than any ladder would.
  *   - FOCUS and WAKE pull, behind a short cooldown, so alt-tabbing between two machines converges
  *     without turning window focus into a git spam button.
+ *   - IDLE pulls too (YAZ-1897 D6): a vault whose last pass ended `synced` runs a QUIET pass every
+ *     `pollMs` (default 60 s), so a board someone is only looking at still receives the other
+ *     machine's shapes. Never while edits are settling (the debounce's pass is coming anyway, and
+ *     a pass kept away from active drawing is a pass that never meets a mid-rebase save), never
+ *     while `pending` (the retry owns it) or `attention` (the next edit or focus does). Quiet means
+ *     no `syncing` flash on the chip every minute — only the result is broadcast.
  *
  * Two invariants everything else is built to protect:
  *   - ONE pass at a time per root, and a burst of triggers during a running pass collapses into
@@ -38,6 +44,7 @@ export const GITHUB_SYNC_FILE = 'github.json'
 const DEFAULT_QUIET_MS = 30_000
 const DEFAULT_RETRY_MS = 120_000
 const DEFAULT_FOCUS_COOLDOWN_MS = 10_000
+const DEFAULT_POLL_MS = 60_000
 
 export interface GitSyncHost {
   readConfig(root: string, name: string): Promise<unknown>
@@ -52,6 +59,7 @@ export interface GitSyncHost {
   quietMs?: number
   retryMs?: number
   focusCooldownMs?: number
+  pollMs?: number
 }
 
 export interface GitSyncManager {
@@ -81,10 +89,23 @@ interface Entry {
   follow: Follow | null
   debounce: ReturnType<typeof setTimeout> | null
   retry: ReturnType<typeof setTimeout> | null
+  /** The idle pull (D6): armed only after a pass that ended `synced` with no edits settling. */
+  poll: ReturnType<typeof setTimeout> | null
   /** Set by `drop`: a pass already in flight must not broadcast or spawn a follow-up after it. */
   dropped: boolean
 }
 
+
+/** `flush` is the quit variant (YAZ-1111); `poll` is the idle pull (YAZ-1897 D6), which shows no `syncing`. */
+type PassMode = 'normal' | 'flush' | 'poll'
+
+/** Every timer an entry can hold, cleared at once — on drop and before the quit flush. */
+function clearTimers(entry: Entry): void {
+  for (const timer of [entry.debounce, entry.retry, entry.poll]) if (timer !== null) clearTimeout(timer)
+  entry.debounce = null
+  entry.retry = null
+  entry.poll = null
+}
 
 /** Unref'd throughout: a sync timer must never hold the app open (the index cache's idiom). */
 function arm(ms: number, fn: () => void): ReturnType<typeof setTimeout> {
@@ -97,6 +118,7 @@ export function createGitSync(host: GitSyncHost): GitSyncManager {
   const quietMs = host.quietMs ?? DEFAULT_QUIET_MS
   const retryMs = host.retryMs ?? DEFAULT_RETRY_MS
   const focusCooldownMs = host.focusCooldownMs ?? DEFAULT_FOCUS_COOLDOWN_MS
+  const pollMs = host.pollMs ?? DEFAULT_POLL_MS
 
   /** Enabled roots only. */
   const entries = new Map<string, Entry>()
@@ -110,7 +132,8 @@ export function createGitSync(host: GitSyncHost): GitSyncManager {
 
   function broadcast(root: string, status: GithubSyncStatus): void {
     const entry = entries.get(root)
-    if (entry !== undefined) entry.last = status
+    // `merged` is news about ONE pass (YAZ-1897): kept out of `last`, so a late `status()` never replays the notice.
+    if (entry !== undefined) entry.last = status.merged === undefined ? status : { ...status, merged: undefined }
     try {
       host.onStatus(status)
     } catch (err) {
@@ -138,10 +161,10 @@ export function createGitSync(host: GitSyncHost): GitSyncManager {
    * The only way a pass ever starts. Idle → run now; busy → join (or create) the ONE follow-up.
    * Unmanaged roots answer `off` without doing anything, so every caller can be unconditional.
    */
-  function requestPass(root: string, flush = false): Promise<GithubSyncStatus> {
+  function requestPass(root: string, mode: PassMode = 'normal'): Promise<GithubSyncStatus> {
     const entry = entries.get(root)
     if (entry === undefined) return Promise.resolve({ root, state: 'off', enabled: false })
-    if (!entry.busy) return runPass(root, entry, flush)
+    if (!entry.busy) return runPass(root, entry, mode)
     if (entry.follow === null) {
       let resolve: (status: GithubSyncStatus) => void = () => {}
       const promise = new Promise<GithubSyncStatus>((r) => {
@@ -160,17 +183,16 @@ export function createGitSync(host: GitSyncHost): GitSyncManager {
    * synchronously from `onStatus` must coalesce into the follow-up rather than start a second
    * pass alongside the one that is about to start.
    */
-  async function runPass(root: string, entry: Entry, flush = false): Promise<GithubSyncStatus> {
+  async function runPass(root: string, entry: Entry, mode: PassMode = 'normal'): Promise<GithubSyncStatus> {
     entry.busy = true
-    if (entry.retry !== null) {
-      clearTimeout(entry.retry)
-      entry.retry = null
-    }
-    broadcast(root, carry(root, 'syncing', entry))
+    for (const timer of [entry.retry, entry.poll]) if (timer !== null) clearTimeout(timer)
+    entry.retry = null
+    entry.poll = null
+    if (mode !== 'poll') broadcast(root, carry(root, 'syncing', entry))
 
     let status: GithubSyncStatus
     try {
-      status = await host.syncPass(root, flush ? { flush: true } : undefined)
+      status = await host.syncPass(root, mode === 'flush' ? { flush: true } : undefined)
     } catch (err) {
       status = { root, state: 'attention', attention: 'error', message: String(err) }
     }
@@ -181,12 +203,20 @@ export function createGitSync(host: GitSyncHost): GitSyncManager {
     entry.lastPassAt = Date.now()
 
     if (!entry.dropped) {
-      broadcast(root, status)
+      // A quiet pull that changed nothing says nothing: no IPC to every window once a minute.
+      if (mode !== 'poll' || JSON.stringify(status) !== JSON.stringify(entry.last)) broadcast(root, status)
       // Offline. Exactly one timer, replaced by (not stacked on) the next pass's.
       if (status.state === 'pending') {
         entry.retry = arm(retryMs, () => {
           entry.retry = null
           void requestPass(root)
+        })
+      }
+      // D6: idle and in step → look again in a minute. Exactly one timer, replaced by the next pass's.
+      if (status.state === 'synced' && entry.debounce === null && mode !== 'flush') {
+        entry.poll = arm(pollMs, () => {
+          entry.poll = null
+          void requestPass(root, 'poll')
         })
       }
     }
@@ -218,6 +248,7 @@ export function createGitSync(host: GitSyncHost): GitSyncManager {
       follow: null,
       debounce: null,
       retry: null,
+      poll: null,
       dropped: false,
     }
     entries.set(root, entry)
@@ -232,10 +263,7 @@ export function createGitSync(host: GitSyncHost): GitSyncManager {
     const entry = entries.get(root)
     if (entry === undefined) return
     entry.dropped = true
-    if (entry.debounce !== null) clearTimeout(entry.debounce)
-    if (entry.retry !== null) clearTimeout(entry.retry)
-    entry.debounce = null
-    entry.retry = null
+    clearTimers(entry)
     entries.delete(root)
     try {
       entry.unsubVault()
@@ -290,6 +318,9 @@ export function createGitSync(host: GitSyncHost): GitSyncManager {
     // The first event of a burst is what the UI needs to hear; the other forty-nine say the same thing.
     if (entry.last.state !== 'pending') broadcast(root, carry(root, 'pending', entry))
     if (entry.debounce !== null) clearTimeout(entry.debounce)
+    // D6: edits are settling — the debounce's pass replaces the idle pull.
+    if (entry.poll !== null) clearTimeout(entry.poll)
+    entry.poll = null
     entry.debounce = arm(quietMs, () => {
       entry.debounce = null
       void requestPass(root)
@@ -391,12 +422,9 @@ export function createGitSync(host: GitSyncHost): GitSyncManager {
       await Promise.all([...evaluations.values()])
       const jobs: Array<Promise<unknown>> = []
       for (const [root, entry] of [...entries]) {
-        if (entry.debounce !== null) clearTimeout(entry.debounce)
-        if (entry.retry !== null) clearTimeout(entry.retry)
-        entry.debounce = null
-        entry.retry = null
+        clearTimers(entry)
         // Through the same chain as everything else: a pass already running is joined, not raced.
-        jobs.push(requestPass(root, true))
+        jobs.push(requestPass(root, 'flush'))
       }
       await Promise.all(jobs)
     },

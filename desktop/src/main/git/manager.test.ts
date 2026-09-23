@@ -47,6 +47,7 @@ interface HarnessOpts {
   quietMs?: number
   retryMs?: number
   focusCooldownMs?: number
+  pollMs?: number
   /** `n` is the 1-based pass count for that root. */
   pass?: (root: string, n: number) => Promise<GithubSyncStatus>
   inspect?: (root: string) => Promise<GithubSyncStatus>
@@ -95,6 +96,7 @@ function harness(opts: HarnessOpts = {}): Harness {
     quietMs: opts.quietMs ?? NEVER,
     retryMs: opts.retryMs ?? NEVER,
     focusCooldownMs: opts.focusCooldownMs ?? NEVER,
+    pollMs: opts.pollMs ?? NEVER,
   }
   if (opts.inspect !== undefined) host.inspect = opts.inspect
 
@@ -393,5 +395,68 @@ describe('files held back as too large (YAZ-1801 D3)', () => {
     const transitional = h.statuses.filter((s) => s.state === 'pending' || s.state === 'syncing').slice(-2)
     expect(transitional.map((s) => s.tooLarge)).toEqual([['Huge.excalidraw'], ['Huge.excalidraw']])
     expect(h.statuses.at(-1)?.tooLarge).toBeUndefined()
+  })
+})
+
+describe('idle pull (YAZ-1897 D6)', () => {
+  it('pulls again after `pollMs` while synced, without a `syncing` flash or a repeat broadcast', async () => {
+    const h = harness({ pollMs: 20 })
+    h.enabled.set(ROOT, true)
+    const manager = createGitSync(h.host)
+    manager.setOpenRoots([ROOT])
+    await until(() => h.passes.length >= 3)
+    const afterAdoption = h.statuses.findIndex((s) => s.state === 'synced') + 1
+    expect(h.statuses.slice(afterAdoption)).toEqual([]) // quiet: nothing new, nothing said
+    manager.setOpenRoots([])
+  })
+
+  it('broadcasts a quiet pull that brought news, and never keeps `merged` as the root\'s last status', async () => {
+    const merged = [{ path: 'b.excalidraw', author: 'Sam', clashes: 0 }]
+    const h = harness({ pollMs: 20, pass: async (root, n) => (n === 2 ? { root, state: 'synced', merged } : { root, state: 'synced' }) })
+    h.enabled.set(ROOT, true)
+    const manager = createGitSync(h.host)
+    manager.setOpenRoots([ROOT])
+    await until(() => h.statuses.some((s) => s.merged !== undefined))
+    expect(h.statuses.map((s) => s.state)).toEqual(['syncing', 'synced', 'synced']) // no `syncing` before the pull
+    expect((await manager.status(ROOT)).merged).toBeUndefined()
+    manager.setOpenRoots([])
+  })
+
+  it('never pulls while pending or in attention', async () => {
+    for (const state of ['pending', 'attention'] as const) {
+      const h = harness({ pollMs: 10, pass: async (root) => ({ root, state }) })
+      h.enabled.set(ROOT, true)
+      const manager = createGitSync(h.host)
+      manager.setOpenRoots([ROOT])
+      await until(() => h.passes.length === 1)
+      await sleep(60)
+      expect(h.passes).toHaveLength(1)
+      manager.setOpenRoots([])
+    }
+  })
+
+  it('stands down while edits settle, and the edit pass re-arms it', async () => {
+    const h = harness({ pollMs: 40, quietMs: 80 })
+    h.enabled.set(ROOT, true)
+    const manager = createGitSync(h.host)
+    manager.setOpenRoots([ROOT])
+    await until(() => h.passes.length === 1)
+    h.emitVault(ROOT, change('a.md', 1))
+    await sleep(60) // the poll would have fired by now; the edit cancelled it
+    expect(h.passes).toHaveLength(1)
+    await until(() => h.passes.length === 2) // the debounce's pass
+    await until(() => h.passes.length === 3) // …and the poll it re-armed
+    manager.setOpenRoots([])
+  })
+
+  it('goes silent when the vault closes', async () => {
+    const h = harness({ pollMs: 10 })
+    h.enabled.set(ROOT, true)
+    const manager = createGitSync(h.host)
+    manager.setOpenRoots([ROOT])
+    await until(() => h.passes.length === 1)
+    manager.setOpenRoots([])
+    await sleep(50)
+    expect(h.passes).toHaveLength(1)
   })
 })
