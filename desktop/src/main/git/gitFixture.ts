@@ -87,15 +87,15 @@ export const REAL_GIT_TIMEOUT_MS = 20_000
 let workerBundle: Promise<string> | null = null
 
 /**
- * `storageWorker.ts` bundled to one CJS file, the way electron-vite's `?modulePath` builds it —
- * a worker thread runs plain JS, not vitest's transformed TS (YAZ-1801 D8). Built once per test
+ * `main/storageWorker.ts` bundled to one CJS file, the way electron-vite's `?modulePath` builds it —
+ * a worker thread runs plain JS, not vitest's transformed TS (YAZ-1801 D8, D11). Built once per test
  * process; the file lives in the temp dir with the rest of the fixtures.
  */
 export function bundleStorageWorker(): Promise<string> {
   workerBundle ??= (async () => {
     const outfile = path.join(await mkdtemp(path.join(tmpdir(), 'yaseendraw-worker-')), 'storageWorker.cjs')
     await build({
-      entryPoints: [fileURLToPath(new URL('./storageWorker.ts', import.meta.url))],
+      entryPoints: [fileURLToPath(new URL('../storageWorker.ts', import.meta.url))],
       outfile,
       bundle: true,
       platform: 'node',

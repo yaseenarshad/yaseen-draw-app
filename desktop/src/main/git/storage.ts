@@ -1,6 +1,5 @@
 import { readdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
-import { Worker } from 'node:worker_threads'
 import { GITHUB_FILE_WARN_BYTES, MAX_DRAWING_BYTES, type VaultStorageFile, type VaultStorageStats } from '@shared/types'
 import { isDrawing } from '@shared/fileKind'
 import { ASSETS_DIR } from '@shared/drawingAssets'
@@ -144,20 +143,4 @@ export async function vaultStorage(root: string, opts?: { candidates?: readonly 
     large: [...walked.large].sort((a, b) => b.bytes - a.bytes || a.path.localeCompare(b.path)),
     embedded: { bytes: withPictures.reduce((n, b) => n + b.embeddedBytes, 0), boards: withPictures.length },
   }
-}
-
-/**
- * D8 — `vaultStorage` on a worker thread, so measuring never freezes the window: the walk
- * JSON.parses every board, and on the main thread that was ~1.3 s of a dead UI on a 230 MB vault.
- * Same function, so the same numbers. `workerFile` is the built `storageWorker.ts` (`?modulePath`
- * in `ipc/storage.ts`). One thread per measure: a measure is rare and a thread starts in ms.
- */
-export function vaultStorageOffThread(workerFile: string, root: string): Promise<VaultStorageStats> {
-  return new Promise((resolve, reject) => {
-    const worker = new Worker(workerFile, { workerData: root })
-    worker.once('message', resolve)
-    worker.once('error', reject)
-    // After a message or an error this is a no-op; otherwise the thread died without answering.
-    worker.once('exit', (code) => reject(new Error(`storage worker exited with code ${code} before answering`)))
-  })
 }
