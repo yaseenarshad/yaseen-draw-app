@@ -34,30 +34,18 @@ function title(status: GithubSyncStatus): string {
   }
 }
 
-/**
- * YAZ-1801 D3: files held back as over GitHub's limit outrank every other label — "Synced" or
- * "Attention" would both undersell "this file is not backed up". Red, counted, and the hover names
- * them. While a pass runs the list rides along (the manager carries it), so the chip does not
- * blink back to "Syncing…" and lose the warning for the length of every pass.
- */
-function tooLargeTitle(paths: readonly string[]): string {
-  return `Not synced — over GitHub's 100 MB limit, only on this Mac: ${paths.join(', ')}`
-}
-
 export function SyncIndicator({ status, onSyncNow }: { status: GithubSyncStatus; onSyncNow: () => void }) {
+  // YAZ-1801 D3: files held back as over GitHub's limit outrank every other label — "Synced" or
+  // "Attention" would both undersell "this file is not backed up". Red, counted, and the hover
+  // names them. The list rides a `syncing` status too (the manager carries it), so the warning
+  // does not blink away for the length of every pass.
   const held = status.tooLarge ?? []
-  if (held.length > 0) {
-    return (
-      <button type="button" className="sync-indicator sync-indicator--attention sync-indicator--too-large" title={tooLargeTitle(held)} aria-live="polite" onClick={onSyncNow}>
-        <span className="sync-indicator__dot" />
-        {held.length === 1 ? '1 file not synced' : `${held.length} files not synced`}
-      </button>
-    )
-  }
+  const label = held.length === 0 ? LABEL[status.state] : held.length === 1 ? '1 file not synced' : `${held.length} files not synced`
+  const hover = held.length === 0 ? title(status) : `Not synced — over GitHub's 100 MB limit, only on this Mac: ${held.join(', ')}`
   return (
-    <button type="button" className={`sync-indicator sync-indicator--${status.state}`} title={title(status)} aria-live="polite" onClick={onSyncNow}>
+    <button type="button" className={`sync-indicator sync-indicator--${held.length === 0 ? status.state : 'attention'}`} title={hover} aria-live="polite" onClick={onSyncNow}>
       <span className="sync-indicator__dot" />
-      {LABEL[status.state]}
+      {label}
     </button>
   )
 }
