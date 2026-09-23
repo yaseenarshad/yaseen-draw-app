@@ -42,7 +42,6 @@ describe('settingCandidates', () => {
       'hoverPreview',
       'libraryFolder',
       'pixabayApiKey',
-      'sharing',
       'hotkeys-window',
       'hotkeys-canvas',
       'hotkeys-mouse',
@@ -52,6 +51,12 @@ describe('settingCandidates', () => {
   it('includes the Sync page only when the engine is there', () => {
     expect(ids(settingCandidates(ctx({ status: null, setEnabled: () => undefined })))).toContain('githubSync')
     expect(ids(settingCandidates(ctx()))).not.toContain('githubSync')
+  })
+
+  it('includes the Sharing page only with App\'s sharing state, every row of it', () => {
+    const sharing = { root: null, status: null, rows: null, listError: null, now: 0, refresh: () => undefined }
+    expect(ids(settingCandidates({ ...ctx(), sharing })).filter((id) => id.startsWith('sharing'))).toEqual(['sharingStatus', 'sharingSetup', 'sharingBoards', 'sharingDomain', 'sharingHelp', 'sharingTurnOff'])
+    expect(ids(searchSettings(settingCandidates({ ...ctx(), sharing }), 'custom domain'))).toEqual(['sharingDomain'])
   })
 
   it('a candidate carries label, hint, keywords and section title, case-folded in `lower`', () => {

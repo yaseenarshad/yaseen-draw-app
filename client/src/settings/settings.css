@@ -293,6 +293,11 @@
   background: var(--accent-soft);
 }
 
+.settings__option:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .settings__option--active {
   border-color: var(--accent);
   background: var(--accent-soft);
