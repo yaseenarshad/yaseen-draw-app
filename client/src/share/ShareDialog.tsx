@@ -251,10 +251,10 @@ export function ShareDialog({ root, path, onClose, onOpenSettings }: ShareDialog
   }
 
   return (
-    <div className="share-overlay" onMouseDown={() => busy === null && onClose()}>
+    <div className="confirm-overlay share-overlay" onMouseDown={() => busy === null && onClose()}>
       <div
         ref={dialogRef}
-        className="share-dialog"
+        className="confirm share-dialog"
         role="dialog"
         aria-modal="true"
         aria-label={`Share ${name}`}
@@ -277,14 +277,14 @@ export function ShareDialog({ root, path, onClose, onOpenSettings }: ShareDialog
         </header>
 
         {loading ? (
-          <p className="share-dialog__muted">…</p>
+          <p className="sharing__muted">…</p>
         ) : status.state !== 'ready' ? (
           <>
-            <p className="share-dialog__text">Sharing isn't set up on this computer yet. It uses your own free Cloudflare account; setting it up takes about two minutes and one pasted key.</p>
+            <p className="confirm__text">Sharing isn't set up on this computer yet. It uses your own free Cloudflare account; setting it up takes about two minutes and one pasted key.</p>
             <footer className="share-dialog__footer">
               <button
                 type="button"
-                className="share-btn share-btn--primary"
+                className="confirm__btn btn--primary"
                 onClick={() => {
                   onClose()
                   onOpenSettings()
@@ -321,11 +321,11 @@ export function ShareDialog({ root, path, onClose, onOpenSettings }: ShareDialog
             )}
 
             <footer className="share-dialog__footer">
-              <button type="button" className="share-btn share-btn--outline" onClick={() => shared && void copy(entry.url)} disabled={!shared || entry.url === ''} data-testid="share-copy">
+              <button type="button" className="confirm__btn" onClick={() => shared && void copy(entry.url)} disabled={!shared || entry.url === ''} data-testid="share-copy">
                 <LinkIcon />
                 {copied ? 'Copied' : 'Copy link'}
               </button>
-              <button type="button" className="share-btn share-btn--primary" onClick={onClose} disabled={busy !== null} data-testid="share-done">
+              <button type="button" className="confirm__btn btn--primary" onClick={onClose} disabled={busy !== null} data-testid="share-done">
                 Done
               </button>
             </footer>

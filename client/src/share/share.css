@@ -1,28 +1,24 @@
 /*
- * Share link (YAZ-1799): the Share dialog and the Settings › Sharing page. Themed only through
- * app.css's tokens, so dark mode needs no rule of its own.
+ * Share link (YAZ-1799): the Share dialog and the Settings › Sharing page. The dialog is the
+ * delete sheet's `.confirm-overlay` / `.confirm` / `.confirm__btn` (app.css) plus only what those
+ * lack; everything is themed through app.css's tokens, so dark mode needs no rule of its own.
  */
 
-.share-overlay {
-  position: fixed;
-  inset: 0;
+/* ---------- Share dialog ---------- */
+
+.confirm-overlay.share-overlay {
   z-index: 80;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.3);
 }
 
-.share-dialog {
+.confirm.share-dialog {
   width: min(480px, calc(100vw - 32px));
   padding: 18px 20px;
-  font-size: 14px;
   line-height: 1.5;
-  color: var(--fg);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
+}
+
+.share-dialog button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .share-dialog__head {
@@ -38,66 +34,23 @@
   margin: 0;
   font-size: 16px;
   font-weight: 500;
-  line-height: 24px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
+/* One line, cut with an ellipsis: a long board name or helper line never widens anything. */
+.share-dialog__title,
+.share-access__helper,
 .share-dialog__close {
-  display: grid;
-  place-items: center;
-  flex: none;
   width: 28px;
   height: 28px;
-  padding: 0;
   color: var(--fg-muted);
   border-radius: 6px;
 }
 
-.share-dialog__close:hover {
+.share-dialog__close:hover,
+.share-picker:hover:not([aria-disabled='true']),
+.share-picker[aria-expanded='true'] {
   background: var(--bg-hover);
 }
-
-.share-dialog__text {
-  margin: 0 0 12px;
-}
-
-.share-dialog__muted {
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: var(--fg-muted);
-}
-
-.share-btn {
-  padding: 5px 12px;
-  font-size: 13px;
-  color: var(--fg);
-  white-space: nowrap;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
-
-.share-btn:hover:not(:disabled) {
-  background: var(--accent-soft);
-}
-
-.share-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.share-btn--primary {
-  color: #fff;
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.share-btn--primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 85%, #000);
-}
-
-/* ---------- Share dialog: General access ---------- */
 
 .share-access__label {
   margin: 0 0 10px;
@@ -140,32 +93,20 @@
 .share-access__helper {
   max-width: 100%;
   margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 12px;
-  line-height: 16px;
   color: var(--fg-muted);
 }
 
-/* A borderless text button with a chevron — it opens the app's own popover (`.ctx-menu`). The
-   negative margin lines its TEXT up with the helper line below while the hover pill overhangs. */
+/* A borderless text button with a chevron that opens the app's own popover (`.ctx-menu`); the
+   negative margin lines its TEXT up with the helper line while the hover pill overhangs. */
 .share-picker {
   display: inline-flex;
   align-items: center;
   gap: 2px;
   margin-left: -6px;
   padding: 2px 4px 2px 6px;
-  font-size: 14px;
   font-weight: 500;
-  line-height: 20px;
-  color: var(--fg);
   border-radius: 6px;
-}
-
-.share-picker:hover:not([aria-disabled='true']),
-.share-picker[aria-expanded='true'] {
-  background: var(--bg-hover);
 }
 
 .share-picker[aria-disabled='true'] {
@@ -188,8 +129,7 @@
   font-weight: 400;
 }
 
-/* Above the share overlay (z 80); otherwise exactly the sort menu, ✓ and all. The arrow keys
-   move focus, so the focused item wears the hover fill. */
+/* Above the share overlay; otherwise exactly the sort menu. The arrow keys move focus, so the focused item wears the hover fill. */
 .ctx-menu.share-menu {
   z-index: 90;
 }
@@ -199,14 +139,13 @@
   background: var(--accent-soft);
 }
 
-/* The one status line: a small coloured dot, then the words. */
+/* The one status line (dialog and Settings rows): a small coloured dot, then the words. */
 .share-status {
   display: flex;
   align-items: center;
   gap: 6px;
   margin: 12px 0 0 48px;
   font-size: 12px;
-  line-height: 16px;
   color: var(--fg-muted);
 }
 
@@ -215,59 +154,54 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--ok);
+  background: var(--dot, var(--ok));
 }
 
-.share-status--busy .share-status__dot {
-  background: var(--accent);
+.share-status--busy {
+  --dot: var(--accent);
 }
 
 .share-status--error {
+  --dot: var(--danger);
   color: var(--danger);
-}
-
-.share-status--error .share-status__dot {
-  background: var(--danger);
 }
 
 .share-dialog__footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   margin-top: 20px;
 }
 
-.share-btn--outline {
+/* The footer's two pills: Copy link (outline, accent text) and Done (filled, right-aligned even alone). */
+.share-dialog__footer .confirm__btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 14px;
+  padding: 5px 16px;
   color: var(--accent);
-  border-color: var(--border);
   border-radius: 999px;
 }
 
-.share-dialog__footer .share-btn--primary {
-  margin-left: auto; /* right-aligned even alone (the not-set-up footer) */
-  padding: 5px 18px;
-  border-radius: 999px;
+.share-dialog__footer .btn--primary {
+  margin-left: auto;
+  color: #fff;
+}
+
+.share-dialog__footer .btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 85%, #000);
 }
 
 /* ---------- Settings › Sharing (YAZ-1889): settings rows and buttons; only what they lack ---------- */
 
-.sharing__status {
-  white-space: nowrap;
-}
-
-.sharing__muted,
-.sharing__error {
+.sharing__muted {
   margin: 0;
   font-size: 13px;
   color: var(--fg-muted);
 }
 
 .sharing__error {
-  margin-top: 8px;
+  margin: 8px 0 0;
+  font-size: 13px;
   color: var(--danger);
 }
 
@@ -279,41 +213,28 @@
   background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
-.sharing__accounts,
-.sharing__confirm {
+/* The account picker and the turn-off confirm: a `.confirm` box in the page instead of over it. */
+.confirm.sharing__inline {
+  width: auto;
   margin: 10px 0 0;
   padding: 10px 12px;
   font-size: 13px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  box-shadow: none;
 }
 
-.sharing__accounts label {
-  display: flex;
-  gap: 8px;
-  padding: 3px 0;
-}
-
-.sharing__confirm p {
-  margin: 0 0 8px;
-}
-
-.sharing__accounts .settings__options {
+.sharing__inline .settings__options {
   margin-top: 8px;
 }
 
+.sharing__steps,
 .sharing__steps {
-  display: flex;
-  flex-direction: column;
   gap: 4px;
-  margin: 10px 0 0;
-  padding: 0;
+  margin-top: 10px;
   font-size: 13px;
-  list-style: none;
 }
 
-.sharing__steps li {
+.sharing__steps li,
+.sharing__inline label {
   display: flex;
   gap: 8px;
 }
@@ -327,26 +248,11 @@
   color: var(--danger);
 }
 
-.sharing__boards {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
 .sharing__board {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 4px 10px;
-}
-
-.sharing__board-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .sharing__board .share-status {
@@ -367,15 +273,9 @@
 .sharing__help h4 {
   margin: 14px 0 4px;
   font-size: 14px;
-  font-weight: 600;
 }
 
-.sharing__help h4:first-child {
-  margin-top: 0;
-}
-
-.sharing__help p,
-.sharing__help ol {
+.sharing__help :is(p, ol) {
   margin: 0 0 6px;
 }
 

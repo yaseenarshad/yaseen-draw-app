@@ -46,7 +46,7 @@ function statusHint({ sharing }: SettingsCtx): string {
 function Status({ sharing }: SettingsCtx) {
   if (sharing?.status == null) return null
   return (
-    <span className="sharing__status" data-testid="sharing-status">
+    <span data-testid="sharing-status">
       {isReady(sharing) ? '✅ Sharing ready' : 'Not set up'}
     </span>
   )
@@ -126,7 +126,7 @@ function SetupSharing({ sharing }: SettingsCtx) {
         </button>
       </div>
       {accounts !== null && (
-        <fieldset className="sharing__accounts" data-testid="sharing-accounts">
+        <fieldset className="confirm sharing__inline" data-testid="sharing-accounts">
           <legend>This key can see {accounts.length} Cloudflare accounts. Which one should hold your shared boards?</legend>
           {accounts.map((a) => (
             <label key={a.id}>
@@ -367,8 +367,8 @@ function TurnOff({ sharing }: SettingsCtx) {
         </button>
       </div>
       {confirm !== null && (
-        <div className="sharing__confirm" data-testid="sharing-confirm">
-          <p>{TURN_OFF[confirm].ask}</p>
+        <div className="confirm sharing__inline" data-testid="sharing-confirm">
+          <p className="confirm__text">{TURN_OFF[confirm].ask}</p>
           <div className="settings__options">
             <button type="button" className="settings__option" onClick={() => setConfirm(null)} disabled={busy}>
               Cancel
