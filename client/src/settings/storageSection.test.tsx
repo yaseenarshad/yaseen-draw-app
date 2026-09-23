@@ -9,6 +9,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { DEFAULT_SETTINGS, GITHUB_FILE_LIMIT_BYTES, type ShrinkResult, type VaultStorageStats } from '@shared/types'
+import { api } from '../api'
+import { useVaultStorage } from '../hooks/useVaultStorage'
 import { SettingsDialog } from './SettingsDialog'
 import { historyBar } from './storageSection'
 
@@ -18,6 +20,7 @@ vi.mock('../api', async (importOriginal) => ({
     drawing: { libraryFolder: vi.fn(async () => '/userData/library') },
     pickFolder: vi.fn(async () => ({ cancelled: true as const })),
     secrets: { has: vi.fn(async () => false), set: vi.fn(async () => undefined) },
+    storage: { stats: vi.fn(async () => STATS), shrink: vi.fn() },
   },
 }))
 
@@ -160,6 +163,23 @@ describe('Settings › Storage (YAZ-1801)', () => {
     expect(groupTitles(el)).toContain('Make boards smaller')
     expect(el.querySelector('[data-testid="storage-shrink"]')).toBeNull()
     expect(el.textContent).toContain('9 boards 230.0 MB lighter · 1 skipped')
+  })
+
+  it("opening Settings, then the page, measures once — the page's open, not also Settings'", async () => {
+    // App's wiring, real hook: the root's own first measure, then Settings, then Storage.
+    function App({ open }: { open: boolean }) {
+      const storage = useVaultStorage('/v', null)
+      return open ? <SettingsDialog ctx={{ settings: { ...DEFAULT_SETTINGS }, onChange: vi.fn(), sync: { status: null, setEnabled: vi.fn() }, storage }} onClose={vi.fn()} /> : null
+    }
+    const { el } = mount(null, {}, false)
+    const stats = vi.mocked(api.storage.stats)
+    stats.mockClear()
+    await act(async () => root?.render(<App open={false} />))
+    expect(stats).toHaveBeenCalledOnce()
+    await act(async () => root?.render(<App open />))
+    expect(stats).toHaveBeenCalledOnce()
+    await act(async () => openStorage(el))
+    expect(stats).toHaveBeenCalledTimes(2)
   })
 
   it('search still reaches the page', () => {

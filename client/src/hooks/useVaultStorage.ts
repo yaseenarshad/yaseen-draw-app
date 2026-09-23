@@ -5,9 +5,10 @@ import { dirtyPaths } from '../lib/renameContinuity'
 
 /**
  * Settings › Storage's data (YAZ-1801 D1): one `storage.stats(root)` per reason to believe the
- * numbers moved — the root changed, Settings opened, the page opened (it calls `refresh`), a sync
- * pass finished (a commit grows the history), or a shrink ran. Stats walk the whole vault and parse every board, so they are NOT
- * refreshed on every watcher event; the page is a report you open, not a live gauge.
+ * numbers moved — the root changed, the page opened (it calls `refresh`), a sync pass finished (a
+ * commit grows the history), or a shrink ran. Opening Settings itself is NOT one: the page's own
+ * open is, and both at once measured twice. Stats walk the whole vault and parse every board, so
+ * they are NOT refreshed on every watcher event; the page is a report you open, not a live gauge.
  *
  * `stats` is null while the first answer is in flight (the page shows "Measuring…"), and keeps
  * the last answer while a refresh runs so the page does not flash empty. A failed read keeps the
@@ -24,7 +25,7 @@ export interface VaultStorageState {
   lastShrink: ShrinkResult | null
 }
 
-export function useVaultStorage(root: string | null, settingsOpen: boolean, syncState: string | null): VaultStorageState {
+export function useVaultStorage(root: string | null, syncState: string | null): VaultStorageState {
   const [stats, setStats] = useState<VaultStorageStats | null>(null)
   const [lastShrink, setLastShrink] = useState<ShrinkResult | null>(null)
   const generation = useRef(0)
@@ -49,11 +50,6 @@ export function useVaultStorage(root: string | null, settingsOpen: boolean, sync
       generation.current++
     }
   }, [refresh])
-
-  // Opening Settings re-measures (the page is what the numbers are for).
-  useEffect(() => {
-    if (settingsOpen) refresh()
-  }, [settingsOpen, refresh])
 
   // Every FINISHED pass (synced / attention / off) may have moved the git numbers. `syncing` is a
   // pass in flight (measured after, not mid-commit) and `pending` is an edit burst waiting out
