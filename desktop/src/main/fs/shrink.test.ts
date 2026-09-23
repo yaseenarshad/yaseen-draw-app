@@ -1,8 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { landAssets } from './drawing'
 import { shrinkVault } from './shrink'
+
+// The real extraction; the spy lets one test land a write from "another window" mid-shrink.
+vi.mock('./drawing', async (actual) => {
+  const mod = await actual<typeof import('./drawing')>()
+  return { ...mod, landAssets: vi.fn(mod.landAssets) }
+})
 
 /**
  * "Move pictures out of boards" (YAZ-1801 D5): the save's own extraction run over a whole vault
@@ -54,6 +61,19 @@ describe('shrinkVault (YAZ-1801 D5)', () => {
     expect(after.elements).toEqual([imageEl('aaa'), imageEl('bbb')])
   })
 
+  it('keeps the block byte-for-byte: the text up to its closing brace is the same before and after', async () => {
+    const body = legacy({ aaa: { mimeType: 'image/png', dataURL: png('A') } }, [imageEl('aaa')])
+    const file = await seed('Legacy.excalidraw', body)
+    const blockText = (text: string) => text.slice(0, text.indexOf('\n  },') + 5)
+
+    await shrinkVault(root)
+
+    const after = await readFile(file, 'utf8')
+    expect(after).not.toBe(body)
+    expect(blockText(after)).toBe(blockText(body))
+    expect(blockText(body)).toContain('"cloudId": "k97"')
+  })
+
   it('stores a picture two boards share ONCE, and drops an embedded picture nothing references', async () => {
     await seed('A.excalidraw', legacy({ same: { mimeType: 'image/png', dataURL: png('S') } }, [imageEl('same')]))
     await seed('Nested/B.excalidraw', legacy({ same: { mimeType: 'image/png', dataURL: png('S') }, orphan: { mimeType: 'image/png', dataURL: png('O') } }, [imageEl('same')]))
@@ -86,6 +106,19 @@ describe('shrinkVault (YAZ-1801 D5)', () => {
     expect((await shrinkVault(root)).shrunk).toBe(1)
     expect(await assets()).toEqual(['good.png'])
     expect(JSON.parse(await readFile(file, 'utf8')).yaseendraw).toEqual(BLOCK)
+  })
+
+  it('skips a board another writer changed while its pictures were landing, and leaves that write alone', async () => {
+    const file = await seed('Legacy.excalidraw', legacy({ aaa: { mimeType: 'image/png', dataURL: png('A') } }, [imageEl('aaa')]))
+    const theirs = legacy({ aaa: { mimeType: 'image/png', dataURL: png('A') } }, [imageEl('aaa'), imageEl('aaa')])
+    vi.mocked(landAssets).mockImplementationOnce(async (dir, pending) => {
+      await writeFile(file, theirs)
+      await utimes(file, new Date(), new Date(Date.now() + 5_000))
+      return (await vi.importActual<typeof import('./drawing')>('./drawing')).landAssets(dir, pending)
+    })
+
+    expect(await shrinkVault(root)).toEqual({ shrunk: 0, skipped: 1, bytesMoved: 0 })
+    expect(await readFile(file, 'utf8')).toBe(theirs)
   })
 
   it('is idempotent: a second run finds nothing to do', async () => {
