@@ -7,7 +7,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { TreeNode } from '@shared/types'
-import { Tree, TOO_LARGE_LABEL, type TreeFileMove, type TreeSelection } from './Tree'
+import { TOO_LARGE_LABEL } from '../lib/syncAttention'
+import { Tree, type TreeFileMove, type TreeSelection } from './Tree'
 
 let root: Root | null = null
 let container: HTMLElement | null = null

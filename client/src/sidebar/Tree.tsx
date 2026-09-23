@@ -1,6 +1,7 @@
 import type { TreeNode } from '@shared/types'
 import type { FileNode } from '@shared/treeSort'
 import { stripExt } from '../lib/paths'
+import { TOO_LARGE_LABEL } from '../lib/syncAttention'
 import { CreateInline } from './CreateInline'
 import { renameInputName, type EntryKind } from './createEntry'
 import { RenameInline } from './RenameInline'
@@ -112,9 +113,6 @@ interface TreeProps {
   tooLarge?: ReadonlySet<string>
   depth?: number
 }
-
-/** The one sentence the cloud-off icon says, on hover and to a screen reader (YAZ-1801 D3). */
-export const TOO_LARGE_LABEL = "Over GitHub's 100 MB limit — only on this Mac"
 
 /** A broken cloud (cloud-off): red, right of the name, on a file sync held back. */
 function CloudOffIcon() {
