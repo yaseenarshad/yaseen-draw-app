@@ -12,3 +12,14 @@ export function boardFolder(root: string, path: string): string {
   const rel = path.startsWith(`${root}/`) ? path.slice(root.length + 1) : path
   return rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '/'
 }
+
+/**
+ * A vault-relative POSIX path (git's, e.g. sync's `tooLarge`) as the absolute path the tree uses,
+ * in the ROOT's own separator: `C:\Notes` + `a/b.mov` → `C:\Notes\a\b.mov` on Windows, where
+ * main's tree paths come from `path.join`. A root with any `/` is treated as POSIX.
+ */
+export function vaultPath(root: string, rel: string): string {
+  const sep = root.includes('/') || !root.includes('\\') ? '/' : '\\'
+  const base = root.endsWith(sep) ? root.slice(0, -1) : root
+  return `${base}${sep}${sep === '/' ? rel : rel.split('/').join(sep)}`
+}
