@@ -44,7 +44,7 @@ describe('attentionCopy', () => {
 
   it('conflict leads with the lossless promise and points at GitHub Desktop — no prompt', () => {
     expect(attentionCopy(status({ attention: 'conflict' }))).toEqual({
-      title: 'Both machines changed the same lines.',
+      title: "Sync couldn't finish merging with the other computer.",
       body: 'Nothing was lost — your local version is untouched. Resolve in GitHub Desktop, then sync again.',
       showSetupPrompt: false,
       dismissible: true,
@@ -105,7 +105,7 @@ describe('buildSetupPrompt', () => {
     ['no-git', 'git is not installed on this computer'],
     ['no-identity', 'git has no user.name or user.email configured'],
     ['auth', "GitHub did not accept this computer's credentials"],
-    ['conflict', 'both machines changed the same lines and the merge conflicted'],
+    ['conflict', 'it could not finish merging changes from another computer, so it stopped without changing anything'],
     ['error', 'git reported an error'],
   ] as Array<[GithubSyncAttention, string]>)('%s reports its own reason line', (reason, line) => {
     expect(buildSetupPrompt('/vault', reason)).toContain(`It reported: ${line}.`)

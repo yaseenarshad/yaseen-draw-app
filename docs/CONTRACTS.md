@@ -150,7 +150,8 @@ calls that go through it; `state`, `window`, `menu`, `link` and `watch` are call
 | `components.preview(req)` | `components:preview` | `{ slug }` → the stored PNG as a dataURL |
 | `components.onChanged` | `components:changed` | pushed to EVERY window when the components library changes — any vault, any writer, no payload |
 | `secrets.set(req)` / `has(req)` | `secrets:set` / `secrets:has` | `{ name, value \| null }` writes or clears a secret — `pixabayApiKey` only, any other name is `BAD_REQUEST`; `{ name }` → boolean. NO channel answers a value (🔒 YAZ-1775 D4, YAZ-1842 D1) |
-| `github.status` / `syncNow` / `setEnabled` / `onStatus` | `github:*` | per-vault GitHub sync |
+| `github.status` / `syncNow` / `setEnabled` / `onStatus` | `github:*` | per-vault GitHub sync; a pass that merged carries `merged` (below) |
+| `github.history` / `version` / `restore` | `github:history` / `github:version` / `github:restore` | Version history (YAZ-1897 D4): `(root, path)` → a board's versions newest first; `(root, path, ref)` → one version's `{ json, files }` (pictures from `assets/`, as `drawing:load`); `(root, path, ref)` writes it over the board. `ref` is opaque (`<sha>:<path>`), anything else is `BAD_REQUEST` |
 | `share.status` / `accounts` / `setup` / `onSetupProgress` / `openCloudflare` | `share:status` / `share:accounts` / `share:setup` / `share:setup-progress` / `share:open-cloudflare` | Share links (YAZ-1799, below): the setup status (no secret), the accounts a pasted key sees, set up from `{ token, accountId? }` with progress pushed to the asking window, and the pre-filled token page in the browser |
 | `share.get` / `list` / `publish` / `setPermission` / `stop` | `share:get` / `share:list` / `share:publish` / `share:set-permission` / `share:stop` | one board's record; the vault's records (`{ root, check? }` — `check: false` skips the live check); share or re-upload `{ root, path, content, id? }`; flip the download flag on the same link; stop. `NOT_SET_UP` before setup, `TOO_LARGE` over 100 MB |
 | `share.setDomain` / `disconnect` / `onChanged` | `share:set-domain` / `share:disconnect` / `share:changed` | attach or remove the custom domain; forget the key (or delete everything first); any status or shares.json change, pushed to EVERY window |
@@ -540,6 +541,51 @@ GitHub refuses any file over 100 MiB (and rejects the WHOLE push that carries on
 
 The demo vault for this is `tools/seedStorageDemoVault.mjs`.
 
+### Two computers, one vault (YAZ-1897)
+
+A sync pass is still commit → fetch → rebase → push (`desktop/src/main/git/sync.ts`). What changed
+is what a CONFLICT does: it is settled and the rebase finishes (`git/resolve.ts`), instead of the
+whole vault stopping until a person untangles it. The decision record is the 🔒 D1–D6 comments on
+YAZ-1897; the scenario catalogue (S1–S28) is the 📘 comment there.
+
+- **D1 — boards merge shape by shape** (`shared/boardMerge.ts`): 3-way against the common ancestor.
+  One side changed a shape → that side (a delete included; saved boards keep deleted shapes as
+  `isDeleted` tombstones). Both changed it → an edit beats a delete, else the newest `updated` wins
+  (then `version`, then the lower `versionNonce`) and it counts as a clash. A clashing shape keeps
+  both sides' `boundElements`; a live shape whose box (`containerId`) or frame (`frameId`) the other
+  side deleted gets that parent back. `appState` merges per key, ours winning a clash; the
+  `yaseendraw` dates block stays first with the earlier `createdAt` and the later `updatedAt`.
+- **D2 — git never line-merges a board.** Every pass keeps `*.excalidraw -merge` in
+  `.git/info/attributes` (this machine only, never committed, never the user's own
+  `.gitattributes`), so every board both sides changed reaches D1.
+- **D3 — anything else keeps both.** The remote's version stays at the path and ours is written
+  beside it as `<name> (conflict, YYYY-MM-DD).<ext>`. Exceptions: `.yaseendraw/shares.json` and
+  `favorites.json` merge per entry (a record beats a removal; favorites keep the remote's order,
+  ours appended), and any other `.yaseendraw/` file keeps ours. Two NEW boards at one path, or a
+  board that will not parse, keep both. A file deleted on one side and edited on the other keeps
+  the edit.
+- **The lossless rule still holds.** Only what cannot be settled (a git step that fails) aborts the
+  rebase, and the pass reports `attention` / `conflict` ("Sync couldn't finish merging…"). A save
+  that lands while the rebase is stopped is parked by copy before any `--continue` or `--abort`
+  and written back after, so the abort can no longer reset it away.
+- **What a pass reports.** `GithubSyncStatus.merged` = `{ path, author, clashes, copy? }[]`, only on
+  the status of the pass that merged (the manager never keeps it as `last`). Each merged commit
+  carries a `Merged-with: <author>` trailer. Once a merge has landed, `refs/yaseendraw/before-merge`
+  points at the pre-rebase commit (local only, replaced by the next merge).
+- **D6 — the idle pull.** A vault whose last pass ended `synced` runs a quiet pass every 60 s
+  (`pollMs`): no `syncing` broadcast first, no broadcast at all when nothing changed, never while
+  edits are settling, `pending` or `attention`.
+- **D4 — seeing it.** A merge puts up one notice ("Merged Sam's changes into “Roadmap” · 2 shapes
+  edited on both — kept the newest.") with **See changes**; a notice with an action waits to be
+  dismissed. Right-click a board › **Version history** (`client/src/history/`) lists its versions;
+  the picture is the board NOW with what changed since the chosen version marked (added green,
+  changed amber, removed faded red, `compare.ts`), or the version **as it was**. **Restore**
+  writes it back as an ordinary edit and re-uploads a shared link.
+- **D5 — no per-board hold.** Every board syncs.
+
+The demo vault for this is `tools/seedMergeDemoVault.mjs` (two computers and a bare origin; the
+app's first sync on open meets every case).
+
 ### Secrets (🔒 YAZ-1775 D4, ⚡ YAZ-1842 D1)
 
 `<userData>/secrets.json` = `{ version: 2, values: Record<name, value> }`, plain text, file mode
@@ -717,7 +763,7 @@ Every board main writes begins with its own two dates:
 
 **🔒 YAZ-1834 D1 — the block lives IN the file, as its first key.** Not in a sidecar and not in
 `.yaseendraw/`: a shared vault file that changed on every save would put the same lines under
-two machines' edits and halt the sync's rebase (the lossless rule); a block inside the drawing
+two machines' edits on every save and make every sync a merge; a block inside the drawing
 changes only when the drawing changes, travels with rename, move, clone and sync for free, and
 needs no repair code. Written first so `fs:tree` can read it from the first KB of the file
 (`BOARD_META_HEAD_BYTES`) without opening the board.

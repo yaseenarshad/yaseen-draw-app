@@ -43,8 +43,9 @@ const COPY: Record<GithubSyncAttention, Omit<AttentionCopy, 'body' | 'dismissibl
     showSetupPrompt: true,
   },
   conflict: {
-    title: 'Both machines changed the same lines.',
-    // The lossless rule (git/sync.ts): the working tree was put back exactly as it was.
+    // YAZ-1897: ordinary conflicts are merged; this is the rare pass that had to stop instead.
+    title: "Sync couldn't finish merging with the other computer.",
+    // The lossless rule (git/resolve.ts): the working tree was put back exactly as it was.
     body: 'Nothing was lost — your local version is untouched. Resolve in GitHub Desktop, then sync again.',
     showSetupPrompt: false,
   },
@@ -102,7 +103,7 @@ const REASON: Record<GithubSyncAttention, string> = {
   'no-git': 'git is not installed on this computer',
   'no-identity': 'git has no user.name or user.email configured',
   auth: "GitHub did not accept this computer's credentials",
-  conflict: 'both machines changed the same lines and the merge conflicted',
+  conflict: 'it could not finish merging changes from another computer, so it stopped without changing anything',
   error: 'git reported an error',
   'too-large': 'a file in the folder is over GitHub\'s 100 MB per-file limit',
 }

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { MAX_FAVORITES, VAULT_CONFIG_DIR } from '@shared/types'
 import { failure } from './fs/testFixture'
-import { FAVORITES_FILE, getFavorites, isSafeRel, removePath, renamePath, setFavorites, toAbs, toRel } from './favorites'
+import { FAVORITES_FILE, getFavorites, isSafeRel, mergeFavoritesFile, removePath, renamePath, setFavorites, toAbs, toRel } from './favorites'
 
 /**
  * The Favorites list in the vault (YAZ-1766 6A, D11–D14): `.yaseendraw/favorites.json` holds
@@ -189,5 +189,22 @@ describe('renamePath / removePath repair (D13)', () => {
     await seed(other, '{not json')
     await removePath([other], path.join(other, 'top.md'))
     expect(await readFile(file(other), 'utf8')).toBe('{not json')
+  })
+})
+
+describe('mergeFavoritesFile (YAZ-1897)', () => {
+  const file = (favorites: string[]) => `${JSON.stringify({ version: 1, favorites }, null, 2)}\n`
+  const merged = (base: string[] | null, theirs: string[], mine: string[]) => JSON.parse(mergeFavoritesFile(base === null ? null : file(base), file(theirs), file(mine)) ?? 'null').favorites
+
+  it("keeps the remote's order, appends our additions, and drops what either side removed", () => {
+    expect(merged(['a', 'b', 'c'], ['c', 'a', 't'], ['a', 'b', 'm'])).toEqual(['a', 't', 'm'])
+  })
+
+  it('merges two lists both machines created, without repeats', () => {
+    expect(merged(null, ['x', 'y'], ['y', 'z'])).toEqual(['x', 'y', 'z'])
+  })
+
+  it('refuses a side that is not a favorites file', () => {
+    expect(mergeFavoritesFile(null, '{"version": 2, "favorites": []}', file([]))).toBeNull()
   })
 })

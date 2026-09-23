@@ -81,7 +81,13 @@ describe('rootsOf', () => {
 describe('registerGithubIpc', () => {
   it('registers exactly the github channels the preload invokes', () => {
     const channels = vi.mocked(ipcMain.handle).mock.calls.map(([ch]) => ch).sort()
-    expect(channels).toEqual([CH.githubStatus, CH.githubSyncNow, CH.githubSetEnabled].sort())
+    expect(channels).toEqual([CH.githubStatus, CH.githubSyncNow, CH.githubSetEnabled, CH.githubHistory, CH.githubVersion, CH.githubRestore].sort())
+  })
+
+  it('refuses a Version history request that is not a board inside the vault (YAZ-1897 D4)', async () => {
+    expect(await registered(CH.githubHistory)({ sender }, 'rel', 'b.excalidraw')).toEqual(bad('NOT_ABSOLUTE'))
+    expect(await registered(CH.githubVersion)({ sender }, vault, '../b.excalidraw', 'x')).toEqual(bad('BAD_REQUEST'))
+    expect(await registered(CH.githubRestore)({ sender }, vault, 'b.excalidraw', 'HEAD:b.excalidraw')).toEqual(bad('BAD_REQUEST'))
   })
 
   it('rejects a root that is not an absolute path, and a non-boolean flag, before any git work happens', async () => {

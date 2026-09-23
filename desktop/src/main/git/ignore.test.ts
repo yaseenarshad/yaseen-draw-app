@@ -2,32 +2,32 @@ import { describe, expect, it } from 'vitest'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { ensureVaultIgnores, VAULT_IGNORED, withIgnoredEntries } from './ignore'
+import { ensureVaultIgnores, VAULT_IGNORED, withLines } from './ignore'
 
-describe('withIgnoredEntries', () => {
+describe('withLines', () => {
   it('creates the file when there is none', () => {
-    expect(withIgnoredEntries(null, ['.DS_Store'])).toBe('.DS_Store\n')
+    expect(withLines(null, ['.DS_Store'])).toBe('.DS_Store\n')
   })
 
   it('appends to what is there and NEVER rewrites a line', () => {
-    expect(withIgnoredEntries('node_modules\n*.log\n', ['.DS_Store'])).toBe('node_modules\n*.log\n.DS_Store\n')
+    expect(withLines('node_modules\n*.log\n', ['.DS_Store'])).toBe('node_modules\n*.log\n.DS_Store\n')
   })
 
   it('adds the missing newline of a file that ends without one', () => {
-    expect(withIgnoredEntries('node_modules', ['.DS_Store'])).toBe('node_modules\n.DS_Store\n')
+    expect(withLines('node_modules', ['.DS_Store'])).toBe('node_modules\n.DS_Store\n')
   })
 
   it('is a no-op when the entry is already there, whatever the whitespace around it', () => {
-    expect(withIgnoredEntries('.DS_Store\n', ['.DS_Store'])).toBeNull()
-    expect(withIgnoredEntries('node_modules\n  .DS_Store  \n', ['.DS_Store'])).toBeNull()
+    expect(withLines('.DS_Store\n', ['.DS_Store'])).toBeNull()
+    expect(withLines('node_modules\n  .DS_Store  \n', ['.DS_Store'])).toBeNull()
   })
 
   it('adds only what is missing, in order', () => {
-    expect(withIgnoredEntries('.DS_Store\n', ['.DS_Store', 'Thumbs.db'])).toBe('.DS_Store\nThumbs.db\n')
+    expect(withLines('.DS_Store\n', ['.DS_Store', 'Thumbs.db'])).toBe('.DS_Store\nThumbs.db\n')
   })
 
   it('an empty file is written as if it were absent', () => {
-    expect(withIgnoredEntries('', ['.DS_Store'])).toBe('.DS_Store\n')
+    expect(withLines('', ['.DS_Store'])).toBe('.DS_Store\n')
   })
 })
 

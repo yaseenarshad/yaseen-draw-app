@@ -97,6 +97,11 @@ chip. `--vault` is REQUIRED and has no default, because the script WIPES what it
 that already exists is refused unless you add `--force`. It writes no profile: open the vault with
 ⌘O.
 
+Two computers merging one vault (YAZ-1897): `node tools/seedMergeDemoVault.mjs --vault <dir>
+--profile <profile-dir>` builds the vault, a bare origin beside it and "Sam's" clone, and leaves
+conflicting edits on both sides, so the app's first sync on open merges every case and shows the
+notice; its `00 READ ME` board lists what to try.
+
 A feature's own demo vault can bring its profile: `node tools/seedPreviewDemoVault.mjs --vault <dir>
 --profile <profile-dir>` (YAZ-1800, the hover preview) writes the vault AND a `yaseendraw.json`
 whose one window is already on it, so the recipe above needs no hand-written JSON — launch with

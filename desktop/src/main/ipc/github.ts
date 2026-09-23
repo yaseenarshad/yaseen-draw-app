@@ -4,6 +4,7 @@ import { BridgeFailure, requireAbsPath } from '../fs/fsUtils'
 import { subscribe } from '../fs/watchers'
 import { detectRepo } from '../git/detect'
 import { resolveGit } from '../git/exec'
+import { boardHistory, boardVersion, restoreBoardVersion } from '../git/history'
 import { createGitSync, type GitSyncManager } from '../git/manager'
 import { syncPass } from '../git/sync'
 import type { Store } from '../store'
@@ -41,7 +42,7 @@ async function inspect(root: string): Promise<GithubSyncStatus> {
 }
 
 /**
- * Registers the three invokes and starts the manager on the current open roots. Returns the
+ * Registers the invokes and starts the manager on the current open roots. Returns the
  * manager because `main/index.ts` owns the three triggers no renderer can send: window focus,
  * OS wake, and the final flush on quit.
  */
@@ -66,6 +67,11 @@ export function registerGithubIpc(store: Store): GitSyncManager {
     if (typeof enabled !== 'boolean') throw new BridgeFailure('BAD_REQUEST', "'enabled' must be a boolean")
     return manager.setEnabled(dir, enabled)
   })
+
+  // Version history (YAZ-1897 D4): every argument is validated in `history.ts`, like `drawing:load`'s.
+  handle(CH.githubHistory, async (root: unknown, path: unknown) => boardHistory(root, path))
+  handle(CH.githubVersion, async (root: unknown, path: unknown, ref: unknown) => boardVersion(root, path, ref))
+  handle(CH.githubRestore, async (root: unknown, path: unknown, ref: unknown) => restoreBoardVersion(root, path, ref))
 
   store.onChange((state) => manager.setOpenRoots(rootsOf(state)))
   manager.setOpenRoots(rootsOf(store.get()))

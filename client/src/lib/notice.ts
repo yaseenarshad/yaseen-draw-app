@@ -16,4 +16,9 @@ export type NoticeKind = 'copy' | 'cut' | 'paste' | 'favorite' | 'error' | 'info
 export interface Notice {
   text: string
   icon: NoticeKind
+  /**
+   * One button on the toast (YAZ-1897: "See changes" after a merge). A notice with an action is
+   * news to act on, so it stays until acted on or dismissed instead of fading after `LINK_NOTICE_MS`.
+   */
+  action?: { label: string; run: () => void }
 }

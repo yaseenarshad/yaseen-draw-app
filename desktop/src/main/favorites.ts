@@ -36,10 +36,33 @@ async function readRaw(root: string): Promise<Raw> {
   const res = await readConfigDetailed(root, FAVORITES_FILE)
   if (res.state === 'absent') return res
   const file = path.join(root, VAULT_CONFIG_DIR, FAVORITES_FILE)
-  if (res.state === 'malformed') return { state: 'bad', file }
-  const v = res.value
-  if (!isRecord(v) || v.version !== 1 || !isStringArray(v.favorites)) return { state: 'bad', file }
-  return { state: 'ok', rels: clean(v.favorites) }
+  const rels = res.state === 'malformed' ? null : relsOf(res.value)
+  return rels === null ? { state: 'bad', file } : { state: 'ok', rels }
+}
+
+/** The cleaned list in a parsed `favorites.json`, or null when it is not `{ version: 1, favorites: string[] }`. */
+const relsOf = (v: unknown): string[] | null => (isRecord(v) && v.version === 1 && isStringArray(v.favorites) ? clean(v.favorites) : null)
+
+/**
+ * Two machines' `favorites.json` after both changed it (🔒 YAZ-1897 scope): a 3-way list merge —
+ * an entry either side removed is gone, the remote's order is kept, and our additions follow it.
+ * `base` is null when both machines created the file. Answers the file's text, or null when a
+ * side is not a favorites file (the caller then keeps our copy).
+ */
+export function mergeFavoritesFile(base: string | null, theirs: string, mine: string): string | null {
+  const parse = (text: string): string[] | null => {
+    try {
+      return relsOf(JSON.parse(text))
+    } catch {
+      return null
+    }
+  }
+  const [b, t, m] = [base === null ? [] : parse(base), parse(theirs), parse(mine)]
+  if (b === null || t === null || m === null) return null
+  const [was, mineSet, theirSet] = [new Set(b), new Set(m), new Set(t)]
+  const kept = t.filter((rel) => !was.has(rel) || mineSet.has(rel))
+  const added = m.filter((rel) => !was.has(rel) && !theirSet.has(rel))
+  return `${JSON.stringify({ version: 1, favorites: clean([...kept, ...added]) }, null, 2)}\n`
 }
 
 /** Per-root promise chain: writes and repairs on one root never interleave. */

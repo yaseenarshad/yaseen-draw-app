@@ -29,6 +29,7 @@ import { basename, stripExt } from '../lib/paths'
 import { isPending, onLiveShareChange } from './liveShare'
 import { buildShareContent } from './shareContent'
 import { errorText, liveLine, type Line } from './shareText'
+import { cycleTab, useModalKeys } from '../lib/modalKeys'
 import './share.css'
 
 interface ShareDialogProps {
@@ -141,16 +142,13 @@ export function ShareDialog({ root, path, onClose, onOpenSettings }: ShareDialog
   const live = useRef({ busy, menu, onClose })
   live.current = { busy, menu, onClose }
 
-  // Focus comes in at once — a key pressed while the dialog loads must not land on the row or
-  // canvas behind — and goes back to whatever had it on close.
-  useEffect(() => {
-    const previous = document.activeElement
-    dialogRef.current?.focus()
-    return () => {
-      clearTimeout(copyTimer.current)
-      if (previous instanceof HTMLElement) previous.focus()
-    }
-  }, [])
+  // The modal-keys rule (`lib/modalKeys.ts`): focus in now and back on close, nothing typed reaches
+  // the app behind. Esc closes an open menu first, then the dialog — never mid-request.
+  useModalKeys(dialogRef, () => {
+    if (live.current.menu !== null) setMenu(null)
+    else if (live.current.busy === null) live.current.onClose()
+  })
+  useEffect(() => () => clearTimeout(copyTimer.current), [])
 
   const refresh = useCallback(async () => {
     try {
@@ -177,22 +175,6 @@ export function ShareDialog({ root, path, onClose, onOpenSettings }: ShareDialog
       clearInterval(tick)
     }
   }, [refresh, path])
-
-  // Capture phase, before anything else hears the key. Esc closes an open menu first, then the
-  // dialog; any key aimed OUTSIDE the dialog is swallowed and focus pulled back in.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const inside = e.target instanceof Node && dialogRef.current?.contains(e.target) === true
-      if (inside && e.key !== 'Escape') return
-      e.preventDefault()
-      e.stopPropagation()
-      if (e.key !== 'Escape') dialogRef.current?.focus()
-      else if (live.current.menu !== null) setMenu(null)
-      else if (live.current.busy === null) live.current.onClose()
-    }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [])
 
   const run = async (kind: Exclude<Busy, null>, fn: () => Promise<void>) => {
     setProblem(null)
@@ -239,16 +221,6 @@ export function ShareDialog({ root, path, onClose, onOpenSettings }: ShareDialog
     if (!loading && document.activeElement === el) (el?.querySelector<HTMLElement>('.share-picker') ?? el?.querySelector<HTMLElement>('button:not(:disabled)'))?.focus()
   }, [loading])
 
-  /** Tab cycles inside the dialog; no key typed here travels on to the app behind. */
-  const onDialogKey = (e: ReactKeyboardEvent) => {
-    e.stopPropagation()
-    if (e.key !== 'Tab') return
-    const focusable = [...(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled)') ?? [])]
-    if (focusable.length === 0) return
-    const i = focusable.indexOf(document.activeElement as HTMLElement)
-    e.preventDefault()
-    focusable[e.shiftKey ? (i <= 0 ? focusable.length - 1 : i - 1) : (i + 1) % focusable.length].focus()
-  }
 
   return (
     <div className="confirm-overlay share-overlay" onMouseDown={() => busy === null && onClose()}>
@@ -259,7 +231,7 @@ export function ShareDialog({ root, path, onClose, onOpenSettings }: ShareDialog
         aria-modal="true"
         aria-label={`Share ${name}`}
         tabIndex={-1}
-        onKeyDown={onDialogKey}
+        onKeyDown={(e) => cycleTab(e, dialogRef.current)}
         onMouseDown={(e) => {
           e.stopPropagation()
           // A picker's own button toggles its menu; a press anywhere else in the dialog closes it.

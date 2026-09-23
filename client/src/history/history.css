@@ -1,0 +1,222 @@
+/*
+ * Version history (YAZ-1897 D4): the delete sheet's `.confirm-overlay` / `.confirm` /
+ * `.confirm__btn` (app.css) plus only what a wider, two-pane dialog needs. Every colour is an
+ * app.css token, so dark mode needs no rule of its own — except the picture, which is the board's.
+ */
+
+.confirm-overlay.history-overlay {
+  z-index: 80;
+}
+
+.confirm.history-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(960px, calc(100vw - 32px));
+  height: min(640px, calc(100vh - 48px));
+  padding: 18px 20px;
+  line-height: 1.5;
+}
+
+.history-dialog:focus {
+  outline: none;
+}
+
+.history-dialog button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.history-dialog__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.history-dialog__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-dialog__close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--fg-muted);
+  border-radius: 6px;
+}
+
+.history-dialog__close:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+.history-dialog__muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+
+.history-dialog__body {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---------- the list ---------- */
+
+.history-list {
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.history-list:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.history-list__row {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.history-list__row:hover {
+  background: var(--bg-hover-row);
+}
+
+.history-list__row--on,
+.history-list__row--on:hover {
+  background: var(--accent-soft);
+}
+
+.history-list__who {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-list__row--local .history-list__who {
+  font-style: italic;
+}
+
+.history-list__meta {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+/* ---------- the picture ---------- */
+
+.history-view {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.history-view__tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.history-view__tab {
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+.history-view__tab:hover {
+  color: var(--fg);
+}
+
+.history-view__tab--on {
+  color: var(--fg);
+  border-color: var(--border);
+  background: var(--bg-side);
+}
+
+.history-view__picture {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-side);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.history-view__picture img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.history-view__legend {
+  display: flex;
+  gap: 14px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.history-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.history-legend__dot {
+  width: 10px;
+  height: 10px;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+}
+
+/* The colour comes from `compare.ts`'s MARK (inline), so the legend and the picture cannot drift. */
+.history-legend--removed .history-legend__dot {
+  border-style: dashed;
+}
+
+/* ---------- the footer ---------- */
+
+.history-dialog__problem {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.history-dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.history-dialog__ask {
+  flex: 1;
+  font-size: 13px;
+}

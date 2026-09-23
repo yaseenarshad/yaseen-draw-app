@@ -1,6 +1,7 @@
 /** What lives in a vault's own `.yaseendraw/`: its config files, its GitHub switch and its favorites. */
 
 import type { MAX_FAVORITES } from './appState'
+import type { DrawingFileEntry } from './drawing'
 
 /**
  * The `.obsidian/`-style dotfolder that travels with a vault, and THE one definition of its name
@@ -38,8 +39,9 @@ export interface GithubSyncConfig {
  * Why a root is stuck, when it is. Each value is a DIFFERENT thing to say to the user, which is
  * the whole reason the set is closed: `no-git` wants "install git" (the Command Line Tools on a Mac, Git for Windows on a PC),
  * `no-identity` wants "set a name and email", `auth` wants "sign in again", `conflict` wants
- * "two machines edited the same lines" (the lossless rule: the working tree was put back exactly
- * as it was — see `git/sync.ts`), `too-large` wants "shrink it or move it out" (YAZ-1801 D3: files
+ * "sync could not finish merging" — since YAZ-1897 every ordinary conflict is merged, so this is
+ * the rare pass that had to stop (the lossless rule: the working tree was put back exactly as it
+ * was — see `git/resolve.ts`), `too-large` wants "shrink it or move it out" (YAZ-1801 D3: files
  * held back under `tooLarge`, everything else synced), and `error` is the honest catch-all that
  * carries a message.
  */
@@ -93,6 +95,27 @@ export interface GithubSyncStatus {
    * "N files not synced" and the `too-large` banner all read this one list.
    */
   tooLarge?: readonly string[]
+  /**
+   * YAZ-1897 D4: what THIS pass merged — present only on the status of the pass that did it (the
+   * manager never keeps it as the root's last status, so a late `status()` cannot replay the notice).
+   */
+  merged?: readonly GithubSyncMerge[]
+}
+
+/**
+ * One file a pass merged instead of stopping (YAZ-1897 D1/D3). A board merged shape by shape has
+ * no `copy`; a file that could not be merged kept both versions — the remote's at `path`, ours at
+ * `copy` — and the notice has to say where ours went.
+ */
+export interface GithubSyncMerge {
+  /** Vault-relative POSIX path. */
+  path: string
+  /** Who made the remote's side of it ("Sara", "Sara and Sam"). */
+  author: string
+  /** Shapes both machines edited; the newest edit of each was kept. */
+  clashes: number
+  /** Vault-relative POSIX path of our copy, when both versions were kept. */
+  copy?: string
 }
 
 /**
@@ -119,6 +142,34 @@ export interface GithubApi {
   setEnabled(root: string, enabled: boolean): Promise<GithubSyncStatus>
   /** Fired in every window on every transition of any vault; filter by `status.root`. Returns an unsubscribe. */
   onStatus(listener: (status: GithubSyncStatus) => void): () => void
+  /**
+   * YAZ-1897 D4 — Version history. A board's committed versions, newest first, plus "your version
+   * before the merge" when the last merge changed this board. Empty for a vault with no git history.
+   * `path` is the board (absolute, or vault-relative), exactly as `drawing.load` takes it.
+   */
+  history(root: string, path: string): Promise<BoardVersion[]>
+  /** One version's scene and its pictures, resolved from `assets/` the way `drawing.load` does. */
+  version(root: string, path: string, ref: string): Promise<BoardVersionScene>
+  /** Writes that version over the board as an ordinary edit; the watcher and sync take it from there. */
+  restore(root: string, path: string, ref: string): Promise<void>
+}
+
+/** One entry in a board's Version history (YAZ-1897 D4). */
+export interface BoardVersion {
+  /** Opaque to the renderer: hand it back to `version` / `restore`. */
+  ref: string
+  author: string
+  /** Epoch milliseconds of the commit. */
+  at: number
+  /** The version a sync merge produced (its commit carries a `Merged-with:` trailer). */
+  merged: boolean
+  /** "Your version before the merge": never pushed, kept on this machine only until the next merge. */
+  localOnly: boolean
+}
+
+export interface BoardVersionScene {
+  json: string
+  files: Record<string, DrawingFileEntry>
 }
 
 // ---------- Storage (Settings › Storage — YAZ-1801) ----------
