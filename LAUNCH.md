@@ -26,7 +26,7 @@ npm run desktop:build
 - `mac.identity: null` makes electron-builder skip signing, so `desktop/build/adhocSign.cjs` (`afterPack`) deep ad-hoc signs the bundle itself — without that seal Gatekeeper reports a downloaded copy as "damaged" instead of offering **Open Anyway**. Check it with `codesign -dv --verbose=2 "desktop/dist-app/mac-arm64/Yaseen Draw.app"`, which prints `Signature=adhoc`. `spctl -a -t install` on the same bundle prints `rejected` — expected, because nothing here is Developer-ID signed.
 - The first packaging run on a clean machine needs network: electron-builder downloads its Electron dist zip and dmgbuild once, then caches them.
 - Install: open the dmg and drag `Yaseen Draw.app` into `/Applications` in Finder (or copy it straight from `desktop/dist-app/mac-arm64/`). The installed app and a `npm run dev` instance coexist — different userData, different single-instance lock.
-- First open is blocked by Gatekeeper (the app is not notarized): right-click › **Open**, or System Settings › Privacy & Security › **Open Anyway** — once, then never again on that Mac. See `README.md` "Sharing it".
+- First open is blocked by Gatekeeper (the app is not notarized): right-click › **Open**, or System Settings › Privacy & Security › **Open Anyway** — once, then never again on that Mac. See `README.md` "Installing on another Mac/PC".
 - The app claims `.excalidraw` as Owner, so after that first open Finder double-click opens drawings with it, and from a shell:
 
 ```bash

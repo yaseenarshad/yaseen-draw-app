@@ -5,6 +5,7 @@ import type { DrawingApi } from './drawing'
 import type { BridgeErrorCode } from './errors'
 import type { CreateDirResponse, CreateFileRequest, CreateFileResponse, DialogApi, FileClipRequest, FileClipState, FileRenamedEvent, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, TreeResponse, WatchEvent } from './files'
 import type { ComponentsApi, MediaApi, SecretsApi } from './library'
+import type { ShareApi } from './share'
 import type { FavoritesApi, GithubApi, StorageApi } from './vault'
 
 /**
@@ -164,6 +165,8 @@ export interface MenuApi {
    * Same enablement rule as Export Image…. Returns an unsubscribe.
    */
   onExportDrawing(listener: () => void): () => void
+  /** File › Share Link (⌘⇧L, YAZ-1799): open the Share dialog for the visible drawing. Same enablement rule. */
+  onShareLink(listener: () => void): () => void
 }
 
 /**
@@ -303,4 +306,6 @@ export interface YaseenDrawApi {
   github: GithubApi
   /** Settings › Storage: what the vault weighs, and moving legacy pictures out of boards (YAZ-1801). */
   storage: StorageApi
+  /** Share link (YAZ-1799): main owns Cloudflare and the secrets; the renderer hands over bytes. */
+  share: ShareApi
 }

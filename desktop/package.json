@@ -6,8 +6,8 @@
   "description": "Yaseen Draw — Electron shell (main + preload); the renderer is ../client",
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build"
+    "dev": "node ../tools/buildShareViewer.mjs && electron-vite dev",
+    "build": "electron-vite build && node ../tools/buildShareViewer.mjs"
   },
   "dependencies": {
     "chokidar": "^4.0.3"
@@ -26,6 +26,12 @@
     },
     "files": [
       "out/**"
+    ],
+    "extraResources": [
+      {
+        "from": "../share/dist/assets",
+        "to": "share-viewer"
+      }
     ],
     "afterPack": "build/adhocSign.cjs",
     "mac": {

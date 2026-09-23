@@ -64,6 +64,7 @@ import { registerRenameContinuity } from '../lib/renameContinuity'
 import { useAppliedTheme } from '../lib/theme'
 import { DRAWING_COMMAND_EVENT, type DrawingCommand } from './drawingCommand'
 import { exportFileName } from './exportDrawing'
+import { noteBoardSaved } from '../share/liveShare'
 import { parseSceneText, type DrawingScene } from './drawingScene'
 import { mayTakeFocus } from './focusHandoff'
 import { ExcalidrawSurface, type DrawingSnapshot, type DrawingSurfaceApi } from './ExcalidrawSurface'
@@ -208,6 +209,8 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasPrefs, 
       try {
         const res = await api.drawing.save({ root, path, json, expectedMtime, newFiles })
         for (const id of res.persisted) persisted.current.add(id)
+        // Always-live share links (YAZ-1799): a shared board re-uploads once its saves settle.
+        noteBoardSaved(root, path)
         return res
       } catch (err) {
         // A stale guard is the conflict bar's business, not an error chip.

@@ -89,6 +89,8 @@ export interface MenuHandlers {
   onRename: (path: string) => void
   /** "Info" (🔒 YAZ-1835 D6): open the board's popover; the caller anchors it where the menu was. */
   onInfo: (path: string) => void
+  /** "Share" (YAZ-1799 D6): open the Share dialog for the board — same gate as Info. */
+  onShare: (path: string) => void
   onDelete: (path: string) => void
 }
 
@@ -308,7 +310,14 @@ const CLIPBOARD_GROUP: readonly Item[] = [cut, copy, paste, copyPaths, copyPath]
 const CREATE_GROUP: readonly Item[] = [newDrawing, newFolder, newDatedFolder]
 const ROW_GROUP: readonly Item[] = [rename]
 const OPEN_IN_GROUP: readonly Item[] = [toggleFavorite, openIn]
-const DELETE_GROUP: readonly Item[] = [info, del]
+/** "Share" (YAZ-1799 D6): exactly Info's gate — one BOARD row — and just above Info, so Info stays directly above Delete (🔒 YAZ-1835 D6). */
+const share: Leaf = (t, h) => {
+  const path = t.infoPath
+  if (path === null) return null
+  return { id: 'share', label: 'Share', onSelect: () => h.onShare(path) }
+}
+
+const DELETE_GROUP: readonly Item[] = [share, info, del]
 
 /** Runs a group's rules and keeps the items they offered — the root's groups and a flyout's leaves alike. */
 const build = <T extends MenuItem>(group: readonly ((t: MenuSectionTargets, h: MenuHandlers) => T | null)[], t: MenuSectionTargets, h: MenuHandlers): T[] =>

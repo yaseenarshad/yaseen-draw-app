@@ -248,6 +248,8 @@ describe('SavedComponents — saving the selection', () => {
     await type(el.querySelector<HTMLInputElement>('input[aria-label="Component name"]')!, 'A card')
     expect(text(el)).toContain('Save 2 elements')
     await click(byText(el, 'Save 2 elements'))
+    // The preview goes through FileReader, so the save can land a few tasks after the click.
+    await settle(() => components.save.mock.calls.length > 0)
     expect(components.save).toHaveBeenCalledExactlyOnceWith({
       name: 'A card',
       fragmentJson: expect.stringContaining('"type": "excalidraw"'),

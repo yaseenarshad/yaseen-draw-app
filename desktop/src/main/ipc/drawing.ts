@@ -44,12 +44,13 @@ export function _resetSweeps(): void {
  * are the real ones unless a test injects stand-ins.
  *
  * The guard is claimed BEFORE the async work starts: two windows opening the same vault in the
- * same tick must not both walk it.
+ * same tick must not both walk it. The returned promise settles when this call's sweep (and its
+ * notice) is done — the app never awaits it; tests do, instead of guessing how long a walk takes.
  */
-export function sweepVaultOnce(root: string, sender: Pick<WebContents, 'isDestroyed' | 'send'>, deps: { trash?: (p: string) => Promise<void>; now?: () => number } = {}): void {
-  if (swept.has(root)) return
+export function sweepVaultOnce(root: string, sender: Pick<WebContents, 'isDestroyed' | 'send'>, deps: { trash?: (p: string) => Promise<void>; now?: () => number } = {}): Promise<void> {
+  if (swept.has(root)) return Promise.resolve()
   swept.add(root)
-  void sweepOrphanAssets(root, { now: deps.now ?? Date.now, trash: deps.trash ?? ((p) => shell.trashItem(p)) }).then((n) => {
+  return sweepOrphanAssets(root, { now: deps.now ?? Date.now, trash: deps.trash ?? ((p) => shell.trashItem(p)) }).then((n) => {
     if (n === 0) return
     const message = `Cleaned ${n} unused ${n === 1 ? 'image' : 'images'}`
     console.log(`[drawing] ${message} in ${root}`)

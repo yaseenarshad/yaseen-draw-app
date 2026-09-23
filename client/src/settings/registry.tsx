@@ -24,6 +24,8 @@ import { LibraryFolderControl, LibraryFolderHint } from './LibraryFolderControl'
 import { ON_OFF_OPTIONS, repoHint, THEME_OPTIONS } from './options'
 import { PixabayKeyControl } from './PixabayKeyControl'
 import { STORAGE_SECTION } from './storageSection'
+import { SHARING_SECTION } from '../share/SharingPage'
+import type { SharingState } from '../share/useSharing'
 
 export interface SettingsCtx {
   settings: SettingsState
@@ -31,6 +33,8 @@ export interface SettingsCtx {
   sync?: { status: GithubSyncStatus | null; setEnabled: (enabled: boolean) => void }
   /** Settings › Storage (YAZ-1801): App's `useVaultStorage`; undefined with no vault open, which hides the section. */
   storage?: VaultStorageState
+  /** Settings › Sharing (YAZ-1799 D7): App's `useSharing`; undefined hides the section. */
+  sharing?: SharingState
 }
 
 export interface SettingDef {
@@ -49,7 +53,7 @@ export interface SettingDef {
   render: (ctx: SettingsCtx) => ReactNode
 }
 
-export type SettingsSectionId = 'appearance' | 'canvas' | 'files' | 'images' | 'sync' | 'storage' | 'hotkeys'
+export type SettingsSectionId = 'appearance' | 'canvas' | 'files' | 'images' | 'sync' | 'storage' | 'sharing' | 'hotkeys'
 
 /** Rows that belong together under one sub-heading; no title = plain rows straight under the section. */
 export interface SettingsGroup {
@@ -202,6 +206,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   },
   // YAZ-1801: what this vault weighs against GitHub's limits, and "Move pictures out of boards".
   STORAGE_SECTION,
+  // YAZ-1799 D7: set up Cloudflare sharing, this vault's shared boards, a custom domain, turning it off.
+  SHARING_SECTION,
   {
     id: 'hotkeys',
     title: 'Hotkeys',

@@ -4,3 +4,4 @@ desktop/dist-app/
 .DS_Store
 *.log
 .claude/*
+share/dist/
