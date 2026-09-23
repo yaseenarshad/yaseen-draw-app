@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { _resetRenameContinuity, flushRenamedDir, flushRenamedPath, registerRenameContinuity, retireDir, retirePath, type RenameContinuityHandle } from './renameContinuity'
+import { _resetRenameContinuity, dirtyPaths, flushRenamedDir, flushRenamedPath, registerRenameContinuity, retireDir, retirePath, type RenameContinuityHandle } from './renameContinuity'
 
 afterEach(() => _resetRenameContinuity())
 
 const handle = (over: Partial<RenameContinuityHandle> = {}): RenameContinuityHandle => ({
   flush: vi.fn(async () => undefined),
   retire: vi.fn(),
+  dirty: () => false,
   ...over,
 })
 
@@ -70,5 +71,17 @@ describe('renameContinuity for a FOLDER (Links E1b GRO-2241, delete GRO-2272)', 
     expect(deeper.retire).toHaveBeenCalledTimes(1)
     expect(sibling.retire).not.toHaveBeenCalled()
     expect(lookalike.retire).not.toHaveBeenCalled()
+  })
+})
+
+describe('dirtyPaths (YAZ-1801 D5)', () => {
+  it('lists the open paths whose editor holds unsaved edits, asking each at call time', () => {
+    let edited = false
+    registerRenameContinuity('/v/a.excalidraw', handle({ dirty: () => edited }))
+    registerRenameContinuity('/v/b.excalidraw', handle({ dirty: () => true }))
+    registerRenameContinuity('/v/c.excalidraw', handle())
+    expect(dirtyPaths()).toEqual(['/v/b.excalidraw'])
+    edited = true
+    expect(dirtyPaths()).toEqual(['/v/a.excalidraw', '/v/b.excalidraw'])
   })
 })

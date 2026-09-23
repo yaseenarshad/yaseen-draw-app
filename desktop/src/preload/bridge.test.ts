@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { ComponentsApi, DialogApi, DrawingApi, FavoritesApi, FileApi, FileClipState, GithubApi, GithubSyncStatus, LinkApi, MediaApi, MenuApi, SecretsApi, ShellApi, StateApi, WatchEvent, WindowApi, YaseenDrawApi } from '@shared/types'
+import type { ComponentsApi, DialogApi, DrawingApi, FavoritesApi, FileApi, FileClipState, GithubApi, GithubSyncStatus, LinkApi, MediaApi, MenuApi, SecretsApi, ShellApi, StateApi, StorageApi, WatchEvent, WindowApi, YaseenDrawApi } from '@shared/types'
 import { CH } from '../channels'
 
 const exposed: Record<string, unknown> = {}
@@ -13,7 +13,7 @@ vi.mock('electron', () => ({
  * typecheck. `as const satisfies` keeps each tuple's literal type (a plain `readonly (keyof T)[]`
  * annotation would widen it and make `Exhaustive<>` vacuous) while still rejecting typos.
  */
-const TOP = ['tree', 'createDir', 'createFile', 'drawing', 'pickFolder', 'dialog', 'watch', 'state', 'window', 'menu', 'link', 'file', 'shell', 'favorites', 'media', 'components', 'secrets', 'github'] as const satisfies readonly (keyof YaseenDrawApi)[]
+const TOP = ['tree', 'createDir', 'createFile', 'drawing', 'pickFolder', 'dialog', 'watch', 'state', 'window', 'menu', 'link', 'file', 'shell', 'favorites', 'media', 'components', 'secrets', 'github', 'storage'] as const satisfies readonly (keyof YaseenDrawApi)[]
 const STATE = ['get', 'setSettings', 'setSidebarWidth', 'pushRecent', 'removeRecent', 'setFolder', 'onChange'] as const satisfies readonly (keyof StateApi)[]
 const WINDOW = ['identity', 'setIdentity', 'open', 'openRecent', 'closeSelf', 'onFlush'] as const satisfies readonly (keyof WindowApi)[]
 const MENU = ['onOpenFolder', 'onOpenRoot', 'onSearch', 'onSwitchVault', 'onSettings', 'onToggleSidebar', 'onCloseTab', 'onNextTab', 'onPrevTab', 'onExportImage', 'onCanvasBackground', 'onExportDrawing'] as const satisfies readonly (keyof MenuApi)[]
@@ -24,6 +24,7 @@ const FAVORITES = ['get', 'set', 'onChanged'] as const satisfies readonly (keyof
 const DRAWING = ['load', 'save', 'libraryFolder'] as const satisfies readonly (keyof DrawingApi)[]
 const DIALOG = ['openDrawing', 'saveDrawing'] as const satisfies readonly (keyof DialogApi)[]
 const GITHUB = ['status', 'syncNow', 'setEnabled', 'onStatus'] as const satisfies readonly (keyof GithubApi)[]
+const STORAGE = ['stats', 'shrink'] as const satisfies readonly (keyof StorageApi)[]
 const MEDIA = ['favorites', 'recent', 'onChanged', 'search', 'preview', 'import'] as const satisfies readonly (keyof MediaApi)[]
 const COMPONENTS = ['list', 'save', 'read', 'rename', 'delete', 'preview', 'onChanged'] as const satisfies readonly (keyof ComponentsApi)[]
 const SECRETS = ['set', 'has'] as const satisfies readonly (keyof SecretsApi)[]
@@ -39,10 +40,11 @@ const _favorites: Exhaustive<FavoritesApi, typeof FAVORITES> = true
 const _drawing: Exhaustive<DrawingApi, typeof DRAWING> = true
 const _dialog: Exhaustive<DialogApi, typeof DIALOG> = true
 const _github: Exhaustive<GithubApi, typeof GITHUB> = true
+const _storage: Exhaustive<StorageApi, typeof STORAGE> = true
 const _media: Exhaustive<MediaApi, typeof MEDIA> = true
 const _components: Exhaustive<ComponentsApi, typeof COMPONENTS> = true
 const _secrets: Exhaustive<SecretsApi, typeof SECRETS> = true
-void [_top, _state, _window, _menu, _link, _file, _shell, _favorites, _drawing, _dialog, _github, _media, _components, _secrets]
+void [_top, _state, _window, _menu, _link, _file, _shell, _favorites, _drawing, _dialog, _github, _storage, _media, _components, _secrets]
 
 describe('preload bridge', () => {
   it('installs window.yaseenDraw with every contract method', async () => {
@@ -58,6 +60,7 @@ describe('preload bridge', () => {
     for (const k of SHELL) expect(typeof api.shell[k], `shell.${k}`).toBe('function')
     for (const k of FAVORITES) expect(typeof api.favorites[k], `favorites.${k}`).toBe('function')
     for (const k of GITHUB) expect(typeof api.github[k], `github.${k}`).toBe('function')
+    for (const k of STORAGE) expect(typeof api.storage[k], `storage.${k}`).toBe('function')
     for (const k of MEDIA) expect(typeof api.media[k], `media.${k}`).toBe('function')
     for (const k of COMPONENTS) expect(typeof api.components[k], `components.${k}`).toBe('function')
     for (const k of DIALOG) expect(typeof api.dialog[k], `dialog.${k}`).toBe('function')
@@ -123,6 +126,17 @@ describe('preload bridge', () => {
     const { bridge } = await import('./index')
     await expect(bridge.github.setEnabled('/v', true)).resolves.toEqual({ root: '/v', state: 'synced' })
     expect(ipcRenderer.invoke).toHaveBeenCalledWith(CH.githubSetEnabled, '/v', true)
+  })
+
+  it('storage.stats / storage.shrink invoke their channels with the root (and the skip list) (YAZ-1801)', async () => {
+    const { ipcRenderer } = await import('electron')
+    const { bridge } = await import('./index')
+    vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: { shrunk: 1, skipped: 0, bytesMoved: 10 } })
+    await expect(bridge.storage.shrink('/v', ['/v/a.excalidraw'])).resolves.toEqual({ shrunk: 1, skipped: 0, bytesMoved: 10 })
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith(CH.storageShrink, '/v', ['/v/a.excalidraw'])
+    vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: { root: '/v' } })
+    await bridge.storage.stats('/v')
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith(CH.storageStats, '/v')
   })
 
   it('forwards github:status-changed payloads to the listener and unsubscribes cleanly (YAZ-1081)', async () => {

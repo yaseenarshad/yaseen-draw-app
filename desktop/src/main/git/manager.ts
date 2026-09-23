@@ -118,10 +118,17 @@ export function createGitSync(host: GitSyncHost): GitSyncManager {
     }
   }
 
-  /** A transitional status that keeps the repo facts the UI is already showing. */
+  /**
+   * A transitional status that keeps the repo facts the UI is already showing — and the held-back
+   * list (YAZ-1801 D3), so a file's cloud-off icon does not blink away for the length of every
+   * pass. Only a finished pass may clear it. A `too-large` result is otherwise an ordinary
+   * `attention`: no retry is armed (only `pending` arms one), the next edit, focus or wake runs
+   * the next pass, and that pass re-checks the files from scratch — nothing here loops.
+   */
   function carry(root: string, state: 'syncing' | 'pending', entry: Entry): GithubSyncStatus {
     const next: GithubSyncStatus = { root, state, enabled: true }
     if (entry.last.repo !== undefined) next.repo = entry.last.repo
+    if (entry.last.tooLarge !== undefined) next.tooLarge = entry.last.tooLarge
     return next
   }
 

@@ -6,7 +6,7 @@
  * open; the query runs over them on every keystroke.
  */
 import { matchCandidates } from '../search/matchCandidates'
-import { availableSections, resolveHint, type SettingDef, type SettingsCtx, type SettingsGroup, type SettingsSection } from './registry'
+import { availableGroups, availableSections, resolveHint, type SettingDef, type SettingsCtx, type SettingsGroup, type SettingsSection } from './registry'
 
 export interface SettingHit {
   section: SettingsSection
@@ -19,7 +19,7 @@ export interface SettingHit {
 
 export function settingCandidates(ctx: SettingsCtx): SettingHit[] {
   return availableSections(ctx).flatMap((section) =>
-    section.groups.flatMap((group) =>
+    availableGroups(section, ctx).flatMap((group) =>
       group.items.map((item) => {
         const name = [item.label, resolveHint(item, ctx), ...(item.keywords ?? []), group.title, group.hint, section.title].filter((part) => part !== undefined).join(' ')
         return { section, group, item, name, lower: name.toLowerCase() }

@@ -11,10 +11,10 @@
  *
  * ONE PAGE, NOT PAGES (Yasin's call after the demo): every setting is on the page at once, so a
  * nav click is a scroll, not a route, and the active nav item is DERIVED from where the page is
- * scrolled to. Opening always starts at the top. The one exception is a `standalone` section
- * (Hotkeys — a reference table, noise among settings): it is its own page inside the dialog,
- * listed under a divider in the nav, and `page` names it while it is showing; `null` is the
- * settings page.
+ * scrolled to. Opening always starts at the top. The exceptions are the `standalone` sections
+ * (Hotkeys — a reference table, noise among settings; Storage — a per-vault report, YAZ-1801): each
+ * is its own page inside the dialog, listed under a divider in the nav, and `page` names the one
+ * showing; `null` is the settings page.
  *
  * ⚡ KEYS ARE THE OVERLAY'S, NEVER `window`'s (⚡ YAZ-888): React
  * flushes mount effects inside the dispatch of the event that opened the dialog, so a `window`
@@ -27,7 +27,7 @@
  */
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { SearchIcon } from '../components/icons'
-import { availableSections, resolveHint, resolveWide, type SettingDef, type SettingsCtx, type SettingsGroup, type SettingsSection, type SettingsSectionId } from './registry'
+import { availableGroups, availableSections, resolveHint, resolveWide, type SettingDef, type SettingsCtx, type SettingsGroup, type SettingsSection, type SettingsSectionId } from './registry'
 import { searchSettings, settingCandidates } from './searchSettings'
 import { SettingRow } from './SettingRow'
 import './settings.css'
@@ -130,7 +130,7 @@ export function SettingsDialog({ ctx, onClose }: SettingsDialogProps) {
   }
 
   const row = (item: SettingDef) => (
-    <SettingRow key={item.id} id={item.id} label={item.label} hint={resolveHint(item, ctx)} wide={resolveWide(item)}>
+    <SettingRow key={item.id} id={item.id} label={item.label} hint={resolveHint(item, ctx)} wide={resolveWide(item)} bare={item.bare === true}>
       {item.render(ctx)}
     </SettingRow>
   )
@@ -146,7 +146,7 @@ export function SettingsDialog({ ctx, onClose }: SettingsDialogProps) {
     <section key={s.id} id={anchorId(s.id)} data-section={s.id} className="settings-section">
       <h2 className="settings-section__title">{s.title}</h2>
       {s.note !== undefined && <p className="settings-section__note">{s.note}</p>}
-      {s.groups.map((g, i) => group(g, g.items, i))}
+      {availableGroups(s, ctx).map((g, i) => group(g, g.items, i))}
     </section>
   )
 

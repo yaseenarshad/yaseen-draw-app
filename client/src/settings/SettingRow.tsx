@@ -12,10 +12,19 @@ interface SettingRowProps {
   label: string
   hint?: string
   wide?: boolean
+  /** YAZ-1801: the control alone, full-width, no label or hint (they still feed search). */
+  bare?: boolean
   children: ReactNode
 }
 
-export function SettingRow({ id, label, hint, wide = false, children }: SettingRowProps) {
+export function SettingRow({ id, label, hint, wide = false, bare = false, children }: SettingRowProps) {
+  if (bare) {
+    return (
+      <div className="setting setting--bare" data-setting={id}>
+        {children}
+      </div>
+    )
+  }
   return (
     <div className={`setting${wide ? ' setting--wide' : ''}`} data-setting={id}>
       <div className="setting__text">

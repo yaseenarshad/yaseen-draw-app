@@ -247,6 +247,11 @@
   min-width: 0;
 }
 
+.setting__hint {
+  /* A hint may carry more than one line (Storage's "Your files" / "Old versions"). */
+  white-space: pre-line;
+}
+
 .setting__label {
   margin: 0;
   color: var(--fg);
@@ -409,4 +414,154 @@
   font-size: 12px;
   color: var(--fg-muted);
   overflow-wrap: anywhere;
+}
+
+/* ---------- Settings › Storage (YAZ-1801 D1) ----------
+   A report page: one bar (the git history against GitHub's lines), a list of files near or over
+   GitHub's per-file limit, and one action. Muted type carries everything secondary. */
+
+/* A bare row (registry `bare`): the control is the whole row. */
+.setting--bare {
+  display: block;
+}
+
+.storage__meter {
+  --storage-bar-w: 240px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.storage__track {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.storage__bar {
+  position: relative;
+  display: block;
+  width: var(--storage-bar-w);
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-hover-row);
+  overflow: hidden;
+}
+
+.storage__fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+}
+
+.storage__tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--fg-muted);
+  opacity: 0.5;
+}
+
+.storage__marks {
+  position: relative;
+  display: block;
+  width: var(--storage-bar-w);
+  height: 12px;
+  font-size: 10px;
+  color: var(--fg-muted);
+}
+
+.storage__mark {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.storage__fill--warn {
+  background: var(--warn);
+}
+
+.storage__fill--danger {
+  background: var(--danger);
+}
+
+.storage__of {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.storage__muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+
+.storage__muted--danger {
+  color: var(--danger);
+}
+
+.storage__files {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.storage__file {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto 9.5em;
+  align-items: center;
+  column-gap: 10px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.storage__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.storage__file--danger .storage__dot {
+  background: var(--danger);
+}
+
+.storage__file--warn .storage__dot {
+  background: var(--warn);
+}
+
+.storage__file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.storage__file-size {
+  text-align: right;
+}
+
+.storage__file-note {
+  color: var(--fg-muted);
+}
+
+.storage__file--danger .storage__file-note {
+  color: var(--danger);
+}
+
+.storage__action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.storage__sentence {
+  margin: 0;
+  font-size: 14px;
 }
