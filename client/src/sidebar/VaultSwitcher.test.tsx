@@ -199,7 +199,7 @@ describe('VaultSwitcher: the rows (D3/D4/D5)', () => {
     expect(panel(el)).not.toBeNull()
   })
 
-  it('Open folder… runs onPickFolder (in place) and closes the panel; disabled while pickDisabled', () => {
+  it('Open folder… runs onPickFolder and closes the panel; disabled while pickDisabled', () => {
     const { el, props, rerender } = render()
     openPanel(el)
     act(() => openFolderRow(el).click())

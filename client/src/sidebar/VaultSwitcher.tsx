@@ -5,7 +5,8 @@
  * sidebar. Its first element is the filter input, autofocused, query reset on every open (D7);
  * below it every recent vault as a Welcome-style row (name + relative time, then the full path,
  * because two vaults can share a basename), the CURRENT vault included and marked `aria-current`
- * (D3); and LAST, under a hairline, "Open folder…" — the existing in-place picker (D4).
+ * (D3); and LAST, under a hairline, "Open folder…" — the app's folder picker (D4), which opens the
+ * picked vault beside this window, never in place (YAZ-1913 🔒 D2).
  *
  * ONE rule for every vault row (D1/D3): activating it — click or ⏎ — asks main's one open-recent
  * door, `window.openRecent(path)`, which brings that vault to the front: its open windows raised
@@ -36,7 +37,7 @@ import { TriangleIcon } from '../components/icons'
 
 export interface VaultSwitcherProps {
   root: string
-  /** "Open folder…" (D4): the sidebar's existing in-place picker, unchanged. */
+  /** "Open folder…" (D4): App's folder picker — the picked vault opens beside this window (YAZ-1913). */
   onPickFolder: () => void
   /** True while the native folder dialog is open; the "Open folder…" row is disabled meanwhile. */
   pickDisabled: boolean

@@ -109,24 +109,19 @@ describe('buildMenuTemplate', () => {
     expect(close?.accelerator).toBe('CmdOrCtrl+Shift+W')
   })
 
-  it('Open Recent lists recents in MRU order; plain click opens in place, ⌥-click beside', () => {
+  it('Open Recent lists recents in MRU order; a click hands over the path alone — ⌥ means nothing (YAZ-1913 D1)', () => {
     const handlers = noopHandlers()
     const file = menuOf(build(RECENTS, false, handlers), 'File')
     const recent = file.find((i) => i.label === 'Open Recent')?.submenu as MenuItemConstructorOptions[]
     expect(recent.map((i) => i.label)).toEqual(['/vaults/notes', '/vaults/work', '/vaults/old'])
 
     click(recent[1])
-    expect(handlers.openRecent).toHaveBeenLastCalledWith('/vaults/work', false)
+    expect(handlers.openRecent).toHaveBeenLastCalledWith('/vaults/work')
     click(recent[0], { altKey: true })
-    expect(handlers.openRecent).toHaveBeenLastCalledWith('/vaults/notes', true)
-  })
-
-  it('a programmatic click (menuItem.click(), no event) opens in place, not a crash', () => {
-    const handlers = noopHandlers()
-    const file = menuOf(build(RECENTS, false, handlers), 'File')
-    const recent = file.find((i) => i.label === 'Open Recent')?.submenu as MenuItemConstructorOptions[]
-    recent[0].click?.(undefined as never, undefined, undefined as never)
-    expect(handlers.openRecent).toHaveBeenCalledWith('/vaults/notes', false)
+    expect(handlers.openRecent).toHaveBeenLastCalledWith('/vaults/notes')
+    // A programmatic `menuItem.click()` passes no event at all: the same call, not a crash.
+    recent[2].click?.(undefined as never, undefined, undefined as never)
+    expect(handlers.openRecent).toHaveBeenLastCalledWith('/vaults/old')
   })
 
   it('Open Recent with no recents shows one disabled placeholder', () => {
@@ -471,24 +466,32 @@ describe('createMenuHandlers', () => {
     expect(() => unfocused.switchVault()).not.toThrow()
   })
 
-  it('openRecent in place sends the path to the focused renderer', () => {
+  it('openRecent from a vault window goes through the one open-recent door (YAZ-1913 D1), never swapping this window', () => {
+    store.upsertWindow(ENTRY)
     const wc = { id: 7, send: vi.fn() }
     const { handlers, windows } = makeHandlers(wc)
-    handlers.openRecent('/vaults/work', false)
-    expect(wc.send).toHaveBeenCalledWith(CH.menuOpenRoot, '/vaults/work')
-    expect(windows.openRecentBeside).not.toHaveBeenCalled()
-  })
-
-  it('openRecent beside (⌥) goes through the window manager\'s one open-recent door (YAZ-1767 D1), never the renderer', () => {
-    const wc = { id: 7, send: vi.fn() }
-    const { handlers, windows } = makeHandlers(wc)
-    handlers.openRecent('/vaults/work', true)
+    handlers.openRecent('/vaults/work')
     expect(windows.openRecentBeside).toHaveBeenCalledExactlyOnceWith('/vaults/work')
     expect(wc.send).not.toHaveBeenCalled()
     // The door's verdict (dead folder → false) is the manager's business; the menu ignores it.
     windows.openRecentBeside.mockReturnValueOnce(false)
-    expect(() => handlers.openRecent('/vaults/gone', true)).not.toThrow()
+    expect(() => handlers.openRecent('/vaults/gone')).not.toThrow()
     expect(wc.send).not.toHaveBeenCalled()
+  })
+
+  it('openRecent from a Welcome window fills that window in place (menu:open-root), not the door', () => {
+    store.upsertWindow({ ...ENTRY, root: null, file: null, tabs: [] })
+    const wc = { id: 7, send: vi.fn() }
+    const { handlers, windows } = makeHandlers(wc)
+    handlers.openRecent('/vaults/work')
+    expect(wc.send).toHaveBeenCalledExactlyOnceWith(CH.menuOpenRoot, '/vaults/work')
+    expect(windows.openRecentBeside).not.toHaveBeenCalled()
+  })
+
+  it('openRecent with no focused window opens through the door: a new window, not a silent no-op (YAZ-1913 S10)', () => {
+    const { handlers, windows } = makeHandlers(undefined)
+    handlers.openRecent('/vaults/work')
+    expect(windows.openRecentBeside).toHaveBeenCalledExactlyOnceWith('/vaults/work')
   })
 
   it('closeTab / nextTab / prevTab go to the focused renderer only (GRO-2232); no focused window is a no-op', () => {
