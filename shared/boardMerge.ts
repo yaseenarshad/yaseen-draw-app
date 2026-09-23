@@ -14,7 +14,11 @@ import { isFiniteNumber, isRecord } from './guards'
  *    a clash between two live edits is counted for the "kept the newest" notice;
  *  - a clashing shape keeps the union of both sides' `boundElements` (arrows and text bound to it),
  *    because load does not repair bindings and an arrow drawn on one machine would otherwise lose
- *    its anchor to the other machine's move.
+ *    its anchor to the other machine's move;
+ *  - a live shape whose PARENT — the box its text sits in (`containerId`), or its frame (`frameId`)
+ *    — ended up deleted gets the parent back from the side that still had it: deleting a box deletes
+ *    its text too, so "the edit beats the delete" has to keep the edited text's box with it (S9).
+ *    A parent neither side kept is let go of instead (the reference is cleared).
  * The board's own settings (`appState`) merge per key the same way, ours winning a clash.
  *
  * Pure and engine-free: it runs in the main process in the middle of a rebase. Answers null for
@@ -123,6 +127,22 @@ export function mergeBoards(baseText: string, theirsText: string, mineText: stri
     const pick = merged.get(id) as Element
     const bindings = unionBindings(t.get(id)?.boundElements, m.get(id)?.boundElements).filter((x) => alive(merged.get(x.id as string)))
     merged.set(id, { ...pick, boundElements: bindings.length > 0 ? bindings : null })
+  }
+
+  // S9: an edited child keeps its parent. Repeats until settled — a revived box may sit in a deleted frame.
+  for (let settled = false; !settled; ) {
+    settled = true
+    for (const e of [...merged.values()]) {
+      if (!alive(e)) continue
+      for (const key of ['containerId', 'frameId'] as const) {
+        const parentId = e[key]
+        if (typeof parentId !== 'string' || alive(merged.get(parentId))) continue
+        const kept = [t.get(parentId), m.get(parentId)].find(alive)
+        if (kept !== undefined) merged.set(parentId, kept)
+        else merged.set(e.id, { ...(merged.get(e.id) as Element), [key]: null })
+        settled = false
+      }
+    }
   }
 
   // Excalidraw orders a scene by fractional `index`; a board written before indices existed keeps the sequence above.

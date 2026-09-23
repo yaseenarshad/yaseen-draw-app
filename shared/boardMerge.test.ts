@@ -95,6 +95,25 @@ describe('mergeBoards — per shape', () => {
   })
 })
 
+describe('mergeBoards — parents (S9)', () => {
+  const box = shape('box', { boundElements: [{ id: 'txt', type: 'text' }] })
+  const txt = shape('txt', { type: 'text', containerId: 'box', text: 'hi' })
+
+  it('text edited on one side inside a box deleted on the other keeps its box', () => {
+    const m = merge([box, txt], [del(box, 9000), del(txt, 9000)], [box, { ...edit(txt, 0), text: 'hi edited' }])
+    expect(m.get('txt')).toMatchObject({ isDeleted: false, text: 'hi edited', containerId: 'box' })
+    expect(m.get('box')?.isDeleted).toBe(false)
+  })
+
+  it('a shape in a frame the other side deleted keeps the frame; a parent neither side kept is let go of', () => {
+    const frame = shape('f', { type: 'frame' })
+    const child = shape('c', { frameId: 'f' })
+    expect(merge([frame, child], [del(frame), del(child)], [frame, edit(child, 5)]).get('f')?.isDeleted).toBe(false)
+    const orphan = shape('o', { containerId: 'nowhere' })
+    expect(merge([], [], [orphan]).get('o')?.containerId).toBeNull()
+  })
+})
+
 describe('mergeBoards — the board around the shapes', () => {
   it('orders by fractional index, ties by id, so both machines write the same bytes', () => {
     const a = shape('b', { index: 'a5' })

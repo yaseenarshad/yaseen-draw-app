@@ -129,6 +129,24 @@ describe('resolveRebase via syncPass', { timeout: REAL_GIT_TIMEOUT_MS }, () => {
     expect(shapesOf(a.read('y.excalidraw'))[0]?.x).toBe(5)
   })
 
+  it('S12: a board renamed on one machine and edited on the other ends up renamed WITH the edit', async () => {
+    const { a, b } = await twoMachines({ 'old.excalidraw': board([r1, r2]) })
+    await b.git('mv', 'old.excalidraw', 'new.excalidraw')
+    await a.write('old.excalidraw', board([{ ...r1, x: 13, version: 2, updated: 2000 }, r2]))
+    await meet(a, b)
+    expect(existsSync(`${a.root}/old.excalidraw`)).toBe(false)
+    expect(shapesOf(a.read('new.excalidraw'))[0]?.x).toBe(13)
+  })
+
+  it('S14: the same picture added on both machines is one file, never a conflict', async () => {
+    const { a, b } = await twoMachines({ 'keep.md': 'x\n' })
+    await b.write('assets/abc123.png', 'same-bytes')
+    await a.write('assets/abc123.png', 'same-bytes')
+    const status = await meet(a, b)
+    expect(status.merged).toBeUndefined()
+    expect(a.read('assets/abc123.png')).toBe('same-bytes')
+  })
+
   it('S13: shares.json and favorites.json merge per entry, silently; another config file keeps ours', async () => {
     const share = (id: string, updatedAt: number) => ({ id, allowDownload: true, sharedAt: 1, updatedAt })
     const shares = (m: Record<string, unknown>) => `${JSON.stringify({ version: 1, shares: m }, null, 2)}\n`
