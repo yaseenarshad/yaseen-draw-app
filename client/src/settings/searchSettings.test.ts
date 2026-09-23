@@ -42,6 +42,7 @@ describe('settingCandidates', () => {
       'hoverPreview',
       'libraryFolder',
       'pixabayApiKey',
+      'sharing',
       'hotkeys-window',
       'hotkeys-canvas',
       'hotkeys-mouse',

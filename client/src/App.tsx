@@ -23,6 +23,8 @@ import { resolveTheme, useSystemPrefersDark } from './lib/theme'
 import { fileHash } from './lib/urlHash'
 import { windowTitle } from './lib/windowTitle'
 import { SettingsDialog } from './settings/SettingsDialog'
+import type { SettingsSectionId } from './settings/registry'
+import { ShareDialog } from './share/ShareDialog'
 import { type SidebarClipboard, Sidebar } from './sidebar/Sidebar'
 import type { SidebarRevealRequest } from './sidebar/revealRow'
 import { TabBar } from './tabs/TabBar'
@@ -281,11 +283,27 @@ export function App() {
   // open the ONE dialog — and it can open with the sidebar collapsed. `open`/`close` are stable
   // because `useMenuEvents` resubscribes whenever a callback identity changes.
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const openSettings = useCallback(() => setSettingsOpen(true), [])
+  // Which standalone page the dialog opens on — the Share dialog's "Open Settings › Sharing" (YAZ-1799).
+  const [settingsPage, setSettingsPage] = useState<SettingsSectionId | undefined>(undefined)
+  const openSettings = useCallback(() => {
+    setSettingsPage(undefined)
+    setSettingsOpen(true)
+  }, [])
+  const openSharingSettings = useCallback(() => {
+    setSettingsPage('sharing')
+    setSettingsOpen(true)
+  }, [])
   const closeSettings = useCallback(() => setSettingsOpen(false), [])
   // Settings › Storage (YAZ-1801 D1, 🔒 D13): measured only while Settings is open — on its page's
   // open, a sync pass finishing, and a shrink. A closed dialog hands the hook no sync state at all.
   const vaultStorage = useVaultStorage(root, settingsOpen ? syncState : null)
+  // The ONE Share dialog (YAZ-1799 D6): File › Share Link… (the active drawing) and the sidebar's "Share…".
+  const [sharePath, setSharePath] = useState<string | null>(null)
+  const fileRef = useRef(file)
+  fileRef.current = file
+  const shareActive = useCallback(() => {
+    if (fileRef.current !== null) setSharePath(fileRef.current)
+  }, [])
 
   // File › Open Folder… / Open Recent (GRO-2161) reuse the same flows as the in-app buttons;
   // File › Close Tab and Window › Next/Previous Tab (GRO-2232) drive the tab model.
@@ -308,6 +326,7 @@ export function App() {
     onExportImage: exportImage,
     onCanvasBackground: setCanvasBackground,
     onExportDrawing: exportDrawing,
+    onShareLink: shareActive,
   })
 
   // Deep links (E1, GRO-2171): a routed link behaves like a sidebar click (Tabs rule 10) —
@@ -469,10 +488,12 @@ export function App() {
           disagree about what this vault is doing. */}
       {settingsOpen && (
         <SettingsDialog
-          ctx={{ settings, onChange: changeSettings, sync: { status: githubSync.status, setEnabled: githubSync.setEnabled }, storage: root === null ? undefined : vaultStorage }}
+          ctx={{ settings, onChange: changeSettings, sync: { status: githubSync.status, setEnabled: githubSync.setEnabled }, storage: root === null ? undefined : vaultStorage, root }}
           onClose={closeSettings}
+          initialPage={settingsPage}
         />
       )}
+      {sharePath !== null && root !== null && <ShareDialog key={sharePath} root={root} path={sharePath} onClose={() => setSharePath(null)} onOpenSettings={openSharingSettings} />}
       {/* YAZ-1818: sync needs attention. Two of the six reasons are things this app cannot fix from
           inside itself (git missing, credentials rejected), so the offer is a prompt to paste
           into any LLM — an assistant that CAN drive the terminal — rather than a wizard. */}
@@ -519,6 +540,7 @@ export function App() {
           onFileMissing={onFileMissing}
           onRenameFile={renameFile}
           onDeleteFile={deleteFile}
+          onShareFile={setSharePath}
           onNotice={notify}
           // YAZ-1801 D3: rows over GitHub's limit wear a cloud-off icon — from the one sync status above.
           tooLarge={tooLargePaths}

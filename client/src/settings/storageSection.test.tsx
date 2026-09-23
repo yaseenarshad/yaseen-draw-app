@@ -76,7 +76,7 @@ const row = (el: HTMLElement, id: string) => el.querySelector<HTMLElement>(`[dat
 describe('Settings › Storage (YAZ-1801)', () => {
   it('is a standalone page under the divider, before Hotkeys — and absent with no vault', () => {
     const { el } = mount(STATS)
-    expect(navTitles(el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images', 'Sync', 'Storage', 'Hotkeys'])
+    expect(navTitles(el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images', 'Sync', 'Storage', 'Sharing', 'Hotkeys'])
     // Under the divider with Hotkeys, not on the scrolling page.
     expect(el.querySelector('.settings-nav__divider + .settings-nav__item')?.textContent).toBe('Storage')
     expect(row(el, 'storageGithub')).toBeNull()

@@ -41,6 +41,7 @@ function installBridge() {
       onExportImage: sub(exportImageListeners),
       onCanvasBackground: sub(canvasBackgroundListeners),
       onExportDrawing: sub(exportDrawingListeners),
+      onShareLink: sub(new Set<() => void>()),
     },
   }
   Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })

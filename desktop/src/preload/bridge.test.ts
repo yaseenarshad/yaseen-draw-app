@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { ComponentsApi, DialogApi, DrawingApi, FavoritesApi, FileApi, FileClipState, GithubApi, GithubSyncStatus, LinkApi, MediaApi, MenuApi, SecretsApi, ShellApi, StateApi, StorageApi, WatchEvent, WindowApi, YaseenDrawApi } from '@shared/types'
+import type { ComponentsApi, DialogApi, DrawingApi, FavoritesApi, FileApi, FileClipState, GithubApi, GithubSyncStatus, LinkApi, MediaApi, MenuApi, SecretsApi, ShareApi, ShellApi, StateApi, StorageApi, WatchEvent, WindowApi, YaseenDrawApi } from '@shared/types'
 import { CH } from '../channels'
 
 const exposed: Record<string, unknown> = {}
@@ -13,10 +13,10 @@ vi.mock('electron', () => ({
  * typecheck. `as const satisfies` keeps each tuple's literal type (a plain `readonly (keyof T)[]`
  * annotation would widen it and make `Exhaustive<>` vacuous) while still rejecting typos.
  */
-const TOP = ['tree', 'createDir', 'createFile', 'drawing', 'pickFolder', 'dialog', 'watch', 'state', 'window', 'menu', 'link', 'file', 'shell', 'favorites', 'media', 'components', 'secrets', 'github', 'storage'] as const satisfies readonly (keyof YaseenDrawApi)[]
+const TOP = ['tree', 'createDir', 'createFile', 'drawing', 'pickFolder', 'dialog', 'watch', 'state', 'window', 'menu', 'link', 'file', 'shell', 'favorites', 'media', 'components', 'secrets', 'github', 'storage', 'share'] as const satisfies readonly (keyof YaseenDrawApi)[]
 const STATE = ['get', 'setSettings', 'setSidebarWidth', 'pushRecent', 'removeRecent', 'setFolder', 'onChange'] as const satisfies readonly (keyof StateApi)[]
 const WINDOW = ['identity', 'setIdentity', 'open', 'openRecent', 'closeSelf', 'onFlush'] as const satisfies readonly (keyof WindowApi)[]
-const MENU = ['onOpenFolder', 'onOpenRoot', 'onSearch', 'onSwitchVault', 'onSettings', 'onToggleSidebar', 'onCloseTab', 'onNextTab', 'onPrevTab', 'onExportImage', 'onCanvasBackground', 'onExportDrawing'] as const satisfies readonly (keyof MenuApi)[]
+const MENU = ['onOpenFolder', 'onOpenRoot', 'onSearch', 'onSwitchVault', 'onSettings', 'onToggleSidebar', 'onCloseTab', 'onNextTab', 'onPrevTab', 'onExportImage', 'onCanvasBackground', 'onExportDrawing', 'onShareLink'] as const satisfies readonly (keyof MenuApi)[]
 const LINK = ['onOpenFile', 'onNotice'] as const satisfies readonly (keyof LinkApi)[]
 const FILE = ['rename', 'onRenamed', 'delete', 'onDeleted', 'clip', 'paste', 'clipState', 'onClipChanged'] as const satisfies readonly (keyof FileApi)[]
 const SHELL = ['reveal', 'openVsCode', 'openDefault'] as const satisfies readonly (keyof ShellApi)[]
@@ -28,6 +28,7 @@ const STORAGE = ['stats', 'shrink'] as const satisfies readonly (keyof StorageAp
 const MEDIA = ['favorites', 'recent', 'onChanged', 'search', 'preview', 'import'] as const satisfies readonly (keyof MediaApi)[]
 const COMPONENTS = ['list', 'save', 'read', 'rename', 'delete', 'preview', 'onChanged'] as const satisfies readonly (keyof ComponentsApi)[]
 const SECRETS = ['set', 'has'] as const satisfies readonly (keyof SecretsApi)[]
+const SHARE = ['status', 'accounts', 'setup', 'onSetupProgress', 'openCloudflare', 'openLink', 'get', 'list', 'publish', 'setPermission', 'stop', 'setDomain', 'disconnect', 'onChanged'] as const satisfies readonly (keyof ShareApi)[]
 type Exhaustive<T, K extends readonly (keyof T)[]> = Exclude<keyof T, K[number]> extends never ? true : never
 const _top: Exhaustive<YaseenDrawApi, typeof TOP> = true
 const _state: Exhaustive<StateApi, typeof STATE> = true
@@ -44,7 +45,8 @@ const _storage: Exhaustive<StorageApi, typeof STORAGE> = true
 const _media: Exhaustive<MediaApi, typeof MEDIA> = true
 const _components: Exhaustive<ComponentsApi, typeof COMPONENTS> = true
 const _secrets: Exhaustive<SecretsApi, typeof SECRETS> = true
-void [_top, _state, _window, _menu, _link, _file, _shell, _favorites, _drawing, _dialog, _github, _storage, _media, _components, _secrets]
+const _share: Exhaustive<ShareApi, typeof SHARE> = true
+void [_top, _state, _window, _menu, _link, _file, _shell, _favorites, _drawing, _dialog, _github, _storage, _share, _media, _components, _secrets]
 
 describe('preload bridge', () => {
   it('installs window.yaseenDraw with every contract method', async () => {
@@ -65,6 +67,7 @@ describe('preload bridge', () => {
     for (const k of COMPONENTS) expect(typeof api.components[k], `components.${k}`).toBe('function')
     for (const k of DIALOG) expect(typeof api.dialog[k], `dialog.${k}`).toBe('function')
     for (const k of SECRETS) expect(typeof api.secrets[k], `secrets.${k}`).toBe('function')
+    for (const k of SHARE) expect(typeof api.share[k], `share.${k}`).toBe('function')
   })
 
   it('media.favorites / media.recent invoke their channels with the request; media:changed reaches the listener (🔒 YAZ-1775 D5)', async () => {
