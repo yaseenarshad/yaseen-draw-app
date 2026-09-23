@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
+import { mkdir, mkdtemp, rm, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -74,6 +75,52 @@ export async function makeBareRemote(): Promise<BareRemote> {
 
 export async function wireOrigin(repo: GitRepo, remote: BareRemote): Promise<void> {
   await repo.run(['remote', 'add', 'origin', remote.url])
+}
+
+/** One machine of a two-machine test (YAZ-1897): its vault, and plain file and git helpers over it. */
+export interface Machine {
+  root: string
+  write: (rel: string, content: string) => Promise<void>
+  read: (rel: string) => string
+  remove: (rel: string) => Promise<void>
+  /** Runs git here and answers trimmed stdout (no throw — the tests assert on what they need). */
+  git: (...args: string[]) => Promise<string>
+}
+
+function machine(root: string, bin: string): Machine {
+  const abs = (rel: string) => path.join(root, rel)
+  return {
+    root,
+    write: async (rel, content) => {
+      await mkdir(path.dirname(abs(rel)), { recursive: true })
+      await writeFile(abs(rel), content)
+    },
+    read: (rel) => readFileSync(abs(rel), 'utf8'),
+    remove: (rel) => unlink(abs(rel)),
+    git: async (...args) => (await git(bin, root, args)).stdout.trim(),
+  }
+}
+
+/**
+ * Two machines sharing one bare-repo "GitHub" (YAZ-1897): machine A ("Yaseen Draw Test") seeded
+ * with `files` and pushed, machine B ("Sam") cloned from it. `cleanup` removes all three.
+ */
+export async function makeTwoMachines(files: Record<string, string>): Promise<{ a: Machine; b: Machine; cleanup: () => Promise<void> }> {
+  const bin = await requireGit()
+  const remote = await makeBareRemote()
+  const repo = await makeGitRepo()
+  const bDir = await mkdtemp(path.join(tmpdir(), 'yaseendraw-b-'))
+  const cleanup = async () => {
+    await Promise.all([remote.cleanup(), repo.cleanup(), rm(bDir, { recursive: true, force: true })])
+  }
+  for (const [rel, content] of Object.entries(files)) await repo.write(rel, content)
+  await repo.run(['add', '-A'])
+  await repo.run(['commit', '-m', 'base'])
+  await wireOrigin(repo, remote)
+  await repo.run(['push', '-u', 'origin', 'HEAD'])
+  await runIn(bin, tmpdir(), ['clone', remote.url, bDir])
+  for (const cfg of [['user.name', 'Sam'], ['user.email', 'sam@example.invalid'], ['commit.gpgsign', 'false']]) await runIn(bin, bDir, ['config', ...cfg])
+  return { a: machine(repo.root, bin), b: machine(bDir, bin), cleanup }
 }
 
 /**

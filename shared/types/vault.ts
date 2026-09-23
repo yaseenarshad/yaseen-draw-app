@@ -1,6 +1,7 @@
 /** What lives in a vault's own `.yaseendraw/`: its config files, its GitHub switch and its favorites. */
 
 import type { MAX_FAVORITES } from './appState'
+import type { DrawingFileEntry } from './drawing'
 
 /**
  * The `.obsidian/`-style dotfolder that travels with a vault, and THE one definition of its name
@@ -141,6 +142,34 @@ export interface GithubApi {
   setEnabled(root: string, enabled: boolean): Promise<GithubSyncStatus>
   /** Fired in every window on every transition of any vault; filter by `status.root`. Returns an unsubscribe. */
   onStatus(listener: (status: GithubSyncStatus) => void): () => void
+  /**
+   * YAZ-1897 D4 — Version history. A board's committed versions, newest first, plus "your version
+   * before the merge" when the last merge changed this board. Empty for a vault with no git history.
+   * `path` is the board (absolute, or vault-relative), exactly as `drawing.load` takes it.
+   */
+  history(root: string, path: string): Promise<BoardVersion[]>
+  /** One version's scene and its pictures, resolved from `assets/` the way `drawing.load` does. */
+  version(root: string, path: string, ref: string): Promise<BoardVersionScene>
+  /** Writes that version over the board as an ordinary edit; the watcher and sync take it from there. */
+  restore(root: string, path: string, ref: string): Promise<void>
+}
+
+/** One entry in a board's Version history (YAZ-1897 D4). */
+export interface BoardVersion {
+  /** Opaque to the renderer: hand it back to `version` / `restore`. */
+  ref: string
+  author: string
+  /** Epoch milliseconds of the commit. */
+  at: number
+  /** The version a sync merge produced (its commit carries a `Merged-with:` trailer). */
+  merged: boolean
+  /** "Your version before the merge": never pushed, kept on this machine only until the next merge. */
+  localOnly: boolean
+}
+
+export interface BoardVersionScene {
+  json: string
+  files: Record<string, DrawingFileEntry>
 }
 
 // ---------- Storage (Settings › Storage — YAZ-1801) ----------
