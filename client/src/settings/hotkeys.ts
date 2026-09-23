@@ -56,6 +56,8 @@ export const MOUSE_TIPS: readonly HotkeyEntry[] = [
   // anything and never folds a folder.
   { keys: '⇧-click file or folder', label: 'Add or remove it from a multi-selection — right-click for Copy N paths / Open N in new tabs' },
   { keys: 'Right-click file', label: 'Cut / Copy / Paste, Copy path, New drawing…, Open in ▸ (new window, VS Code, default app, Finder)' },
+  // The vault menu (YAZ-1941, ported from Docs YAZ-1798): the sidebar header's vault name, or any vault in the ⌘O switcher.
+  { keys: 'Right-click vault', label: 'Open in this window, Copy vault name / path, Reveal in Finder, VS Code, Remove from recents' },
 ]
 
 /** The three groups as Settings › Hotkeys shows them, heading first — one place to add a fourth. */

@@ -26,7 +26,7 @@ nothing to do with each other. A bare `D3` would be unresolvable, so there are n
 | `client/src/drawings/presentation/` | the canvas panel's Present tab: the slide rules, the panel and the full-pane player |
 | `client/src/image-studio/` | the canvas panel's Images tab: the Image Studio, the shapes catalog, both insert paths |
 | `client/src/components-library/` | the canvas panel's Components tab: the saved-component library, its capture, import, preview and insert (named so it is never confused with `client/src/components/`) |
-| `client/src/sidebar/` | the file tree, its context menu, rename/move/trash, favorites, vault switcher |
+| `client/src/sidebar/` | the file tree, its context menu, rename/move/trash, favorites, vault switcher and its right-click vault menu (items as data in `vaultMenuSections.ts`) |
 | `client/src/tabs/` | the tab strip |
 | `client/src/workspace/` | the tab model (`tabsReducer`) and its per-tab history |
 | `client/src/settings/` | the settings dialog and its registry |
@@ -654,7 +654,20 @@ the vault switcher's Open folder… row and its vault rows, File › Open Recent
 one open-recent door, `openRecentBeside`: that vault's live windows are raised, or a new window opens
 on its remembered last file. Picked folders decide in the renderer (`App.tsx` `openPicked`, which
 knows its root); Open Recent decides in main (`menu.ts` `openRecent`, from the target window's
-entry).
+entry). The one opt-in exception is the vault menu's "Open in this window" (YAZ-1941 D2), which
+says so in its label and calls App's `openRoot` directly.
+
+**The vault menu** (YAZ-1941, a port of Yaseen Docs YAZ-1798): right-clicking the switcher's
+trigger (= the current vault) or any live row opens the sidebar's own `ContextMenu` with
+`buildVaultMenuSections({ path, isCurrent })` (`sidebar/vaultMenuSections.ts`, pure) — another
+vault gets [Open in this window] · [Copy vault name · Copy path] · [Reveal in Finder · Open in VS
+Code] · [Remove from recent vaults]; the current vault only the middle two groups. "Open in this
+window" is `openRoot` (in place; `false` greys the row like a click's); Reveal / VS Code are the
+Sidebar's own verbs (any absolute path, `NOT_FOUND` notice); the copies confirm through the sidebar
+notice; Remove is `storage.removeRecentRoot` with no confirm (the folder is untouched) and drops the
+row at once. The menu is the top layer while it stands: Esc and click-away close only it, and the
+filter ignores ↑/↓/⏎/Esc meanwhile. Every right-click swallows Electron's native text menu; a
+"Folder not found" row gets no menu.
 
 | Menu | Item | Key |
 |---|---|---|
