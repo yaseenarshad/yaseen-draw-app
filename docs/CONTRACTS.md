@@ -492,7 +492,7 @@ GitHub refuses any file over 100 MiB (and rejects the WHOLE push that carries on
 `shared/types/vault.ts`.
 
 - **D3 — an oversize file never jams sync.** A sync pass stats the untracked and modified files
-  before `git add -A` and excludes any over `GITHUB_FILE_LIMIT_BYTES` (95 MiB, a margin under the
+  before `git add -A` and excludes any at or over `GITHUB_FILE_LIMIT_BYTES` (95 MiB, a margin under the
   100) by literal pathspec, then re-checks the staged list and `reset`s anything that grew past it.
   Everything else commits and pushes; the pass ends `attention` / `too-large` with
   `GithubSyncStatus.tooLarge` (vault-relative paths). The banner for it has NO Dismiss and stays

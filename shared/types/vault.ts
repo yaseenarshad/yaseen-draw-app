@@ -44,7 +44,7 @@ export interface GithubSyncConfig {
 export type GithubSyncAttention = 'no-git' | 'no-identity' | 'auth' | 'conflict' | 'error' | 'too-large'
 
 /**
- * YAZ-1801 D3: the size past which a sync pass holds a file back instead of committing it.
+ * YAZ-1801 D3: the size at which a sync pass holds a file back instead of committing it.
  * GitHub REFUSES any file over 100 MiB, and one such file inside a commit rejects the whole push —
  * so every other edit in the vault would stop syncing behind it. 95 MiB leaves a margin for a
  * file that grows between the check and the push. `too-large` is the attention that says so.
@@ -85,8 +85,8 @@ export interface GithubSyncStatus {
    */
   enabled?: boolean
   /**
-   * YAZ-1801 D3: vault-relative POSIX paths the last pass held back because each is over
-   * `GITHUB_FILE_LIMIT_BYTES`. They stay on this machine only; everything else synced. Present
+   * YAZ-1801 D3: vault-relative POSIX paths the last pass held back because each is at or
+   * over `GITHUB_FILE_LIMIT_BYTES`. They stay on this machine only; everything else synced. Present
    * (and non-empty) only while there is at least one — the sidebar's cloud-off icon, the chip's
    * "N files not synced" and the `too-large` banner all read this one list.
    */
