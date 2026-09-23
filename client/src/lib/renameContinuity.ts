@@ -22,8 +22,8 @@ export interface RenameContinuityHandle {
   flush(): Promise<void>
   /** Stop this editor writing ever again (pending drops, unmount flush becomes a no-op). */
   retire(): void
-  /** Whether the tab holds edits not yet on disk (YAZ-1801: shrink must not rewrite under them). Absent = clean. */
-  dirty?(): boolean
+  /** Whether the tab holds edits not yet on disk (YAZ-1801: shrink must not rewrite under them). */
+  dirty(): boolean
 }
 
 const handles = new Map<string, RenameContinuityHandle>()
@@ -69,7 +69,7 @@ export function retireDir(dir: string): void {
  * own mtime re-check narrows that race to the instant of the write.
  */
 export function dirtyPaths(): string[] {
-  return [...handles].filter(([, handle]) => handle.dirty?.() === true).map(([path]) => path)
+  return [...handles].filter(([, handle]) => handle.dirty()).map(([path]) => path)
 }
 
 /** Test hook. */
