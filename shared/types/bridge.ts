@@ -306,6 +306,6 @@ export interface YaseenDrawApi {
   github: GithubApi
   /** Settings › Storage: what the vault weighs, and moving legacy pictures out of boards (YAZ-1801). */
   storage: StorageApi
-  /** Share link (YAZ-1799, prototype): main owns Cloudflare and the secrets; the renderer hands over bytes. */
+  /** Share link (YAZ-1799): main owns Cloudflare and the secrets; the renderer hands over bytes. */
   share: ShareApi
 }
