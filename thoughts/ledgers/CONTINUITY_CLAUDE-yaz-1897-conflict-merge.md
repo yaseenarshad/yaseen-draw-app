@@ -19,10 +19,9 @@
   - [x] 2A board merge (79259b7) · [x] 2B resolve inside sync (e0f6796) · [x] 2C 60 s poll (639d07e) · [x] 2D history backend (7006768)
   - [x] 3A merged notice + 3B Version history panel (9ebc09a)
   - [x] 4A scenarios S1–S28 (34114bf: S9 parent revival, S12, S14) · [x] 4B live dev-app check via CDP + demo vault (d4c4250)
-  - [x] 5A audit (YAZ-1911)
-- Now: [→] 5B apply the audit, docs, merge, release (YAZ-1912)
-- Remaining:
-  - [ ] Merge to main, cut the smallest version bump, replace the installed app
+  - [x] 5A audit (YAZ-1911) · [x] 5B polish (2f19b1f)
+  - [x] Merged PR #11 (72ce61b), released v0.1.6 (8fabfc7), installed on Yasin's Mac
+- Now: nothing. YAZ-1897 is done.
 
 ## Gotchas learned
 - In a rebase, stage 2 is the UPSTREAM and stage 3 is ours. Read stages with `checkout-index --stage=all --temp` (no stdout buffer).
