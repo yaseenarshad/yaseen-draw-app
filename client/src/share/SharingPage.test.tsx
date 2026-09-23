@@ -48,7 +48,6 @@ const board = (name: string, over: Partial<ShareListEntry> = {}): ShareListEntry
   sync: { state: 'ok' },
   stale: false,
   fileExists: true,
-  live: 'live',
   ...over,
 })
 
@@ -288,7 +287,7 @@ describe('Settings › Sharing (YAZ-1889)', () => {
       board('View only', { allowDownload: false }),
       board('Uploading', { sync: { state: 'uploading' } }),
       board('Failed', { sync: { state: 'failed', message: 'The upload failed (HTTP 500). Try again in a moment.' } }),
-      board('Stale', { live: 'missing', stale: true }),
+      board('Stale', { stale: true }),
       board('Gone', { fileExists: false }),
     ])
     await mount()
@@ -300,7 +299,7 @@ describe('Settings › Sharing (YAZ-1889)', () => {
     expect(lines[0]).toMatch(/^Up to date · /)
     expect(lines[2]).toBe('Uploading…')
     expect(lines[3]).toBe("Couldn't update: The upload failed (HTTP 500). Try again in a moment.")
-    expect(lines[4]).toMatch(/^Stale: the link doesn't work/)
+    expect(lines[4]).toMatch(/^Couldn't update: the shared copy is gone from Cloudflare/)
     expect(lines[5]).toMatch(/^No board at this path any more/)
   })
 

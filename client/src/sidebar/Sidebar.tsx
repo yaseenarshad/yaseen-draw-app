@@ -92,8 +92,8 @@ interface SidebarProps {
    * routes ANY failure to the passive notice — this promise never rejects, so the sheet just closes.
    */
   onDeleteFile: (path: string) => Promise<void>
-  /** Right-click → "Share" (YAZ-1799 D6): App opens its one Share dialog for the board. Optional so older harnesses need not pass it. */
-  onShareFile?: (path: string) => void
+  /** Right-click → "Share" (YAZ-1799 D6): App opens its one Share dialog for the board. */
+  onShareFile: (path: string) => void
   /** Show a transient, unobtrusive message — never a dialog (E1, GRO-2171). App owns the banner. */
   onNotice: (message: string, kind?: NoticeKind) => void
   /**
@@ -1464,7 +1464,7 @@ export function Sidebar({
               onToggleFavorite: toggleFavorite,
               onRename: (path) => setRenamingEntry({ path, kind: menu.rowKind === 'file' ? 'file' : 'dir' }),
               onInfo: (path) => setInfoPopover({ x: menu.x, y: menu.y, path, now: Date.now() }),
-              onShare: (path) => onShareFile?.(path),
+              onShare: onShareFile,
               onDelete: askDelete,
             },
           )}

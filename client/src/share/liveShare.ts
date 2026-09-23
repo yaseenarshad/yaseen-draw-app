@@ -1,7 +1,7 @@
 /**
- * ALWAYS-LIVE LINKS (YAZ-1799, Yasin's amendment — replaces "frozen snapshot + Update"). Every
- * successful save of a board that has a `shares.json` entry re-uploads the standalone export to
- * the SAME id, so the link always shows the board as last saved. There is no Update button.
+ * ALWAYS-LIVE LINKS (YAZ-1799 🔒 D3). Every successful save of a board that has a `shares.json`
+ * entry re-uploads the standalone export to the SAME id, so the link always shows the board as
+ * last saved.
  *
  * Coalescing, per board, in this renderer (the window whose autosave wrote the board):
  *  - SETTLE: an upload starts only after 10 s with no further save — a drawing session is many
@@ -10,7 +10,7 @@
  *  - LATEST WINS: a save that lands mid-upload schedules one more upload after it finishes, which
  *    reads the board from disk again — so the last save is always what ends up behind the link.
  *
- * A failed upload (offline, too large, refused) keeps the share record; main records the reason
+ * A failed upload (offline, too large, refused, not set up) keeps the share record; main records the reason
  * (the Share dialog and Settings › Sharing show it) and the next save simply tries again. Nothing
  * here retries on a timer.
  *
@@ -86,15 +86,14 @@ async function run(b: BoardState): Promise<void> {
   emit()
   const path = b.path
   try {
-    // Only boards that are shared, and only once sharing is set up; everything else is a no-op.
+    // Only boards that are shared; everything else is a no-op.
     const entry = await api.share.get({ root: b.root, path })
     if (entry === null) return
-    const status = await api.share.status()
-    if (status.state !== 'ready') return
     // No flush: this run was triggered BY a save, so the disk is at least that new. Main checks
-    // the size (TOO_LARGE is recorded as the board's error) and records every outcome.
-    const built = await buildShareContent(b.root, path, { flush: false })
-    await api.share.publish({ root: b.root, path, content: built.content, id: entry.id })
+    // the size and the setup (TOO_LARGE / NOT_SET_UP are recorded as the board's error) and
+    // records every outcome.
+    const content = await buildShareContent(b.root, path, { flush: false })
+    await api.share.publish({ root: b.root, path, content, id: entry.id })
   } catch {
     // Recorded by main (the dialog and Settings show it); the next save retries. A rename that
     // pulled the board out from under this run is not a failure: run again where it went.

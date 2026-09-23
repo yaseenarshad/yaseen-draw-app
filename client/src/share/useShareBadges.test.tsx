@@ -22,7 +22,7 @@ let changed: () => void = () => {}
 const file = (path: string): TreeNode => ({ type: 'file', name: path.slice(path.lastIndexOf('/') + 1), path, size: 1, mtime: 0, kind: 'drawing' })
 const MOVE: TreeFileMove = { dragging: null, dropDir: null, start: vi.fn(), end: vi.fn(), hover: vi.fn(), drop: vi.fn() }
 const SELECTION: TreeSelection = { paths: new Set(), toggle: vi.fn(), set: vi.fn() }
-const row = (path: string, over: Partial<ShareListEntry> = {}): ShareListEntry => ({ path, id: 'abc', url: 'https://share.test/b/abc', allowDownload: true, sharedAt: 0, updatedAt: Date.now(), sync: { state: 'ok' }, stale: false, fileExists: true, live: 'live', ...over })
+const row = (path: string, over: Partial<ShareListEntry> = {}): ShareListEntry => ({ path, id: 'abc', url: 'https://share.test/b/abc', allowDownload: true, sharedAt: 0, updatedAt: Date.now(), sync: { state: 'ok' }, stale: false, fileExists: true, ...over })
 
 function Probe({ nodes }: { nodes: TreeNode[] }) {
   const badges = useShareBadges('/v')
@@ -37,14 +37,12 @@ beforeEach(() => {
     changed = l
     return () => {}
   })
-  Object.defineProperty(window, 'yaseenDraw', { value: { share: {} }, configurable: true, writable: true })
 })
 afterEach(() => {
   act(() => root?.unmount())
   root = null
   el?.remove()
   resetLiveShareForTests()
-  delete (window as unknown as Record<string, unknown>).yaseenDraw
 })
 
 const flush = () =>
@@ -88,7 +86,7 @@ describe('shared-board marks (YAZ-1890)', () => {
   })
 
   it('red when the last update failed, and when the link is stale', async () => {
-    list.mockResolvedValue([row(A, { sync: { state: 'failed', message: 'You are offline.' } }), row(B, { stale: true, live: 'missing' })])
+    list.mockResolvedValue([row(A, { sync: { state: 'failed', message: 'You are offline.' } }), row(B, { stale: true })])
     await mount([file(A), file(B)])
     expect(mark(A)?.dataset.tone).toBe('error')
     expect(mark(A)?.getAttribute('title')).toBe("Shared · Couldn't update: You are offline.")

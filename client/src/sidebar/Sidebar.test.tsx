@@ -68,6 +68,11 @@ function installBridge() {
       // Open in default app (YAZ-1577): the row with no viewer's click, and its menu item.
       openDefault: vi.fn(async ({ path }: { path: string }) => ({ path })),
     },
+    // The shared-board marks (YAZ-1890) read this vault's shares; none here.
+    share: {
+      list: vi.fn(async () => []),
+      onChanged: vi.fn(() => () => undefined),
+    },
   }
   Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
   return bridge
@@ -112,6 +117,7 @@ async function mount(over: Partial<SidebarProps> = {}, tweakBridge?: (bridge: Re
     onFileMissing: vi.fn(),
     onRenameFile: vi.fn(async () => undefined),
     onDeleteFile: vi.fn(async () => undefined),
+    onShareFile: vi.fn(),
     onNotice: vi.fn(),
     pendingSearchFocus: false,
     onSearchFocusHandled: vi.fn(),

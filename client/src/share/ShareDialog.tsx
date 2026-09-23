@@ -23,12 +23,12 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { ContextMenuSurface } from '../components/ContextMenuSurface'
 import { GlobeIcon, LinkIcon, LockIcon, TriangleIcon } from '../components/icons'
-import { MAX_SHARE_BYTES, type ShareEntry, type ShareStatus } from '@shared/types'
-import { api, BridgeRequestError } from '../api'
+import type { ShareEntry, ShareStatus } from '@shared/types'
+import { api } from '../api'
 import { basename, stripExt } from '../lib/paths'
-import { relativeTime } from '../lib/relativeTime'
 import { isPending, onLiveShareChange } from './liveShare'
-import { buildShareContent, formatMB } from './shareContent'
+import { buildShareContent } from './shareContent'
+import { errorText, liveLine, type Line } from './shareText'
 import './share.css'
 
 interface ShareDialogProps {
@@ -39,24 +39,6 @@ interface ShareDialogProps {
 }
 
 type Busy = null | 'sharing' | 'unsharing' | 'permission'
-type Line = { tone: 'ok' | 'busy' | 'error'; text: string }
-
-export const formatWhen = (t: number): string => new Date(t).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-
-export function errorText(err: unknown): string {
-  if (err instanceof BridgeRequestError) return err.message
-  if (err instanceof SyntaxError) return "This board's file isn't valid JSON, so it can't be shared."
-  return err instanceof Error ? err.message : String(err)
-}
-
-/** The one status line — the dialog, the sidebar mark's tooltip and the Settings list say the same thing. */
-export function liveLine(entry: ShareEntry, pending: boolean, now: number): Line {
-  if (entry.sync.state === 'uploading') return { tone: 'busy', text: 'Uploading…' }
-  if (pending) return { tone: 'busy', text: 'Waiting to upload changes…' }
-  if (entry.sync.state === 'failed') return { tone: 'error', text: `Couldn't update: ${entry.sync.message ?? 'unknown error'}` }
-  if (entry.stale) return { tone: 'error', text: "Couldn't update: the shared copy is gone from Cloudflare. Save the board to put it back." }
-  return { tone: 'ok', text: `Up to date · ${relativeTime(entry.updatedAt, now)}` }
-}
 
 interface Choice<V extends string> {
   value: V
@@ -226,12 +208,8 @@ export function ShareDialog({ root, path, onClose, onOpenSettings }: ShareDialog
   }
 
   const share = () =>
-    run('sharing', async () => {
-      const built = await buildShareContent(root, path)
-      if (built.tooLarge)
-        throw new Error(`This board is ${formatMB(built.bytes)} once its images are packed in; Cloudflare's free plan takes at most ${formatMB(MAX_SHARE_BYTES)} per upload. Use fewer or smaller images, or split the board.`)
-      setEntry(await api.share.publish({ root, path, content: built.content }))
-    })
+    // Main checks the size (TOO_LARGE, in plain English) — the one place it is checked.
+    run('sharing', async () => setEntry(await api.share.publish({ root, path, content: await buildShareContent(root, path) })))
 
   const unshare = () =>
     run('unsharing', async () => {

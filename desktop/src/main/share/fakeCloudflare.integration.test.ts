@@ -236,10 +236,10 @@ describe('keeping links right (scenarios 8, 11, 12)', () => {
     for (const f of await readdir(path.join(dir, 'fake', 'bucket'))) if (f.includes(s.id)) await rm(path.join(dir, 'fake', 'bucket', f))
     await rename(deep(), path.join(vault, 'Renamed in Finder.excalidraw'))
     const rows = await sharing.list(vault)
-    expect(rows.find((r) => r.id === s.id)).toMatchObject({ live: 'missing', stale: true, fileExists: true })
-    expect(rows.find((r) => r.id === d.id)).toMatchObject({ live: 'live', stale: false, fileExists: false })
+    expect(rows.find((r) => r.id === s.id)).toMatchObject({ stale: true, fileExists: true })
+    expect(rows.find((r) => r.id === d.id)).toMatchObject({ stale: false, fileExists: false })
     expect((await publish(simple(), s.id)).id).toBe(s.id)
-    expect((await sharing.list(vault)).find((r) => r.id === s.id)).toMatchObject({ live: 'live', stale: false, allowDownload: false })
+    expect((await sharing.list(vault)).find((r) => r.id === s.id)).toMatchObject({ stale: false, allowDownload: false })
     expect((await get(`/raw/${s.id}`)).status).toBe(403) // the view-only flag came back with it
   })
 

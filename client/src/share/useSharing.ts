@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ShareListEntry, ShareStatus } from '@shared/types'
 import { api } from '../api'
-import { errorText } from './ShareDialog'
+import { errorText } from './shareText'
 import { onLiveShareChange } from './liveShare'
 
 /**

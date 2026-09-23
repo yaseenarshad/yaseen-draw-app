@@ -268,12 +268,12 @@ describe('sharing (YAZ-1799) against the real Worker', () => {
     const first = await sharing.publish(vault, board(), '{"v":1}')
     await sharing.setPermission(vault, board(), false)
     bucket.objects.clear()
-    expect((await sharing.list(vault))[0]).toMatchObject({ id: first.id, live: 'missing', stale: true })
+    expect((await sharing.list(vault))[0]).toMatchObject({ id: first.id, stale: true })
     expect(await sharing.get(vault, board())).toMatchObject({ stale: true }) // the Share dialog sees it too
     workerCalls = []
     await sharing.publish(vault, board(), '{"v":2}', first.id)
     expect(puts()).toEqual([{ method: 'PUT', route: `/api/boards/${first.id}`, allow: '0' }]) // a create on the Worker: it needs the flag
-    expect((await sharing.list(vault))[0]).toMatchObject({ id: first.id, live: 'live', allowDownload: false, stale: false })
+    expect((await sharing.list(vault))[0]).toMatchObject({ id: first.id, allowDownload: false, stale: false })
     expect((await fakeFetch(`${ORIGIN}/raw/${first.id}`)).status).toBe(403)
     workerCalls = []
     await sharing.publish(vault, board(), '{"v":3}', first.id)
@@ -284,9 +284,11 @@ describe('sharing (YAZ-1799) against the real Worker', () => {
     await sharing.setup('tok', () => {})
     const first = await sharing.publish(vault, board(), '{"v":1}')
     workerCalls = []
-    expect(await sharing.list(vault, { check: false })).toEqual([expect.objectContaining({ id: first.id, live: 'unknown', fileExists: true })])
+    expect(await sharing.list(vault, { check: false })).toEqual([expect.objectContaining({ id: first.id, stale: false, fileExists: true })])
     expect(workerCalls).toEqual([])
-    expect((await sharing.list(vault))[0]).toMatchObject({ live: 'live' })
+    bucket.objects.clear()
+    expect((await sharing.list(vault, { check: false }))[0]).toMatchObject({ stale: false }) // unchecked: nothing learned
+    expect((await sharing.list(vault))[0]).toMatchObject({ stale: true })
     expect(workerCalls).toEqual([expect.objectContaining({ method: 'HEAD', route: `/scene/${first.id}` })])
   })
 

@@ -134,12 +134,13 @@ export interface ShareBadge {
   title: string
 }
 
-/** The shared-board mark (YAZ-1890): a small link glyph right of the name; its title is the link's status. */
-const ShareMark = ({ badge }: { badge: ShareBadge }) => (
-  <span className="tree__share" data-tone={badge.tone} title={badge.title} aria-label={badge.title} role="img">
-    <LinkIcon size={12} />
-  </span>
-)
+/** The shared-board mark (YAZ-1890): a small link glyph right of the name; its title is the link's status. Nothing for an unshared board. */
+const ShareMark = ({ badge }: { badge: ShareBadge | undefined }) =>
+  badge === undefined ? null : (
+    <span className="tree__share" data-tone={badge.tone} title={badge.title} aria-label={badge.title} role="img">
+      <LinkIcon size={12} />
+    </span>
+  )
 
 export function Tree({
   nodes,
@@ -303,7 +304,7 @@ export function Tree({
             >
               <span className="tree__label">{stripExt(node.name)}</span>
               {tooLarge?.has(node.path) === true && <CloudOffIcon />}
-              {shareBadges?.has(node.path) === true && <ShareMark badge={shareBadges.get(node.path) as ShareBadge} />}
+              <ShareMark badge={shareBadges?.get(node.path)} />
             </button>
           </li>
         ),

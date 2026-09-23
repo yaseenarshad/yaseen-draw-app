@@ -92,10 +92,9 @@ export interface ShareEntry {
   stale: boolean
 }
 
-/** A Settings list row: the record plus two checks — is the board still there, is the link still live. */
+/** A Settings list row: the record plus whether the board is still at its path. Whether the link is still live is `stale` (a checked list sets it). */
 export interface ShareListEntry extends ShareEntry {
   fileExists: boolean
-  live: 'live' | 'missing' | 'unknown'
 }
 
 export interface ShareBoardRequest {
