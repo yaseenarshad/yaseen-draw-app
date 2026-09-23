@@ -654,7 +654,7 @@ the vault switcher's Open folder… row and its vault rows, File › Open Recent
 one open-recent door, `openRecentBeside`: that vault's live windows are raised, or a new window opens
 on its remembered last file. Picked folders decide in the renderer (`App.tsx` `openPicked`, which
 knows its root); Open Recent decides in main (`menu.ts` `openRecent`, from the target window's
-entry, and with no window at all it opens one).
+entry).
 
 | Menu | Item | Key |
 |---|---|---|

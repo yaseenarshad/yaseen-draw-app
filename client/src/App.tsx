@@ -263,7 +263,7 @@ export function App() {
   // ⌘O (YAZ-1767 D8): the ⌘K handshake for the vault switcher — un-collapse first, then bump a
   // request counter the sidebar header's panel consumes. The request is pinned to the root it was
   // made on: the Sidebar remounts `key={root}`, and a stale counter must not reopen the panel on
-  // the vault an in-place "Open folder…" just switched to. Welcome (root null) has no switcher.
+  // the new root of a vault that was just moved or renamed. Welcome (root null) has no switcher.
   const [switcherRequest, setSwitcherRequest] = useState<{ seq: number; root: string | null }>({ seq: 0, root: null })
   const openVaultSwitcher = useCallback(() => {
     if (root === null) return

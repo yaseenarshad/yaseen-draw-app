@@ -15,11 +15,10 @@
 ## State
 - Done:
   - [x] 1- Deep scope (YAZ-1915)
-  - [x] 2- Build (YAZ-1916)
-- Now: [→] 3- Verify end-to-end (YAZ-1917)
-- Remaining:
-  - [ ] 4A- Audit (YAZ-1919)
-  - [ ] 4B- Apply, merge, release, install (YAZ-1920)
+  - [x] 2- Build (YAZ-1916) — 67eeda1
+  - [x] 3- Verify end-to-end (YAZ-1917) — 12/12 real-app checks via the main-process inspector
+  - [x] 4A- Audit (YAZ-1919) — A1–A6
+- Now: [→] 4B- Apply, merge, release, install (YAZ-1920)
 
 ## Open Questions
 - None.
@@ -27,3 +26,8 @@
 ## Working Set
 - Branch `yaz-1913-open-folder-beside`, worktree `../yaseen-draw-app-yaz-1913`
 - `npm test`, `npm run typecheck`, `npm run build`
+
+## Learnings
+- S10 (Open Recent with no window) cannot happen: the app quits on its last window.
+- Real-app checks without Playwright: launch the built app with `--inspect` + `YASEEN_DRAW_USER_DATA_DIR`, click menu items from main, stub only `dialog.showOpenDialog`, read each renderer's `window.identity()`.
+- Under heavy machine load the git integration tests hit their 20 s timeouts; rerun those files alone before blaming a change.

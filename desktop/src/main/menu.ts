@@ -288,8 +288,8 @@ export function createMenuHandlers(store: Store, windows: MenuWindows, host: Men
         host.focusedWebContents()?.send(CH.menuOpenRoot, path)
         return
       }
-      // Everything else — a vault window, or none focused — goes through the one open-recent door
-      // (YAZ-1767 D1): raise that vault's windows, or a new window on its remembered last file.
+      // A vault window goes through the one open-recent door (YAZ-1767 D1): raise that vault's
+      // windows, or a new window on its remembered last file.
       windows.openRecentBeside(path)
     },
     search() {
