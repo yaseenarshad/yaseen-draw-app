@@ -34,14 +34,29 @@
   margin: 0;
   font-size: 16px;
   font-weight: 500;
+  line-height: 24px;
 }
 
 /* One line, cut with an ellipsis: a long board name or helper line never widens anything. */
 .share-dialog__title,
-.share-access__helper,
+.share-access__helper {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Focus lands on the dialog itself when it opens (the modal-keys rule) — no ring for that. */
+.share-dialog:focus {
+  outline: none;
+}
+
 .share-dialog__close {
+  display: grid;
+  place-items: center;
+  flex: none;
   width: 28px;
   height: 28px;
+  padding: 0;
   color: var(--fg-muted);
   border-radius: 6px;
 }
@@ -226,11 +241,14 @@
   margin-top: 8px;
 }
 
-.sharing__steps,
 .sharing__steps {
+  display: flex;
+  flex-direction: column;
   gap: 4px;
-  margin-top: 10px;
+  margin: 10px 0 0;
+  padding: 0;
   font-size: 13px;
+  list-style: none;
 }
 
 .sharing__steps li,
@@ -246,6 +264,21 @@
 
 .sharing__steps li[data-state='failed'] .sharing__step-detail {
   color: var(--danger);
+}
+
+.sharing__boards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sharing__board-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sharing__board {
