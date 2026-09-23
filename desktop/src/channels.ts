@@ -94,6 +94,10 @@ export const CH = {
   githubSyncNow: 'github:sync-now',
   githubSetEnabled: 'github:set-enabled',
   githubStatusChanged: 'github:status-changed',
+  // Version history (YAZ-1897 D4): read-only over the vault's own git, plus the one restore write.
+  githubHistory: 'github:history',
+  githubVersion: 'github:version',
+  githubRestore: 'github:restore',
   // Settings › Storage (YAZ-1801): sizes from the disk + local git, and the legacy-picture shrink.
   storageStats: 'storage:stats',
   storageShrink: 'storage:shrink',

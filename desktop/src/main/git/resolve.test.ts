@@ -1,11 +1,9 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { mkdtemp, readFile, rm, writeFile, mkdir, unlink } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GITHUB_FILE_LIMIT_BYTES } from '@shared/types'
-import { git } from './exec'
-import { makeBareRemote, makeGitRepo, REAL_GIT_TIMEOUT_MS, requireGit, wireOrigin } from './gitFixture'
+import { makeTwoMachines, REAL_GIT_TIMEOUT_MS, type Machine } from './gitFixture'
 import { BEFORE_MERGE_REF } from './resolve'
 import { syncPass } from './sync'
 
@@ -21,49 +19,15 @@ const shape = (id: string, over: Partial<El> = {}): El => ({ id, type: 'rectangl
 const board = (elements: El[]): string => `${JSON.stringify({ type: 'excalidraw', version: 2, source: 'test', elements, appState: { gridSize: 20 }, files: {} }, null, 2)}\n`
 const shapesOf = (text: string): El[] => (JSON.parse(text) as { elements: El[] }).elements
 
-interface Machine {
-  root: string
-  write: (rel: string, content: string) => Promise<void>
-  read: (rel: string) => string
-  remove: (rel: string) => Promise<void>
-  git: (...args: string[]) => Promise<string>
-}
-
 const cleanups: Array<() => Promise<void>> = []
 afterEach(async () => {
   for (const c of cleanups.splice(0)) await c()
 })
 
-function machine(root: string, bin: string): Machine {
-  const abs = (rel: string) => path.join(root, rel)
-  return {
-    root,
-    write: async (rel, content) => {
-      await mkdir(path.dirname(abs(rel)), { recursive: true })
-      await writeFile(abs(rel), content)
-    },
-    read: (rel) => readFileSync(abs(rel), 'utf8'),
-    remove: (rel) => unlink(abs(rel)),
-    git: async (...args) => (await git(bin, root, args)).stdout.trim(),
-  }
-}
-
-/** Machine A ("Yaseen Draw Test") seeded with `files` and pushed; machine B ("Sam") cloned from it. */
 async function twoMachines(files: Record<string, string>): Promise<{ a: Machine; b: Machine }> {
-  const bin = await requireGit()
-  const remote = await makeBareRemote()
-  const repo = await makeGitRepo()
-  cleanups.push(remote.cleanup, repo.cleanup)
-  for (const [rel, content] of Object.entries(files)) await repo.write(rel, content)
-  await repo.run(['add', '-A'])
-  await repo.run(['commit', '-m', 'base'])
-  await wireOrigin(repo, remote)
-  await repo.run(['push', '-u', 'origin', 'HEAD'])
-  const bDir = await mkdtemp(path.join(tmpdir(), 'yaseendraw-b-'))
-  cleanups.push(() => rm(bDir, { recursive: true, force: true }))
-  expect((await git(bin, tmpdir(), ['clone', remote.url, bDir])).code).toBe(0)
-  for (const cfg of [['user.name', 'Sam'], ['user.email', 'sam@example.invalid'], ['commit.gpgsign', 'false']]) await git(bin, bDir, ['config', ...cfg])
-  return { a: machine(repo.root, bin), b: machine(bDir, bin) }
+  const pair = await makeTwoMachines(files)
+  cleanups.push(pair.cleanup)
+  return pair
 }
 
 /** Every file's bytes, `.git` excluded. */

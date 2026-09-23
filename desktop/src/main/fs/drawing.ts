@@ -61,7 +61,7 @@ import { atomicWrite, BridgeFailure, fsCall, requireAbsPath, requireDir } from '
 const TOO_LARGE = `drawing exceeds ${MAX_DRAWING_BYTES} bytes`
 
 /** A document path — vault-relative or absolute — resolved INSIDE `dir`, with the drawing extension. */
-function resolveDocument(dir: string, rel: unknown): string {
+export function resolveDocument(dir: string, rel: unknown): string {
   if (typeof rel !== 'string' || rel.trim() === '' || rel.includes('\0')) throw new BridgeFailure('BAD_REQUEST', "missing 'path'")
   const file = path.resolve(dir, rel)
   if (!file.startsWith(dir + path.sep)) throw new BridgeFailure('BAD_REQUEST', 'path escapes the vault root', { path: rel })
@@ -82,7 +82,7 @@ function target(raw: unknown): { dir: string; file: string; body: Record<string,
  * an `elements` array. `code` differs by door — a bad file is the disk's fault (`IO_ERROR`), a
  * bad `json` argument is the caller's (`BAD_REQUEST`).
  */
-function sceneElements(json: string, file: string, code: 'IO_ERROR' | 'BAD_REQUEST'): readonly unknown[] {
+export function sceneElements(json: string, file: string, code: 'IO_ERROR' | 'BAD_REQUEST'): readonly unknown[] {
   const bad = (): never => {
     throw new BridgeFailure(code, code === 'IO_ERROR' ? 'file is not an Excalidraw scene' : "'json' is not an Excalidraw scene", { path: file })
   }
@@ -116,8 +116,16 @@ export async function loadDrawing(req: DrawingLoadRequest): Promise<DrawingLoadR
   await requireDir(dir)
   const snapshot = await readBoundedRegularFile(file, MAX_DRAWING_BYTES, TOO_LARGE)
   const json = snapshot.data.toString('utf8')
-  const elements = sceneElements(json, file, 'IO_ERROR')
-  // A legacy scene's own embedded entries are the fallback when the store has nothing.
+  const { files, stored } = await sceneFiles(dir, json, sceneElements(json, file, 'IO_ERROR'))
+  return { path: file, json, mtime: snapshot.mtime, size: snapshot.size, files, stored }
+}
+
+/**
+ * The pictures a scene references, from the vault's `assets/` store — with a legacy scene's own
+ * embedded entries as the fallback. Shared by `drawing:load` and Version history's old versions
+ * (YAZ-1897 D4), so an old version draws its pictures exactly the way the open board does.
+ */
+export async function sceneFiles(dir: string, json: string, elements: readonly unknown[]): Promise<{ files: Record<string, DrawingFileEntry>; stored: string[] }> {
   const { embedded } = stripEmbeddedFiles(json)
   const store = await listStore(dir)
   const files: Record<string, DrawingFileEntry> = {}
@@ -137,7 +145,7 @@ export async function loadDrawing(req: DrawingLoadRequest): Promise<DrawingLoadR
     const legacy = embedded[id]
     if (legacy !== undefined) files[id] = legacy
   }
-  return { path: file, json, mtime: snapshot.mtime, size: snapshot.size, files, stored }
+  return { files, stored }
 }
 
 /** One asset to land: validated shape, resolved name, decoded bytes. */
