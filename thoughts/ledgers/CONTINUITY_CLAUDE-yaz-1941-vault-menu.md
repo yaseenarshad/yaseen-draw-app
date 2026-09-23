@@ -15,10 +15,10 @@
 - Done:
   - [x] 1- Scope (YAZ-1942)
   - [x] 2- Build (YAZ-1943) — 3-way merge of Docs `9437799..0965cfd` onto draw; typecheck clean, 154 files / 2333 tests green
-- Now: [→] 3- Hand pass S1–S20 (YAZ-1944)
-- Remaining:
-  - [ ] 4A- Audit (YAZ-1946)
-  - [ ] 4B- Apply, merge, cleanup (YAZ-1947)
+  - [x] 3- Hand pass S1–S20 (YAZ-1944) — Yasin: "all good"
+  - [x] 4A- Audit (YAZ-1946) — comment-only, 6 items
+  - [x] 4B- Apply, merge, cleanup (YAZ-1947) — docstrings name YAZ-1941, ledger closed, rig + worktree removed
+- CLOSED 2026-09-23.
 
 ## Open Questions
 - none

@@ -7,7 +7,7 @@ interface ContextMenuProps {
   /**
    * The items as data (🔒 D8, YAZ-1674) — built by a sections builder, where every gating rule
    * lives: the file tree's `buildMenuSections` (six groups, 🔒 D7) or the vault switcher's
-   * `buildVaultMenuSections` (four, YAZ-1798). This component only draws them: a
+   * `buildVaultMenuSections` (four, YAZ-1941). This component only draws them: a
    * `role="group"` per NON-EMPTY section (the separator is CSS between adjacent groups), and one
    * button per item whose ONLY text child is the label — the hint is drawn from `data-hint`, so
    * `textContent` and the accessible name stay the bare label. A parent item ("Open in ▸", D7
@@ -130,7 +130,7 @@ function ParentItem({ item, open, onOpen, onCloseFlyout, onClose }: { item: Menu
   )
 }
 
-/** The sidebar's right-click menu — the file tree's (GRO-2022) and the vault switcher's (YAZ-1798). The overlay catches click-away and stray right-clicks. */
+/** The sidebar's right-click menu — the file tree's (GRO-2022) and the vault switcher's (YAZ-1941). The overlay catches click-away and stray right-clicks. */
 export function ContextMenu({ x, y, sections, onClose }: ContextMenuProps) {
   // The ONE open flyout (D7 amended): at most one parent is expanded at a time.
   const [openId, setOpenId] = useState<string | null>(null)

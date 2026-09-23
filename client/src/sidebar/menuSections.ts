@@ -100,7 +100,7 @@ type Item = (t: MenuSectionTargets, h: MenuHandlers) => MenuItem | null
 /** A leaf-only rule — what a flyout may hold. Every leaf is also an `Item`. */
 type Leaf = (t: MenuSectionTargets, h: MenuHandlers) => MenuAction | null
 
-/** Why a clipboard write failed, as the notices spell it — shared with the vault menu (YAZ-1798). */
+/** Why a clipboard write failed, as the notices spell it — shared with the vault menu (YAZ-1941). */
 export const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error))
 /** "1 item" / "3 items" — the one spelling the menu's labels and the Sidebar's notices share. */
 export const countItems = (n: number) => (n === 1 ? '1 item' : `${n} items`)

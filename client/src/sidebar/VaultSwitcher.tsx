@@ -30,8 +30,9 @@
  * Right-click (YAZ-1941, a port of Docs YAZ-1798 — the D-numbers below are 1798's): the trigger
  * (= the current vault) and every live row open the vault menu — `buildVaultMenuSections` drawn by
  * the sidebar's own `ContextMenu`. "Open in this window" is the ONE deliberate in-place switch
- * (D8/D11); a `false` from it greys the row exactly like a click's. The menu is the top layer while it stands (D4): Esc and click-away close it alone, and
- * the filter ignores ↑/↓/⏎/Esc until it is gone. Right-click never moves the highlight.
+ * (D8/D11); a `false` from it greys the row exactly like a click's. The menu is the top layer
+ * while it stands (D4): Esc and click-away close it alone, and the filter ignores ↑/↓/⏎/Esc until
+ * it is gone. Right-click never moves the highlight.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { ContextMenuSurface } from '../components/ContextMenuSurface'

@@ -2,7 +2,7 @@ import { basename } from '../lib/paths'
 import { errorText, type MenuAction, type MenuSection } from './menuSections'
 
 /**
- * The vault right-click menu AS DATA (YAZ-1798 D2/D7): GitHub Desktop's repository menu, kept to
+ * The vault right-click menu AS DATA (YAZ-1941, a port of Docs YAZ-1798 — D2/D7 are 1798's): GitHub Desktop's repository menu, kept to
  * what means something for a vault. Drawn by the sidebar's own `ContextMenu`, which skips empty
  * groups — so the CURRENT vault simply returns two of the four. Four groups, in this order:
  *
