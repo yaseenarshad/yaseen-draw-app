@@ -91,6 +91,8 @@ export interface MenuHandlers {
   onInfo: (path: string) => void
   /** "Share" (YAZ-1799 D6): open the Share dialog for the board — same gate as Info. */
   onShare: (path: string) => void
+  /** "Version history" (YAZ-1897 D4): open the board's versions — same gate as Info. */
+  onHistory: (path: string) => void
   onDelete: (path: string) => void
 }
 
@@ -317,7 +319,14 @@ const share: Leaf = (t, h) => {
   return { id: 'share', label: 'Share', onSelect: () => h.onShare(path) }
 }
 
-const DELETE_GROUP: readonly Item[] = [share, info, del]
+/** "Version history" (YAZ-1897 D4): the same one-board gate, between Share and Info. */
+const history: Leaf = (t, h) => {
+  const path = t.infoPath
+  if (path === null) return null
+  return { id: 'history', label: 'Version history', onSelect: () => h.onHistory(path) }
+}
+
+const DELETE_GROUP: readonly Item[] = [share, history, info, del]
 
 /** Runs a group's rules and keeps the items they offered — the root's groups and a flyout's leaves alike. */
 const build = <T extends MenuItem>(group: readonly ((t: MenuSectionTargets, h: MenuHandlers) => T | null)[], t: MenuSectionTargets, h: MenuHandlers): T[] =>

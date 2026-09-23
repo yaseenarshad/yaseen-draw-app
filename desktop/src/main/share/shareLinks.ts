@@ -42,7 +42,11 @@ export async function readShares(root: string): Promise<ShareMap> {
   const read = await readConfigDetailed(root, SHARES_FILE)
   if (read.state === 'absent') return {}
   if (read.state === 'malformed') throw new BridgeFailure('INVALID_CONFIG', `.yaseendraw/${SHARES_FILE} is not valid JSON: ${read.error}`, { path: read.file })
-  const raw = read.value
+  return sharesOf(read.value)
+}
+
+/** The records in a parsed `shares.json`; a wrong shape is an empty map, a bad row costs only itself. */
+function sharesOf(raw: unknown): ShareMap {
   if (!isRecord(raw) || !isRecord(raw.shares)) return {}
   const out: ShareMap = {}
   for (const [rel, rec] of Object.entries(raw.shares)) {
@@ -50,6 +54,38 @@ export async function readShares(root: string): Promise<ShareMap> {
     if (parsed !== null) out[rel] = parsed
   }
   return out
+}
+
+const sameRecord = (a: ShareRecord | undefined, b: ShareRecord | undefined): boolean => JSON.stringify(a) === JSON.stringify(b)
+
+/**
+ * Two machines' `shares.json` after both changed it (🔒 YAZ-1897 scope): merged per board, so
+ * neither machine's live link is forgotten — a conflicted copy in `.yaseendraw/` would leave a
+ * link live on Cloudflare that the vault no longer updates. One side changed a board's record →
+ * that side; both → the newer `updatedAt`, and a record beats a removal (the D1 rule). `base` is
+ * null when both machines created the file. Answers the file's text, or null when a side is not JSON.
+ */
+export function mergeSharesFile(base: string | null, theirs: string, mine: string): string | null {
+  const parse = (text: string): ShareMap | null => {
+    try {
+      return sharesOf(JSON.parse(text))
+    } catch {
+      return null
+    }
+  }
+  const [b, t, m] = [base === null ? {} : parse(base), parse(theirs), parse(mine)]
+  if (b === null || t === null || m === null) return null
+  const out: ShareMap = {}
+  for (const key of new Set([...Object.keys(t), ...Object.keys(m)])) {
+    const [tv, mv] = [t[key], m[key]]
+    let pick: ShareRecord | undefined
+    if (sameRecord(tv, b[key])) pick = mv
+    else if (sameRecord(mv, b[key])) pick = tv
+    else if (tv === undefined || mv === undefined) pick = tv ?? mv // a record beats a removal
+    else pick = tv.updatedAt > mv.updatedAt ? tv : mv
+    if (pick !== undefined) out[key] = pick
+  }
+  return `${JSON.stringify({ version: VERSION, shares: out }, null, 2)}\n`
 }
 
 /** One chain per vault root: every write to its shares.json queues here. */

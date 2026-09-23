@@ -104,8 +104,10 @@ export async function resolveGit(candidates: readonly string[] = GIT_CANDIDATES)
  *
  * `timeoutMs` defaults to 30 s; the sync pass's two transfers (`fetch`, `push`) raise it to
  * `TRANSFER_TIMEOUT_MS` (YAZ-1801 D4). `input` is written to the child's stdin and closed.
+ * `maxBuffer` raises the 10 MB stdout cap for the one read that returns a whole file (a board's
+ * old version for Version history, YAZ-1897 D4).
  */
-export function git(bin: string, root: string, args: string[], opts: { timeoutMs?: number; input?: string } = {}): Promise<GitResult> {
+export function git(bin: string, root: string, args: string[], opts: { timeoutMs?: number; input?: string; maxBuffer?: number } = {}): Promise<GitResult> {
   const timeout = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS
   return new Promise((resolve, reject) => {
     const child = execFile(
@@ -114,7 +116,7 @@ export function git(bin: string, root: string, args: string[], opts: { timeoutMs
       {
         cwd: root,
         timeout,
-        maxBuffer: MAX_BUFFER,
+        maxBuffer: opts.maxBuffer ?? MAX_BUFFER,
         windowsHide: true,
         encoding: 'utf8',
         // Merged over the inherited environment rather than replacing it — git still needs HOME
@@ -156,3 +158,6 @@ export function git(bin: string, root: string, args: string[], opts: { timeoutMs
     }
   })
 }
+
+/** One `-z` listing as paths; a failed listing is an empty one (a guard built on it is then a no-op, never a stop). */
+export const zList = (res: GitResult): string[] => (res.code === 0 ? res.stdout.split('\0').filter((p) => p !== '') : [])

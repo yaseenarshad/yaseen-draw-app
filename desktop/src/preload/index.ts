@@ -156,6 +156,9 @@ const api: YaseenDrawApi = {
     syncNow: (root) => call(CH.githubSyncNow, root),
     setEnabled: (root, enabled) => call(CH.githubSetEnabled, root, enabled),
     onStatus: on<GithubSyncStatus>(CH.githubStatusChanged),
+    history: (root, path) => call(CH.githubHistory, root, path),
+    version: (root, path, ref) => call(CH.githubVersion, root, path, ref),
+    restore: (root, path, ref) => call(CH.githubRestore, root, path, ref),
   },
   // Settings › Storage (YAZ-1801): read-only sizes, and the one rewrite (legacy pictures → assets/).
   storage: {
