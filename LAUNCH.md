@@ -86,7 +86,8 @@ cd desktop && YASEEN_DRAW_USER_DATA_DIR=/tmp/draw-profile npx electron-vite dev
 
 The env var is read before the single-instance lock, so the installed app and the dev app run side
 by side. Do NOT add `--watch` while agents are editing main-process files: every rebuild relaunches
-the window on the user's screen.
+the window on the user's screen. For a human GUI run with no agent editing main, `--watch` is the
+right call (`seedStorageDemoVault.mjs` prints it) — without it, a main-process edit needs a manual relaunch.
 
 The vault itself is generated — `node tools/seedDemoVault.mjs --vault <dir>` writes 63 boards plus
 a content-addressed `assets/` folder covering every awkward case (missing asset, legacy embedded
