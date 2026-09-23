@@ -39,7 +39,9 @@ export interface GithubSyncConfig {
  * the whole reason the set is closed: `no-git` wants "install git" (the Command Line Tools on a Mac, Git for Windows on a PC),
  * `no-identity` wants "set a name and email", `auth` wants "sign in again", `conflict` wants
  * "two machines edited the same lines" (the lossless rule: the working tree was put back exactly
- * as it was — see `git/sync.ts`), and `error` is the honest catch-all that carries a message.
+ * as it was — see `git/sync.ts`), `too-large` wants "shrink it or move it out" (YAZ-1801 D3: files
+ * held back under `tooLarge`, everything else synced), and `error` is the honest catch-all that
+ * carries a message.
  */
 export type GithubSyncAttention = 'no-git' | 'no-identity' | 'auth' | 'conflict' | 'error' | 'too-large'
 

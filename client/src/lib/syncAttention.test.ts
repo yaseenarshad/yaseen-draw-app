@@ -77,7 +77,7 @@ describe('attentionCopy', () => {
     const copy = attentionCopy(status({ attention: 'too-large', tooLarge: ['a.excalidraw', 'b/Big video.mov'] }))
     expect(copy?.title).toBe('2 files are too big for GitHub.')
     expect(copy?.body).toContain('a.excalidraw and Big video.mov are over')
-    expect(copy?.body).toContain('They stay on this Mac only.')
+    expect(copy?.body).toContain('They stay on this Mac only. Everything else is synced. Shrink them (Settings › Storage) or move them out of the vault.')
   })
 
   it('attention with no reason at all falls back to error copy — a real problem is never silenced', () => {

@@ -1,4 +1,5 @@
 import type { GithubSyncStatus } from '@shared/types'
+import { TOO_LARGE_LABEL } from '../lib/syncAttention'
 
 /**
  * The GitHub sync chip (YAZ-1081 🔒 YAZ-1775 D4): sits immediately LEFT of the per-tab Saved
@@ -41,7 +42,7 @@ export function SyncIndicator({ status, onSyncNow }: { status: GithubSyncStatus;
   // does not blink away for the length of every pass.
   const held = status.tooLarge ?? []
   const label = held.length === 0 ? LABEL[status.state] : held.length === 1 ? '1 file not synced' : `${held.length} files not synced`
-  const hover = held.length === 0 ? title(status) : `Not synced — over GitHub's 100 MB limit, only on this Mac: ${held.join(', ')}`
+  const hover = held.length === 0 ? title(status) : `${TOO_LARGE_LABEL}: ${held.join(', ')}`
   return (
     <button type="button" className={`sync-indicator sync-indicator--${held.length === 0 ? status.state : 'attention'}`} title={hover} aria-live="polite" onClick={onSyncNow}>
       <span className="sync-indicator__dot" />

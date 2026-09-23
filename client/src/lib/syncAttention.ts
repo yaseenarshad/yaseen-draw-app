@@ -62,6 +62,13 @@ const COPY: Record<GithubSyncAttention, Omit<AttentionCopy, 'body' | 'dismissibl
 }
 
 /**
+ * What a held-back file's cloud-off icon says (hover and screen reader), and what the chip's hover
+ * leads with — ONE phrase for the one fact (YAZ-1801 D3). "100 MB" is GitHub's own number; the
+ * guard holds files back a margin under it (`GITHUB_FILE_LIMIT_BYTES`).
+ */
+export const TOO_LARGE_LABEL = "Over GitHub's 100 MB limit — only on this Mac"
+
+/**
  * The `too-large` body (YAZ-1801 D3): WHICH files, by base name (the full paths are on the sidebar
  * rows' icons), and the three facts that make it calm rather than alarming — it is safe on this
  * Mac, nothing else is held up, and here is how to fix it.
@@ -70,7 +77,7 @@ function tooLargeBody(paths: readonly string[]): string {
   const names = paths.map(basename)
   const many = names.length > 1
   const subject = many ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : (names[0] ?? 'A file')
-  return `${subject} ${many ? 'are' : 'is'} over GitHub's 100 MB limit. ${many ? 'They stay' : 'It stays'} on this Mac only. Everything else is synced. Shrink it (Settings › Storage) or move it out of the vault.`
+  return `${subject} ${many ? 'are' : 'is'} over GitHub's 100 MB limit. ${many ? 'They stay' : 'It stays'} on this Mac only. Everything else is synced. ${many ? 'Shrink them' : 'Shrink it'} (Settings › Storage) or move ${many ? 'them' : 'it'} out of the vault.`
 }
 
 /**
