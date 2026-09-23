@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * USAGE: node tools/fakeCloudflare.mjs --data <dir> [--port 8787]
+ * USAGE: node tools/fakeCloudflare.mjs --data <dir> [--port 8787]   (--port 0 picks any free port)
  *
  * A LOCAL, FAKE Cloudflare for share links (YAZ-1799). Nothing here talks to the
  * real Cloudflare. One port serves two things:
@@ -31,7 +31,7 @@ import { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 import { handle as workerHandle } from '../share/worker.js'
 
-const USAGE = 'usage: node tools/fakeCloudflare.mjs --data <dir> [--port 8787]'
+const USAGE = 'usage: node tools/fakeCloudflare.mjs --data <dir> [--port 8787] (0 = any free port)'
 const args = process.argv.slice(2)
 const flag = (name) => {
   const i = args.indexOf(name)
@@ -403,9 +403,20 @@ async function onRequest(req, res) {
   }
 }
 // Loopback only, on BOTH stacks: `localhost` may resolve to ::1 or 127.0.0.1 depending on the client.
-for (const host of ['127.0.0.1', '::1']) {
+// 127.0.0.1 comes first and is required: if it cannot listen the fake exits at once rather than idling
+// half-up. `--port 0` lets it pick a free port itself (the tests do this, so no port is ever probed and
+// then re-bound); ::1 then follows on the same port, best effort, as before.
+function listen(host, port, required) {
   const server = http.createServer(onRequest)
   server.requestTimeout = 0
-  server.on('error', (err) => console.error(`[fake] cannot listen on ${host}:${PORT}: ${err.message}`))
-  server.listen(PORT, host, () => console.log(`fake Cloudflare on http://${host.includes(':') ? `[${host}]` : host}:${PORT} (data ${DATA}) — ${fileURLToPath(import.meta.url)}`))
+  server.on('error', (err) => {
+    console.error(`[fake] cannot listen on ${host}:${port}: ${err.message}`)
+    if (required) process.exit(1)
+  })
+  server.listen(port, host, () => {
+    const bound = server.address().port
+    console.log(`fake Cloudflare on http://${host.includes(':') ? `[${host}]` : host}:${bound} (data ${DATA}) — ${fileURLToPath(import.meta.url)}`)
+    if (required) listen('::1', bound, false)
+  })
 }
+listen('127.0.0.1', PORT, true)

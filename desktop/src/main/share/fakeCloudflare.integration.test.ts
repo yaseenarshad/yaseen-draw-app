@@ -9,7 +9,6 @@
  */
 import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -29,27 +28,25 @@ let sharing: Sharing
 /** Every request `sharing.ts` sent to the share Worker (not Cloudflare's API). */
 let workerRequests: string[]
 
-async function freePort(): Promise<number> {
-  const probe = createServer()
-  await new Promise<void>((resolve) => probe.listen(0, '127.0.0.1', resolve))
-  const { port } = probe.address() as { port: number }
-  await new Promise((resolve) => probe.close(resolve))
-  return port
-}
-
-/** Starts the fake on a free port, or (scenario 8's reconnect) back on `port` with the same account. */
-async function startFake(port?: number): Promise<void> {
-  port ??= await freePort()
-  origin = `http://127.0.0.1:${port}`
+/**
+ * Starts the fake on a port it picks itself (`--port 0`), or (scenario 8's reconnect) back on `port`
+ * with the same account. The fake binds and reports its own port: probing a free port here and handing
+ * it over left a window for another process to take it, and the fake then sat half-up until the hook
+ * timed out. Now a port it cannot take makes it exit at once, with its reason in the error.
+ */
+async function startFake(port = 0): Promise<void> {
   const child = spawn(process.execPath, [FAKE, '--data', path.join(dir, 'fake'), '--port', String(port)], { stdio: ['ignore', 'pipe', 'pipe'] })
   server = child
-  await new Promise<void>((resolve, reject) => {
+  origin = await new Promise<string>((resolve, reject) => {
     let out = ''
+    let err = ''
+    child.stderr!.on('data', (d: Buffer) => (err += d.toString()))
     child.stdout!.on('data', (d: Buffer) => {
       out += d.toString()
-      if (out.includes(`http://127.0.0.1:${port}`)) resolve()
+      const bound = /http:\/\/127\.0\.0\.1:(\d+)/.exec(out)
+      if (bound !== null) resolve(`http://127.0.0.1:${bound[1]}`)
     })
-    child.once('exit', (code) => reject(new Error(`fakeCloudflare exited ${code}: ${out}`)))
+    child.once('exit', (code, signal) => reject(new Error(`fakeCloudflare exited ${code ?? signal}: ${out}${err}`)))
   })
 }
 async function stopFake(): Promise<void> {
