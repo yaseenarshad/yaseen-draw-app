@@ -239,7 +239,13 @@ export function App() {
     return true
   }, [resetTabs])
 
-  const { pick, picking } = usePickFolder({ onPicked: openRoot })
+  // A vault window never has its vault swapped (YAZ-1913 🔒 D2): a picked folder goes to main's one
+  // open-recent door (a new window, or that vault's windows raised). Only Welcome fills in place.
+  const openPicked = useCallback((path: string) => {
+    if (root === null) void openRoot(path)
+    else void window.yaseenDraw.window.openRecent(path).catch((err: unknown) => console.error('[open-folder] openRecent failed:', err))
+  }, [root, openRoot])
+  const { pick, picking } = usePickFolder({ onPicked: openPicked })
 
   // ⌘W ladder (Tabs rule 7): close the active tab; with zero tabs open (incl. Welcome) close
   // the WINDOW through the real close path so the close/flush handshake runs.
