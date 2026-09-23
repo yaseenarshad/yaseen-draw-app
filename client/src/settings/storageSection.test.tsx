@@ -8,9 +8,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { DEFAULT_SETTINGS, GITHUB_FILE_LIMIT_BYTES, type ShrinkResult, type VaultStorageStats } from '@shared/types'
+import { DEFAULT_SETTINGS, GITHUB_FILE_LIMIT_BYTES, type VaultStorageStats } from '@shared/types'
 import { api } from '../api'
-import { useVaultStorage } from '../hooks/useVaultStorage'
+import { useVaultStorage, type VaultStorageState } from '../hooks/useVaultStorage'
 import { SettingsDialog } from './SettingsDialog'
 import { historyBar } from './storageSection'
 
@@ -49,12 +49,7 @@ afterEach(() => {
   container = null
 })
 
-interface StorageCtx {
-  stats: VaultStorageStats | null
-  refresh: () => void
-  shrink: () => Promise<ShrinkResult>
-  lastShrink: ShrinkResult | null
-}
+type StorageCtx = VaultStorageState
 
 function render(storage: StorageCtx | undefined) {
   act(() => root?.render(<SettingsDialog ctx={{ settings: { ...DEFAULT_SETTINGS }, onChange: vi.fn(), sync: { status: null, setEnabled: vi.fn() }, storage }} onClose={vi.fn()} />))
@@ -65,7 +60,7 @@ function mount(stats: VaultStorageStats | null, over: Partial<StorageCtx> = {}, 
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
-  const storage: StorageCtx | undefined = withStorage ? { stats, refresh: vi.fn(), shrink: vi.fn(async () => ({ shrunk: 0, skipped: 0, bytesMoved: 0 })), lastShrink: null, ...over } : undefined
+  const storage: StorageCtx | undefined = withStorage ? { stats, failed: false, refresh: vi.fn(), shrink: vi.fn(async () => ({ shrunk: 0, skipped: 0, bytesMoved: 0 })), lastShrink: null, ...over } : undefined
   render(storage)
   return { el: container, storage }
 }
@@ -97,6 +92,13 @@ describe('Settings › Storage (YAZ-1801)', () => {
     openStorage(el)
     expect(row(el, 'storageGithub')?.textContent).toContain('Measuring…')
     expect(groupTitles(el)).toEqual([])
+  })
+
+  it("a failed first measure says so instead of measuring forever", () => {
+    const { el } = mount(null, { failed: true })
+    openStorage(el)
+    expect(row(el, 'storageGithub')?.textContent).toContain("Couldn't measure this vault")
+    expect(row(el, 'storageGithub')?.textContent).not.toContain('Measuring…')
   })
 
   it('measures again whenever the page is opened', () => {
@@ -165,31 +167,48 @@ describe('Settings › Storage (YAZ-1801)', () => {
     expect(el.textContent).toContain('9 boards 230.0 MB lighter · 1 skipped')
   })
 
-  it("opening Settings, then the page, measures once — the page's open, not also Settings'", async () => {
-    // App's wiring, real hook: the root's own first measure, then Settings, then Storage.
+  it("measures nothing while Settings is closed, and once when the page opens — not also on Settings' open (🔒 D13)", async () => {
+    // App's wiring, real hook: a closed dialog passes no sync state; an open one passes the live one.
     function App({ open }: { open: boolean }) {
-      const storage = useVaultStorage('/v', null)
+      const storage = useVaultStorage('/v', open ? 'synced' : null)
       return open ? <SettingsDialog ctx={{ settings: { ...DEFAULT_SETTINGS }, onChange: vi.fn(), sync: { status: null, setEnabled: vi.fn() }, storage }} onClose={vi.fn()} /> : null
     }
     const { el } = mount(null, {}, false)
     const stats = vi.mocked(api.storage.stats)
     stats.mockClear()
     await act(async () => root?.render(<App open={false} />))
-    expect(stats).toHaveBeenCalledOnce()
+    expect(stats).not.toHaveBeenCalled()
     await act(async () => root?.render(<App open />))
-    expect(stats).toHaveBeenCalledOnce()
+    expect(stats).not.toHaveBeenCalled()
     await act(async () => openStorage(el))
-    expect(stats).toHaveBeenCalledTimes(2)
+    expect(stats).toHaveBeenCalledOnce()
   })
 
-  it('search still reaches the page', () => {
+  it('the pictures could not be moved: a failed shrink says so, and leaves no result line', async () => {
+    const { el } = mount(STATS, { shrink: vi.fn(async () => Promise.reject(new Error('worker gone'))) })
+    openStorage(el)
+    await act(async () => el.querySelector<HTMLButtonElement>('[data-testid="storage-shrink"]')!.click())
+    expect(el.textContent).toContain('The pictures could not be moved.')
+    expect(el.querySelector('[role="status"]')).toBeNull()
+  })
+
+  it.each(['old versions', 'too big', 'pictures', 'shrink'])('search for "%s" still reaches the page (S8)', (query) => {
     const { el } = mount(STATS)
     const input = el.querySelector<HTMLInputElement>('input[aria-label="Search settings"]')!
     act(() => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'old versions')
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, query)
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    expect(el.querySelector('.settings-section__title')?.textContent).toBe('Storage')
+    expect(el.querySelector('.settings-section__title')?.textContent).toMatch(/^Storage( › |$)/)
+  })
+
+  it('"too big" finds the page even when no file is large (the GitHub row carries it)', () => {
+    const { el } = mount({ ...STATS, large: [] })
+    const input = el.querySelector<HTMLInputElement>('input[aria-label="Search settings"]')!
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'too big')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
     expect(row(el, 'storageGithub')).not.toBeNull()
   })
 })

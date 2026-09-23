@@ -15,7 +15,8 @@
  * through `secrets:set` and reads back only "set" / "not set".
  */
 import type { ReactNode } from 'react'
-import type { GithubSyncStatus, SettingsState, ShrinkResult, VaultStorageStats } from '@shared/types'
+import type { GithubSyncStatus, SettingsState } from '@shared/types'
+import type { VaultStorageState } from '../hooks/useVaultStorage'
 import { CANVAS_SECTION } from './canvasSection'
 import { Segmented } from './controls'
 import { HOTKEY_GROUPS, type HotkeyEntry } from './hotkeys'
@@ -29,7 +30,7 @@ export interface SettingsCtx {
   onChange: (next: SettingsState) => void
   sync?: { status: GithubSyncStatus | null; setEnabled: (enabled: boolean) => void }
   /** Settings › Storage (YAZ-1801): App's `useVaultStorage`; undefined with no vault open, which hides the section. */
-  storage?: { stats: VaultStorageStats | null; refresh: () => void; shrink: () => Promise<ShrinkResult>; lastShrink: ShrinkResult | null }
+  storage?: VaultStorageState
 }
 
 export interface SettingDef {

@@ -21,8 +21,9 @@
  * first. Red at `GITHUB_FILE_LIMIT_BYTES`, the SAME line the sync guard holds files back at, so a
  * red row is exactly a file sync will not push; amber below it.
  *
- * `stats === null` is the first measurement in flight: the bar row says "Measuring…" and the two
- * conditional groups stay hidden rather than flashing empty. Opening the page measures again (D8).
+ * `stats === null` is the first measurement in flight: the bar row says "Measuring…" (or, if it
+ * failed, "Couldn't measure this vault" — reopening the page retries) and the two conditional
+ * groups stay hidden rather than flashing empty. Opening the page measures again (🔒 D13).
  */
 import { useEffect, useState } from 'react'
 import { GITHUB_FILE_LIMIT_BYTES, GITHUB_REPO_HARD_BYTES, GITHUB_REPO_MAX_BYTES, GITHUB_REPO_SOFT_BYTES, type VaultStorageFile } from '@shared/types'
@@ -47,7 +48,7 @@ function GithubBar({ storage }: SettingsCtx) {
   const refresh = storage?.refresh
   useEffect(() => refresh?.(), [refresh])
   const stats = storage?.stats ?? null
-  if (stats === null) return <span className="storage__muted">Measuring…</span>
+  if (stats === null) return <span className="storage__muted">{storage?.failed === true ? "Couldn't measure this vault" : 'Measuring…'}</span>
   if (stats.git === null) return <span className="storage__muted">Not synced with git — nothing counts against GitHub</span>
   const history = stats.git.historyBytes
   const { pct, tone, of } = historyBar(history)
@@ -160,7 +161,7 @@ export const STORAGE_SECTION: SettingsSection = {
           id: 'storageGithub',
           label: 'GitHub',
           hint: githubHint,
-          keywords: ['storage', 'size', 'disk', 'git', 'history', 'repo', 'old versions', 'your files', '1 GB', '5 GB'],
+          keywords: ['storage', 'size', 'disk', 'git', 'history', 'repo', 'old versions', 'your files', '1 GB', '5 GB', 'too big'],
           render: (ctx) => <GithubBar {...ctx} />,
         },
       ],

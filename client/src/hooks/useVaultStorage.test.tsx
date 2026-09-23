@@ -40,12 +40,22 @@ afterEach(() => {
   statsFn.mockClear()
 })
 
-describe('useVaultStorage — one measure at a time', () => {
-  it('triggers while a measure runs queue exactly one re-run after it', async () => {
+describe('useVaultStorage — one measure at a time, only when asked (🔒 D13)', () => {
+  it('a vault opening measures nothing by itself; the page asking does', () => {
     root = createRoot(document.createElement('div'))
     render('/v', null)
+    expect(statsFn).not.toHaveBeenCalled()
+    state.refresh()
     expect(statsFn).toHaveBeenCalledOnce()
-    // A pass finishes, another starts and finishes, and the page opens — all mid-measure.
+  })
+
+  it('triggers while a measure runs queue exactly one re-run after it', async () => {
+    root = createRoot(document.createElement('div'))
+    render('/v', 'synced')
+    state.refresh()
+    expect(statsFn).toHaveBeenCalledOnce()
+    // A pass runs and finishes, another does, and the page asks again — all mid-measure.
+    render('/v', 'syncing')
     render('/v', 'synced')
     render('/v', 'syncing')
     render('/v', 'attention')
@@ -60,18 +70,44 @@ describe('useVaultStorage — one measure at a time', () => {
     expect(statsFn).toHaveBeenCalledTimes(2)
   })
 
-  it("a root change measures the new root at once and drops the old root's answer and re-run", async () => {
+  it('only a pass FINISHING measures: Settings opening (null → synced) and a pass starting do not', async () => {
+    root = createRoot(document.createElement('div'))
+    render('/v', null)
+    render('/v', 'synced')
+    render('/v', 'pending')
+    render('/v', 'syncing')
+    expect(statsFn).not.toHaveBeenCalled()
+    render('/v', 'synced')
+    expect(statsFn).toHaveBeenCalledOnce()
+  })
+
+  it("a root change clears the numbers and the shrink result, measures nothing, and drops the old root's answer", async () => {
     root = createRoot(document.createElement('div'))
     render('/a', null)
     state.refresh()
-    render('/b', null)
-    expect(statsFn.mock.calls).toEqual([['/a'], ['/b']])
-
     await answer(0, measured('/a', 1))
+    vi.mocked(api.storage.shrink).mockResolvedValueOnce({ shrunk: 1, skipped: 0, bytesMoved: 5 })
+    await act(async () => void (await state.shrink()))
+    expect(state.lastShrink).toEqual({ shrunk: 1, skipped: 0, bytesMoved: 5 })
+    expect(statsFn).toHaveBeenCalledTimes(2) // the shrink's own refresh, still in flight
+
+    render('/b', null)
+    expect(state.stats).toBeNull()
+    expect(state.lastShrink).toBeNull()
+    await answer(1, measured('/a', 2))
     expect(state.stats).toBeNull()
     expect(statsFn).toHaveBeenCalledTimes(2)
-    await answer(1, measured('/b', 1))
-    expect(state.stats).toEqual(measured('/b', 1))
-    expect(statsFn).toHaveBeenCalledTimes(2)
+  })
+
+  it('a failed first measure is `failed` (not measuring forever); the next refresh retries', async () => {
+    root = createRoot(document.createElement('div'))
+    render('/v', null)
+    statsFn.mockImplementationOnce(() => Promise.reject(new Error('worker gone')))
+    state.refresh()
+    await act(async () => undefined)
+    expect(state).toMatchObject({ stats: null, failed: true })
+    state.refresh()
+    await answer(0, measured('/v', 1))
+    expect(state).toMatchObject({ stats: measured('/v', 1), failed: false })
   })
 })
