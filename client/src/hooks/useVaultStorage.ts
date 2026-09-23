@@ -5,8 +5,8 @@ import { dirtyPaths } from '../lib/renameContinuity'
 
 /**
  * Settings › Storage's data (YAZ-1801 D1): one `storage.stats(root)` per reason to believe the
- * numbers moved — the root changed, Settings opened, a sync pass finished (a commit grows the
- * history), or a shrink ran. Stats walk the whole vault and parse every board, so they are NOT
+ * numbers moved — the root changed, Settings opened, the page opened (it calls `refresh`), a sync
+ * pass finished (a commit grows the history), or a shrink ran. Stats walk the whole vault and parse every board, so they are NOT
  * refreshed on every watcher event; the page is a report you open, not a live gauge.
  *
  * `stats` is null while the first answer is in flight (the page shows "Measuring…"), and keeps

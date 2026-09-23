@@ -1,9 +1,9 @@
 /**
  * Settings › Storage (YAZ-1801 D1): its own page (standalone, before Hotkeys), present only with a
- * vault open. One bar — the git history against 1 GB, then amber against 5 GB, then red and full —
- * with one muted line under it; "Needs attention" only when a file is ≥ 50 MiB (red at the sync
- * guard's 95 MiB, amber below); "Make boards smaller" only while pictures are inside boards, its
- * result line outliving the numbers.
+ * vault open. One bar that always ends at 10 GB (D7), with "Your files" and "Old versions" on two
+ * muted lines under it; "Needs attention" only when a file is ≥ 50 MiB (red at the sync guard's
+ * 95 MiB, amber below); "Make boards smaller" only while pictures are inside boards, its result
+ * line outliving the numbers.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
@@ -96,7 +96,14 @@ describe('Settings › Storage (YAZ-1801)', () => {
     expect(groupTitles(el)).toEqual([])
   })
 
-  it('the bar row: history of 1 GB, one muted line with your files and old versions', () => {
+  it('measures again whenever the page is opened', () => {
+    const { el, storage } = mount(STATS)
+    expect(storage?.refresh).not.toHaveBeenCalled()
+    openStorage(el)
+    expect(storage?.refresh).toHaveBeenCalledOnce()
+  })
+
+  it('the bar row: history of 10 GB, then your files and old versions on two muted lines', () => {
     const { el } = mount(STATS)
     openStorage(el)
     const github = row(el, 'storageGithub')!
@@ -105,11 +112,11 @@ describe('Settings › Storage (YAZ-1801)', () => {
     expect(github.querySelector('.storage__fill--ok')).not.toBeNull()
   })
 
-  it('the bar always ends at 10 GB: green to 1 GB, amber to 5 GB, red past it', () => {
-    expect(historyBar(512 * MB)).toEqual({ pct: 5, tone: 'ok', of: '10 GB' })
-    expect(historyBar(2.5 * GB)).toEqual({ pct: 25, tone: 'warn', of: '10 GB' })
+  it('the bar always ends at 10 GB: green to 1 GB, amber to 5 GB, red past it, never under a 1 % sliver', () => {
+    expect(historyBar(98 * MB)).toEqual({ pct: 1, tone: 'ok', of: '10 GB' })
+    expect(historyBar(1.2 * GB)).toEqual({ pct: 12, tone: 'warn', of: '10 GB' })
     expect(historyBar(6 * GB)).toEqual({ pct: 60, tone: 'danger', of: '10 GB' })
-    expect(historyBar(12 * GB)).toEqual({ pct: 100, tone: 'danger', of: "10 GB — over GitHub's max" })
+    expect(historyBar(11 * GB)).toEqual({ pct: 100, tone: 'danger', of: "10 GB — over GitHub's max" })
   })
 
   it('a folder that is not a git repo: no bar, and just "Your files"', () => {

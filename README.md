@@ -114,7 +114,7 @@ what a new element looks like — and they apply to every board, every window an
 system Trash has no programmatic undo) and **Files › Library folder** (where components and image
 favorites live — point it inside a synced vault and they sync too). **Images › Pixabay API key**
 (kept in the app's own data folder, readable only by your user; never shown again). **Sync** for this vault's GitHub switch. **Storage** (its own page) shows this vault's git
-history against GitHub's 1 GB, lists any file close to or over GitHub's 100 MB limit, and offers
+history on a bar that ends at GitHub's 10 GB maximum (marked at 1 GB and 5 GB), lists any file close to or over GitHub's 100 MB limit, and offers
 **Move pictures out** for older boards that still carry their pictures inside. A
 file over GitHub's 100 MB limit is never committed: sync holds it back, says so in a banner, and
 marks it with a red cloud in the sidebar — everything else keeps syncing.
