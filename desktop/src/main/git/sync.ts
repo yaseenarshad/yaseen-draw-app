@@ -1,9 +1,10 @@
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
-import { GITHUB_FILE_LIMIT_BYTES, type GithubSyncStatus } from '@shared/types'
+import { GITHUB_FILE_LIMIT_BYTES, type GithubSyncMerge, type GithubSyncStatus } from '@shared/types'
 import { detectRepo } from './detect'
 import { ensureVaultIgnores, VAULT_IGNORED } from './ignore'
-import { git, GIT_TIMEOUT_CODE, installGitHint, resolveGit, type GitResult } from './exec'
+import { git, GIT_TIMEOUT_CODE, installGitHint, resolveGit, zList, type GitResult } from './exec'
+import { ensureBoardMergeRule, resolveRebase } from './resolve'
 
 /**
  * One sync pass (YAZ-1081 2B): everything "make this vault and its GitHub remote agree" means,
@@ -19,10 +20,11 @@ import { git, GIT_TIMEOUT_CODE, installGitHint, resolveGit, type GitResult } fro
  *     anyway, restored by a copy, never a merge.
  *   - REBASE, never merge. Two machines editing different notes replay cleanly and the history
  *     stays a line anyone can read in the GitHub UI.
- *   - A rebase that CONFLICTS is aborted immediately (the lossless rule, YAZ-1081): git puts the
- *     working tree back byte-for-byte and the pass reports `attention/conflict`. We would rather
- *     stop and say so than leave a vault sitting in a half-finished rebase with `<<<<<<<` markers
- *     inside the user's prose. Resolution is a later issue and a deliberate, visible act.
+ *   - A rebase that CONFLICTS is settled and finished (YAZ-1897, `resolve.ts`): boards merge shape
+ *     by shape, anything else keeps both copies, and the pass reports what it merged. Only what
+ *     cannot be settled is aborted (the lossless rule, YAZ-1081): git puts the working tree back
+ *     byte-for-byte and the pass reports `attention/conflict`. A vault is never left in a
+ *     half-finished rebase, and no `<<<<<<<` marker ever lands in a user's file.
  *
  * Every failure is CLASSIFIED rather than thrown (`classifyGitFailure`), because the three kinds
  * want three different responses: offline is not the user's problem (retry quietly), auth is
@@ -75,9 +77,6 @@ const FLUSH_PUSH_TIMEOUT_MS = 5_000
  * not "a slow one". The flush push keeps its own 5 s cap — quitting still never waits on it.
  */
 export const TRANSFER_TIMEOUT_MS = 10 * 60_000
-
-/** One `-z` listing as paths; a failed listing is an empty one (the guard is then a no-op, never a stop). */
-const zList = (res: GitResult): string[] => (res.code === 0 ? res.stdout.split('\0').filter((p) => p !== '') : [])
 
 /** The vault-relative paths in `rel` whose working-tree file is at or over the GitHub guard. A path that will not stat (deleted) is not. */
 async function oversize(root: string, rel: readonly string[]): Promise<string[]> {
@@ -217,6 +216,7 @@ export async function syncPass(root: string, opts?: { candidates?: readonly stri
 
   // ---------- 1. local edits become one commit (minus anything GitHub would refuse — D3) ----------
   const droppings = await keepDroppingsOut(bin, root)
+  await ensureBoardMergeRule(bin, root) // YAZ-1897 D2: boards never reach git's line merge
   let tooLarge: string[] = []
   if (facts.dirty || droppings) {
     const staging = await stageWithinLimit(bin, root)
@@ -260,32 +260,35 @@ export async function syncPass(root: string, opts?: { candidates?: readonly stri
   }
 
   // ---------- 3. replay our commits on top of theirs (never a merge; see D12 for the one stash) ----------
+  let merged: GithubSyncMerge[] = []
   if (behind > 0 && !flush) {
+    const span = (await git(bin, root, ['rev-parse', 'HEAD', '@{u}'])).stdout.split('\n')
     const outcome = await parkWhileRebasing(bin, root, tooLarge, async () => {
-      const rebased = await git(bin, root, ['rebase', '@{u}'])
-      // The lossless rule. `--abort` restores the pre-rebase tree AND HEAD; its own exit code is
-      // ignored on purpose — if even the abort failed there is nothing further this pass can do,
-      // and `attention/conflict` is still the right thing to put in front of the user.
-      if (rebased.code !== 0) await git(bin, root, ['rebase', '--abort'])
-      return rebased.code === 0
+      if ((await git(bin, root, ['rebase', '@{u}'])).code === 0) return true
+      // YAZ-1897: settle the conflicts and finish; it aborts (losslessly) whatever it cannot settle.
+      const report = await resolveRebase(bin, root, { before: span[0] ?? 'HEAD', upstream: span[1] ?? '@{u}' })
+      merged = report ?? []
+      return report !== null
     })
     if (outcome !== true && outcome !== false) return withTooLarge(fromFailure(root, repo, outcome), tooLarge)
     if (!outcome) {
-      return withTooLarge({ root, state: 'attention', attention: 'conflict', message: 'the same lines changed on two machines — nothing was lost, but this needs a human', repo }, tooLarge)
+      return withTooLarge({ root, state: 'attention', attention: 'conflict', message: 'sync could not finish merging with the other machine — nothing was lost, but this needs a human', repo }, tooLarge)
     }
   }
+  // Every answer from here on carries what the pass merged (and the held-back list), pushed or not.
+  const done = (status: GithubSyncStatus): GithubSyncStatus => withTooLarge(merged.length > 0 ? { ...status, merged } : status, tooLarge)
 
   // ---------- 4. publish ----------
   if (ahead > 0) {
     const pushed = await git(bin, root, hasUpstream ? ['push'] : ['push', '-u', 'origin', 'HEAD'], { timeoutMs: flush ? FLUSH_PUSH_TIMEOUT_MS : TRANSFER_TIMEOUT_MS })
-    if (pushed.code !== 0) return withTooLarge(fromFailure(root, repo, pushed), tooLarge)
+    if (pushed.code !== 0) return done(fromFailure(root, repo, pushed))
   }
 
   // D3: everything else is pushed; the held-back files are the one thing left to say, and saying
   // it is an `attention` — the banner stays up (no Dismiss) until a pass no longer finds any.
   // The words are the renderer's (`syncAttention.ts`), built from the list, so there is no `message`.
-  if (tooLarge.length > 0) return { root, state: 'attention', attention: 'too-large', tooLarge, repo }
-  return { root, state: 'synced', repo }
+  if (tooLarge.length > 0) return done({ root, state: 'attention', attention: 'too-large', repo })
+  return done({ root, state: 'synced', repo })
 }
 
 /**

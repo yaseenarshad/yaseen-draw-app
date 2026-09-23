@@ -38,8 +38,9 @@ export interface GithubSyncConfig {
  * Why a root is stuck, when it is. Each value is a DIFFERENT thing to say to the user, which is
  * the whole reason the set is closed: `no-git` wants "install git" (the Command Line Tools on a Mac, Git for Windows on a PC),
  * `no-identity` wants "set a name and email", `auth` wants "sign in again", `conflict` wants
- * "two machines edited the same lines" (the lossless rule: the working tree was put back exactly
- * as it was — see `git/sync.ts`), `too-large` wants "shrink it or move it out" (YAZ-1801 D3: files
+ * "sync could not finish merging" — since YAZ-1897 every ordinary conflict is merged, so this is
+ * the rare pass that had to stop (the lossless rule: the working tree was put back exactly as it
+ * was — see `git/resolve.ts`), `too-large` wants "shrink it or move it out" (YAZ-1801 D3: files
  * held back under `tooLarge`, everything else synced), and `error` is the honest catch-all that
  * carries a message.
  */
@@ -93,6 +94,27 @@ export interface GithubSyncStatus {
    * "N files not synced" and the `too-large` banner all read this one list.
    */
   tooLarge?: readonly string[]
+  /**
+   * YAZ-1897 D4: what THIS pass merged — present only on the status of the pass that did it (the
+   * manager never keeps it as the root's last status, so a late `status()` cannot replay the notice).
+   */
+  merged?: readonly GithubSyncMerge[]
+}
+
+/**
+ * One file a pass merged instead of stopping (YAZ-1897 D1/D3). A board merged shape by shape has
+ * no `copy`; a file that could not be merged kept both versions — the remote's at `path`, ours at
+ * `copy` — and the notice has to say where ours went.
+ */
+export interface GithubSyncMerge {
+  /** Vault-relative POSIX path. */
+  path: string
+  /** Who made the remote's side of it ("Sara", "Sara and Sam"). */
+  author: string
+  /** Shapes both machines edited; the newest edit of each was kept. */
+  clashes: number
+  /** Vault-relative POSIX path of our copy, when both versions were kept. */
+  copy?: string
 }
 
 /**
