@@ -473,7 +473,7 @@ export function App() {
           onClose={closeSettings}
         />
       )}
-      {/* YAZ-1818: sync needs attention. Two of the five reasons are things this app cannot fix from
+      {/* YAZ-1818: sync needs attention. Two of the six reasons are things this app cannot fix from
           inside itself (git missing, credentials rejected), so the offer is a prompt to paste
           into any LLM — an assistant that CAN drive the terminal — rather than a wizard. */}
       {syncCopy !== null && !syncDismissed && root !== null && githubSync.status !== null && (

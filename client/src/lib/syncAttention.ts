@@ -1,11 +1,12 @@
 import type { GithubSyncAttention, GithubSyncStatus } from '@shared/types'
+import { basename } from './paths'
 
 /**
  * What to SAY when sync is stuck (YAZ-1081 3B) — the whole reason `GithubSyncAttention` is a
  * closed set: each value is a different sentence to a person, not a different error code.
  *
  * Pure and separate from the banner that renders it, because the copy is the part worth
- * testing: two of these five reasons are things the app cannot fix from inside itself (git
+ * testing: two of these six reasons are things the app cannot fix from inside itself (git
  * missing, credentials rejected), so the honest affordance is a prompt the user pastes into an
  * LLM that CAN drive their terminal — not a dead end, and not a wizard we would have to keep
  * correct against every future macOS/Windows/git/GitHub change.
@@ -60,21 +61,16 @@ const COPY: Record<GithubSyncAttention, Omit<AttentionCopy, 'body' | 'dismissibl
   },
 }
 
-/** Base names for the banner: "a, b and c" — the full paths are on the sidebar rows' icons. */
-function nameList(paths: readonly string[]): string {
-  const names = paths.map((p) => p.slice(p.lastIndexOf('/') + 1))
-  return names.length <= 1 ? (names[0] ?? 'A file') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
-}
-
 /**
- * The `too-large` body (YAZ-1801 D3): WHICH file, and the three facts that make it calm rather
- * than alarming — it is safe on this Mac, nothing else is held up, and here is how to fix it.
+ * The `too-large` body (YAZ-1801 D3): WHICH files, by base name (the full paths are on the sidebar
+ * rows' icons), and the three facts that make it calm rather than alarming — it is safe on this
+ * Mac, nothing else is held up, and here is how to fix it.
  */
-function tooLargeBody(status: GithubSyncStatus): string {
-  const paths = status.tooLarge ?? []
-  const verb = paths.length > 1 ? 'are' : 'is'
-  const subject = paths.length === 0 ? 'A file' : nameList(paths)
-  return `${subject} ${verb} over GitHub's 100 MB limit. ${paths.length > 1 ? 'They stay' : 'It stays'} on this Mac only. Everything else is synced. Shrink it (Settings › Storage) or move it out of the vault.`
+function tooLargeBody(paths: readonly string[]): string {
+  const names = paths.map(basename)
+  const many = names.length > 1
+  const subject = many ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : (names[0] ?? 'A file')
+  return `${subject} ${many ? 'are' : 'is'} over GitHub's 100 MB limit. ${many ? 'They stay' : 'It stays'} on this Mac only. Everything else is synced. Shrink it (Settings › Storage) or move it out of the vault.`
 }
 
 /**
@@ -87,8 +83,10 @@ function tooLargeBody(status: GithubSyncStatus): string {
 export function attentionCopy(status: GithubSyncStatus): AttentionCopy | null {
   if (status.state !== 'attention') return null
   const entry = COPY[status.attention ?? 'error']
-  const count = status.tooLarge?.length ?? 0
-  if (status.attention === 'too-large') return { title: count > 1 ? `${count} files are too big for GitHub.` : entry.title, body: tooLargeBody(status), showSetupPrompt: false, dismissible: false }
+  if (status.attention === 'too-large') {
+    const paths = status.tooLarge ?? []
+    return { title: paths.length > 1 ? `${paths.length} files are too big for GitHub.` : entry.title, body: tooLargeBody(paths), showSetupPrompt: false, dismissible: false }
+  }
   return { title: entry.title, body: entry.body ?? status.message ?? 'git reported an error.', showSetupPrompt: entry.showSetupPrompt, dismissible: true }
 }
 
