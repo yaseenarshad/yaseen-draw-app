@@ -131,6 +131,7 @@ function installBridge(state: AppState, identity: IdentityFixture) {
       onExportImage: menuSub(menuExportImage),
       onCanvasBackground: menuSub(menuCanvasBackground),
       onExportDrawing: menuSub(menuExportDrawing),
+      onShareLink: vi.fn(() => () => undefined),
     },
     link: {
       onOpenFile: vi.fn((l: (path: string) => void) => {

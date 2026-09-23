@@ -1,0 +1,138 @@
+/**
+ * SHARE LINK (YAZ-1799, PROTOTYPE): one board, uploaded to the user's OWN Cloudflare (one R2
+ * bucket + one small Worker), reachable by anyone with its long random link. ALWAYS LIVE (Yasin's
+ * amendment of D3): every save of a shared board re-uploads it to the same link (`liveShare.ts`).
+ *
+ * WHO OWNS WHAT (the production shape, kept in the prototype):
+ *  - MAIN owns Cloudflare: the API token and the Worker's upload password live in `secrets.json`
+ *    (the secrets door — the renderer can never read either), and every HTTP call is main's.
+ *  - The RENDERER assembles the bytes (the same standalone `.excalidraw` Export Drawing writes,
+ *    🔒 YAZ-1799 D3) because only it has the engine; it hands them to main to upload.
+ *  - The vault remembers which boards are shared in `<vault>/.yaseendraw/shares.json`:
+ *    `{ version: 1, shares: { "<vault-relative path>": { id, allowDownload, sharedAt, updatedAt } } }`.
+ *  - ONE LINK per board, `/b/<id>`, plus a permission the owner flips on that same link (the
+ *    Google Docs model): "can view and download" (default) or "can view only". The Worker
+ *    enforces it — `/raw/<id>` is 403 when downloads are off.
+ */
+
+/**
+ * The Workers free-plan request body limit — the Worker enforces it and the app pre-checks it,
+ * so a board over it is refused with an explanation instead of a failed upload. Decimal megabytes,
+ * as Cloudflare states the limit.
+ */
+export const MAX_SHARE_BYTES = 100 * 1000 * 1000
+
+/** The two secrets sharing keeps in `secrets.json`. Neither ever reaches a renderer. */
+export const CLOUDFLARE_TOKEN_SECRET = 'cloudflareApiToken'
+export const SHARE_UPLOAD_PASSWORD_SECRET = 'shareUploadPassword'
+
+/** What Settings › Sharing shows at the top. Holds no secret. */
+export interface ShareStatus {
+  state: 'off' | 'ready'
+  /** The public origin links are built on: the custom domain when attached, else workers.dev. */
+  url: string | null
+  /** The workers.dev address, even when a custom domain is attached. */
+  workersDevUrl: string | null
+  customDomain: string | null
+  accountName: string | null
+  workerName: string | null
+  bucketName: string | null
+  readyAt: number | null
+  /** True when this build talks to the local fake Cloudflare (the demo). */
+  demo: boolean
+}
+
+/** The setup flow's steps, in order — the progress list renders exactly these. */
+export const SHARE_SETUP_STEPS = ['verify', 'account', 'bucket', 'viewer', 'worker', 'secret', 'subdomain', 'test'] as const
+export type ShareSetupStep = (typeof SHARE_SETUP_STEPS)[number]
+
+export const SHARE_SETUP_LABELS: Record<ShareSetupStep, string> = {
+  verify: 'Checking the key',
+  account: 'Finding your Cloudflare account',
+  bucket: 'Creating the storage bucket (R2)',
+  viewer: 'Uploading the viewer page',
+  worker: 'Uploading the share Worker',
+  secret: 'Setting the upload password',
+  subdomain: 'Turning on the workers.dev address',
+  test: 'Test upload',
+}
+
+export interface ShareSetupProgress {
+  step: ShareSetupStep
+  state: 'running' | 'done' | 'failed'
+  /** Plain-English detail: what was found, or what went wrong and what to do about it. */
+  message?: string
+}
+
+/**
+ * Where a shared board's ALWAYS-LIVE link stands (Yasin's amendment): every save re-uploads, so
+ * the interesting facts are "is an upload running" and "did the last one fail, and why". Kept by
+ * main in memory — a relaunch starts from `ok`, and the next save tells the truth again.
+ */
+export interface ShareSync {
+  state: 'ok' | 'uploading' | 'failed'
+  /** The last failure, in plain English. */
+  message?: string
+  /** When the last failure happened. */
+  failedAt?: number
+}
+
+/** One board's share record as the renderer sees it. `path` is absolute. */
+export interface ShareEntry {
+  path: string
+  id: string
+  /** `/b/<id>` on the share origin. */
+  url: string
+  /** "can view and download" (true, the default for a new share) or "can view only" (false). */
+  allowDownload: boolean
+  sharedAt: number
+  /** When the link last got a successful upload. */
+  updatedAt: number
+  sync: ShareSync
+}
+
+/** A Settings list row: the record plus two checks — is the board still there, is the link still live. */
+export interface ShareListEntry extends ShareEntry {
+  fileExists: boolean
+  live: 'live' | 'missing' | 'unknown'
+}
+
+export interface ShareBoardRequest {
+  root: string
+  path: string
+}
+
+export interface SharePublishRequest extends ShareBoardRequest {
+  /** The standalone `.excalidraw` text (images embedded). */
+  content: string
+}
+
+export interface SharePermissionRequest extends ShareBoardRequest {
+  allowDownload: boolean
+}
+
+export interface ShareApi {
+  status(): Promise<ShareStatus>
+  /** Check a pasted key and list the Cloudflare accounts it can see — more than one means a picker. */
+  accounts(req: { token: string }): Promise<{ id: string; name: string }[]>
+  /** Provision everything from one pasted API token (on `accountId` when the key sees several); progress arrives on `onSetupProgress`. An existing Worker + bucket are reused. */
+  setup(req: { token: string; accountId?: string }): Promise<ShareStatus>
+  onSetupProgress(listener: (progress: ShareSetupProgress) => void): () => void
+  /** Open Cloudflare's "create API token" page (the fake one in the demo) in the browser. */
+  openCloudflare(): Promise<void>
+  /** Open a share link in the default browser. */
+  openLink(req: { url: string }): Promise<void>
+  get(req: ShareBoardRequest): Promise<ShareEntry | null>
+  list(req: { root: string }): Promise<ShareListEntry[]>
+  /** First share (new id), or an automatic re-upload after a save (same id): the object is replaced in place. */
+  publish(req: SharePublishRequest): Promise<ShareEntry>
+  /** Flip "view and download" / "view only" on the SAME link — no re-upload. */
+  setPermission(req: SharePermissionRequest): Promise<ShareEntry>
+  /** Delete the object (the link dies at once) and forget the record. */
+  stop(req: ShareBoardRequest): Promise<void>
+  setDomain(req: { hostname: string | null }): Promise<ShareStatus>
+  /** `deleteEverything`: wipe every object, then the Worker and the bucket. Either way the token and password are forgotten. */
+  disconnect(req: { root: string | null; deleteEverything: boolean }): Promise<ShareStatus>
+  /** Any status or shares.json change, in every window. */
+  onChanged(listener: () => void): () => void
+}

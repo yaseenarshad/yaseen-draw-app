@@ -15,6 +15,7 @@ export type BridgeErrorCode =
   | 'INVALID_CONFIG' // a vault config file (e.g. .yaseendraw/github.json) is unusable; the mutation is refused, the file never touched
   | 'UNSUPPORTED_TYPE' // 🔒 YAZ-1775 D4: a media provider answered with something that is not an image (the worker's 415)
   | 'PROVIDER_FAILED' // 🔒 YAZ-1775 D4: a media provider was REACHED and refused, or answered nonsense (the worker's 502)
+  | 'NOT_SET_UP' // YAZ-1799: sharing is not set up yet (Settings › Sharing)
   | 'OFFLINE' // 🔒 YAZ-1775 D4: the provider could not be reached at all — a passive state in the UI, never an error banner
 
 /** The one document extension the app opens, edits and creates (🔒 YAZ-1775 D1). */

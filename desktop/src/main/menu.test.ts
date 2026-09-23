@@ -24,6 +24,7 @@ const noopHandlers = (): MenuHandlers => ({
   toggleSidebar: vi.fn(),
   exportImage: vi.fn(),
   exportDrawing: vi.fn(),
+  shareLink: vi.fn(),
   canvasBackground: vi.fn(),
   openHelp: vi.fn(),
 })
@@ -190,6 +191,19 @@ describe('buildMenuTemplate', () => {
     expect(menuOf(build(RECENTS, false, handlers, false), 'File').find((i) => i.id === 'menu.file.export-drawing')?.enabled).toBe(false)
     // It sits beside the image export, and the two are not the same gesture.
     expect(file.findIndex((i) => i.id === 'menu.file.export-drawing')).toBe(file.findIndex((i) => i.id === 'menu.file.export-image') + 1)
+  })
+
+  it('File › Share Link is ⌘⇧L, right after Export Drawing…, gated the same way (YAZ-1799)', () => {
+    const handlers = noopHandlers()
+    const file = menuOf(build(RECENTS, false, handlers, true), 'File')
+    const item = file.find((i) => i.id === 'menu.file.share-link')
+    expect(item?.label).toBe('Share Link')
+    expect(item?.accelerator).toBe('CmdOrCtrl+Shift+L')
+    expect(item?.enabled).toBe(true)
+    click(item)
+    expect(handlers.shareLink).toHaveBeenCalledTimes(1)
+    expect(file.findIndex((i) => i.id === 'menu.file.share-link')).toBe(file.findIndex((i) => i.id === 'menu.file.export-drawing') + 1)
+    expect(menuOf(build(RECENTS, false, handlers, false), 'File').find((i) => i.id === 'menu.file.share-link')?.enabled).toBe(false)
   })
 
   it('⌘⇧S is claimed by nothing else in the menu bar', () => {

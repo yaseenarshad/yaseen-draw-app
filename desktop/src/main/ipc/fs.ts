@@ -11,6 +11,7 @@ import { renameFile } from '../fs/rename'
 import { removeEntry } from '../fs/remove'
 import { revealItem } from '../fs/reveal'
 import { tree } from '../fs/tree'
+import { repairShares, shareFsHooks } from '../share/fsHooks'
 import { sweepVaultOnce } from './drawing'
 import type { Store } from '../store'
 import type { WindowLookup } from '../windows'
@@ -68,6 +69,8 @@ export function registerFsIpc(store: Store, windows: WindowLookup): void {
     const res = await renameFile(req)
     store.renamePath(res.oldPath, res.newPath)
     await repairFavorites(favorites.renamePath(openRoots(store), res.oldPath, res.newPath))
+    // YAZ-1799: a shared board's link follows it (shares.json key rewritten, same id).
+    await repairShares(shareFsHooks.renamed(openRoots(store), res.oldPath, res.newPath))
     broadcastAll(CH.fileRenamed, { oldPath: res.oldPath, newPath: res.newPath, kind: res.kind })
     return res
   })
@@ -94,6 +97,8 @@ export function registerFsIpc(store: Store, windows: WindowLookup): void {
     const res = await removeEntry(req)
     store.removePath(res.path)
     await repairFavorites(favorites.removePath(openRoots(store), res.path))
+    // YAZ-1799: deleting a shared board (or a folder holding some) stops sharing them.
+    await repairShares(shareFsHooks.deleted(openRoots(store), res.path))
     broadcastAll(CH.fileDeleted, { path: res.path, kind: res.kind })
     return res
   })
@@ -134,6 +139,7 @@ export function registerFsIpc(store: Store, windows: WindowLookup): void {
         const r = await renameFile({ oldPath: from, newPath: to })
         store.renamePath(r.oldPath, r.newPath)
         await repairFavorites(favorites.renamePath(openRoots(store), r.oldPath, r.newPath))
+        await repairShares(shareFsHooks.renamed(openRoots(store), r.oldPath, r.newPath))
         broadcastAll(CH.fileRenamed, { oldPath: r.oldPath, newPath: r.newPath, kind: r.kind })
         return r
       },

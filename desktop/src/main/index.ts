@@ -195,7 +195,8 @@ app.whenReady().then(() => {
   // A tab switch changes which file is in front (🔒 YAZ-1775 D10); focus changes which window is asked.
   subscribeMenuRebuildOnActiveFile(store, applyMenu)
   rebuildMenuOnFocus = applyMenu
-  gitSync = registerIpc(store, manager, app.getPath('userData'))
+  // YAZ-1799 (prototype): the share viewer's built assets, beside the app in the repo checkout.
+  gitSync = registerIpc(store, manager, app.getPath('userData'), join(app.getAppPath(), '..', 'share', 'dist', 'assets'))
   // 🔒 YAZ-1775 D5: the one library folder every vault shares. Made at startup, detached — a launch must
   // not wait on a disk, and a path that cannot be created is still what the Settings row names.
   void ensureLibraryFolder(store.get().settings.libraryFolder, app.getPath('userData'))

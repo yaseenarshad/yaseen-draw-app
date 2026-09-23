@@ -41,6 +41,8 @@ export interface MenuHandlers {
   exportImage(): void
   /** File › Export Drawing… (⌘⇧S, 🔒 YAZ-1775 D3): the focused renderer's visible drawing writes a standalone `.excalidraw`. */
   exportDrawing(): void
+  /** File › Share Link (⌘⇧L, YAZ-1799): the focused renderer opens the Share dialog for its visible drawing. */
+  shareLink(): void
   /** View › Canvas Background › a pick (🔒 YAZ-1775 D10): the focused renderer's visible drawing takes `color`. */
   canvasBackground(color: string): void
   openHelp(): void
@@ -131,6 +133,8 @@ export function buildMenuTemplate({ recents, isDev, activeIsDrawing }: MenuInput
         // own "Save as" is off (`saveToActiveFile: false`) and a registered accelerator never
         // reaches the page on macOS anyway — and it is the key the gesture means.
         { id: 'menu.file.export-drawing', label: 'Export Drawing…', accelerator: 'CmdOrCtrl+Shift+S', enabled: activeIsDrawing, click: () => handlers.exportDrawing() },
+        // YAZ-1799 (prototype): a frozen snapshot of the same standalone file, uploaded to the user's own Cloudflare.
+        { id: 'menu.file.share-link', label: 'Share Link', accelerator: 'CmdOrCtrl+Shift+L', enabled: activeIsDrawing, click: () => handlers.shareLink() },
         { type: 'separator' },
         // ⌘W is Close Tab (GRO-2232, locked): the renderer owns tab state, so the gesture goes to
         // the focused window's renderer. Close Window moves to ⌘⇧W and keeps `role: 'close'` — the
@@ -315,6 +319,9 @@ export function createMenuHandlers(store: Store, windows: MenuWindows, host: Men
     },
     exportDrawing() {
       host.focusedWebContents()?.send(CH.menuExportDrawing)
+    },
+    shareLink() {
+      host.focusedWebContents()?.send(CH.menuShareLink)
     },
     canvasBackground(color) {
       host.focusedWebContents()?.send(CH.menuCanvasBackground, color)

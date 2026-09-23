@@ -61,6 +61,8 @@ export const CH = {
   // File › Export Drawing… (🔒 YAZ-1775 D3, YAZ-1821): same gating and same delivery as `menu:export-image`.
   menuExportDrawing: 'menu:export-drawing',
   menuCanvasBackground: 'menu:canvas-background',
+  // File › Share Link… (⌘⇧L, YAZ-1799): same gating and delivery as `menu:export-drawing`.
+  menuShareLink: 'menu:share-link',
   linkOpenFile: 'link:open-file',
   linkNotice: 'link:notice',
   favoritesGet: 'favorites:get',
@@ -95,6 +97,22 @@ export const CH = {
   // Settings › Storage (YAZ-1801): sizes from the disk + local git, and the legacy-picture shrink.
   storageStats: 'storage:stats',
   storageShrink: 'storage:shrink',
+  // Share link (YAZ-1799, prototype): main owns Cloudflare, the token and the upload password; the
+  // renderer asks for status, hands over bytes, and hears progress and changes as pushes.
+  shareStatus: 'share:status',
+  shareAccounts: 'share:accounts',
+  shareSetup: 'share:setup',
+  shareSetupProgress: 'share:setup-progress',
+  shareOpenCloudflare: 'share:open-cloudflare',
+  shareOpenLink: 'share:open-link',
+  shareGet: 'share:get',
+  shareList: 'share:list',
+  sharePublish: 'share:publish',
+  shareSetPermission: 'share:set-permission',
+  shareStop: 'share:stop',
+  shareSetDomain: 'share:set-domain',
+  shareDisconnect: 'share:disconnect',
+  shareChanged: 'share:changed',
   appFlush: 'app:flush',
   appFlushed: 'app:flushed',
 } as const

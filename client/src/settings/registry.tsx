@@ -24,6 +24,7 @@ import { LibraryFolderControl, LibraryFolderHint } from './LibraryFolderControl'
 import { ON_OFF_OPTIONS, repoHint, THEME_OPTIONS } from './options'
 import { PixabayKeyControl } from './PixabayKeyControl'
 import { STORAGE_SECTION } from './storageSection'
+import { SharingPage } from '../share/SharingPage'
 
 export interface SettingsCtx {
   settings: SettingsState
@@ -31,6 +32,8 @@ export interface SettingsCtx {
   sync?: { status: GithubSyncStatus | null; setEnabled: (enabled: boolean) => void }
   /** Settings › Storage (YAZ-1801): App's `useVaultStorage`; undefined with no vault open, which hides the section. */
   storage?: VaultStorageState
+  /** The window's vault, for Settings › Sharing's "Your shared boards" (YAZ-1799). */
+  root?: string | null
 }
 
 export interface SettingDef {
@@ -49,7 +52,7 @@ export interface SettingDef {
   render: (ctx: SettingsCtx) => ReactNode
 }
 
-export type SettingsSectionId = 'appearance' | 'canvas' | 'files' | 'images' | 'sync' | 'storage' | 'hotkeys'
+export type SettingsSectionId = 'appearance' | 'canvas' | 'files' | 'images' | 'sync' | 'storage' | 'sharing' | 'hotkeys'
 
 /** Rows that belong together under one sub-heading; no title = plain rows straight under the section. */
 export interface SettingsGroup {
@@ -202,6 +205,27 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   },
   // YAZ-1801: what this vault weighs against GitHub's limits, and "Move pictures out of boards".
   STORAGE_SECTION,
+  {
+    // YAZ-1799 D7 (prototype): its own page — setup flow, the shared-boards list and a long write-up
+    // are not rows to scroll past. Search still finds it.
+    id: 'sharing',
+    title: 'Sharing',
+    standalone: true,
+    groups: [
+      {
+        items: [
+          {
+            id: 'sharing',
+            label: 'Share links',
+            hint: 'Live links to boards (anyone with the link can view, or view and download) — hosted on your own free Cloudflare account.',
+            keywords: ['share', 'link', 'cloudflare', 'worker', 'r2', 'publish', 'domain', 'viewer'],
+            wide: true,
+            render: (ctx) => <SharingPage root={ctx.root ?? null} />,
+          },
+        ],
+      },
+    ],
+  },
   {
     id: 'hotkeys',
     title: 'Hotkeys',

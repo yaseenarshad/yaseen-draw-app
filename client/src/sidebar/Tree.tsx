@@ -111,6 +111,8 @@ interface TreeProps {
   onHoverFile?: (node: FileNode | null) => void
   /** YAZ-1801 D3: absolute paths held back from sync as over GitHub's limit; their rows get the cloud-off icon. */
   tooLarge?: ReadonlySet<string>
+  /** Shared boards (YAZ-1799): a small link icon on the row, red when the last update failed or the link is stale; the title is the status. */
+  shareBadges?: ReadonlyMap<string, ShareBadge>
   depth?: number
 }
 
@@ -125,6 +127,21 @@ function CloudOffIcon() {
     </span>
   )
 }
+
+export interface ShareBadge {
+  tone: 'ok' | 'error'
+  title: string
+}
+
+/** The shared-board mark: a small link glyph. */
+const ShareMark = ({ badge }: { badge: ShareBadge }) => (
+  <span className="tree__share" data-tone={badge.tone} title={badge.title} aria-label={badge.title} role="img">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
+      <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
+    </svg>
+  </span>
+)
 
 export function Tree({
   nodes,
@@ -143,9 +160,10 @@ export function Tree({
   reorder,
   onHoverFile,
   tooLarge,
+  shareBadges,
   depth = 0,
 }: TreeProps) {
-  const recurse = { expanded, activeFile, onToggle, onOpenFile, onOpenFileBackground, onOpenDefault, onNodeContextMenu, pending, renaming, move, selection, reorder, onHoverFile, tooLarge }
+  const recurse = { expanded, activeFile, onToggle, onOpenFile, onOpenFileBackground, onOpenDefault, onNodeContextMenu, pending, renaming, move, selection, reorder, onHoverFile, tooLarge, shareBadges }
   // The reorder gesture lives on depth-0 rows alone; deeper rows of a reorderable tree drag nothing.
   const rowReorder = reorder !== undefined && depth === 0 ? reorder : null
   // What a FILE row's drag does: move on disk (E1b) on an ordinary tree, reorder at depth 0 of a reorderable one, nothing below that.
@@ -287,6 +305,7 @@ export function Tree({
             >
               <span className="tree__label">{stripExt(node.name)}</span>
               {tooLarge?.has(node.path) === true && <CloudOffIcon />}
+              {shareBadges?.get(node.path) !== undefined && <ShareMark badge={shareBadges.get(node.path) as ShareBadge} />}
             </button>
           </li>
         ),

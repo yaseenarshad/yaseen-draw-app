@@ -1200,3 +1200,16 @@ button {
   opacity: 0.5;
   cursor: default;
 }
+
+/* A shared board's mark (YAZ-1799): a small link glyph after the name; red when its last update failed or the link is stale. */
+.tree__share {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  margin-left: 6px;
+  color: var(--ok);
+}
+
+.tree__share[data-tone='error'] {
+  color: var(--danger);
+}

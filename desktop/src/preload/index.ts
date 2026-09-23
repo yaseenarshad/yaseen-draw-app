@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AppState, FileClipState, FileDeletedEvent, FileRenamedEvent, GithubSyncStatus, WatchEvent, YaseenDrawApi } from '@shared/types'
+import type { AppState, ShareSetupProgress, FileClipState, FileDeletedEvent, FileRenamedEvent, GithubSyncStatus, WatchEvent, YaseenDrawApi } from '@shared/types'
 import { CH, type Envelope } from '../channels'
 
 /** invoke + unwrap: resolves the value or rejects with the plain `BridgeError` object. */
@@ -92,6 +92,7 @@ const api: YaseenDrawApi = {
     onExportImage: on<void>(CH.menuExportImage),
     onCanvasBackground: on<string>(CH.menuCanvasBackground),
     onExportDrawing: on<void>(CH.menuExportDrawing),
+    onShareLink: on<void>(CH.menuShareLink),
   },
   // Deep links (E1, GRO-2171): main routes a yaseendraw:// URL to the best window.
   link: {
@@ -160,6 +161,23 @@ const api: YaseenDrawApi = {
   storage: {
     stats: (root) => call(CH.storageStats, root),
     shrink: (root, skip) => call(CH.storageShrink, root, skip),
+  },
+  // Share link (YAZ-1799, prototype): main owns Cloudflare, the token and the upload password.
+  share: {
+    status: () => call(CH.shareStatus),
+    accounts: (req) => call(CH.shareAccounts, req),
+    setup: (req) => call(CH.shareSetup, req),
+    onSetupProgress: on<ShareSetupProgress>(CH.shareSetupProgress),
+    openCloudflare: () => call(CH.shareOpenCloudflare),
+    openLink: (req) => call(CH.shareOpenLink, req),
+    get: (req) => call(CH.shareGet, req),
+    list: (req) => call(CH.shareList, req),
+    publish: (req) => call(CH.sharePublish, req),
+    setPermission: (req) => call(CH.shareSetPermission, req),
+    stop: (req) => call(CH.shareStop, req),
+    setDomain: (req) => call(CH.shareSetDomain, req),
+    disconnect: (req) => call(CH.shareDisconnect, req),
+    onChanged: on<void>(CH.shareChanged),
   },
 }
 
