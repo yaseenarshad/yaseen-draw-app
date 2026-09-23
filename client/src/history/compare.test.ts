@@ -41,4 +41,10 @@ describe('changesScene', () => {
     expect(scene.find((e) => e.id === 'yaz-mark-moved')).toMatchObject({ strokeColor: MARK.changed })
     expect(scene.find((e) => e.id === 'yaz-mark-gone')).toMatchObject({ strokeColor: MARK.removed, strokeStyle: 'dashed' })
   })
+
+  it('text inside a marked box gets no outline of its own', () => {
+    const now = [el('card'), el('label', { type: 'text', containerId: 'card' })]
+    const scene = changesScene(engine, now, compareBoards([], now)) as Array<Record<string, unknown>>
+    expect(scene.map((e) => e.id).filter((id) => String(id).startsWith('yaz-mark'))).toEqual(['yaz-mark-card'])
+  })
 })

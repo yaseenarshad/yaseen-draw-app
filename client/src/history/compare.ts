@@ -75,7 +75,10 @@ export function changesScene(engine: CompareEngine, now: readonly unknown[], cha
       roundness: null,
     }
   }
-  const marks = [...changes.added.map((e) => outline(e, MARK.added, false)), ...changes.changed.map((e) => outline(e, MARK.changed, false)), ...changes.removed.map((e) => outline(e, MARK.removed, true))]
+  // Text inside a box that is already marked would draw a second outline inside the first: the box's says it.
+  const marked = new Set([...changes.added, ...changes.changed, ...changes.removed].map((e) => e.id))
+  const own = (e: Element) => typeof e.containerId !== 'string' || !marked.has(e.containerId)
+  const marks = [...changes.added.filter(own).map((e) => outline(e, MARK.added, false)), ...changes.changed.filter(own).map((e) => outline(e, MARK.changed, false)), ...changes.removed.filter(own).map((e) => outline(e, MARK.removed, true))]
   return [...ghosts, ...(now as unknown[]), ...(engine.restoreElements(marks as never, null) as unknown[])]
 }
 
