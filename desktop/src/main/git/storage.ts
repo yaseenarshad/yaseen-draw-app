@@ -1,9 +1,8 @@
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { GITHUB_FILE_WARN_BYTES, MAX_DRAWING_BYTES, type VaultStorageFile, type VaultStorageStats } from '@shared/types'
 import { isDrawing } from '@shared/fileKind'
-import { ASSETS_DIR } from '@shared/drawingAssets'
-import { isSkipped } from '../fs/fsUtils'
+import { vaultFiles } from '../fs/fsUtils'
 import { detectRepo } from './detect'
 import { git, resolveGit } from './exec'
 
@@ -54,46 +53,31 @@ interface Walked {
   other: { bytes: number; count: number }
 }
 
-/** One walk of the vault: every board measured (and parsed once for its embedded bytes), `assets/` and the rest summed. */
+/** One walk of the vault (`vaultFiles`, shared with shrink): every board measured (and parsed once for its embedded bytes), `assets/` and the rest summed. */
 async function walk(root: string): Promise<Walked> {
   const out: Walked = { boards: [], large: [], pictures: { bytes: 0, count: 0 }, other: { bytes: 0, count: 0 } }
-  const stack: Array<{ dir: string; inAssets: boolean }> = [{ dir: root, inAssets: false }]
-  while (stack.length > 0) {
-    const { dir, inAssets } = stack.pop()!
-    const entries = await readdir(dir, { withFileTypes: true }).catch(() => [])
-    for (const e of entries) {
-      // Dot-entries (`.git`, `.yaseendraw`, Finder's droppings) and `node_modules` are invisible,
-      // as they are to every other walk in the app.
-      if (isSkipped(e.name)) continue
-      const full = path.join(dir, e.name)
-      if (e.isDirectory()) {
-        // Only the TOP-LEVEL `assets/` is the store (🔒 YAZ-1775 D3); a user's own `assets` folder deeper down is theirs.
-        stack.push({ dir: full, inAssets: inAssets || (dir === root && e.name === ASSETS_DIR) })
-        continue
-      }
-      if (!e.isFile()) continue
-      const st = await stat(full).catch(() => null)
-      if (st === null) continue
-      const rel = path.relative(root, full).split(path.sep).join('/')
-      if (st.size >= GITHUB_FILE_WARN_BYTES) out.large.push({ path: rel, bytes: st.size })
-      if (inAssets) {
-        out.pictures.bytes += st.size
-        out.pictures.count += 1
-      } else if (isDrawing(e.name)) {
-        let embeddedBytes = 0
-        // Past the read ceiling a board is not parsed (it would not open either); it still counts by size.
-        if (st.size <= MAX_DRAWING_BYTES) {
-          try {
-            embeddedBytes = embeddedBytesOf(JSON.parse(await readFile(full, 'utf8')))
-          } catch {
-            // Corrupt or unreadable: its size is real, its pictures are unknowable.
-          }
+  for await (const { full, name, inAssets } of vaultFiles(root)) {
+    const st = await stat(full).catch(() => null)
+    if (st === null) continue
+    const rel = path.relative(root, full).split(path.sep).join('/')
+    if (st.size >= GITHUB_FILE_WARN_BYTES) out.large.push({ path: rel, bytes: st.size })
+    if (inAssets) {
+      out.pictures.bytes += st.size
+      out.pictures.count += 1
+    } else if (isDrawing(name)) {
+      let embeddedBytes = 0
+      // Past the read ceiling a board is not parsed (it would not open either); it still counts by size.
+      if (st.size <= MAX_DRAWING_BYTES) {
+        try {
+          embeddedBytes = embeddedBytesOf(JSON.parse(await readFile(full, 'utf8')))
+        } catch {
+          // Corrupt or unreadable: its size is real, its pictures are unknowable.
         }
-        out.boards.push({ path: rel, bytes: st.size, embeddedBytes })
-      } else {
-        out.other.bytes += st.size
-        out.other.count += 1
       }
+      out.boards.push({ path: rel, bytes: st.size, embeddedBytes })
+    } else {
+      out.other.bytes += st.size
+      out.other.count += 1
     }
   }
   return out

@@ -25,7 +25,9 @@
  * An asset is IMMUTABLE — the same bytes always get the same name — so a save never rewrites one
  * (`wx`; EEXIST means it is already exactly these bytes). A LEGACY export that still embeds
  * `files` opens (its entries pass straight through the load) and SHRINKS on its first save:
- * `stripEmbeddedFiles` lifts the bytes into the store and writes the scene lean.
+ * `liftEmbedded` takes the referenced bytes out of the scene and `landAssets` writes them into the
+ * store, then the scene is written lean. Settings › Storage's "Move pictures out" (`shrink.ts`,
+ * YAZ-1801 D5) runs the same two helpers over every legacy board at once.
  *
  * ASSETS FIRST, THEN THE SCENE. A scene on disk must never name bytes that are not there, so
  * every asset lands before the file that references it. The reverse order would leave a crash

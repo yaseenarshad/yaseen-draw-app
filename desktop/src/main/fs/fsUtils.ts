@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { BoardMeta, BridgeError, TreeNode } from '@shared/types'
 import { fileKind, isDrawing } from '@shared/fileKind'
 import { byName } from '@shared/treeSort'
+import { ASSETS_DIR } from '@shared/drawingAssets'
 import { readBoardHead } from './boardHead'
 
 /**
@@ -48,6 +49,27 @@ export function requireDrawingFile(p: string): void {
 /** Dot-entries and node_modules are invisible to every call. */
 export function isSkipped(name: string): boolean {
   return name.startsWith('.') || name === 'node_modules'
+}
+
+/**
+ * Every regular file in a vault, depth-first — the ONE walk Settings › Storage's two jobs share
+ * (YAZ-1801: `git/storage.ts` measures, `fs/shrink.ts` rewrites), so they can never disagree about
+ * which files are the vault's. Dot-entries and `node_modules` are invisible (`isSkipped`); an
+ * unreadable folder is an empty one. `inAssets` marks the TOP-LEVEL `assets/` store only (🔒
+ * YAZ-1775 D3) — a user's own `assets` folder deeper down is theirs.
+ */
+export async function* vaultFiles(root: string): AsyncGenerator<{ full: string; name: string; inAssets: boolean }> {
+  const stack: Array<{ dir: string; inAssets: boolean }> = [{ dir: root, inAssets: false }]
+  while (stack.length > 0) {
+    const { dir, inAssets } = stack.pop()!
+    const entries = await readdir(dir, { withFileTypes: true }).catch(() => [])
+    for (const e of entries) {
+      if (isSkipped(e.name)) continue
+      const full = path.join(dir, e.name)
+      if (e.isDirectory()) stack.push({ dir: full, inAssets: inAssets || (dir === root && e.name === ASSETS_DIR) })
+      else if (e.isFile()) yield { full, name: e.name, inAssets }
+    }
+  }
 }
 
 function errnoCode(err: unknown): string | undefined {
