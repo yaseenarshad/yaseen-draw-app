@@ -13,7 +13,7 @@ import { useWatch } from './hooks/useWatch'
 import { fileClipboardVerb } from './lib/fileClipboardHotkey'
 import { LINK_NOTICE_MS, type Notice, type NoticeKind } from './lib/notice'
 import { NoticeIcon } from './components/NoticeIcon'
-import { basename } from './lib/paths'
+import { basename, vaultPath } from './lib/paths'
 import { flushRenamedDir, flushRenamedPath, retireDir, retirePath } from './lib/renameContinuity'
 import { EMPTY_SELECTION } from './lib/selection'
 import { storage } from './lib/storage'
@@ -78,10 +78,10 @@ export function App() {
   }, [syncState, syncReason])
   const syncCopy = githubSync.status === null ? null : attentionCopy(githubSync.status)
   // YAZ-1801 D3: the files the last pass held back (over GitHub's limit), as ABSOLUTE paths for the
-  // sidebar's cloud-off icons. Read off the ONE status above — never a second subscription — so
-  // the banner, the chip and the tree always agree about which files are stuck.
+  // sidebar's cloud-off icons, in the root's own separator (`vaultPath`). Read off the ONE status
+  // above — never a second subscription — so the banner, the chip and the tree always agree.
   const tooLargeList = githubSync.status?.tooLarge
-  const tooLargePaths = useMemo<ReadonlySet<string>>(() => new Set(root === null ? [] : (tooLargeList ?? []).map((rel) => `${root}/${rel}`)), [root, tooLargeList])
+  const tooLargePaths = useMemo<ReadonlySet<string>>(() => new Set(root === null ? [] : (tooLargeList ?? []).map((rel) => vaultPath(root, rel))), [root, tooLargeList])
   // ⌘K's half of the search-bar focus handshake (YAZ-801, wired in YAZ-804): `openSearch` sets it
   // (including the collapsed case, which un-collapses and mounts the sidebar with the flag already
   // true); the sidebar focuses its input and clears it through the callback.
