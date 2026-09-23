@@ -116,7 +116,7 @@ describe('Share dialog states (YAZ-1888)', () => {
     share.status.mockResolvedValue({ state: 'off' } as ShareStatus)
     const { onClose, onOpenSettings } = await mount()
     expect($('.share-dialog__title')?.textContent).toBe('Share “Roadmap”')
-    expect($('.share-dialog__text')?.textContent).toMatch(/isn't set up/)
+    expect($('.confirm__text')?.textContent).toMatch(/isn't set up/)
     expect(byTest('share-access')).toBeNull()
     click(byTest('share-setup'))
     expect(onClose).toHaveBeenCalledTimes(1)
