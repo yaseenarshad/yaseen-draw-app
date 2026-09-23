@@ -8,7 +8,7 @@ import { LINK_NOTICE_MS, type NoticeKind } from './lib/notice'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { StrictMode, act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { DEFAULT_SETTINGS, defaultAppState, defaultFolderState, type AppState, type GithubSyncStatus, type SidebarLens, type TreeResponse, type WindowIdentity } from '@shared/types'
+import { DEFAULT_SETTINGS, defaultAppState, defaultFolderState, type AppState, type GithubSyncStatus, type PickFolderResponse, type SidebarLens, type TreeResponse, type WindowIdentity } from '@shared/types'
 import * as continuity from './lib/renameContinuity'
 import { storage } from './lib/storage'
 
@@ -71,6 +71,7 @@ type IdentityFixture = Omit<WindowIdentity, 'sidebarCollapsed' | 'sidebarLens' |
 
 function installBridge(state: AppState, identity: IdentityFixture) {
   const stateChanged = new Set<(next: AppState) => void>()
+  const menuOpenFolder = new Set<() => void>()
   const menuOpenRoot = new Set<(path: string) => void>()
   const menuSearch = new Set<() => void>()
   const menuSwitchVault = new Set<() => void>()
@@ -96,7 +97,7 @@ function installBridge(state: AppState, identity: IdentityFixture) {
     tree: vi.fn(async (root: string): Promise<TreeResponse> => ({ root, tree: [], generatedAt: 1 })),
     readFile: vi.fn(async (path: string) => ({ path, content: '', mtime: 1, size: 0 })),
     writeFile: vi.fn(async ({ path, content }: { path: string; content: string }) => ({ path, mtime: 2, size: content.length })),
-    pickFolder: vi.fn(async () => ({ cancelled: true as const })),
+    pickFolder: vi.fn(async (): Promise<PickFolderResponse> => ({ cancelled: true })),
     watch: vi.fn(() => () => undefined),
     state: {
       get: vi.fn(async () => state),
@@ -122,10 +123,11 @@ function installBridge(state: AppState, identity: IdentityFixture) {
       open: vi.fn(),
       duplicate: vi.fn(),
       closeSelf: vi.fn(async () => undefined),
+      openRecent: vi.fn(async () => true),
       onFlush: vi.fn(() => () => undefined),
     },
     menu: {
-      onOpenFolder: vi.fn(() => () => undefined),
+      onOpenFolder: menuSub(menuOpenFolder),
       onOpenRoot: vi.fn((l: (path: string) => void) => {
         menuOpenRoot.add(l)
         return () => menuOpenRoot.delete(l)
@@ -190,6 +192,7 @@ function installBridge(state: AppState, identity: IdentityFixture) {
   return {
     bridge,
     emitStateChanged: (next: AppState) => stateChanged.forEach((listener) => listener(next)),
+    emitOpenFolder: () => menuOpenFolder.forEach((l) => l()),
     emitOpenRoot: (path: string) => menuOpenRoot.forEach((l) => l(path)),
     emitSearch: () => menuSearch.forEach((l) => l()),
     emitSwitchVault: () => menuSwitchVault.forEach((l) => l()),
@@ -1050,5 +1053,51 @@ describe('in-app delete (GRO-2272)', () => {
     const before = document.title
     await act(async () => b.emitFileDeleted('/v/somewhere-else.excalidraw'))
     expect(document.title).toBe(before)
+  })
+})
+
+describe('App › Open folder… never swaps a vault window (YAZ-1913 🔒 D2)', () => {
+  it('a vault window hands the picked folder to main\'s open-recent door and keeps its own vault and tabs (S1, S2)', async () => {
+    const { bridge, el, emitOpenFolder } = await mount(defaultAppState(), { id: 'w1', root: '/v', file: '/v/a.excalidraw', tabs: ['/v/a.excalidraw'] })
+    bridge.pickFolder.mockResolvedValueOnce({ path: '/w' })
+    await act(async () => emitOpenFolder())
+    expect(bridge.window.openRecent).toHaveBeenCalledExactlyOnceWith('/w')
+    expect(bridge.tree).not.toHaveBeenCalledWith('/w')
+    expect(bridge.window.setIdentity).not.toHaveBeenCalledWith(expect.objectContaining({ root: '/w' }))
+    expect(el.querySelector('[data-editor]')?.getAttribute('data-path')).toBe('/v/a.excalidraw')
+    expect(document.title).toBe('a — v')
+  })
+
+  it('picking this window\'s own vault goes to the door too (it just raises) — the tabs are not reset (S4)', async () => {
+    const { bridge, el, emitOpenFolder } = await mount(defaultAppState(), { id: 'w1', root: '/v', file: '/v/b.excalidraw', tabs: ['/v/a.excalidraw', '/v/b.excalidraw'] })
+    bridge.pickFolder.mockResolvedValueOnce({ path: '/v' })
+    await act(async () => emitOpenFolder())
+    expect(bridge.window.openRecent).toHaveBeenCalledExactlyOnceWith('/v')
+    expect(el.querySelectorAll('.tabbar [role="tab"]').length).toBe(2)
+    expect(el.querySelector('[data-editor]')?.getAttribute('data-path')).toBe('/v/b.excalidraw')
+  })
+
+  it('a cancelled dialog does nothing (S5)', async () => {
+    const { bridge, emitOpenFolder } = await mount(defaultAppState(), { id: 'w1', root: '/v', file: null, tabs: [] })
+    await act(async () => emitOpenFolder())
+    expect(bridge.pickFolder).toHaveBeenCalledOnce()
+    expect(bridge.window.openRecent).not.toHaveBeenCalled()
+  })
+
+  it('the Welcome window\'s Open folder… button fills it in place, never through the door (S6)', async () => {
+    const { bridge, el } = await mount(defaultAppState(), { id: 'w1', root: null, file: null, tabs: [] })
+    bridge.pickFolder.mockResolvedValueOnce({ path: '/vaults/w' })
+    await act(async () => el.querySelector<HTMLButtonElement>('.welcome .btn--primary')?.click())
+    expect(document.title).toBe('w')
+    expect(bridge.window.setIdentity).toHaveBeenCalledWith(expect.objectContaining({ root: '/vaults/w' }))
+    expect(bridge.window.openRecent).not.toHaveBeenCalled()
+  })
+
+  it('⌘⇧O on the Welcome window also fills it in place (S7)', async () => {
+    const { bridge, emitOpenFolder } = await mount(defaultAppState(), { id: 'w1', root: null, file: null, tabs: [] })
+    bridge.pickFolder.mockResolvedValueOnce({ path: '/vaults/w' })
+    await act(async () => emitOpenFolder())
+    expect(document.title).toBe('w')
+    expect(bridge.window.openRecent).not.toHaveBeenCalled()
   })
 })

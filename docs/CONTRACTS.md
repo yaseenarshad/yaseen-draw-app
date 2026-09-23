@@ -648,13 +648,21 @@ stable. A menu action targets the OS-focused window, else the most recently focu
 (GRO-2197: macOS reports no focused window while the app is not frontmost, and a menu item must
 never silently do nothing).
 
+**🔒 A window with a vault never has its vault swapped (YAZ-1913).** Only an empty Welcome window
+(root `null`) fills itself in place. Every other vault-opening gesture — File › Open Folder… (⌘⇧O),
+the vault switcher's Open folder… row and its vault rows, File › Open Recent — goes through main's
+one open-recent door, `openRecentBeside`: that vault's live windows are raised, or a new window opens
+on its remembered last file. Picked folders decide in the renderer (`App.tsx` `openPicked`, which
+knows its root); Open Recent decides in main (`menu.ts` `openRecent`, from the target window's
+entry).
+
 | Menu | Item | Key |
 |---|---|---|
 | Yaseen Draw | Settings… | ⌘, |
 | File | New Window | ⌘⇧N |
 | File | Switch Vault… | ⌘O |
 | File | Open Folder… | ⌘⇧O |
-| File | Open Recent ▸ | — (⌥-click an entry opens it beside this window) |
+| File | Open Recent ▸ | — (from a vault window it opens beside; Welcome fills in place) |
 | File | Search Vault | ⌘K |
 | File | Export Image… (a drawing tab only) | ⌘⇧E |
 | File | Export Drawing… (a drawing tab only) | ⌘⇧S |

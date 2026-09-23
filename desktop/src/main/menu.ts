@@ -21,8 +21,8 @@ export interface MenuHandlers {
   switchVault(): void
   /** File › Open Folder… (⌘⇧O): the focused window's renderer runs its pick-folder flow. */
   openFolder(): void
-  /** File › Open Recent › item: in place in the focused window; `beside` (⌥-click) in a new one. */
-  openRecent(path: string, beside: boolean): void
+  /** File › Open Recent › item: in place on a Welcome window; beside it otherwise (YAZ-1913 🔒 D1). */
+  openRecent(path: string): void
   /** File › Search Vault (⌘K, YAZ-804): the focused window's renderer focuses its sidebar search bar. */
   search(): void
   /** Yaseen Draw › Settings… (⌘,, YAZ-1679): the focused window's renderer opens its settings dialog. */
@@ -87,9 +87,7 @@ export function buildMenuTemplate({ recents, isDev, activeIsDrawing }: MenuInput
       : recents.map((r, i) => ({
           id: `menu.file.open-recent.${i}`,
           label: r.path,
-          // Electron hands the modifier state of the triggering gesture to click; ⌥ = open beside.
-          // A programmatic `menuItem.click()` passes NO event at all — that opens in place.
-          click: (_item, _win, event) => handlers.openRecent(r.path, event?.altKey === true),
+          click: () => handlers.openRecent(r.path),
         }))
   return [
     // macOS titles the first menu with the running app's name; the label only matters off-mac.
@@ -284,14 +282,15 @@ export function createMenuHandlers(store: Store, windows: MenuWindows, host: Men
     openFolder() {
       host.focusedWebContents()?.send(CH.menuOpenFolder)
     },
-    openRecent(path, beside) {
-      // Beside is the window manager's one open-recent door (YAZ-1767 D1): it probes the directory,
-      // prunes a dead one from the MRU, bumps a live one and opens it on its remembered last file.
-      if (beside) {
-        windows.openRecentBeside(path)
+    openRecent(path) {
+      // A vault window never has its vault swapped (YAZ-1913 🔒 D1): only an empty Welcome window fills in place.
+      if (focusedEntry()?.root === null) {
+        host.focusedWebContents()?.send(CH.menuOpenRoot, path)
         return
       }
-      host.focusedWebContents()?.send(CH.menuOpenRoot, path)
+      // A vault window goes through the one open-recent door (YAZ-1767 D1): raise that vault's
+      // windows, or a new window on its remembered last file.
+      windows.openRecentBeside(path)
     },
     search() {
       host.focusedWebContents()?.send(CH.menuSearch)
