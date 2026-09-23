@@ -12,7 +12,9 @@ import { syncPass } from './sync'
 /**
  * The five guarantees GitHub Sync stands on (YAZ-1081 — Fable-owned, see YAZ-1082 scope 4/4).
  * Implementation issues (YAZ-1085+) must make these pass UNMODIFIED:
- *   1. a rebase conflict is LOSSLESS — the working tree comes back byte-identical
+ *   1. a conflict is LOSSLESS — every byte from both machines survives (merged, or kept as two
+ *      copies — YAZ-1897 D1/D3), and a pass that has to stop anyway leaves the working tree
+ *      byte-identical, a save made while it was stopped included
  *   2. passes on one root never interleave, and a trigger burst coalesces to ONE follow-up
  *   3. a disabled root produces ZERO git activity, no matter what the watcher sees
  *   4. a machine with no git classifies `attention/no-git` instead of throwing
@@ -78,19 +80,41 @@ async function pushFromB(bin: string, bDir: string, content: string): Promise<vo
   }
 }
 
-describe('guarantee 1: a rebase conflict is lossless', { timeout: REAL_GIT_TIMEOUT_MS }, () => {
-  it('aborts back to a byte-identical working tree and reports attention/conflict', async () => {
+describe('guarantee 1: a conflict is lossless', { timeout: REAL_GIT_TIMEOUT_MS }, () => {
+  it('keeps both versions of a file both machines changed, and finishes the pass (YAZ-1897 D3)', async () => {
     const { bin, a, bDir } = await twoClonesOneRemote()
     await pushFromB(bin, bDir, 'line one CHANGED ON B\nline two\n')
     await a.write('note.md', 'line one CHANGED ON A\nline two\n')
+
+    const status = await syncPass(a.root)
+
+    expect(status.state).toBe('synced')
+    const copy = status.merged?.[0]?.copy ?? ''
+    expect(status.merged).toEqual([{ path: 'note.md', author: 'other', clashes: 0, copy: expect.stringMatching(/^note \(conflict, \d{4}-\d{2}-\d{2}\)\.md$/) }])
+    const files = snapshot(a.root)
+    expect(files.get('note.md')).toBe('line one CHANGED ON B\nline two\n')
+    expect(files.get(copy)).toBe('line one CHANGED ON A\nline two\n')
+    expect((await git(bin, a.root, ['status'])).stdout).not.toMatch(/rebase in progress/i)
+  })
+
+  it('aborts back to a byte-identical working tree when the merge cannot be committed, keeping a save made mid-rebase', async () => {
+    const { bin, a, bDir } = await twoClonesOneRemote()
+    await pushFromB(bin, bDir, 'line one CHANGED ON B\nline two\n')
+    await a.write('note.md', 'line one CHANGED ON A\nline two\n')
+    await a.write('other.md', 'saved before\n')
+    await a.run(['add', '-A'])
+    await a.run(['commit', '-m', 'local work'])
+    // A user hook that refuses any commit made while a rebase is stopped — and, standing in for the
+    // app's autosave, writes a board exactly then. The merge cannot be committed, so the pass aborts.
+    const hook = path.join(a.root, '.git', 'hooks', 'pre-commit')
+    await writeFile(hook, `#!/bin/sh\nif [ -d "$(git rev-parse --git-dir)/rebase-merge" ]; then echo "saved mid-rebase" > other.md; exit 1; fi\n`, { mode: 0o755 })
     const before = snapshot(a.root)
 
     const status = await syncPass(a.root)
 
     expect(status.state).toBe('attention')
     expect(status.attention).toBe('conflict')
-    expect(snapshot(a.root)).toEqual(before)
-    // No half-finished rebase left behind.
+    expect(snapshot(a.root)).toEqual(new Map([...before, ['other.md', 'saved mid-rebase\n']]))
     const st = await git(bin, a.root, ['status'])
     expect(st.stdout).not.toMatch(/rebase in progress/i)
   })

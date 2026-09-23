@@ -156,3 +156,6 @@ export function git(bin: string, root: string, args: string[], opts: { timeoutMs
     }
   })
 }
+
+/** One `-z` listing as paths; a failed listing is an empty one (a guard built on it is then a no-op, never a stop). */
+export const zList = (res: GitResult): string[] => (res.code === 0 ? res.stdout.split('\0').filter((p) => p !== '') : [])
