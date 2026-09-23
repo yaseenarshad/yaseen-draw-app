@@ -7,6 +7,8 @@ import { CH, type Envelope } from '../../channels'
 import { registerStorageIpc } from './storage'
 
 vi.mock('electron', () => ({ ipcMain: { handle: vi.fn(), on: vi.fn() } }))
+// electron-vite's `?modulePath` is a build-time import; here it is the same worker, bundled by the fixture.
+vi.mock('../git/storageWorker?modulePath', async () => ({ default: await (await import('../git/gitFixture')).bundleStorageWorker() }))
 
 /** The `storage.*` doors (YAZ-1801): requests are checked like request bodies before any walk or rewrite. */
 
