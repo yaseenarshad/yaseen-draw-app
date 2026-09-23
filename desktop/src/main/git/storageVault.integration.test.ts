@@ -15,6 +15,8 @@ import { syncPass } from './sync'
  * version of the vault `tools/seedStorageDemoVault.mjs` builds (📋 YAZ-1801). The two files over
  * the 95 MiB line are the real size: the `.mov` is sparse, and the board's pictures are runs of
  * one byte, so writing, parsing and committing them stays cheap. No Playwright, no app.
+ *
+ * The `it`s are ORDERED STEPS over one vault (each builds on the last), so run the file, not one test.
  */
 
 const MiB = 1024 * 1024

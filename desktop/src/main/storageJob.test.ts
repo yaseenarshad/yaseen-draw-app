@@ -40,6 +40,16 @@ async function longestStall(work: () => Promise<unknown>): Promise<number> {
   return Math.max(longest, performance.now() - last)
 }
 
+/**
+ * The fixture is heavy enough to freeze the loop in-thread; off it, the loop barely notices.
+ * RELATIVE, not wall-clock: a busy machine (the full suite runs files in parallel) stretches both
+ * runs, so the claim is "the worker run stalls far less than the same work in-thread".
+ */
+function expectOffThread(blocked: number, stalled: number): void {
+  expect(blocked).toBeGreaterThan(100)
+  expect(stalled).toBeLessThan(blocked / 3)
+}
+
 const png = (fill: string) => ({ mimeType: 'image/png', dataURL: `data:image/png;base64,${fill.repeat(1000)}` })
 // What freezes a parse is many small objects, not one long string: ~20 MB of freedraw strokes
 // takes V8 a few hundred ms, while 40 MB of base64 in one string takes ~20.
@@ -80,9 +90,7 @@ describe('runOffThread (YAZ-1801 D8, 🔒 D11)', { timeout: REAL_GIT_TIMEOUT_MS 
     const stalled = await longestStall(async () => (offThread = await runOffThread(worker, { kind: 'stats', root: repo.root })))
 
     expect(offThread).toEqual(inThread)
-    // The fixture is heavy enough to freeze the loop in-thread; off it, the loop barely notices.
-    expect(blocked).toBeGreaterThan(150)
-    expect(stalled).toBeLessThan(60)
+    expectOffThread(blocked, stalled)
   })
 
   it('shrink: the same result and the same files as the direct call, skip list honoured, while the event loop keeps turning', async () => {
@@ -101,8 +109,7 @@ describe('runOffThread (YAZ-1801 D8, 🔒 D11)', { timeout: REAL_GIT_TIMEOUT_MS 
     expect(inThread).toMatchObject({ shrunk: 1, skipped: 2 })
     expect(offThread).toEqual(inThread)
     expect(await contents(viaWorker)).toEqual(await contents(direct))
-    expect(blocked).toBeGreaterThan(150)
-    expect(stalled).toBeLessThan(60)
+    expectOffThread(blocked, stalled)
   })
 
   it('rejects, rather than hanging, when the worker cannot do the job', async () => {
