@@ -283,9 +283,9 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const openSettings = useCallback(() => setSettingsOpen(true), [])
   const closeSettings = useCallback(() => setSettingsOpen(false), [])
-  // Settings › Storage (YAZ-1801 D1): measured when its page opens, on a root change, and after every
-  // finished sync pass (a commit moves the git numbers). App's, beside `githubSync`, for the same one-per-window reason.
-  const vaultStorage = useVaultStorage(root, syncState)
+  // Settings › Storage (YAZ-1801 D1, 🔒 D13): measured only while Settings is open — on its page's
+  // open, a sync pass finishing, and a shrink. A closed dialog hands the hook no sync state at all.
+  const vaultStorage = useVaultStorage(root, settingsOpen ? syncState : null)
 
   // File › Open Folder… / Open Recent (GRO-2161) reuse the same flows as the in-app buttons;
   // File › Close Tab and Window › Next/Previous Tab (GRO-2232) drive the tab model.
