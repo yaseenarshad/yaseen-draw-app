@@ -1917,7 +1917,7 @@ describe('context menu order (GRO-2272 C1a)', () => {
       // The favorite toggle (YAZ-1766 D3) leads the "Open in ▸" group, one hairline above Delete.
       'Add to favorites',
       'Open in',
-      // Share… (YAZ-1799 D6) and Info (🔒 YAZ-1835 D6) sit in Delete's group; Info stays right above it.
+      // Share (YAZ-1799 D6) and Info (🔒 YAZ-1835 D6) sit in Delete's group; Info stays right above it.
       'Share',
       'Info',
       'Delete',

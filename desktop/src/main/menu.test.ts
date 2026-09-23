@@ -206,13 +206,14 @@ describe('buildMenuTemplate', () => {
     expect(menuOf(build(RECENTS, false, handlers, false), 'File').find((i) => i.id === 'menu.file.share-link')?.enabled).toBe(false)
   })
 
-  it('⌘⇧S is claimed by nothing else in the menu bar', () => {
+  it('⌘⇧S and ⌘⇧L are claimed by nothing else in the menu bar', () => {
     const accelerators = build()
       .flatMap((top) => (Array.isArray(top.submenu) ? (top.submenu as MenuItemConstructorOptions[]) : []))
       .flatMap((item) => [item, ...(Array.isArray(item.submenu) ? (item.submenu as MenuItemConstructorOptions[]) : [])])
       .map((item) => item.accelerator)
       .filter((a): a is string => a !== undefined)
     expect(accelerators.filter((a) => a === 'CmdOrCtrl+Shift+S')).toEqual(['CmdOrCtrl+Shift+S'])
+    expect(accelerators.filter((a) => a === 'CmdOrCtrl+Shift+L')).toEqual(['CmdOrCtrl+Shift+L'])
   })
 
   it('View › Canvas Background carries the engine`s five picks, gated the same way (🔒 YAZ-1775 D10)', () => {

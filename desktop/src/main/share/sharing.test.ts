@@ -227,11 +227,12 @@ describe('sharing (YAZ-1799) against the real Worker', () => {
     const first = await sharing.publish(vault, board(), '{"v":1}')
     await sharing.setPermission(vault, board(), false)
     bucket.objects.clear()
-    expect((await sharing.list(vault))[0]).toMatchObject({ id: first.id, live: 'missing' })
+    expect((await sharing.list(vault))[0]).toMatchObject({ id: first.id, live: 'missing', stale: true })
+    expect(await sharing.get(vault, board())).toMatchObject({ stale: true }) // the Share dialog sees it too
     workerCalls = []
     await sharing.publish(vault, board(), '{"v":2}', first.id)
     expect(puts()).toEqual([{ method: 'PUT', route: `/api/boards/${first.id}`, allow: '0' }]) // a create on the Worker: it needs the flag
-    expect((await sharing.list(vault))[0]).toMatchObject({ id: first.id, live: 'live', allowDownload: false })
+    expect((await sharing.list(vault))[0]).toMatchObject({ id: first.id, live: 'live', allowDownload: false, stale: false })
     expect((await fakeFetch(`${ORIGIN}/raw/${first.id}`)).status).toBe(403)
     workerCalls = []
     await sharing.publish(vault, board(), '{"v":3}', first.id)

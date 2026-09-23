@@ -89,6 +89,8 @@ export interface ShareEntry {
   /** When the link last got a successful upload. */
   updatedAt: number
   sync: ShareSync
+  /** The Worker last answered 404 for this link (a Settings check or a permission change): its copy is gone until the next save puts it back. */
+  stale: boolean
 }
 
 /** A Settings list row: the record plus two checks — is the board still there, is the link still live. */

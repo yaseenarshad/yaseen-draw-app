@@ -1,6 +1,6 @@
 /*
- * Share link (YAZ-1799, prototype): the Share dialog and the Settings › Sharing page. Themed only
- * through app.css's tokens, so dark mode needs no rule of its own.
+ * Share link (YAZ-1799): the Share dialog and the Settings › Sharing page. Themed only through
+ * app.css's tokens, so dark mode needs no rule of its own.
  */
 
 .share-overlay {
@@ -60,7 +60,6 @@
 }
 
 .share-dialog__text,
-.share-setup-note p,
 .share-confirm p {
   margin: 0 0 12px;
 }
@@ -71,19 +70,7 @@
   color: var(--fg-muted);
 }
 
-.share-dialog__live {
-  margin: 8px 0 0;
-  font-size: 13px;
-  color: var(--ok);
-}
-
-.share-dialog__progress {
-  margin: 12px 0 0;
-  color: var(--accent);
-}
-
 .share-dialog__error,
-.share-dialog__warn,
 .share-dialog__ok {
   margin: 12px 0 0;
   padding: 8px 10px;
@@ -94,12 +81,6 @@
 .share-dialog__error {
   color: var(--danger);
   background: color-mix(in srgb, var(--danger) 10%, transparent);
-}
-
-.share-dialog__warn {
-  color: var(--notice-fg);
-  background: var(--notice-bg);
-  border: 1px solid var(--notice-border);
 }
 
 .share-dialog__ok {
@@ -114,7 +95,6 @@
   margin-top: 16px;
 }
 
-.share-setup-note,
 .share-confirm {
   margin-top: 12px;
   padding: 12px;
@@ -125,38 +105,6 @@
 
 .share-confirm .share-dialog__actions {
   margin-top: 0;
-}
-
-.share-link__label {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--fg-muted);
-}
-
-.share-link__row {
-  display: flex;
-  gap: 6px;
-}
-
-.share-link__item + .share-link__item {
-  margin-top: 10px;
-}
-
-.share-link__hint {
-  font-weight: 400;
-}
-
-.share-link__url {
-  flex: 1;
-  min-width: 0;
-  padding: 6px 8px;
-  font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: var(--fg);
-  background: var(--bg-side);
-  border: 1px solid var(--border);
-  border-radius: 6px;
 }
 
 .share-btn {
@@ -377,7 +325,7 @@
   border-radius: 4px;
 }
 
-/* ---------- Share dialog: General access (the Google Docs block) ---------- */
+/* ---------- Share dialog: General access ---------- */
 
 .share-access__label {
   margin: 0 0 10px;
@@ -428,10 +376,6 @@
   color: var(--fg-muted);
 }
 
-.share-access__perm {
-  flex: none;
-}
-
 /* A borderless text button with a chevron — it opens the app's own popover (`.ctx-menu`). The
    negative margin lines its TEXT up with the helper line below while the hover pill overhangs. */
 .share-picker {
@@ -466,29 +410,21 @@
   color: var(--fg-muted);
 }
 
-.share-access__perm .share-picker {
+.share-picker--right {
+  flex: none;
   margin-left: 0;
   font-weight: 400;
 }
 
-/* Above the share overlay (z 80); otherwise exactly the sidebar's menu. */
+/* Above the share overlay (z 80); otherwise exactly the sort menu, ✓ and all. The arrow keys
+   move focus, so the focused item wears the hover fill. */
 .ctx-menu.share-menu {
   z-index: 90;
 }
 
-.share-menu .ctx-menu__item:focus {
-  outline: none;
-}
-
-.share-menu .ctx-menu__item:hover,
 .share-menu .ctx-menu__item:focus-visible {
+  outline: none;
   background: var(--accent-soft);
-}
-
-.share-menu .ctx-menu__item[data-hint]::after {
-  opacity: 1;
-  font-size: 13px;
-  color: var(--accent);
 }
 
 /* The one status line: a small coloured dot, then the words. */
@@ -540,6 +476,7 @@
 }
 
 .share-dialog__footer .share-btn--primary {
+  margin-left: auto; /* right-aligned even alone (the not-set-up footer) */
   padding: 5px 18px;
   border-radius: 999px;
 }

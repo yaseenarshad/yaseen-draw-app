@@ -308,7 +308,7 @@ export function createSharing(deps: SharingDeps): Sharing {
   async function entryFor(root: string, key: string, rec: ShareRecord): Promise<ShareEntry> {
     const origin = linkOrigin(await readConfig())
     const abs = absFromKey(root, key)
-    return { path: abs, ...links(origin, rec), sharedAt: rec.sharedAt, updatedAt: rec.updatedAt, sync: syncOf(rec.id) }
+    return { path: abs, ...links(origin, rec), sharedAt: rec.sharedAt, updatedAt: rec.updatedAt, sync: syncOf(rec.id), stale: stale.has(rec.id) }
   }
 
   async function get(root: string, path: string): Promise<ShareEntry | null> {
@@ -338,7 +338,7 @@ export function createSharing(deps: SharingDeps): Sharing {
             live = 'unknown'
           }
         }
-        return { path: abs, ...links(origin, rec), sharedAt: rec.sharedAt, updatedAt: rec.updatedAt, sync: syncOf(rec.id), fileExists, live }
+        return { path: abs, ...links(origin, rec), sharedAt: rec.sharedAt, updatedAt: rec.updatedAt, sync: syncOf(rec.id), stale: stale.has(rec.id), fileExists, live }
       }),
     ).then((rows) => rows.sort((a, b) => b.updatedAt - a.updatedAt))
   }
