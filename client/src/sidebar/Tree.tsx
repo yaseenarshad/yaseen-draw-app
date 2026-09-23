@@ -108,7 +108,24 @@ interface TreeProps {
    * leaving (null). The Sidebar owns the dwell and the panel. Absent = previews off.
    */
   onHoverFile?: (node: FileNode | null) => void
+  /** YAZ-1801 D3: absolute paths held back from sync as over GitHub's limit; their rows get the cloud-off icon. */
+  tooLarge?: ReadonlySet<string>
   depth?: number
+}
+
+/** The one sentence the cloud-off icon says, on hover and to a screen reader (YAZ-1801 D3). */
+export const TOO_LARGE_LABEL = "Over GitHub's 100 MB limit — only on this Mac"
+
+/** A broken cloud (cloud-off): red, right of the name, on a file sync held back. */
+function CloudOffIcon() {
+  return (
+    <span className="tree__too-large" role="img" aria-label={TOO_LARGE_LABEL} title={TOO_LARGE_LABEL}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M22.61 16.95A5 5 0 0 0 18 10h-1.26a8 8 0 0 0-7.05-6M5 5a8 8 0 0 0 4 15h9a5 5 0 0 0 1.7-.3" />
+        <line x1="1" y1="1" x2="23" y2="23" />
+      </svg>
+    </span>
+  )
 }
 
 export function Tree({
@@ -127,9 +144,10 @@ export function Tree({
   selection,
   reorder,
   onHoverFile,
+  tooLarge,
   depth = 0,
 }: TreeProps) {
-  const recurse = { expanded, activeFile, onToggle, onOpenFile, onOpenFileBackground, onOpenDefault, onNodeContextMenu, pending, renaming, move, selection, reorder, onHoverFile }
+  const recurse = { expanded, activeFile, onToggle, onOpenFile, onOpenFileBackground, onOpenDefault, onNodeContextMenu, pending, renaming, move, selection, reorder, onHoverFile, tooLarge }
   // The reorder gesture lives on depth-0 rows alone; deeper rows of a reorderable tree drag nothing.
   const rowReorder = reorder !== undefined && depth === 0 ? reorder : null
   // What a FILE row's drag does: move on disk (E1b) on an ordinary tree, reorder at depth 0 of a reorderable one, nothing below that.
@@ -270,6 +288,7 @@ export function Tree({
               }}
             >
               <span className="tree__label">{stripExt(node.name)}</span>
+              {tooLarge?.has(node.path) === true && <CloudOffIcon />}
             </button>
           </li>
         ),

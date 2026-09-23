@@ -309,6 +309,8 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasPrefs, 
           retired.current = true
           autosave.current?.dispose()
         },
+        // YAZ-1801: Settings › Storage's shrink skips a board this tab has unsaved edits on.
+        dirty: () => autosave.current?.dirty === true,
       }),
     [path],
   )

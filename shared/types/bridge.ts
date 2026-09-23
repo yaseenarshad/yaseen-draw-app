@@ -5,7 +5,7 @@ import type { DrawingApi } from './drawing'
 import type { BridgeErrorCode } from './errors'
 import type { CreateDirResponse, CreateFileRequest, CreateFileResponse, DialogApi, FileClipRequest, FileClipState, FileRenamedEvent, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, TreeResponse, WatchEvent } from './files'
 import type { ComponentsApi, MediaApi, SecretsApi } from './library'
-import type { FavoritesApi, GithubApi } from './vault'
+import type { FavoritesApi, GithubApi, StorageApi } from './vault'
 
 /**
  * Every bridge promise rejects with a plain object satisfying `BridgeError` (the preload
@@ -301,4 +301,6 @@ export interface YaseenDrawApi {
   secrets: SecretsApi
   /** Per-vault GitHub sync, off by default (YAZ-1081). */
   github: GithubApi
+  /** Settings › Storage: what the vault weighs, and moving legacy pictures out of boards (YAZ-1801). */
+  storage: StorageApi
 }

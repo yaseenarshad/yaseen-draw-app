@@ -92,6 +92,9 @@ export const CH = {
   githubSyncNow: 'github:sync-now',
   githubSetEnabled: 'github:set-enabled',
   githubStatusChanged: 'github:status-changed',
+  // Settings › Storage (YAZ-1801): sizes from the disk + local git, and the legacy-picture shrink.
+  storageStats: 'storage:stats',
+  storageShrink: 'storage:shrink',
   appFlush: 'app:flush',
   appFlushed: 'app:flushed',
 } as const

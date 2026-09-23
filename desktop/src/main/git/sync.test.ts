@@ -1,10 +1,11 @@
 import { existsSync } from 'node:fs'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, truncate, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GIT_TIMEOUT_CODE, git, type GitResult } from './exec'
 import { makeBareRemote, makeGitRepo, REAL_GIT_TIMEOUT_MS, requireGit, wireOrigin, type BareRemote, type GitRepo } from './gitFixture'
+import { GITHUB_FILE_LIMIT_BYTES } from '@shared/types'
 import { classifyGitFailure, commitMessage, syncPass } from './sync'
 
 /**
@@ -114,6 +115,70 @@ describe('syncPass', { timeout: REAL_GIT_TIMEOUT_MS }, () => {
     expect((await syncPass(repo.root)).state).toBe('synced')
 
     expect(existsSync(path.join(repo.root, '.gitignore'))).toBe(false)
+  })
+
+  // ---------- YAZ-1801 D3: a file over GitHub's limit never jams the rest ----------
+
+  /** A SPARSE file just over the guard: `truncate` sets the size without writing a byte, so this costs nothing. */
+  async function oversize(repo: GitRepo, name: string): Promise<void> {
+    await repo.write(name, '')
+    await truncate(path.join(repo.root, name), GITHUB_FILE_LIMIT_BYTES + 1)
+  }
+
+  it('holds an oversize file back, commits and pushes everything else, and says so as attention/too-large', async () => {
+    const { repo, remote } = await pushedRepo()
+    await repo.write('small.md', '# small\n')
+    await oversize(repo, 'Folder/Huge board.excalidraw')
+
+    const status = await syncPass(repo.root)
+
+    expect(status).toMatchObject({ state: 'attention', attention: 'too-large', tooLarge: ['Folder/Huge board.excalidraw'] })
+    expect(status.message).toContain('Huge board.excalidraw')
+    const tracked = await repo.run(['ls-files'])
+    expect(tracked).toContain('small.md')
+    expect(tracked).not.toContain('Huge board')
+    // The rest really went: the remote has our commit, and its subject does not name the held-back file.
+    expect(await remoteHead(repo, remote)).toBe(await repo.run(['rev-parse', 'HEAD']))
+    expect(await repo.run(['log', '-1', '--format=%s'])).toBe('sync: small.md')
+    // Never even hashed: excluded BEFORE the add, so no 95 MB blob lands in .git/objects.
+    expect(await repo.run(['count-objects'])).toMatch(/, \d+ kilobytes$/)
+    expect(Number(/(\d+) kilobytes/.exec(await repo.run(['count-objects']))?.[1])).toBeLessThan(1024)
+  })
+
+  it('is idempotent: a second pass holds the same file back, makes no commit, and does not fail on "nothing to commit"', async () => {
+    const { repo } = await pushedRepo()
+    await oversize(repo, 'Big video.mov')
+    const head = await repo.run(['rev-parse', 'HEAD'])
+
+    const first = await syncPass(repo.root)
+    const second = await syncPass(repo.root)
+
+    for (const status of [first, second]) expect(status).toMatchObject({ state: 'attention', attention: 'too-large', tooLarge: ['Big video.mov'] })
+    // The ONLY dirty file was oversize: nothing was staged, so nothing was committed.
+    expect(await repo.run(['rev-parse', 'HEAD'])).toBe(head)
+    expect(await repo.run(['diff', '--cached', '--name-only'])).toBe('')
+  })
+
+  it('holds back a TRACKED file that grew past the limit; the committed version stays as it was', async () => {
+    const { repo } = await pushedRepo()
+    await truncate(path.join(repo.root, 'note.md'), GITHUB_FILE_LIMIT_BYTES + 1)
+
+    const status = await syncPass(repo.root)
+
+    expect(status).toMatchObject({ attention: 'too-large', tooLarge: ['note.md'] })
+    expect(await repo.run(['show', 'HEAD:note.md'])).toBe('line one')
+  })
+
+  it('clears once the file is gone: the next pass is plain synced, with no list', async () => {
+    const { repo } = await pushedRepo()
+    await oversize(repo, 'Huge.excalidraw')
+    expect((await syncPass(repo.root)).attention).toBe('too-large')
+
+    await unlink(path.join(repo.root, 'Huge.excalidraw'))
+    const status = await syncPass(repo.root)
+
+    expect(status.state).toBe('synced')
+    expect(status.tooLarge).toBeUndefined()
   })
 
   it('summarises past three files in the subject', async () => {

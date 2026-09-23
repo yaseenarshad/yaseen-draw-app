@@ -156,6 +156,11 @@ const api: YaseenDrawApi = {
     setEnabled: (root, enabled) => call(CH.githubSetEnabled, root, enabled),
     onStatus: on<GithubSyncStatus>(CH.githubStatusChanged),
   },
+  // Settings › Storage (YAZ-1801): read-only sizes, and the one rewrite (legacy pictures → assets/).
+  storage: {
+    stats: (root) => call(CH.storageStats, root),
+    shrink: (root, skip) => call(CH.storageShrink, root, skip),
+  },
 }
 
 contextBridge.exposeInMainWorld('yaseenDraw', api)
