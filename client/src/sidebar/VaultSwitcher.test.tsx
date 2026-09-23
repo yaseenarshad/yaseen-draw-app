@@ -3,8 +3,9 @@
  * D3 the current vault is a row (`aria-current`), D4 "Open folder…" last, D5 dead folders stay in
  * an open panel, D6 the one-line trigger, D7 the filter/keyboard model (ranking, default
  * highlight skipping the current vault, clamp, Enter, Esc, focus never leaving the input), D8 the
- * ⌘O request. Every open goes through the mocked `window.yaseenDraw.window.openRecent` — the one
- * back-end door (D1); nothing here ever opens in place.
+ * ⌘O request. Every CLICK goes through the mocked `window.yaseenDraw.window.openRecent` — the one
+ * back-end door (D1). The right-click menu (YAZ-1941, ported from Docs YAZ-1798) is pinned at the
+ * bottom: its "Open in this window" is the only in-place open, through the `onOpenHere` prop.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { StrictMode, act } from 'react'
@@ -49,7 +50,17 @@ afterEach(() => {
 type Props = Parameters<typeof VaultSwitcher>[0]
 
 function render(over: Partial<Props> = {}) {
-  const props: Props = { root: ROOT, onPickFolder: vi.fn(), pickDisabled: false, openRequest: 0, ...over }
+  const props: Props = {
+    root: ROOT,
+    onPickFolder: vi.fn(),
+    pickDisabled: false,
+    openRequest: 0,
+    onOpenHere: vi.fn(async () => true),
+    onReveal: vi.fn(),
+    onOpenVsCode: vi.fn(),
+    onNotice: vi.fn(),
+    ...over,
+  }
   const draw = (next: Partial<Props>) => {
     Object.assign(props, next)
     act(() =>
@@ -412,5 +423,126 @@ describe('VaultSwitcher: pure helpers', () => {
     expect(defaultHighlight([], '', '/v/cur')).toBe(0)
     expect(defaultHighlight(list, 'a', '/v/cur')).toBe(0)
     expect(defaultHighlight([], 'zzz', '/v/cur')).toBe(0)
+  })
+})
+
+describe('VaultSwitcher: the right-click menu (YAZ-1798)', () => {
+  const vaultMenu = () => document.querySelector<HTMLElement>('.ctx-overlay .ctx-menu')
+  const menuLabels = () => [...(vaultMenu()?.querySelectorAll('.ctx-menu__item') ?? [])].map((b) => b.textContent)
+  const menuItem = (label: string) => [...(vaultMenu()?.querySelectorAll<HTMLButtonElement>('.ctx-menu__item') ?? [])].find((b) => b.textContent === label)!
+  /** Dispatches a right-click and reports whether the native menu was swallowed (G1). */
+  const rightClick = (target: HTMLElement) => {
+    const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 40, clientY: 50 })
+    act(() => void target.dispatchEvent(e))
+    return e.defaultPrevented
+  }
+  const pick = (label: string) => act(() => menuItem(label).click())
+  const OTHER = RECENTS[2].path // '/v/Archive'
+  const otherRow = (el: HTMLElement) => rows(el)[2]
+
+  it('the trigger opens the CURRENT vault\'s menu (no Open in this window, no Remove) and leaves the panel closed; the native menu is swallowed', () => {
+    const { el } = render()
+    expect(rightClick(trigger(el))).toBe(true)
+    expect(menuLabels()).toEqual(['Copy vault name', 'Copy path', 'Reveal in Finder', 'Open in VS Code'])
+    expect(panel(el)).toBeNull()
+  })
+
+  it('the current vault\'s own row gets the same four; another row gets all seven — and the highlight never moves', () => {
+    const { el } = render()
+    openPanel(el)
+    const before = activeRow(el)
+    rightClick(rows(el)[0])
+    expect(menuLabels()).toEqual(['Copy vault name', 'Copy path', 'Reveal in Finder', 'Open in VS Code'])
+    act(() => void window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+    rightClick(otherRow(el))
+    expect(menuLabels()).toEqual(['Open in this window', 'Copy vault name', 'Copy path', 'Reveal in Finder', 'Open in VS Code', 'Remove from recent vaults'])
+    expect(activeRow(el)).toBe(before)
+  })
+
+  it('Reveal in Finder / Open in VS Code hand the row\'s path to the Sidebar\'s verbs; the menu closes, the panel stays', () => {
+    const { el, props } = render()
+    openPanel(el)
+    rightClick(otherRow(el))
+    pick('Reveal in Finder')
+    expect(props.onReveal).toHaveBeenCalledWith(OTHER)
+    expect(vaultMenu()).toBeNull()
+    expect(panel(el)).not.toBeNull()
+    rightClick(otherRow(el))
+    pick('Open in VS Code')
+    expect(props.onOpenVsCode).toHaveBeenCalledWith(OTHER)
+  })
+
+  it('Copy vault name writes the basename and confirms through onNotice', async () => {
+    const writeText = vi.fn(async () => undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    const { el, props } = render()
+    openPanel(el)
+    rightClick(otherRow(el))
+    pick('Copy vault name')
+    await settle()
+    expect(writeText).toHaveBeenCalledWith('Archive')
+    expect(props.onNotice).toHaveBeenCalledWith('Copied vault name')
+  })
+
+  it('Remove from recent vaults forgets the MRU entry and drops the row at once; the panel stays with the filter focused', () => {
+    const remove = vi.spyOn(storage, 'removeRecentRoot').mockImplementation(() => undefined)
+    const { el } = render()
+    openPanel(el)
+    rightClick(otherRow(el))
+    pick('Remove from recent vaults')
+    expect(remove).toHaveBeenCalledWith(OTHER)
+    expect(rows(el).map((r) => r.querySelector('.vault-switcher__path')?.textContent)).not.toContain(OTHER)
+    expect(panel(el)).not.toBeNull()
+    expect(document.activeElement).toBe(filter(el))
+    remove.mockRestore()
+  })
+
+  it('Open in this window goes through onOpenHere (never openRecent) and closes the panel on success', async () => {
+    const { el, props } = render()
+    openPanel(el)
+    rightClick(otherRow(el))
+    pick('Open in this window')
+    await settle()
+    expect(props.onOpenHere).toHaveBeenCalledWith(OTHER)
+    expect(openRecent).not.toHaveBeenCalled()
+    expect(panel(el)).toBeNull()
+  })
+
+  it('Open in this window on a folder that is gone (false) greys the row like a click does; the panel stays — and the dead row then gets no menu', async () => {
+    const { el } = render({ onOpenHere: vi.fn(async () => false) })
+    openPanel(el)
+    rightClick(otherRow(el))
+    pick('Open in this window')
+    await settle()
+    expect(otherRow(el).disabled).toBe(true)
+    expect(otherRow(el).querySelector('.vault-switcher__when')?.textContent).toBe(MISSING_TEXT)
+    expect(panel(el)).not.toBeNull()
+    expect(rightClick(otherRow(el))).toBe(true)
+    expect(vaultMenu()).toBeNull()
+  })
+
+  it('layers (D4): Esc closes only the menu, the next Esc the panel; ↑/↓/⏎ never reach the panel while the menu stands', () => {
+    const { el } = render()
+    openPanel(el)
+    const before = activeRow(el)
+    rightClick(otherRow(el))
+    key(el, 'ArrowDown')
+    key(el, 'Enter')
+    expect(activeRow(el)).toBe(before)
+    expect(openRecent).not.toHaveBeenCalled()
+    key(el, 'Escape')
+    expect(vaultMenu()).toBeNull()
+    expect(panel(el)).not.toBeNull()
+    key(el, 'Escape')
+    expect(panel(el)).toBeNull()
+  })
+
+  it('layers (D4): a click outside the menu closes only the menu', () => {
+    const { el } = render()
+    openPanel(el)
+    rightClick(otherRow(el))
+    act(() => void document.querySelector('.ctx-overlay')!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })))
+    expect(vaultMenu()).toBeNull()
+    expect(panel(el)).not.toBeNull()
   })
 })

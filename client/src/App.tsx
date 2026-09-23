@@ -217,7 +217,9 @@ export function App() {
   }, [root, file])
 
   /**
-   * Switch this window to `path` in place (C3, GRO-2165). Resolves false — and drops the dead
+   * Switch this window to `path` in place (C3, GRO-2165) — the WELCOME window, and the vault menu's
+   * explicit "Open in this window" (YAZ-1941 D2); every other open from a vault window goes beside
+   * (YAZ-1913). Resolves false — and drops the dead
    * MRU entry — when the folder is gone on disk (C2), leaving the window as it is; any other
    * probe failure still switches, and the sidebar surfaces the error.
    */
@@ -598,6 +600,8 @@ export function App() {
           onSearchFocusHandled={searchFocusHandled}
           // ⌘O (YAZ-1767 D8): only a request made on THIS root counts; any other reads as none.
           switcherOpenRequest={switcherRequest.root === root ? switcherRequest.seq : 0}
+          // The vault menu's "Open in this window" (YAZ-1941 D2): the one deliberate in-place switch.
+          onOpenVaultHere={openRoot}
         />
       )}
       {root !== null && !sidebarCollapsed && <div className={`sidebar-resize${resizing ? ' sidebar-resize--active' : ''}`} aria-hidden onMouseDown={startSidebarResize} />}
