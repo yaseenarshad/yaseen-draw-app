@@ -1,27 +1,28 @@
 /**
- * THE SHARE DIALOG (YAZ-1799 D6, prototype) — the Google Docs model Yasin approved. ONE dialog
- * behind both entry points (File › Share Link ⌘⇧L, sidebar right-click "Share"):
+ * THE SHARE DIALOG (YAZ-1799 D6) — the Google Docs model Yasin approved. ONE dialog behind both
+ * entry points (File › Share Link ⌘⇧L, sidebar right-click "Share"):
  *
  *   Share "<board>"                                          ✕
  *   General access
  *   (🌐)  Anyone with the link ▾               View and download ▾
- *         Anyone on the internet with the link can view and download
+ *         Anyone on the internet with this link can view and download
  *   ● Up to date · yesterday
  *   [🔗 Copy link]                                           [Done]
  *
- * The two pickers are borderless text buttons that open the app's own popover
- * (`ContextMenuSurface`, `.ctx-menu__item`, the sort menu's ✓ hint) — not native selects.
+ * "Anyone with the link" shares the board (the Export Drawing file, uploaded, "View and download"
+ * by default); "Not shared" deletes it and the link dies at once. The permission flips a flag on
+ * the SAME link without re-uploading; the Worker enforces it. Every save of a shared board
+ * re-uploads by itself (`liveShare.ts`), so the status line only reports.
  *
- * "Anyone with the link" creates the share (the Export Drawing file, uploaded); "Not shared"
- * deletes it (the link dies at once) — no separate Stop button, no confirm. The "can …" choice
- * flips a flag on the SAME link without re-uploading; the Worker enforces it. Every save of a
- * shared board re-uploads by itself (`liveShare.ts`), so the status line only reports.
+ * MODAL KEYS: focus moves in the moment the dialog mounts (not once it has loaded), Tab cycles
+ * inside it, and a window capture listener swallows any key aimed OUTSIDE it — nothing typed while
+ * it is open reaches the sidebar tree or the canvas behind.
  *
  * Main owns every Cloudflare detail; the dialog never sees a token or a password.
  */
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { ContextMenuSurface } from '../components/ContextMenuSurface'
-import { TriangleIcon } from '../components/icons'
+import { GlobeIcon, LinkIcon, LockIcon, TriangleIcon } from '../components/icons'
 import { MAX_SHARE_BYTES, type ShareEntry, type ShareStatus } from '@shared/types'
 import { api, BridgeRequestError } from '../api'
 import { basename, stripExt } from '../lib/paths'
@@ -38,6 +39,7 @@ interface ShareDialogProps {
 }
 
 type Busy = null | 'sharing' | 'unsharing' | 'permission'
+type Line = { tone: 'ok' | 'busy' | 'error'; text: string }
 
 export const formatWhen = (t: number): string => new Date(t).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -47,80 +49,67 @@ export function errorText(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
-/** The one status line, shared with the Settings list. */
-export function liveLine(entry: ShareEntry, pending: boolean, now: number): { tone: 'ok' | 'busy' | 'error'; text: string } {
-  if (entry.sync.state === 'uploading' || pending) return { tone: 'busy', text: 'Uploading…' }
+/** The one status line — the dialog, the sidebar mark's tooltip and the Settings list say the same thing. */
+export function liveLine(entry: ShareEntry, pending: boolean, now: number): Line {
+  if (entry.sync.state === 'uploading') return { tone: 'busy', text: 'Uploading…' }
+  if (pending) return { tone: 'busy', text: 'Waiting to upload changes…' }
   if (entry.sync.state === 'failed') return { tone: 'error', text: `Couldn't update: ${entry.sync.message ?? 'unknown error'}` }
+  if (entry.stale) return { tone: 'error', text: "Couldn't update: the shared copy is gone from Cloudflare. Save the board to put it back." }
   return { tone: 'ok', text: `Up to date · ${relativeTime(entry.updatedAt, now)}` }
 }
 
-/** One option of a picker menu. */
 interface Choice<V extends string> {
   value: V
   label: string
 }
 
+const MENU_WIDTH = 220
+
 /**
  * A borderless text button with a chevron that opens the app's own popover under it, the current
- * option ticked. Keyboard: Enter / Space open (it is a button), ↑ / ↓ move, Enter / Space pick,
- * Esc closes the menu first (the dialog's capture listener asks `pickerCloser`).
+ * option ticked (the sort menu's ✓). Enter / Space open it (it is a button), ↑ / ↓ move, Enter /
+ * Space pick, Tab closes it. The dialog owns which picker is open, so its Esc closes the menu first.
  */
-function Picker<V extends string>({ value, choices, onPick, disabled, label, testId, align = 'left' }: { value: V; choices: readonly Choice<V>[]; onPick: (v: V) => void; disabled?: boolean; label: string; testId: string; align?: 'left' | 'right' }) {
+function Picker<V extends string>(props: { label: string; value: V; choices: readonly Choice<V>[]; open: boolean; onOpenChange: (open: boolean) => void; onPick: (v: V) => void; disabled: boolean; testId: string; align?: 'left' | 'right' }) {
+  const { label, value, choices, open, onOpenChange, onPick, disabled, testId, align = 'left' } = props
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
-  const [at, setAt] = useState<{ x: number; y: number } | null>(null)
+  const wasOpen = useRef(false)
   const current = choices.find((c) => c.value === value) ?? choices[0]
+  const items = () => [...(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role=menuitemradio]') ?? [])]
 
-  const open = () => {
-    const r = buttonRef.current?.getBoundingClientRect()
-    if (r === undefined) return
-    setAt({ x: align === 'right' ? r.right - 220 : r.left - 6, y: r.bottom + 4 })
-  }
-  const close = (refocus = true) => {
-    setAt(null)
-    if (refocus) buttonRef.current?.focus()
-  }
-  // While open, this menu is the one Esc (and a click elsewhere in the dialog) closes first.
+  // Opening focuses the ticked option; a close that left focus nowhere (Esc) hands it back to the button.
   useEffect(() => {
-    if (at === null) return
-    const closer = () => close()
-    pickerCloser.current = closer
-    return () => {
-      if (pickerCloser.current === closer) pickerCloser.current = null
-    }
-  }, [at])
+    if (open) items()[Math.max(0, choices.findIndex((c) => c.value === value))]?.focus()
+    else if (wasOpen.current && document.activeElement === document.body) buttonRef.current?.focus()
+    wasOpen.current = open
+  }, [open])
 
-  // Focus the ticked option once the menu is on screen.
-  useEffect(() => {
-    if (at === null) return
-    const items = menuRef.current?.querySelectorAll<HTMLButtonElement>('[role=menuitemradio]')
-    const i = choices.findIndex((c) => c.value === value)
-    items?.[Math.max(0, i)]?.focus()
-  }, [at !== null])
-
+  const close = () => {
+    onOpenChange(false)
+    buttonRef.current?.focus()
+  }
   const onMenuKey = (e: ReactKeyboardEvent) => {
     if (e.key === 'Tab') {
-      // Tab leaves the menu the way Esc does: closed, focus back on its button.
       e.preventDefault()
-      e.stopPropagation()
       close()
-      return
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      const all = items()
+      const i = all.indexOf(document.activeElement as HTMLButtonElement)
+      all[(i + (e.key === 'ArrowDown' ? 1 : all.length - 1)) % all.length]?.focus()
     }
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
-    e.preventDefault()
-    const items = [...(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role=menuitemradio]') ?? [])]
-    const i = items.indexOf(document.activeElement as HTMLButtonElement)
-    items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus()
   }
 
+  const r = open ? buttonRef.current?.getBoundingClientRect() : undefined
   return (
     <>
-      <button ref={buttonRef} type="button" className="share-picker" aria-haspopup="menu" aria-expanded={at !== null} aria-label={`${label}: ${current.label}`} data-testid={testId} aria-disabled={disabled === true} onClick={() => (disabled === true ? undefined : at === null ? open() : close())}>
+      <button ref={buttonRef} type="button" className={`share-picker share-picker--${align}`} aria-haspopup="menu" aria-expanded={open} aria-label={`${label}: ${current.label}`} aria-disabled={disabled} data-testid={testId} onClick={() => !disabled && onOpenChange(!open)}>
         <span>{current.label}</span>
-        <TriangleIcon up={at !== null} />
+        <TriangleIcon up={open} />
       </button>
-      {at !== null && (
-        <ContextMenuSurface x={at.x} y={at.y} width={220} className="share-menu" onClose={() => close(false)}>
+      {r !== undefined && (
+        <ContextMenuSurface x={align === 'right' ? r.right - MENU_WIDTH : r.left - 6} y={r.bottom + 4} width={MENU_WIDTH} className="share-menu" onClose={() => onOpenChange(false)}>
           <div ref={menuRef} role="group" aria-label={label} onKeyDown={onMenuKey}>
             {choices.map((c) => (
               <button
@@ -145,9 +134,6 @@ function Picker<V extends string>({ value, choices, onPick, disabled, label, tes
   )
 }
 
-/** The open picker's closer, if any — so Esc and a click elsewhere in the dialog close the MENU first. */
-const pickerCloser: { current: (() => void) | null } = { current: null }
-
 const ACCESS: readonly Choice<'none' | 'anyone'>[] = [
   { value: 'none', label: 'Not shared' },
   { value: 'anyone', label: 'Anyone with the link' },
@@ -157,45 +143,29 @@ const PERMISSION: readonly Choice<'download' | 'view'>[] = [
   { value: 'view', label: 'View only' },
 ]
 
-const LockIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <rect x="5" y="11" width="14" height="10" rx="2" />
-    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-  </svg>
-)
-const GlobeIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="12" cy="12" r="9" />
-    <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
-  </svg>
-)
-const LinkIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
-    <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
-  </svg>
-)
-
 export function ShareDialog({ root, path, onClose, onOpenSettings }: ShareDialogProps) {
   const [status, setStatus] = useState<ShareStatus | null>(null)
   const [entry, setEntry] = useState<ShareEntry | null | undefined>(undefined)
   const [pending, setPending] = useState(() => isPending(path))
   const [busy, setBusy] = useState<Busy>(null)
   const [problem, setProblem] = useState<string | null>(null)
-  const [note, setNote] = useState<string | null>(null)
+  const [menu, setMenu] = useState<null | 'access' | 'permission'>(null)
   const [copied, setCopied] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const name = stripExt(basename(path))
-  const busyRef = useRef(busy)
-  busyRef.current = busy
   const dialogRef = useRef<HTMLDivElement>(null)
-  const loadedOnce = useRef(false)
+  const copyTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  // What the window listener and `share:changed` read without resubscribing.
+  const live = useRef({ busy, menu, onClose })
+  live.current = { busy, menu, onClose }
 
-  // Modal focus: once the content is on screen, focus goes to the access picker (or the first
-  // button) so keys never land on the sidebar or canvas behind; whatever had focus gets it back.
+  // Focus comes in at once — a key pressed while the dialog loads must not land on the row or
+  // canvas behind — and goes back to whatever had it on close.
   useEffect(() => {
     const previous = document.activeElement
+    dialogRef.current?.focus()
     return () => {
+      clearTimeout(copyTimer.current)
       if (previous instanceof HTMLElement) previous.focus()
     }
   }, [])
@@ -215,7 +185,7 @@ export function ShareDialog({ root, path, onClose, onOpenSettings }: ShareDialog
   useEffect(() => {
     void refresh()
     const offMain = api.share.onChanged(() => {
-      if (busyRef.current === null) void refresh()
+      if (live.current.busy === null) void refresh()
     })
     const offLocal = onLiveShareChange(() => setPending(isPending(path)))
     const tick = setInterval(() => setNow(Date.now()), 30_000)
@@ -226,22 +196,24 @@ export function ShareDialog({ root, path, onClose, onOpenSettings }: ShareDialog
     }
   }, [refresh, path])
 
-  // Esc: an open picker menu first, then the dialog. Capture phase, so it runs before anything else.
+  // Capture phase, before anything else hears the key. Esc closes an open menu first, then the
+  // dialog; any key aimed OUTSIDE the dialog is swallowed and focus pulled back in.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
+      const inside = e.target instanceof Node && dialogRef.current?.contains(e.target) === true
+      if (inside && e.key !== 'Escape') return
       e.preventDefault()
       e.stopPropagation()
-      if (pickerCloser.current !== null) pickerCloser.current()
-      else if (busyRef.current === null) onClose()
+      if (e.key !== 'Escape') dialogRef.current?.focus()
+      else if (live.current.menu !== null) setMenu(null)
+      else if (live.current.busy === null) live.current.onClose()
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [onClose])
+  }, [])
 
   const run = async (kind: Exclude<Busy, null>, fn: () => Promise<void>) => {
     setProblem(null)
-    setNote(null)
     setBusy(kind)
     try {
       await fn()
@@ -265,47 +237,40 @@ export function ShareDialog({ root, path, onClose, onOpenSettings }: ShareDialog
     run('unsharing', async () => {
       await api.share.stop({ root, path })
       setEntry(null)
-      setNote('Link turned off.')
     })
 
-  const setPermission = (allowDownload: boolean) =>
-    run('permission', async () => {
-      setEntry(await api.share.setPermission({ root, path, allowDownload }))
-    })
+  const setPermission = (allowDownload: boolean) => run('permission', async () => setEntry(await api.share.setPermission({ root, path, allowDownload })))
 
   const copy = async (url: string) => {
     await navigator.clipboard.writeText(url)
     setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    clearTimeout(copyTimer.current)
+    copyTimer.current = setTimeout(() => setCopied(false), 1500)
   }
 
-  const ready = status?.state === 'ready'
   const loading = status === null || entry === undefined
   const shared = entry !== null && entry !== undefined
   const on = shared || busy === 'sharing'
-  const line: { tone: 'ok' | 'busy' | 'error'; text: string } | null =
-    busy === 'sharing' ? { tone: 'busy', text: 'Uploading…' } : busy === 'unsharing' ? { tone: 'busy', text: 'Turning the link off…' } : shared ? liveLine(entry, pending, now) : null
+  const line: Line | null =
+    busy === 'sharing' ? { tone: 'busy', text: 'Uploading…' } : busy === 'unsharing' ? { tone: 'busy', text: 'Turning the link off…' } : problem !== null ? { tone: 'error', text: problem } : shared ? liveLine(entry, pending, now) : null
+  const helper = !on ? 'Only you can open this board' : shared && !entry.allowDownload ? 'Anyone on the internet with this link can view' : 'Anyone on the internet with this link can view and download'
+
+  // Once loaded, the access picker takes focus — unless the user has already moved it.
   useEffect(() => {
-    if (loading || loadedOnce.current) return
-    loadedOnce.current = true
     const el = dialogRef.current
-    ;(el?.querySelector<HTMLElement>('[data-testid=share-access]') ?? el?.querySelector<HTMLElement>('button:not(:disabled)'))?.focus()
+    if (!loading && document.activeElement === el) (el?.querySelector<HTMLElement>('.share-picker') ?? el?.querySelector<HTMLElement>('button:not(:disabled)'))?.focus()
   }, [loading])
 
-  /** Keys stay in the dialog: Tab cycles inside it, and nothing typed here reaches the app behind (sidebar arrows, canvas shortcuts). */
+  /** Tab cycles inside the dialog; no key typed here travels on to the app behind. */
   const onDialogKey = (e: ReactKeyboardEvent) => {
     e.stopPropagation()
     if (e.key !== 'Tab') return
     const focusable = [...(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled)') ?? [])]
     if (focusable.length === 0) return
     const i = focusable.indexOf(document.activeElement as HTMLElement)
-    const next = e.shiftKey ? (i <= 0 ? focusable.length - 1 : i - 1) : i === focusable.length - 1 ? 0 : i + 1
     e.preventDefault()
-    focusable[next].focus()
+    focusable[e.shiftKey ? (i <= 0 ? focusable.length - 1 : i - 1) : (i + 1) % focusable.length].focus()
   }
-
-  // Who, not what: the permission picker on the same row already says what people can do.
-  const helper = on ? 'Anyone on the internet with this link' : 'Only you can open this board'
 
   return (
     <div className="share-overlay" onMouseDown={() => busy === null && onClose()}>
@@ -313,13 +278,14 @@ export function ShareDialog({ root, path, onClose, onOpenSettings }: ShareDialog
         ref={dialogRef}
         className="share-dialog"
         role="dialog"
-        onKeyDown={onDialogKey}
         aria-modal="true"
         aria-label={`Share ${name}`}
+        tabIndex={-1}
+        onKeyDown={onDialogKey}
         onMouseDown={(e) => {
           e.stopPropagation()
-          // A click on a picker's own button toggles it; anywhere else in the dialog closes an open menu.
-          if (!(e.target as Element).closest('.share-picker')) pickerCloser.current?.()
+          // A picker's own button toggles its menu; a press anywhere else in the dialog closes it.
+          if (!(e.target as Element).closest('.share-picker')) setMenu(null)
         }}
         data-testid="share-dialog"
       >
@@ -334,22 +300,23 @@ export function ShareDialog({ root, path, onClose, onOpenSettings }: ShareDialog
 
         {loading ? (
           <p className="share-dialog__muted">…</p>
-        ) : !ready ? (
-          <div className="share-setup-note">
-            <p>
-              <strong>Sharing isn't set up on this computer yet.</strong> It uses your own free Cloudflare account; setting it up takes about two minutes and one pasted key.
-            </p>
-            <button
-              type="button"
-              className="share-btn share-btn--primary"
-              onClick={() => {
-                onClose()
-                onOpenSettings()
-              }}
-            >
-              Open Settings › Sharing
-            </button>
-          </div>
+        ) : status.state !== 'ready' ? (
+          <>
+            <p className="share-dialog__text">Sharing isn't set up on this computer yet. It uses your own free Cloudflare account; setting it up takes about two minutes and one pasted key.</p>
+            <footer className="share-dialog__footer">
+              <button
+                type="button"
+                className="share-btn share-btn--primary"
+                onClick={() => {
+                  onClose()
+                  onOpenSettings()
+                }}
+                data-testid="share-setup"
+              >
+                Open Settings › Sharing
+              </button>
+            </footer>
+          </>
         ) : (
           <>
             <h3 className="share-access__label">General access</h3>
@@ -358,15 +325,13 @@ export function ShareDialog({ root, path, onClose, onOpenSettings }: ShareDialog
                 {on ? <GlobeIcon /> : <LockIcon />}
               </span>
               <div className="share-access__text">
-                <Picker label="General access" testId="share-access" value={on ? 'anyone' : 'none'} choices={ACCESS} disabled={busy !== null} onPick={(v) => void (v === 'anyone' ? share() : unshare())} />
+                <Picker label="General access" testId="share-access" value={on ? 'anyone' : 'none'} choices={ACCESS} open={menu === 'access'} onOpenChange={(o) => setMenu(o ? 'access' : null)} disabled={busy !== null} onPick={(v) => void (v === 'anyone' ? share() : unshare())} />
                 <p className="share-access__helper" title={helper}>
                   {helper}
                 </p>
               </div>
               {shared && (
-                <div className="share-access__perm">
-                  <Picker label="People with the link can" testId="share-permission" align="right" value={entry.allowDownload ? 'download' : 'view'} choices={PERMISSION} disabled={busy !== null} onPick={(v) => void setPermission(v === 'download')} />
-                </div>
+                <Picker label="People with the link can" testId="share-permission" align="right" value={entry.allowDownload ? 'download' : 'view'} choices={PERMISSION} open={menu === 'permission'} onOpenChange={(o) => setMenu(o ? 'permission' : null)} disabled={busy !== null} onPick={(v) => void setPermission(v === 'download')} />
               )}
             </div>
 
@@ -374,12 +339,6 @@ export function ShareDialog({ root, path, onClose, onOpenSettings }: ShareDialog
               <p className={`share-status share-status--${line.tone}`} role="status" data-testid="share-live">
                 <span className="share-status__dot" aria-hidden />
                 {line.text}
-              </p>
-            )}
-            {note !== null && problem === null && line === null && <p className="share-status">{note}</p>}
-            {problem !== null && (
-              <p className="share-dialog__error" role="alert">
-                {problem}
               </p>
             )}
 

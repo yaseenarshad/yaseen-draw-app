@@ -298,7 +298,7 @@ export function App() {
   // Settings › Storage (YAZ-1801 D1, 🔒 D13): measured only while Settings is open — on its page's
   // open, a sync pass finishing, and a shrink. A closed dialog hands the hook no sync state at all.
   const vaultStorage = useVaultStorage(root, settingsOpen ? syncState : null)
-  // The ONE Share dialog (YAZ-1799 D6): File › Share Link… (the active drawing) and the sidebar's "Share…".
+  // The ONE Share dialog (YAZ-1799 D6): File › Share Link (the active drawing) and the sidebar's "Share".
   const [sharePath, setSharePath] = useState<string | null>(null)
   const fileRef = useRef(file)
   fileRef.current = file

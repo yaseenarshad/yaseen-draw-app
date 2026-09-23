@@ -22,6 +22,7 @@ function installBridge() {
   const exportImageListeners = new Set<() => void>()
   const canvasBackgroundListeners = new Set<(color: string) => void>()
   const exportDrawingListeners = new Set<() => void>()
+  const shareLinkListeners = new Set<() => void>()
   const sub = <T,>(set: Set<T>) =>
     vi.fn((l: T) => {
       set.add(l)
@@ -41,7 +42,7 @@ function installBridge() {
       onExportImage: sub(exportImageListeners),
       onCanvasBackground: sub(canvasBackgroundListeners),
       onExportDrawing: sub(exportDrawingListeners),
-      onShareLink: sub(new Set<() => void>()),
+      onShareLink: sub(shareLinkListeners),
     },
   }
   Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
@@ -58,7 +59,8 @@ function installBridge() {
     emitExportImage: () => exportImageListeners.forEach((l) => l()),
     emitCanvasBackground: (color: string) => canvasBackgroundListeners.forEach((l) => l(color)),
     emitExportDrawing: () => exportDrawingListeners.forEach((l) => l()),
-    count: () => openFolderListeners.size + openRootListeners.size + searchListeners.size + switchVaultListeners.size + settingsListeners.size + toggleSidebarListeners.size + closeTabListeners.size + nextTabListeners.size + prevTabListeners.size + exportImageListeners.size + canvasBackgroundListeners.size + exportDrawingListeners.size,
+    emitShareLink: () => shareLinkListeners.forEach((l) => l()),
+    count: () => openFolderListeners.size + openRootListeners.size + searchListeners.size + switchVaultListeners.size + settingsListeners.size + toggleSidebarListeners.size + closeTabListeners.size + nextTabListeners.size + prevTabListeners.size + exportImageListeners.size + canvasBackgroundListeners.size + exportDrawingListeners.size + shareLinkListeners.size,
   }
 }
 
@@ -75,6 +77,7 @@ interface ProbeProps {
   onExportImage: () => void
   onCanvasBackground: (color: string) => void
   onExportDrawing: () => void
+  onShareLink?: () => void
 }
 
 function Probe(props: ProbeProps) {
@@ -92,7 +95,7 @@ afterEach(() => {
 describe('useMenuEvents', () => {
   it('routes menu gestures to the callbacks and unsubscribes on unmount', () => {
     const b = installBridge()
-    const handlers = { onOpenFolder: vi.fn(), onOpenRoot: vi.fn(), onSearch: vi.fn(), onSwitchVault: vi.fn(), onSettings: vi.fn(), onToggleSidebar: vi.fn(), onCloseTab: vi.fn(), onNextTab: vi.fn(), onPrevTab: vi.fn(), onExportImage: vi.fn(), onCanvasBackground: vi.fn(), onExportDrawing: vi.fn() }
+    const handlers = { onOpenFolder: vi.fn(), onOpenRoot: vi.fn(), onSearch: vi.fn(), onSwitchVault: vi.fn(), onSettings: vi.fn(), onToggleSidebar: vi.fn(), onCloseTab: vi.fn(), onNextTab: vi.fn(), onPrevTab: vi.fn(), onExportImage: vi.fn(), onCanvasBackground: vi.fn(), onExportDrawing: vi.fn(), onShareLink: vi.fn() }
     root = createRoot(document.createElement('div'))
     act(() => root?.render(<Probe {...handlers} />))
 
@@ -121,6 +124,9 @@ describe('useMenuEvents', () => {
     expect(handlers.onCanvasBackground).toHaveBeenCalledWith('#fffce8')
     act(() => b.emitExportDrawing())
     expect(handlers.onExportDrawing).toHaveBeenCalledTimes(1)
+    // YAZ-1799 D6: File › Share Link (⌘⇧L) opens the Share dialog for the visible drawing.
+    act(() => b.emitShareLink())
+    expect(handlers.onShareLink).toHaveBeenCalledTimes(1)
 
     act(() => root?.unmount())
     root = null
