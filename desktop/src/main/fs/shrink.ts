@@ -23,30 +23,17 @@
  * Clean open tabs need nothing from here: the rewrite is an ordinary external change, and the
  * editor's watcher rule reloads a clean tab silently (`DrawingEditor` — echo / reload / conflict).
  */
-import { readdir, stat } from 'node:fs/promises'
-import path from 'node:path'
+import { stat } from 'node:fs/promises'
 import { MAX_DRAWING_BYTES, type ShrinkResult } from '@shared/types'
 import { isDrawing } from '@shared/fileKind'
-import { ASSETS_DIR } from '@shared/drawingAssets'
 import { readBoundedRegularFile } from './boundedRead'
 import { landAssets, liftEmbedded } from './drawing'
-import { atomicWrite, isSkipped } from './fsUtils'
+import { atomicWrite, vaultFiles } from './fsUtils'
 
-/** Every `.excalidraw` under `root`, skipping dot-dirs, `node_modules` and the top-level store. */
+/** Every `.excalidraw` in the vault outside the top-level store, in a stable order. */
 async function boardsUnder(root: string): Promise<string[]> {
   const out: string[] = []
-  const stack = [root]
-  while (stack.length > 0) {
-    const dir = stack.pop()!
-    const entries = await readdir(dir, { withFileTypes: true }).catch(() => [])
-    for (const e of entries) {
-      if (isSkipped(e.name)) continue
-      const full = path.join(dir, e.name)
-      if (e.isDirectory()) {
-        if (!(dir === root && e.name === ASSETS_DIR)) stack.push(full)
-      } else if (e.isFile() && isDrawing(e.name)) out.push(full)
-    }
-  }
+  for await (const f of vaultFiles(root)) if (!f.inAssets && isDrawing(f.name)) out.push(f.full)
   return out.sort()
 }
 

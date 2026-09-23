@@ -1,7 +1,5 @@
 import { Worker } from 'node:worker_threads'
 import type { ShrinkResult, VaultStorageStats } from '@shared/types'
-import { shrinkVault } from './fs/shrink'
-import { vaultStorage } from './git/storage'
 
 /**
  * Settings › Storage's two heavy jobs, run OFF the main thread (YAZ-1801 D8, 🔒 D11): measuring
@@ -19,11 +17,6 @@ export type StorageJob = { kind: 'stats'; root: string } | { kind: 'shrink'; roo
 interface Answers {
   stats: VaultStorageStats
   shrink: ShrinkResult
-}
-
-/** The job, in whichever thread calls it — the worker's whole body. */
-export function runStorageJob(job: StorageJob): Promise<VaultStorageStats | ShrinkResult> {
-  return job.kind === 'stats' ? vaultStorage(job.root) : shrinkVault(job.root, { skip: job.skip })
 }
 
 /** `job` on a fresh worker. `workerFile` is the built `storageWorker.ts` (`?modulePath` in `ipc/storage.ts`). */
