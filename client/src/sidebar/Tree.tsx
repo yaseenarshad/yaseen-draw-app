@@ -1,5 +1,6 @@
 import type { TreeNode } from '@shared/types'
 import type { FileNode } from '@shared/treeSort'
+import { LinkIcon } from '../components/icons'
 import { stripExt } from '../lib/paths'
 import { TOO_LARGE_LABEL } from '../lib/syncAttention'
 import { CreateInline } from './CreateInline'
@@ -111,6 +112,8 @@ interface TreeProps {
   onHoverFile?: (node: FileNode | null) => void
   /** YAZ-1801 D3: absolute paths held back from sync as over GitHub's limit; their rows get the cloud-off icon. */
   tooLarge?: ReadonlySet<string>
+  /** Shared boards (YAZ-1799): a small link icon on the row, red when the last update failed or the link is stale; the title is the status. */
+  shareBadges?: ReadonlyMap<string, ShareBadge>
   depth?: number
 }
 
@@ -125,6 +128,19 @@ function CloudOffIcon() {
     </span>
   )
 }
+
+export interface ShareBadge {
+  tone: 'ok' | 'error'
+  title: string
+}
+
+/** The shared-board mark (YAZ-1890): a small link glyph right of the name; its title is the link's status. Nothing for an unshared board. */
+const ShareMark = ({ badge }: { badge: ShareBadge | undefined }) =>
+  badge === undefined ? null : (
+    <span className="tree__share" data-tone={badge.tone} title={badge.title} aria-label={badge.title} role="img">
+      <LinkIcon size={12} />
+    </span>
+  )
 
 export function Tree({
   nodes,
@@ -143,9 +159,10 @@ export function Tree({
   reorder,
   onHoverFile,
   tooLarge,
+  shareBadges,
   depth = 0,
 }: TreeProps) {
-  const recurse = { expanded, activeFile, onToggle, onOpenFile, onOpenFileBackground, onOpenDefault, onNodeContextMenu, pending, renaming, move, selection, reorder, onHoverFile, tooLarge }
+  const recurse = { expanded, activeFile, onToggle, onOpenFile, onOpenFileBackground, onOpenDefault, onNodeContextMenu, pending, renaming, move, selection, reorder, onHoverFile, tooLarge, shareBadges }
   // The reorder gesture lives on depth-0 rows alone; deeper rows of a reorderable tree drag nothing.
   const rowReorder = reorder !== undefined && depth === 0 ? reorder : null
   // What a FILE row's drag does: move on disk (E1b) on an ordinary tree, reorder at depth 0 of a reorderable one, nothing below that.
@@ -287,6 +304,7 @@ export function Tree({
             >
               <span className="tree__label">{stripExt(node.name)}</span>
               {tooLarge?.has(node.path) === true && <CloudOffIcon />}
+              <ShareMark badge={shareBadges?.get(node.path)} />
             </button>
           </li>
         ),

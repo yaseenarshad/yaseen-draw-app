@@ -79,3 +79,27 @@ export const HeartIcon = () => (
     <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
   </svg>
 )
+
+/** Share link (YAZ-1799): the chain — the Share dialog's Copy link button and a shared board's sidebar mark. */
+export const LinkIcon = ({ size = 15 }: { size?: number }) => (
+  <svg {...svg} width={size} height={size} viewBox="0 0 24 24" strokeWidth={2}>
+    <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
+    <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
+  </svg>
+)
+
+/** The Share dialog's "Not shared" (YAZ-1799). */
+export const LockIcon = () => (
+  <svg {...svg} width={18} height={18} viewBox="0 0 24 24" strokeWidth={1.8}>
+    <rect x="5" y="11" width="14" height="10" rx="2" />
+    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+  </svg>
+)
+
+/** The Share dialog's "Anyone with the link" (YAZ-1799). */
+export const GlobeIcon = () => (
+  <svg {...svg} width={18} height={18} viewBox="0 0 24 24" strokeWidth={1.8}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+  </svg>
+)

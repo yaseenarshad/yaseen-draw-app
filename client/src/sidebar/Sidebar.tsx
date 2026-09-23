@@ -12,6 +12,7 @@ import { allDirs, ancestorDirs, favoriteRoots, findDirNode, findNode, focusRoots
 import { sortTree, type FileNode } from '@shared/treeSort'
 import { useAppliedTheme } from '../lib/theme'
 import { BoardInfo } from './BoardInfo'
+import { useShareBadges } from '../share/useShareBadges'
 import { BoardPreview } from './BoardPreview'
 import { boardPreviewKey } from './boardPreviewCache'
 import { SearchResults } from '../search/SearchResults'
@@ -91,6 +92,8 @@ interface SidebarProps {
    * routes ANY failure to the passive notice — this promise never rejects, so the sheet just closes.
    */
   onDeleteFile: (path: string) => Promise<void>
+  /** Right-click → "Share" (YAZ-1799 D6): App opens its one Share dialog for the board. */
+  onShareFile: (path: string) => void
   /** Show a transient, unobtrusive message — never a dialog (E1, GRO-2171). App owns the banner. */
   onNotice: (message: string, kind?: NoticeKind) => void
   /**
@@ -290,6 +293,7 @@ export function Sidebar({
   onFileMissing,
   onRenameFile,
   onDeleteFile,
+  onShareFile,
   onNotice,
   pendingSearchFocus,
   onSearchFocusHandled,
@@ -426,6 +430,8 @@ export function Sidebar({
     [closePreview],
   )
   const previewsOn = settings.hoverPreview && !searching
+  // YAZ-1799: a link mark on shared boards (red when the last update failed or the link is stale).
+  const shareBadges = useShareBadges(root)
   // The hovered board off the LIVE tree (the Info popover's rule): its fresh mtime keys the picture, and gone closes the panel.
   const hoverNode = useMemo(() => {
     if (hover === null || tree === null) return null
@@ -1394,6 +1400,7 @@ export function Sidebar({
                 selection={selection}
                 onHoverFile={previewsOn ? hoverFile : undefined}
                 tooLarge={tooLarge}
+                shareBadges={shareBadges}
               />
             )}
           </>
@@ -1421,6 +1428,7 @@ export function Sidebar({
                 selection={selection}
                 onHoverFile={previewsOn ? hoverFile : undefined}
                 tooLarge={tooLarge}
+                shareBadges={shareBadges}
               />
             )}
           </>
@@ -1456,6 +1464,7 @@ export function Sidebar({
               onToggleFavorite: toggleFavorite,
               onRename: (path) => setRenamingEntry({ path, kind: menu.rowKind === 'file' ? 'file' : 'dir' }),
               onInfo: (path) => setInfoPopover({ x: menu.x, y: menu.y, path, now: Date.now() }),
+              onShare: onShareFile,
               onDelete: askDelete,
             },
           )}

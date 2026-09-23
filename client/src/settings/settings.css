@@ -293,6 +293,11 @@
   background: var(--accent-soft);
 }
 
+.settings__option:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .settings__option--active {
   border-color: var(--accent);
   background: var(--accent-soft);
@@ -397,8 +402,8 @@
   width: 5.5rem;
 }
 
-/* The secret field (Settings › Images › Pixabay API key, 🔒 YAZ-1775 D4): a pasted key is long, and it sits in the button row. */
-.settings__input--secret {
+/* A field that fills its button row (a pasted API key, a custom domain): the value is long, and the row's buttons sit beside it. */
+.settings__input--fill {
   flex: 1 1 12rem;
   min-width: 0;
 }

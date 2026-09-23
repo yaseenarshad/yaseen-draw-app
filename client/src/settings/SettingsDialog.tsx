@@ -12,7 +12,7 @@
  * ONE PAGE, NOT PAGES (Yasin's call after the demo): every setting is on the page at once, so a
  * nav click is a scroll, not a route, and the active nav item is DERIVED from where the page is
  * scrolled to. Opening always starts at the top. The exceptions are the `standalone` sections
- * (Hotkeys — a reference table, noise among settings; Storage — a per-vault report, YAZ-1801): each
+ * (Hotkeys — a reference table, noise among settings; Storage — a per-vault report, YAZ-1801; Sharing — a setup flow and a write-up, YAZ-1799): each
  * is its own page inside the dialog, listed under a divider in the nav, and `page` names the one
  * showing; `null` is the settings page.
  *
@@ -44,9 +44,11 @@ const anchorId = (id: SettingsSectionId) => `settings-${id}`
 interface SettingsDialogProps {
   ctx: SettingsCtx
   onClose: () => void
+  /** Open straight onto a standalone page (the Share dialog's "Open Settings › Sharing", YAZ-1799). */
+  initialPage?: SettingsSectionId
 }
 
-export function SettingsDialog({ ctx, onClose }: SettingsDialogProps) {
+export function SettingsDialog({ ctx, onClose, initialPage }: SettingsDialogProps) {
   const sections = availableSections(ctx)
   const scrollSections = sections.filter((s) => s.standalone !== true)
   const pages = sections.filter((s) => s.standalone === true)
@@ -55,7 +57,7 @@ export function SettingsDialog({ ctx, onClose }: SettingsDialogProps) {
 
   const [query, setQuery] = useState('')
   /** The standalone page showing, or null for the settings page. Search leaves it alone, so clearing a query returns to it. */
-  const [page, setPage] = useState<SettingsSectionId | null>(null)
+  const [page, setPage] = useState<SettingsSectionId | null>(initialPage ?? null)
   /** The scrollspy's answer: which scroll section is being read. Meaningful only while `page` is null. */
   const [active, setActive] = useState<SettingsSectionId>(scrollSections[0].id)
   /** An anchor click's target, applied after the render that (re)shows the settings page — a search or a standalone page may be leaving. */

@@ -7,6 +7,7 @@ import { fileLink, parseFileLink } from '@shared/links'
 import type { WindowEntry } from '@shared/types'
 import type { GitSyncManager } from './git/manager'
 import { registerIpc } from './ipc'
+import { viewerAssetsDir } from './ipc/share'
 import { ensureLibraryFolder } from './library/folder'
 import { openableFileArgs } from './fileArgs'
 import { createLinkQueue } from './linkQueue'
@@ -195,7 +196,10 @@ app.whenReady().then(() => {
   // A tab switch changes which file is in front (🔒 YAZ-1775 D10); focus changes which window is asked.
   subscribeMenuRebuildOnActiveFile(store, applyMenu)
   rebuildMenuOnFocus = applyMenu
-  gitSync = registerIpc(store, manager, app.getPath('userData'))
+  gitSync = registerIpc(store, manager, app.getPath('userData'), {
+    viewerAssetsDir: viewerAssetsDir({ isPackaged: app.isPackaged, resourcesPath: process.resourcesPath, appPath: app.getAppPath() }),
+    isPackaged: app.isPackaged,
+  })
   // 🔒 YAZ-1775 D5: the one library folder every vault shares. Made at startup, detached — a launch must
   // not wait on a disk, and a path that cannot be created is still what the Settings row names.
   void ensureLibraryFolder(store.get().settings.libraryFolder, app.getPath('userData'))

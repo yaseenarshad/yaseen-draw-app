@@ -25,10 +25,12 @@ interface UseMenuEventsOptions {
   onCanvasBackground: (color: string) => void
   /** File › Export Drawing… (⌘⇧S, 🔒 YAZ-1775 D3): the visible drawing writes a standalone `.excalidraw`. */
   onExportDrawing: () => void
+  /** File › Share Link (⌘⇧L, YAZ-1799): open the Share dialog for the visible drawing. */
+  onShareLink: () => void
 }
 
 /** Menu gestures from the main process (GRO-2161, tabs GRO-2232); main sends them to the focused window only. */
-export function useMenuEvents({ onOpenFolder, onOpenRoot, onSearch, onSwitchVault, onSettings, onToggleSidebar, onCloseTab, onNextTab, onPrevTab, onExportImage, onCanvasBackground, onExportDrawing }: UseMenuEventsOptions): void {
+export function useMenuEvents({ onOpenFolder, onOpenRoot, onSearch, onSwitchVault, onSettings, onToggleSidebar, onCloseTab, onNextTab, onPrevTab, onExportImage, onCanvasBackground, onExportDrawing, onShareLink }: UseMenuEventsOptions): void {
   useEffect(() => {
     const menu = window.yaseenDraw.menu
     const offs = [
@@ -44,7 +46,8 @@ export function useMenuEvents({ onOpenFolder, onOpenRoot, onSearch, onSwitchVaul
       menu.onExportImage(onExportImage),
       menu.onCanvasBackground(onCanvasBackground),
       menu.onExportDrawing(onExportDrawing),
+      menu.onShareLink(() => onShareLink()),
     ]
     return () => offs.forEach((off) => off())
-  }, [onOpenFolder, onOpenRoot, onSearch, onSwitchVault, onSettings, onToggleSidebar, onCloseTab, onNextTab, onPrevTab, onExportImage, onCanvasBackground, onExportDrawing])
+  }, [onOpenFolder, onOpenRoot, onSearch, onSwitchVault, onSettings, onToggleSidebar, onCloseTab, onNextTab, onPrevTab, onExportImage, onCanvasBackground, onExportDrawing, onShareLink])
 }

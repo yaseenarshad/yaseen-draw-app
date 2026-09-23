@@ -10,6 +10,7 @@ import { registerGithubIpc } from './github'
 import { registerMediaLibraryIpc } from './mediaLibrary'
 import { registerMediaStudioIpc } from './mediaStudio'
 import { registerSecretsIpc } from './secrets'
+import { registerShareIpc } from './share'
 import { registerStateIpc } from './state'
 import { registerStorageIpc } from './storage'
 import { registerWatchIpc } from './watch'
@@ -25,7 +26,7 @@ import { registerWindowIpc } from './window'
  * (🔒 YAZ-1775 D5) and where `secrets.json` lives (🔒 YAZ-1775 D4), and every module under `main/` that touches it
  * stays Electron-free and testable.
  */
-export function registerIpc(store: Store, windows: WindowManagerIpc, userData: string): GitSyncManager {
+export function registerIpc(store: Store, windows: WindowManagerIpc, userData: string, share: { viewerAssetsDir: string; isPackaged: boolean }): GitSyncManager {
   registerFsIpc(store, windows)
   registerDrawingIpc(store, userData)
   registerDialogIpc()
@@ -36,7 +37,10 @@ export function registerIpc(store: Store, windows: WindowManagerIpc, userData: s
   registerComponentsIpc(store, userData)
   // 🔒 YAZ-1775 D4: the secrets instance is THREADED into the studio's providers — that is how a Pixabay
   // request gets its key without the key ever leaving main.
-  registerMediaStudioIpc(userData, registerSecretsIpc(userData))
+  const secrets = registerSecretsIpc(userData)
+  registerMediaStudioIpc(userData, secrets)
+  // YAZ-1799: sharing reads the Cloudflare token and upload password from the same door — main only.
+  registerShareIpc(userData, secrets, share)
   registerWindowIpc(store, windows)
   registerStorageIpc()
   return registerGithubIpc(store)

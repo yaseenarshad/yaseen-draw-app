@@ -1,0 +1,317 @@
+/*
+ * Share link (YAZ-1799): the Share dialog and the Settings › Sharing page. The dialog is the
+ * delete sheet's `.confirm-overlay` / `.confirm` / `.confirm__btn` (app.css) plus only what those
+ * lack; everything is themed through app.css's tokens, so dark mode needs no rule of its own.
+ */
+
+/* ---------- Share dialog ---------- */
+
+.confirm-overlay.share-overlay {
+  z-index: 80;
+}
+
+.confirm.share-dialog {
+  width: min(480px, calc(100vw - 32px));
+  padding: 18px 20px;
+  line-height: 1.5;
+}
+
+.share-dialog button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.share-dialog__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.share-dialog__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+/* One line, cut with an ellipsis: a long board name or helper line never widens anything. */
+.share-dialog__title,
+.share-access__helper {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Focus lands on the dialog itself when it opens (the modal-keys rule) — no ring for that. */
+.share-dialog:focus {
+  outline: none;
+}
+
+.share-dialog__close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--fg-muted);
+  border-radius: 6px;
+}
+
+.share-dialog__close:hover,
+.share-picker:hover:not([aria-disabled='true']),
+.share-picker[aria-expanded='true'] {
+  background: var(--bg-hover);
+}
+
+.share-access__label {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+
+/* One row: 36px round icon · access picker over its helper line · permission picker, right. */
+.share-access {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.share-access__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  color: var(--fg-muted);
+  background: var(--bg-hover);
+  border-radius: 50%;
+}
+
+.share-access__icon--on {
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+}
+
+.share-access__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.share-access__helper {
+  max-width: 100%;
+  margin: 0;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+/* A borderless text button with a chevron that opens the app's own popover (`.ctx-menu`); the
+   negative margin lines its TEXT up with the helper line while the hover pill overhangs. */
+.share-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: -6px;
+  padding: 2px 4px 2px 6px;
+  font-weight: 500;
+  border-radius: 6px;
+}
+
+.share-picker[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.share-picker:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.share-picker svg {
+  color: var(--fg-muted);
+}
+
+.share-picker--right {
+  flex: none;
+  margin-left: 0;
+  font-weight: 400;
+}
+
+/* Above the share overlay; otherwise exactly the sort menu. The arrow keys move focus, so the focused item wears the hover fill. */
+.ctx-menu.share-menu {
+  z-index: 90;
+}
+
+.share-menu .ctx-menu__item:focus-visible {
+  outline: none;
+  background: var(--accent-soft);
+}
+
+/* The one status line (dialog and Settings rows): a small coloured dot, then the words. */
+.share-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 0 48px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.share-status__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dot, var(--ok));
+}
+
+.share-status--busy {
+  --dot: var(--accent);
+}
+
+.share-status--error {
+  --dot: var(--danger);
+  color: var(--danger);
+}
+
+.share-dialog__footer {
+  display: flex;
+  align-items: center;
+  margin-top: 20px;
+}
+
+/* The footer's two pills: Copy link (outline, accent text) and Done (filled, right-aligned even alone). */
+.share-dialog__footer .confirm__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 16px;
+  color: var(--accent);
+  border-radius: 999px;
+}
+
+.share-dialog__footer .btn--primary {
+  margin-left: auto;
+  color: #fff;
+}
+
+.share-dialog__footer .btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 85%, #000);
+}
+
+/* ---------- Settings › Sharing (YAZ-1889): settings rows and buttons; only what they lack ---------- */
+
+.sharing__muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+
+.sharing__error {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--danger);
+}
+
+.settings__option.sharing__danger {
+  color: var(--danger);
+}
+
+.settings__option.sharing__danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+/* The account picker and the turn-off confirm: a `.confirm` box in the page instead of over it. */
+.confirm.sharing__inline {
+  width: auto;
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  box-shadow: none;
+}
+
+.sharing__inline .settings__options {
+  margin-top: 8px;
+}
+
+.sharing__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 10px 0 0;
+  padding: 0;
+  font-size: 13px;
+  list-style: none;
+}
+
+.sharing__steps li,
+.sharing__inline label {
+  display: flex;
+  gap: 8px;
+}
+
+.sharing__steps li[data-state='pending'],
+.sharing__step-detail {
+  color: var(--fg-muted);
+}
+
+.sharing__steps li[data-state='failed'] .sharing__step-detail {
+  color: var(--danger);
+}
+
+.sharing__boards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sharing__board-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sharing__board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.sharing__board .share-status {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.sharing__domain {
+  align-self: center;
+  margin-right: 8px;
+}
+
+.sharing__help {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.sharing__help h4 {
+  margin: 14px 0 4px;
+  font-size: 14px;
+}
+
+.sharing__help :is(p, ol) {
+  margin: 0 0 6px;
+}
+
+.sharing__help ol {
+  padding-left: 20px;
+}
