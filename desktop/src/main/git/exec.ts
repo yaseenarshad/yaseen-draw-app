@@ -101,11 +101,14 @@ export async function resolveGit(candidates: readonly string[] = GIT_CANDIDATES)
  * On timeout the child is killed (SIGTERM) and the result resolves with `code`
  * `GIT_TIMEOUT_CODE` (-1) and a `timed out` line appended to stderr, so a wedged git looks like
  * any other classifiable failure to the caller rather than an exception.
+ *
+ * `timeoutMs` defaults to 30 s; the sync pass's two transfers (`fetch`, `push`) raise it to
+ * `TRANSFER_TIMEOUT_MS` (YAZ-1801 D4). `input` is written to the child's stdin and closed.
  */
-export function git(bin: string, root: string, args: string[], opts: { timeoutMs?: number } = {}): Promise<GitResult> {
+export function git(bin: string, root: string, args: string[], opts: { timeoutMs?: number; input?: string } = {}): Promise<GitResult> {
   const timeout = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS
   return new Promise((resolve, reject) => {
-    execFile(
+    const child = execFile(
       bin,
       args,
       {
@@ -144,5 +147,12 @@ export function git(bin: string, root: string, args: string[], opts: { timeoutMs
         reject(err)
       },
     )
+    // `input` (YAZ-1801): the list a `--batch` reader takes on stdin (`cat-file --batch-check`).
+    // Still no shell — it is bytes on a pipe, never parsed as a command line. An EPIPE from a child
+    // that exits early is swallowed here; its exit code is what the caller classifies.
+    if (opts.input !== undefined) {
+      child.stdin?.on('error', () => undefined)
+      child.stdin?.end(opts.input)
+    }
   })
 }

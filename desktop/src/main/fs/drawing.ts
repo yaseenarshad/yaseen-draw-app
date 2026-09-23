@@ -25,7 +25,9 @@
  * An asset is IMMUTABLE — the same bytes always get the same name — so a save never rewrites one
  * (`wx`; EEXIST means it is already exactly these bytes). A LEGACY export that still embeds
  * `files` opens (its entries pass straight through the load) and SHRINKS on its first save:
- * `stripEmbeddedFiles` lifts the bytes into the store and writes the scene lean.
+ * `liftEmbedded` takes the referenced bytes out of the scene and `landAssets` writes them into the
+ * store, then the scene is written lean. Settings › Storage's "Move pictures out" (`shrink.ts`,
+ * YAZ-1801 D5) runs the same two helpers over every legacy board at once.
  *
  * ASSETS FIRST, THEN THE SCENE. A scene on disk must never name bytes that are not there, so
  * every asset lands before the file that references it. The reverse order would leave a crash
@@ -139,10 +141,62 @@ export async function loadDrawing(req: DrawingLoadRequest): Promise<DrawingLoadR
 }
 
 /** One asset to land: validated shape, resolved name, decoded bytes. */
-interface PendingAsset {
+export interface PendingAsset {
   fileId: string
   name: string
   bytes: Buffer
+}
+
+/**
+ * THE ONE EXTRACTION (YAZ-1801 D5): a scene's lean text, and the embedded pictures that must land
+ * in `assets/` before it. Shared by `drawing:save` (a legacy board shrinks on its first save) and
+ * Settings › Storage's "Move pictures out of boards" (`shrink.ts`), so the two can never disagree
+ * about which bytes survive.
+ *
+ * Only pictures the scene still REFERENCES are lifted — an embedded entry no live element uses is
+ * dropped with the `files` map, never written to the store (it would be an orphan the day it
+ * lands). An entry whose dataURL is not base64, or whose mime the store does not keep, is dropped
+ * the same way: the engine could not have drawn it either. `exclude` is what the caller already
+ * has in hand (the renderer's `newFiles` on a save), so nothing is decoded twice.
+ *
+ * Throws when `json` is not a scene object (`stripEmbeddedFiles`); both callers validated first.
+ */
+export function liftEmbedded(json: string, elements: readonly unknown[], exclude: ReadonlySet<string> = new Set()): { lean: string; lifted: PendingAsset[] } {
+  const { json: lean, embedded } = stripEmbeddedFiles(json)
+  const referenced = referencedFileIds(elements)
+  const lifted: PendingAsset[] = []
+  for (const [fileId, entry] of Object.entries(embedded)) {
+    if (!referenced.has(fileId) || !isValidFileId(fileId) || exclude.has(fileId)) continue
+    const data = parseDataUrl(entry.dataURL)
+    const name = assetFileName(fileId, entry.mimeType)
+    if (data === null || name === null) continue
+    lifted.push({ fileId, name, bytes: Buffer.from(data.base64, 'base64') })
+  }
+  return { lean, lifted }
+}
+
+/**
+ * Write each asset into `<dir>/assets/` — `wx`, EEXIST is success (content-addressed: an existing
+ * file IS these bytes) — and answer the ids now in the store. The other half of the one door
+ * `liftEmbedded` opens; a failure rejects as a `BridgeFailure` naming the path.
+ */
+export async function landAssets(dir: string, pending: readonly PendingAsset[]): Promise<string[]> {
+  const persisted: string[] = []
+  if (pending.length === 0) return persisted
+  const store = path.join(dir, ASSETS_DIR)
+  await fsCall(store, () => mkdir(store, { recursive: true }))
+  for (const asset of pending) {
+    const to = path.join(store, asset.name)
+    await fsCall(to, async () => {
+      try {
+        await writeFile(to, asset.bytes, { flag: 'wx' })
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
+      }
+    })
+    persisted.push(asset.fileId)
+  }
+  return persisted
 }
 
 /** One `newFiles` entry, checked like a request body — it names a file the renderer wants created. */
@@ -167,17 +221,9 @@ export async function saveDrawing(req: DrawingSaveRequest): Promise<DrawingSaveR
   // Every check before any write: a half-landed save is worse than a refused one.
   const elements = sceneElements(json, file, 'BAD_REQUEST')
   const pending = newFiles.map((entry) => checkAsset(entry, file))
-  const { json: lean, embedded } = stripEmbeddedFiles(json)
-  // A legacy scene's still-embedded bytes shrink into the store on THIS save — only the ones the
-  // scene still references, and only those the renderer did not already ship as `newFiles`.
-  const referenced = referencedFileIds(elements)
-  for (const [fileId, entry] of Object.entries(embedded)) {
-    if (!referenced.has(fileId) || !isValidFileId(fileId) || pending.some((p) => p.fileId === fileId)) continue
-    const data = parseDataUrl(entry.dataURL)
-    const name = assetFileName(fileId, entry.mimeType)
-    if (data === null || name === null) continue
-    pending.push({ fileId, name, bytes: Buffer.from(data.base64, 'base64') })
-  }
+  // A legacy scene's still-embedded bytes shrink into the store on THIS save (see `liftEmbedded`).
+  const { lean, lifted } = liftEmbedded(json, elements, new Set(pending.map((p) => p.fileId)))
+  pending.push(...lifted)
   await requireDir(dir)
   // The file as it is now: its block and mtime in one open (🔒 YAZ-1834 D3), serving both the
   // conflict guard and the stamp. A block-less board is as old as its file; a brand-new one is
@@ -194,23 +240,7 @@ export async function saveDrawing(req: DrawingSaveRequest): Promise<DrawingSaveR
   }
   // Assets first (see the module doc), and only once the conflict guard has passed — a refused
   // save must leave the vault exactly as it found it.
-  const persisted: string[] = []
-  if (pending.length > 0) {
-    const store = path.join(dir, ASSETS_DIR)
-    await fsCall(store, () => mkdir(store, { recursive: true }))
-    for (const asset of pending) {
-      const to = path.join(store, asset.name)
-      await fsCall(to, async () => {
-        try {
-          // `wx`: an existing file is left exactly as it is — content-addressed means it IS these bytes.
-          await writeFile(to, asset.bytes, { flag: 'wx' })
-        } catch (err) {
-          if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
-        }
-      })
-      persisted.push(asset.fileId)
-    }
-  }
+  const persisted = await landAssets(dir, pending)
   const { mtime, size } = await fsCall(file, () => atomicWrite(file, stamped))
   return { path: file, mtime, size, persisted }
 }

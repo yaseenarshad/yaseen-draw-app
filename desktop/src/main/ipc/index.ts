@@ -11,6 +11,7 @@ import { registerMediaLibraryIpc } from './mediaLibrary'
 import { registerMediaStudioIpc } from './mediaStudio'
 import { registerSecretsIpc } from './secrets'
 import { registerStateIpc } from './state'
+import { registerStorageIpc } from './storage'
 import { registerWatchIpc } from './watch'
 import { registerWindowIpc } from './window'
 
@@ -37,5 +38,6 @@ export function registerIpc(store: Store, windows: WindowManagerIpc, userData: s
   // request gets its key without the key ever leaving main.
   registerMediaStudioIpc(userData, registerSecretsIpc(userData))
   registerWindowIpc(store, windows)
+  registerStorageIpc()
   return registerGithubIpc(store)
 }

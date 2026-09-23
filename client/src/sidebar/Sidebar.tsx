@@ -102,6 +102,11 @@ interface SidebarProps {
   /** The focus above happened (YAZ-801); App clears its flag so the next ⌘K is a fresh request. */
   onSearchFocusHandled: () => void
   /**
+   * YAZ-1801 D3: absolute paths the last sync pass held back as over GitHub's limit. Rows for
+   * them wear a cloud-off icon. App derives it from its ONE sync status; absent = none.
+   */
+  tooLarge?: ReadonlySet<string>
+  /**
    * The file clipboard's two verbs for App's ⌘C / ⌘X / ⌘V listener (D6 amended, YAZ-1674). App
    * owns the LISTENER — this component is unmounted while the sidebar is collapsed, and focus
    * after a click may sit in the canvas or nowhere focusable, so a panel listener never hears the
@@ -289,6 +294,7 @@ export function Sidebar({
   pendingSearchFocus,
   onSearchFocusHandled,
   clipboardRef,
+  tooLarge,
 }: SidebarProps) {
   const [tree, setTree] = useState<TreeResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -1387,6 +1393,7 @@ export function Sidebar({
                 reorder={favoriteReorder}
                 selection={selection}
                 onHoverFile={previewsOn ? hoverFile : undefined}
+                tooLarge={tooLarge}
               />
             )}
           </>
@@ -1413,6 +1420,7 @@ export function Sidebar({
                 move={fileMove}
                 selection={selection}
                 onHoverFile={previewsOn ? hoverFile : undefined}
+                tooLarge={tooLarge}
               />
             )}
           </>

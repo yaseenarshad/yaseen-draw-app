@@ -150,6 +150,7 @@ calls that go through it; `state`, `window`, `menu`, `link` and `watch` are call
 | `components.onChanged` | `components:changed` | pushed to EVERY window when the components library changes — any vault, any writer, no payload |
 | `secrets.set(req)` / `has(req)` | `secrets:set` / `secrets:has` | `{ name, value \| null }` writes or clears a secret; `{ name }` → boolean. NO channel answers a value (🔒 YAZ-1775 D4, YAZ-1842 D1) |
 | `github.status` / `syncNow` / `setEnabled` / `onStatus` | `github:*` | per-vault GitHub sync |
+| `storage.stats(root)` / `storage.shrink(root, skip)` | `storage:stats` / `storage:shrink` | Settings › Storage (YAZ-1801): the vault's sizes from the disk and the LOCAL git (never the network), measured on a worker thread (D8), and "Move pictures out of boards" (on the same worker, 🔒 D11) — every legacy board rewritten lean, pictures into `assets/`, its `yaseendraw` block kept verbatim (`updatedAt` does not move); `skip` = absolute paths with unsaved edits in a tab → `{ shrunk, skipped, bytesMoved }` |
 
 Rules that hold across the whole surface:
 
@@ -163,9 +164,11 @@ Rules that hold across the whole surface:
   `drawing:save`), nothing else may read or write those bytes. A save is an ORDER as well as a
   write: the images the scene names land before the scene that names them, and the dates ride
   the same atomic write (🔒 YAZ-1834 D3).
-- **Read ceilings are per door.** `MAX_FILE_BYTES` (10 MiB) bounds the text reads;
-  `MAX_DRAWING_BYTES` (200 MiB) bounds `drawing:load`, which has to open legacy scenes that still
-  embed their images as base64.
+- **One read ceiling, per document.** `MAX_DRAWING_BYTES` (200 MiB, `shared/types/errors.ts`)
+  bounds every whole-file read of a board — `drawing:load`, `dialog:open-file`, and the save's
+  own size check — because they all have to open legacy scenes that still embed their images as
+  base64. There is no separate text-read ceiling any more (the markdown layer that had one went
+  in YAZ-1808); `fs:tree` reads only a board's first KB (`BOARD_META_HEAD_BYTES`).
 - **Assets are immutable and append-only.** A save writes an asset with `wx` and treats EEXIST as
   success; nothing but the orphan sweep ever removes one.
 - **The renderer never reaches a provider** (🔒 YAZ-1775 D4). Iconify and Pixabay are fetched by MAIN, which
@@ -482,6 +485,57 @@ only subscriber to. What that event DROVE is kept, because it is the camera beha
 than an animation protocol: the transition token that stops a stale landing, and the rule that an
 in-flight transition must not land while the deck is zoomed out.
 
+### Board size and GitHub's limits (YAZ-1801)
+
+GitHub refuses any file over 100 MiB (and rejects the WHOLE push that carries one), warns over
+50 MiB, and wants a repo under 1 GB (strongly under 5 GB). The constants live in
+`shared/types/vault.ts`.
+
+- **D3 — an oversize file never jams sync.** A sync pass stats the untracked and modified files
+  before `git add -A` and excludes any at or over `GITHUB_FILE_LIMIT_BYTES` (95 MiB, a margin under the
+  100) by literal pathspec, then re-checks the staged list and `reset`s anything that grew past it.
+  Everything else commits and pushes; the pass ends `attention` / `too-large` with
+  `GithubSyncStatus.tooLarge` (vault-relative paths). The banner for it has NO Dismiss and stays
+  until a pass stops finding the file; the chip reads "N files not synced"; the sidebar row wears a
+  red cloud-off icon. The manager carries `tooLarge` through `pending` / `syncing` and arms no retry
+  for it. Out of scope: a file already COMMITTED over the limit (the push fails as `error`).
+- **🔒 D12 — a held-back tracked file never blocks the rebase.** It is still modified after the
+  commit, and `git rebase` refuses an unstaged change. So, only when the remote is ahead, exactly
+  the held-back TRACKED files are parked (`stash push -- <paths>`), the rebase runs, and their bytes
+  are copied back (`checkout stash@{0} -- <paths>`, unstaged, `stash drop`) whether it landed or
+  aborted — a copy, never a merge. The pass still ends `too-large`, never a false `conflict`. The
+  parked blob stays unreachable in `.git` until git's own gc, so "Git history" can read high by
+  that file's size until then. This is the sync pass's only stash.
+- **D4 — transfers get 10 minutes.** `fetch origin` and the ordinary `push` run with
+  `TRANSFER_TIMEOUT_MS`; every local call keeps 30 s; the quit flush's push keeps 5 s.
+- **D5 — one extraction.** `liftEmbedded` + `landAssets` (`desktop/src/main/fs/drawing.ts`) are
+  the only code that moves embedded pictures into `assets/`; `drawing:save` and `shrinkVault`
+  (`fs/shrink.ts`) both call them. Shrink differs from a save in one way only: it never stamps —
+  the block rides through verbatim. It skips boards the renderer lists as dirty (THIS window's
+  tabs with unsaved edits — `renameContinuity.dirtyPaths`), re-checks each board's mtime before
+  writing, and counts unreadable boards as skipped. A clean tab on a rewritten board reloads through
+  the ordinary watcher rule.
+- **D6 — no history reset.** Settings › Storage shows "Old versions" (history minus the current
+  snapshot's on-disk size) in the bar's muted line and offers no button for it.
+- **D8 + 🔒 D11 — neither measuring nor shrinking freezes the window.** `storage:stats` and
+  `storage:shrink` both go through `runOffThread` (`main/storageJob.ts`) to ONE `worker_threads`
+  Worker (`main/storageWorker.ts`, built as its own main chunk by electron-vite's `?modulePath`
+  import), told which job by a tagged message: `{ kind: 'stats', root }` | `{ kind: 'shrink', root,
+  skip }`. Same functions, same answers; one short-lived thread per job. Both walk the vault with
+  the one `vaultFiles` (`fs/fsUtils.ts`), so they agree on which files are the vault's. Shrink's
+  mtime re-check before each write (D5) still lets a save that lands while the worker runs win.
+- **🔒 D13 — measured only while Settings is open.** `useVaultStorage` measures on the Storage
+  page's open, on a sync pass FINISHING (`syncing` → synced / attention / off) while Settings is
+  open — App passes `settingsOpen ? syncState : null` — and after a shrink; one measure at a time,
+  a trigger mid-measure queuing one re-run. A vault change clears the numbers and measures nothing.
+  A failed first measure reads "Couldn't measure this vault" (not "Measuring…" forever); the next
+  page open retries.
+- **One red line.** The page's "Needs attention" lists every file ≥ 50 MiB (`VaultStorageStats.large`,
+  any kind — board, picture, video) and turns it red at `GITHUB_FILE_LIMIT_BYTES`, the same 95 MiB the
+  sync guard holds files back at, so a red row is exactly a file sync will not push.
+
+The demo vault for this is `tools/seedStorageDemoVault.mjs`.
+
 ### Secrets (🔒 YAZ-1775 D4, ⚡ YAZ-1842 D1)
 
 `<userData>/secrets.json` = `{ version: 2, values: Record<name, value> }`, plain text, file mode
@@ -766,7 +820,11 @@ two that do not — the Pixabay key and the GitHub switch — are marked below.
 | Files | Confirm before deleting · Library folder (🔒 YAZ-1775 D5: resolved path, Choose…, Reset to default) |
 | Images | Pixabay API key (🔒 YAZ-1775 D4: a password field, Save / Clear, "Key set" / "No key" from `secrets:has`, never echoed) — NOT in `SettingsState`, it lives in main's owner-only `secrets.json` (YAZ-1842 D1) |
 | Sync | the per-vault GitHub switch — the other setting NOT in `SettingsState` (it lives in `.yaseendraw/github.json`) |
+| Storage | its own page, like Hotkeys (YAZ-1801), present only while a vault is open — a report, not settings: **GitHub** (a bar of the git history on a fixed scale ending at 10 GB, marked at 1 GB and 5 GB; green to 1 GB, amber to 5 GB, red past it, "10 GB — over GitHub's max" past 10 GB; "Not synced with git" for a plain folder) with two muted lines, "Your files N" and "Old versions N" · **Needs attention** (only when non-empty: every file ≥ 50 MiB, red "Stays on this Mac" at the sync guard's 95 MiB, amber "Close to the limit" below) · **Make boards smaller** (only while pictures are inside boards, or a result from this session is showing: one sentence, "Move pictures out", the result line). Measured only while Settings is open (🔒 D13): on the page's open, a sync pass finishing, and after a shrink — one measure at a time, a trigger mid-measure queuing one re-run; a failed first measure reads "Couldn't measure this vault" |
 | Hotkeys | its own page: the Window, Canvas and Mouse tables, from `hotkeys.ts` |
+
+A group may declare `available(ctx)` (Storage's two conditional groups), and a row may be `bare`
+— its control is the whole row, its label and hint feed search only.
 
 `hotkeys.ts` is the single source of truth for every binding the app advertises — Settings ›
 Hotkeys renders it and nothing else — and `hotkeys.test.ts` pins the expected set, the Canvas

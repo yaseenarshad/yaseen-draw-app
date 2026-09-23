@@ -1,4 +1,4 @@
-import type { BridgeError, BridgeErrorCode, ComponentItem, ComponentReadResponse, ComponentRenameRequest, ComponentSaveRequest, ComponentSlugRequest, CreateDirResponse, CreateFileRequest, CreateFileResponse, DeleteRequest, DeleteResponse, DrawingLoadRequest, DrawingLoadResponse, DrawingSaveRequest, DrawingSaveResponse, FileClipRequest, FileClipState, GithubSyncStatus, MediaFavoritesRequest, MediaImportRequest, MediaImportResponse, MediaPreviewRequest, MediaPreviewResponse, MediaRecentRequest, MediaSearchRequest, MediaSearchResponse, OpenDrawingResponse, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, RevealRequest, RevealResponse, SaveDrawingRequest, SaveDrawingResponse, SecretHasRequest, SecretSetRequest, StoredMediaItem, TreeResponse } from '@shared/types'
+import type { BridgeError, BridgeErrorCode, ComponentItem, ComponentReadResponse, ComponentRenameRequest, ComponentSaveRequest, ComponentSlugRequest, CreateDirResponse, CreateFileRequest, CreateFileResponse, DeleteRequest, DeleteResponse, DrawingLoadRequest, DrawingLoadResponse, DrawingSaveRequest, DrawingSaveResponse, FileClipRequest, FileClipState, GithubSyncStatus, MediaFavoritesRequest, MediaImportRequest, MediaImportResponse, MediaPreviewRequest, MediaPreviewResponse, MediaRecentRequest, MediaSearchRequest, MediaSearchResponse, OpenDrawingResponse, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, RevealRequest, RevealResponse, SaveDrawingRequest, SaveDrawingResponse, SecretHasRequest, SecretSetRequest, ShrinkResult, StoredMediaItem, TreeResponse, VaultStorageStats } from '@shared/types'
 
 /** Typed failure from the main process (see docs/CONTRACTS.md "Bridge API"). */
 export class BridgeRequestError extends Error {
@@ -117,5 +117,10 @@ export const api = {
     syncNow: (root: string) => call<GithubSyncStatus>(() => window.yaseenDraw.github.syncNow(root)),
     setEnabled: (root: string, enabled: boolean) => call<GithubSyncStatus>(() => window.yaseenDraw.github.setEnabled(root, enabled)),
     onStatus: (listener: (status: GithubSyncStatus) => void) => window.yaseenDraw.github.onStatus(listener),
+  },
+  /** Settings › Storage (YAZ-1801): what the vault weighs (disk + local git), and moving legacy pictures out of boards. */
+  storage: {
+    stats: (root: string) => call<VaultStorageStats>(() => window.yaseenDraw.storage.stats(root)),
+    shrink: (root: string, skip: readonly string[]) => call<ShrinkResult>(() => window.yaseenDraw.storage.shrink(root, skip)),
   },
 }

@@ -22,6 +22,8 @@ export interface RenameContinuityHandle {
   flush(): Promise<void>
   /** Stop this editor writing ever again (pending drops, unmount flush becomes a no-op). */
   retire(): void
+  /** Whether the tab holds edits not yet on disk (YAZ-1801: shrink must not rewrite under them). */
+  dirty(): boolean
 }
 
 const handles = new Map<string, RenameContinuityHandle>()
@@ -57,6 +59,17 @@ export function retirePath(path: string): void {
 export function retireDir(dir: string): void {
   const prefix = `${dir}/`
   for (const [path, handle] of handles) if (path.startsWith(prefix)) handle.retire()
+}
+
+/**
+ * Every open path in THIS window whose editor has unsaved edits (YAZ-1801 D5) — the `skip` list
+ * "Move pictures out of boards" hands main, so it never rewrites a board under a dirty buffer
+ * (that is the conflict bar's case, and the user would see it for an action they took in
+ * Settings). Per renderer, like the map: another WINDOW's dirty tab is not in it — the shrink's
+ * own mtime re-check narrows that race to the instant of the write.
+ */
+export function dirtyPaths(): string[] {
+  return [...handles].filter(([, handle]) => handle.dirty()).map(([path]) => path)
 }
 
 /** Test hook. */

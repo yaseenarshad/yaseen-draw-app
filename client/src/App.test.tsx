@@ -8,7 +8,7 @@ import { LINK_NOTICE_MS, type NoticeKind } from './lib/notice'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { StrictMode, act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { DEFAULT_SETTINGS, defaultAppState, defaultFolderState, type AppState, type SidebarLens, type TreeResponse, type WindowIdentity } from '@shared/types'
+import { DEFAULT_SETTINGS, defaultAppState, defaultFolderState, type AppState, type GithubSyncStatus, type SidebarLens, type TreeResponse, type WindowIdentity } from '@shared/types'
 import * as continuity from './lib/renameContinuity'
 import { storage } from './lib/storage'
 
@@ -35,6 +35,8 @@ interface SidebarStubProps {
   onNotice: (message: string, icon?: NoticeKind) => void
   /** ⌘C / ⌘X / ⌘V's handle (⚡ YAZ-1674 D6 amended): App asks, the Sidebar (here a stub) answers. */
   clipboardRef: { current: { cutOrCopy: (op: 'copy' | 'cut') => boolean; paste: () => boolean } | null }
+  /** YAZ-1801 D3: the held-back files, as the tree's absolute paths. */
+  tooLarge?: ReadonlySet<string>
 }
 
 const captured = vi.hoisted(() => ({
@@ -74,6 +76,7 @@ function installBridge(state: AppState, identity: IdentityFixture) {
   const linkNotice = new Set<(message: string) => void>()
   const fileRenamed = new Set<(ev: { oldPath: string; newPath: string; kind?: 'file' | 'dir' }) => void>()
   const fileDeleted = new Set<(ev: { path: string; kind: 'file' | 'dir' }) => void>()
+  const syncStatus = new Set<(status: GithubSyncStatus) => void>()
   const menuSub = (set: Set<() => void>) =>
     vi.fn((l: () => void) => {
       set.add(l)
@@ -160,7 +163,10 @@ function installBridge(state: AppState, identity: IdentityFixture) {
       status: vi.fn(async (r: string) => ({ root: r, state: 'off' as const })),
       syncNow: vi.fn(async (r: string) => ({ root: r, state: 'off' as const })),
       setEnabled: vi.fn(async (r: string) => ({ root: r, state: 'off' as const })),
-      onStatus: vi.fn(() => () => undefined),
+      onStatus: vi.fn((l: (status: GithubSyncStatus) => void) => {
+        syncStatus.add(l)
+        return () => syncStatus.delete(l)
+      }),
     },
   }
   Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
@@ -182,6 +188,7 @@ function installBridge(state: AppState, identity: IdentityFixture) {
     emitLinkNotice: (message: string) => linkNotice.forEach((l) => l(message)),
     emitFileRenamed: (oldPath: string, newPath: string, kind?: 'file' | 'dir') => fileRenamed.forEach((l) => l({ oldPath, newPath, kind })),
     emitFileDeleted: (path: string, kind: 'file' | 'dir' = 'file') => fileDeleted.forEach((l) => l({ path, kind })),
+    emitSyncStatus: (status: GithubSyncStatus) => syncStatus.forEach((l) => l(status)),
   }
 }
 
@@ -355,6 +362,21 @@ describe('App notice icon (D10 amended, YAZ-1674)', () => {
     act(() => captured.sidebar?.onNotice('plain'))
     expect(el.querySelector<HTMLElement>('.link-notice')?.dataset.icon).toBe('info')
     expect(el.querySelector('.link-notice')?.textContent).toBe('plain')
+  })
+})
+
+describe('App files held back as too large (YAZ-1801 D3)', () => {
+  it('shows the too-large banner with NO Dismiss, and hands the sidebar the held-back files as absolute tree paths', async () => {
+    const { el, emitSyncStatus } = await mount(defaultAppState(), { id: 'w1', root: '/v', file: null, tabs: [] })
+    await act(async () => emitSyncStatus({ root: '/v', state: 'attention', attention: 'too-large', tooLarge: ['Folder/Big video.mov'], enabled: true }))
+    const banner = el.querySelector('.sync-banner')
+    expect(banner?.textContent).toContain('Big video.mov is over GitHub')
+    expect([...(banner?.querySelectorAll('button') ?? [])].map((b) => b.textContent)).not.toContain('Dismiss')
+    expect([...(captured.sidebar?.tooLarge ?? [])]).toEqual(['/v/Folder/Big video.mov'])
+
+    await act(async () => emitSyncStatus({ root: '/v', state: 'synced', enabled: true }))
+    expect(el.querySelector('.sync-banner')).toBeNull()
+    expect([...(captured.sidebar?.tooLarge ?? [])]).toEqual([])
   })
 })
 

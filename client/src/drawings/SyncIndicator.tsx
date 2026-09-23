@@ -1,4 +1,5 @@
 import type { GithubSyncStatus } from '@shared/types'
+import { TOO_LARGE_LABEL } from '../lib/syncAttention'
 
 /**
  * The GitHub sync chip (YAZ-1081 🔒 YAZ-1775 D4): sits immediately LEFT of the per-tab Saved
@@ -35,10 +36,17 @@ function title(status: GithubSyncStatus): string {
 }
 
 export function SyncIndicator({ status, onSyncNow }: { status: GithubSyncStatus; onSyncNow: () => void }) {
+  // YAZ-1801 D3: files held back as over GitHub's limit outrank every other label — "Synced" or
+  // "Attention" would both undersell "this file is not backed up". Red, counted, and the hover
+  // names them. The list rides a `syncing` status too (the manager carries it), so the warning
+  // does not blink away for the length of every pass.
+  const held = status.tooLarge ?? []
+  const label = held.length === 0 ? LABEL[status.state] : held.length === 1 ? '1 file not synced' : `${held.length} files not synced`
+  const hover = held.length === 0 ? title(status) : `${TOO_LARGE_LABEL}: ${held.join(', ')}`
   return (
-    <button type="button" className={`sync-indicator sync-indicator--${status.state}`} title={title(status)} aria-live="polite" onClick={onSyncNow}>
+    <button type="button" className={`sync-indicator sync-indicator--${held.length === 0 ? status.state : 'attention'}`} title={hover} aria-live="polite" onClick={onSyncNow}>
       <span className="sync-indicator__dot" />
-      {LABEL[status.state]}
+      {label}
     </button>
   )
 }
