@@ -151,10 +151,10 @@ describe('SettingsDialog shell (D1)', () => {
 describe('SettingsDialog: one page of every settings section (the post-demo redesign)', () => {
   it('the nav: the settings-page anchors (Sync only with the engine), a divider, then the standalone Hotkeys page', () => {
     const { el } = mount()
-    expect(navShape(el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images', '—', 'Sharing', 'Hotkeys'])
+    expect(navShape(el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images', '—', 'Hotkeys'])
     unmount()
     const withSync = mount({ ...DEFAULT_SETTINGS }, status())
-    expect(navShape(withSync.el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images', 'Sync', '—', 'Sharing', 'Hotkeys'])
+    expect(navShape(withSync.el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images', 'Sync', '—', 'Hotkeys'])
   })
 
   it('renders every settings section on the one page, in order, each anchored by id and every row addressed by data-setting — Hotkeys is not on it', () => {

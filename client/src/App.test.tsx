@@ -169,6 +169,12 @@ function installBridge(state: AppState, identity: IdentityFixture) {
         return () => syncStatus.delete(l)
       }),
     },
+    // Settings › Sharing (YAZ-1799 D7): App's `useSharing` reads while Settings is open. Not set up.
+    share: {
+      status: vi.fn(async () => ({ state: 'off' as const, url: null, workersDevUrl: null, customDomain: null, accountName: null, workerName: null, bucketName: null, readyAt: null, demo: false })),
+      list: vi.fn(async () => []),
+      onChanged: vi.fn(() => () => {}),
+    },
   }
   Object.defineProperty(window, 'yaseenDraw', { value: bridge, configurable: true, writable: true })
   return {
@@ -678,7 +684,8 @@ describe('App settings dialog (YAZ-1679)', () => {
   it('Yaseen Draw › Settings… (⌘,) mounts the ONE dialog, and its × unmounts it', async () => {
     const { el, emitSettings } = await mount(defaultAppState(), { id: 'w1', root: '/v', file: null, tabs: [] })
     expect(el.querySelector('.settings-dialog')).toBeNull()
-    act(() => emitSettings())
+    // Async: opening Settings reads the share status (App's `useSharing`), which lands a tick later.
+    await act(async () => emitSettings())
     expect(el.querySelector('.settings-dialog')).not.toBeNull()
     act(() => el.querySelector<HTMLButtonElement>('[aria-label="Close settings"]')?.click())
     expect(el.querySelector('.settings-dialog')).toBeNull()

@@ -59,8 +59,7 @@
   background: var(--bg-hover);
 }
 
-.share-dialog__text,
-.share-confirm p {
+.share-dialog__text {
   margin: 0 0 12px;
 }
 
@@ -68,43 +67,6 @@
   margin: 6px 0 0;
   font-size: 12px;
   color: var(--fg-muted);
-}
-
-.share-dialog__error,
-.share-dialog__ok {
-  margin: 12px 0 0;
-  padding: 8px 10px;
-  font-size: 13px;
-  border-radius: 8px;
-}
-
-.share-dialog__error {
-  color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
-}
-
-.share-dialog__ok {
-  color: var(--ok);
-  background: color-mix(in srgb, var(--ok) 10%, transparent);
-}
-
-.share-dialog__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.share-confirm {
-  margin-top: 12px;
-  padding: 12px;
-  background: var(--bg-side);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-
-.share-confirm .share-dialog__actions {
-  margin-top: 0;
 }
 
 .share-btn {
@@ -133,196 +95,6 @@
 
 .share-btn--primary:hover:not(:disabled) {
   background: color-mix(in srgb, var(--accent) 85%, #000);
-}
-
-.share-btn--danger {
-  color: var(--danger);
-  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
-}
-
-.share-btn--danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-}
-
-/* ---------- Settings › Sharing ---------- */
-
-.sharing-page {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  font-size: 14px;
-  line-height: 1.55;
-}
-
-.sharing-card {
-  padding: 14px 16px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-
-.sharing-card h3 {
-  margin: 0 0 8px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.sharing-card p {
-  margin: 0 0 8px;
-}
-
-.sharing-card p:last-child {
-  margin-bottom: 0;
-}
-
-.sharing-status {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 15px;
-}
-
-.sharing-status__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--fg-muted);
-}
-
-.sharing-status--ready .sharing-status__dot {
-  background: var(--ok);
-}
-
-.sharing-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.sharing-input {
-  flex: 1;
-  min-width: 200px;
-  padding: 6px 8px;
-  font-size: 13px;
-  color: var(--fg);
-  background: var(--bg-side);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
-
-.sharing-steps {
-  margin: 10px 0 0;
-  padding: 0;
-  list-style: none;
-  font-size: 13px;
-}
-
-.sharing-steps li {
-  display: grid;
-  grid-template-columns: 22px 1fr;
-  gap: 4px;
-  padding: 3px 0;
-}
-
-.sharing-steps__icon {
-  text-align: center;
-}
-
-.sharing-steps__detail {
-  grid-column: 2;
-  font-size: 12px;
-  color: var(--fg-muted);
-}
-
-.sharing-steps li[data-state='failed'] .sharing-steps__detail {
-  color: var(--danger);
-  font-size: 13px;
-}
-
-.sharing-steps li[data-state='pending'] {
-  color: var(--fg-muted);
-}
-
-.sharing-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.sharing-list li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 4px 10px;
-  padding: 8px 0;
-  border-top: 1px solid var(--border);
-}
-
-.sharing-list li:first-child {
-  border-top: 0;
-}
-
-.sharing-list__name {
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sharing-list__meta {
-  grid-column: 1;
-  font-size: 12px;
-  color: var(--fg-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sharing-list__flag {
-  grid-column: 1 / -1;
-  font-size: 12px;
-  color: var(--notice-fg);
-}
-
-.sharing-list__live {
-  grid-column: 1 / -1;
-  font-size: 12px;
-  color: var(--ok);
-}
-
-.sharing-list__live[data-tone='busy'] {
-  color: var(--accent);
-}
-
-.sharing-list__live[data-tone='error'] {
-  color: var(--danger);
-}
-
-.sharing-list__actions {
-  grid-row: 1 / span 2;
-  grid-column: 2;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.sharing-help h4 {
-  margin: 14px 0 4px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.sharing-help ol,
-.sharing-help ul {
-  margin: 0 0 8px;
-  padding-left: 20px;
-}
-
-.sharing-help code {
-  padding: 1px 4px;
-  font-size: 12px;
-  background: var(--bg-side);
-  border-radius: 4px;
 }
 
 /* ---------- Share dialog: General access ---------- */
@@ -481,29 +253,132 @@
   border-radius: 999px;
 }
 
-/* The account picker (a key that sees several Cloudflare accounts). */
-.sharing-accounts {
-  margin: 12px 0 0;
+/* ---------- Settings › Sharing (YAZ-1889): settings rows and buttons; only what they lack ---------- */
+
+.sharing__status {
+  white-space: nowrap;
+}
+
+.sharing__muted,
+.sharing__error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+
+.sharing__error {
+  margin-top: 8px;
+  color: var(--danger);
+}
+
+.settings__option.sharing__danger {
+  color: var(--danger);
+}
+
+.settings__option.sharing__danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.sharing__accounts,
+.sharing__confirm {
+  margin: 10px 0 0;
   padding: 10px 12px;
+  font-size: 13px;
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
 
-.sharing-accounts legend {
-  padding: 0 4px;
-  font-size: 13px;
-}
-
-.sharing-accounts__row {
+.sharing__accounts label {
   display: flex;
-  align-items: center;
   gap: 8px;
-  padding: 4px 0;
-  font-size: 13px;
-  cursor: pointer;
+  padding: 3px 0;
 }
 
-.sharing-accounts .sharing-row {
-  justify-content: flex-end;
+.sharing__confirm p {
+  margin: 0 0 8px;
+}
+
+.sharing__accounts .settings__options {
   margin-top: 8px;
+}
+
+.sharing__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 10px 0 0;
+  padding: 0;
+  font-size: 13px;
+  list-style: none;
+}
+
+.sharing__steps li {
+  display: flex;
+  gap: 8px;
+}
+
+.sharing__steps li[data-state='pending'],
+.sharing__step-detail {
+  color: var(--fg-muted);
+}
+
+.sharing__steps li[data-state='failed'] .sharing__step-detail {
+  color: var(--danger);
+}
+
+.sharing__boards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sharing__board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.sharing__board-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sharing__board .share-status {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.sharing__domain {
+  align-self: center;
+  margin-right: 8px;
+}
+
+.sharing__help {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.sharing__help h4 {
+  margin: 14px 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sharing__help h4:first-child {
+  margin-top: 0;
+}
+
+.sharing__help p,
+.sharing__help ol {
+  margin: 0 0 6px;
+}
+
+.sharing__help ol {
+  padding-left: 20px;
 }

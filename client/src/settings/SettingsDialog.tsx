@@ -12,7 +12,7 @@
  * ONE PAGE, NOT PAGES (Yasin's call after the demo): every setting is on the page at once, so a
  * nav click is a scroll, not a route, and the active nav item is DERIVED from where the page is
  * scrolled to. Opening always starts at the top. The exceptions are the `standalone` sections
- * (Hotkeys — a reference table, noise among settings; Storage — a per-vault report, YAZ-1801): each
+ * (Hotkeys — a reference table, noise among settings; Storage — a per-vault report, YAZ-1801; Sharing — a setup flow and a write-up, YAZ-1799): each
  * is its own page inside the dialog, listed under a divider in the nav, and `page` names the one
  * showing; `null` is the settings page.
  *
