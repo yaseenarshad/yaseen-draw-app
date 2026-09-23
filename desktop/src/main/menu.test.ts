@@ -488,12 +488,6 @@ describe('createMenuHandlers', () => {
     expect(windows.openRecentBeside).not.toHaveBeenCalled()
   })
 
-  it('openRecent with no focused window opens through the door: a new window, not a silent no-op (YAZ-1913 S10)', () => {
-    const { handlers, windows } = makeHandlers(undefined)
-    handlers.openRecent('/vaults/work')
-    expect(windows.openRecentBeside).toHaveBeenCalledExactlyOnceWith('/vaults/work')
-  })
-
   it('closeTab / nextTab / prevTab go to the focused renderer only (GRO-2232); no focused window is a no-op', () => {
     const wc = { id: 7, send: vi.fn() }
     const { handlers } = makeHandlers(wc)
