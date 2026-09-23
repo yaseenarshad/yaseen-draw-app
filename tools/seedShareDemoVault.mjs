@@ -239,9 +239,10 @@ function bucketObject(key, bytes, customMetadata, updatedAt) {
   fs.writeFileSync(path.join(BUCKET, encodeURIComponent(key)), bytes)
   fs.writeFileSync(path.join(BUCKET, `${encodeURIComponent(key)}.meta.json`), JSON.stringify({ key, size: bytes.length, uploaded: new Date(updatedAt).toISOString(), httpMetadata: { contentType: 'application/json; charset=utf-8' }, customMetadata }))
 }
-/** A shared board as the Worker stores it: one object, the permission in its customMetadata. */
+/** A shared board as the Worker stores it: the board, plus its download flag as its own `perm/<id>` object. */
 function bucketPut(id, allowDownload, name, sceneObj, updatedAt) {
-  bucketObject(`boards/${id}.excalidraw`, Buffer.from(`${JSON.stringify(sceneObj)}\n`), { name, updatedAt: String(updatedAt), allowDownload: allowDownload ? '1' : '0' }, updatedAt)
+  bucketObject(`boards/${id}.excalidraw`, Buffer.from(`${JSON.stringify(sceneObj)}\n`), { name, updatedAt: String(updatedAt) }, updatedAt)
+  bucketObject(`perm/${id}`, Buffer.from(allowDownload ? '1' : '0'), {}, updatedAt)
 }
 bucketPut(ID10, false, '10 Already shared — link works on launch', board10, now - DAY)
 bucketPut(ID12, true, '12 Renamed — old name', board12, now - 5 * DAY)
