@@ -114,6 +114,9 @@ async function wipe(env) {
   return json({ deleted: keys.length, done: !page.truncated })
 }
 
+/** A `filename*` value: `encodeURIComponent` leaves `'()*` bare, which RFC 5987 does not allow (an apostrophe ends the charset part). */
+const rfc5987 = (s) => encodeURIComponent(s).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
+
 /** The scene for the viewer (`download` false) or the download itself (`download` true — refused when off). */
 async function sceneOrRaw(request, env, id, url, download) {
   const object = request.method === 'HEAD' ? await env.BUCKET.head(key(id)) : await env.BUCKET.get(key(id))
@@ -121,7 +124,7 @@ async function sceneOrRaw(request, env, id, url, download) {
   if (download && !(await allowsDownload(env, id))) return json({ error: 'download_not_allowed' }, 403)
   const name = object.customMetadata?.name ?? 'Shared board'
   const headers = new Headers({ 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'access-control-allow-origin': '*' })
-  if (download && url.searchParams.has('download')) headers.set('content-disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`${name}.excalidraw`)}`)
+  if (download && url.searchParams.has('download')) headers.set('content-disposition', `attachment; filename*=UTF-8''${rfc5987(`${name}.excalidraw`)}`)
   headers.set('x-board-name', encodeURIComponent(name))
   return new Response(request.method === 'HEAD' ? null : object.body, { status: 200, headers })
 }

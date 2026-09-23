@@ -89,6 +89,42 @@ describe('share Worker: PUT streams the board', () => {
   })
 })
 
+describe('share Worker: a big board (YAZ-1892 scenario 10)', () => {
+  it('a ~45 MB body streams through in 1 MB chunks and reads back byte for byte', async () => {
+    const MB = 1_000_000
+    const chunks = 45
+    let pulled = 0
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (pulled === chunks) return controller.close()
+        controller.enqueue(new Uint8Array(MB).fill(pulled++ % 251))
+      },
+    })
+    let received: unknown
+    const spy = { ...bucket, put: (key: string, value: ReadableStream, opts: object) => ((received = value), bucket.put(key, value, opts)) }
+    const res = await handle(
+      new Request(`${ORIGIN}/api/boards/${ID}`, { method: 'PUT', headers: { authorization: `Bearer ${PASSWORD}`, 'content-length': String(chunks * MB) }, body, duplex: 'half' } as RequestInit),
+      { BUCKET: spy, UPLOAD_PASSWORD: PASSWORD },
+    )
+    expect(await res.json()).toMatchObject({ id: ID, size: chunks * MB })
+    expect(received).toBeInstanceOf(ReadableStream)
+    const back = new Uint8Array(await (await call('GET', `/raw/${ID}`, { auth: null })).arrayBuffer())
+    expect(back.length).toBe(chunks * MB)
+    expect([back[0], back[MB], back[chunks * MB - 1]]).toEqual([0, 1, 44])
+  })
+})
+
+describe('share Worker: the download file name', () => {
+  it('encodes every character RFC 5987 does not allow bare — apostrophes, brackets and stars included', async () => {
+    const name = "Tom's “café” (v2)* 🎨"
+    await call('PUT', `/api/boards/${ID}`, { body: '{}', headers: { 'x-board-name': encodeURIComponent(name) } })
+    const header = (await call('GET', `/raw/${ID}?download=1`, { auth: null })).headers.get('content-disposition') ?? ''
+    const value = header.split("filename*=UTF-8''")[1]
+    expect(value).toMatch(/^[A-Za-z0-9!#$&+\-.^_`|~%]+$/)
+    expect(decodeURIComponent(value)).toBe(`${name}.excalidraw`)
+  })
+})
+
 describe('share Worker: the download flag is its own object, perm/<id> (D15)', () => {
   it('a PUT with x-allow-download writes the flag; a PUT without it leaves the flag alone', async () => {
     await put('{"v":1}', '0')
