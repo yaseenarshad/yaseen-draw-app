@@ -63,7 +63,8 @@ export function createBoards(ctx: ShareContext) {
 
   /**
    * Every share in the vault, newest first. `check` (Settings) also asks the Worker whether each
-   * link is still live — one HEAD per share; the sidebar badges pass `check: false` and send none.
+   * link is still live — one HEAD per share, which sets `stale`; the sidebar badges pass
+   * `check: false` and send none.
    */
   async function list(root: string, { check = true }: { check?: boolean } = {}): Promise<ShareListEntry[]> {
     const r = requireAbsPath(root, 'root')
@@ -72,19 +73,14 @@ export function createBoards(ctx: ShareContext) {
     const rows = await Promise.all(
       Object.entries(shares).map(async ([key, rec]): Promise<ShareListEntry> => {
         const fileExists = await stat(absFromKey(r, key)).then((s) => s.isFile(), () => false)
-        let live: ShareListEntry['live'] = 'unknown'
         if (check && origin !== null) {
-          try {
-            // `/scene`, not `/raw`: a view-only board answers 403 on `/raw` and would read as broken.
-            const res = await ctx.doFetch(`${origin}/scene/${rec.id}`, { method: 'HEAD', signal: AbortSignal.timeout(LIVE_CHECK_MS) })
-            live = res.status === 200 ? 'live' : res.status === 404 ? 'missing' : 'unknown'
-            if (live === 'missing') stale.add(rec.id)
-            else if (live === 'live') stale.delete(rec.id)
-          } catch {
-            live = 'unknown'
-          }
+          // `/scene`, not `/raw`: a view-only board answers 403 on `/raw` and would read as broken.
+          // A 404 marks the link stale, a 200 clears it; anything else (offline, 5xx) leaves it as it was.
+          const res = await ctx.doFetch(`${origin}/scene/${rec.id}`, { method: 'HEAD', signal: AbortSignal.timeout(LIVE_CHECK_MS) }).catch(() => null)
+          if (res?.status === 404) stale.add(rec.id)
+          else if (res?.status === 200) stale.delete(rec.id)
         }
-        return { ...toEntry(r, key, rec, origin), fileExists, live }
+        return { ...toEntry(r, key, rec, origin), fileExists }
       }),
     )
     return rows.sort((a, b) => b.updatedAt - a.updatedAt)

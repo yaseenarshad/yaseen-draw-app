@@ -77,7 +77,7 @@ interface ProbeProps {
   onExportImage: () => void
   onCanvasBackground: (color: string) => void
   onExportDrawing: () => void
-  onShareLink?: () => void
+  onShareLink: () => void
 }
 
 function Probe(props: ProbeProps) {

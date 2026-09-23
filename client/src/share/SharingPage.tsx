@@ -22,7 +22,7 @@ import { api } from '../api'
 import { basename, stripExt } from '../lib/paths'
 import type { SettingsCtx, SettingsSection } from '../settings/registry'
 import { isPending } from './liveShare'
-import { errorText, liveLine } from './ShareDialog'
+import { errorText, liveLine, type Line } from './shareText'
 import type { SharingState } from './useSharing'
 import './share.css'
 
@@ -108,7 +108,7 @@ function SetupSharing({ sharing }: SettingsCtx) {
         </button>
         <input
           type="password"
-          className="settings__input settings__input--secret"
+          className="settings__input settings__input--fill"
           aria-label="Cloudflare API key"
           placeholder="Paste your Cloudflare API key"
           autoComplete="off"
@@ -163,11 +163,10 @@ function SetupSharing({ sharing }: SettingsCtx) {
   )
 }
 
-/** A row's one status line: a board or a link that is gone says so first; otherwise the Share dialog's own line. */
-function boardLine(row: ShareListEntry, ready: boolean, now: number): ReturnType<typeof liveLine> | null {
+/** A row's one status line: a board that is gone says so first; otherwise the Share dialog's own line. */
+function boardLine(row: ShareListEntry, ready: boolean, now: number): Line | null {
   if (!row.fileExists) return { tone: 'error', text: 'No board at this path any more (renamed, moved or deleted?). The link keeps showing the last version uploaded.' }
   if (!ready) return null
-  if (row.live === 'missing' && row.sync.state !== 'uploading') return { tone: 'error', text: "Stale: the link doesn't work, its copy is gone from Cloudflare. Save the board once to put it back, or stop sharing it." }
   return liveLine(row, isPending(row.path), now)
 }
 
@@ -271,7 +270,7 @@ function CustomDomain({ sharing }: SettingsCtx) {
           </>
         ) : (
           <>
-            <input className="settings__input settings__input--secret" aria-label="Custom domain" placeholder="share.yourdomain.com" spellCheck={false} value={draft} onChange={(e) => setDraft(e.target.value)} disabled={!ready || busy} />
+            <input className="settings__input settings__input--fill" aria-label="Custom domain" placeholder="share.yourdomain.com" spellCheck={false} value={draft} onChange={(e) => setDraft(e.target.value)} disabled={!ready || busy} />
             <button type="button" className="settings__option" onClick={() => void apply(draft)} disabled={!ready || busy || draft.trim() === ''} data-testid="sharing-attach">
               {busy ? 'Attaching' : 'Attach'}
             </button>
@@ -329,7 +328,7 @@ const TURN_OFF = {
     done: 'Key forgotten. Your links keep showing their last version; set sharing up again to update or stop them.',
   },
   delete: {
-    ask: 'Delete every shared board, the Worker and the storage bucket from your Cloudflare account, and forget the key on this Mac? Every link stops working at once, for good. Your boards on this Mac are not touched.',
+    ask: 'Delete every shared board, the Worker and the storage bucket from your Cloudflare account, and forget the key on this Mac? Every link stops working at once, for good. Your boards on this Mac are not touched. Only the open vault's list of shared boards is cleared: another vault still lists its old links until you stop them there.',
     go: 'Delete all shared links',
     done: 'Every shared link was deleted from Cloudflare, and this Mac forgot the key.',
   },

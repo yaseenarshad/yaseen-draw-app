@@ -56,7 +56,7 @@ export function PixabayKeyControl() {
         {status}
       </p>
       <div className="settings__options" role="group" aria-label="Pixabay API key">
-        <input type="password" className="settings__input settings__input--secret" aria-label="Pixabay API key" autoComplete="off" spellCheck={false} placeholder="Paste your key" value={draft} onChange={(e) => setDraft(e.target.value)} disabled={busy} />
+        <input type="password" className="settings__input settings__input--fill" aria-label="Pixabay API key" autoComplete="off" spellCheck={false} placeholder="Paste your key" value={draft} onChange={(e) => setDraft(e.target.value)} disabled={busy} />
         <button type="button" className="settings__option" onClick={() => void write(draft)} disabled={busy || draft === ''}>
           Save
         </button>

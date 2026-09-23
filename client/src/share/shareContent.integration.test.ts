@@ -46,8 +46,8 @@ async function write(rel: string, data: string | Uint8Array) {
   await fs.writeFile(at(rel), data)
 }
 async function shared(rel: string) {
-  const built = await buildShareContent(root, at(rel), { flush: false })
-  return { ...built, scene: JSON.parse(built.content) as { elements: { id: string; isDeleted?: boolean }[]; files: Record<string, { dataURL: string }> } }
+  const content = await buildShareContent(root, at(rel), { flush: false })
+  return { content, scene: JSON.parse(content) as { elements: { id: string; isDeleted?: boolean }[]; files: Record<string, { dataURL: string }> } }
 }
 
 beforeAll(async () => {
@@ -91,7 +91,6 @@ describe('the bytes a share uploads, from seeded boards (YAZ-1892 scenario 9)', 
   it('an empty board shares as a valid empty scene', async () => {
     const built = await shared('06 Empty.excalidraw')
     expect(built.scene).toMatchObject({ type: 'excalidraw', elements: [], files: {} })
-    expect(built.tooLarge).toBe(false)
   })
 
   it('unicode, emoji and apostrophe names and a board four folders down load and build', async () => {

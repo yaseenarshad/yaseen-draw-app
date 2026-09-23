@@ -2,7 +2,7 @@
  * The Share dialog (YAZ-1799 D6, YAZ-1888): one component per state it can show, the two pickers
  * driven by keyboard, and the modal's key boundary — nothing typed in the dialog or its menus
  * reaches the sidebar tree behind it, and nothing aimed at the tree while it is open can share or
- * unshare a board (the prototype's keyboard-test incident).
+ * unshare a board (an early build's keyboard-test incident).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
@@ -22,12 +22,13 @@ vi.mock('../api', async (importOriginal) => ({
     },
   },
 }))
-vi.mock('./shareContent', () => ({ buildShareContent: vi.fn(async () => ({ content: '{"type":"excalidraw"}', bytes: 20, tooLarge: false })), formatMB: (b: number) => `${b / 1e6} MB` }))
+vi.mock('./shareContent', () => ({ buildShareContent: vi.fn(async () => '{"type":"excalidraw"}') }))
 
-import { api } from '../api'
+import { api, BridgeRequestError } from '../api'
 import { buildShareContent } from './shareContent'
 import { noteBoardSaved, resetLiveShareForTests } from './liveShare'
-import { liveLine, ShareDialog } from './ShareDialog'
+import { ShareDialog } from './ShareDialog'
+import { liveLine } from './shareText'
 
 const share = vi.mocked(api.share)
 const ROOT = '/v'
@@ -235,15 +236,14 @@ describe('Share dialog actions (YAZ-1888)', () => {
     expect(share.publish).not.toHaveBeenCalled()
   })
 
-  it('a board too large to share says why, in red, and stays unshared', async () => {
-    vi.mocked(buildShareContent).mockResolvedValueOnce({ content: '', bytes: 150e6, tooLarge: true })
+  it("a board too large to share says why (main's TOO_LARGE, the one size check), in red, and stays unshared", async () => {
+    share.publish.mockRejectedValueOnce(new BridgeRequestError('TOO_LARGE', "This board is 150.0 MB once its images are packed in, and Cloudflare's free plan accepts at most 100.0 MB per upload."))
     await mount()
     click(byTest('share-access'))
     click(items()[1])
     await flush()
-    expect(share.publish).not.toHaveBeenCalled()
     expect(status().className).toContain('share-status--error')
-    expect(status().textContent).toMatch(/150 MB/)
+    expect(status().textContent).toMatch(/150\.0 MB/)
     expect(byTest('share-access').textContent).toBe('Not shared')
   })
 })

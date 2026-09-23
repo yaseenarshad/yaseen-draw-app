@@ -2,8 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const publish = vi.fn()
 const get = vi.fn()
-const status = vi.fn()
-vi.mock('../api', () => ({ api: { share: { publish: (...a: unknown[]) => publish(...a), get: (...a: unknown[]) => get(...a), status: (...a: unknown[]) => status(...a) } } }))
+vi.mock('../api', () => ({ api: { share: { publish: (...a: unknown[]) => publish(...a), get: (...a: unknown[]) => get(...a) } } }))
 const build = vi.fn()
 vi.mock('./shareContent', () => ({ buildShareContent: (...a: unknown[]) => build(...a) }))
 
@@ -20,8 +19,7 @@ describe('always-live share links (YAZ-1799 D3, YAZ-1886)', () => {
     vi.useFakeTimers()
     publish.mockReset().mockResolvedValue({})
     get.mockReset().mockResolvedValue({ id: 'abc' })
-    status.mockReset().mockResolvedValue({ state: 'ready' })
-    build.mockReset().mockImplementation(async () => ({ content: `v${build.mock.calls.length}`, bytes: 2, tooLarge: false }))
+    build.mockReset().mockImplementation(async () => `v${build.mock.calls.length}`)
   })
   afterEach(() => {
     resetLiveShareForTests()
@@ -44,16 +42,22 @@ describe('always-live share links (YAZ-1799 D3, YAZ-1886)', () => {
     expect(isPending(P)).toBe(false)
   })
 
-  it('never uploads a board that is not shared, or while sharing is not set up', async () => {
+  it('never uploads a board that is not shared', async () => {
     get.mockResolvedValueOnce(null)
     noteBoardSaved(ROOT, P)
     await vi.advanceTimersByTimeAsync(SETTLE_MS)
     await flush()
-    status.mockResolvedValueOnce({ state: 'off' })
-    noteBoardSaved(ROOT, P)
-    await vi.advanceTimersByTimeAsync(SETTLE_MS)
-    await flush()
+    expect(build).not.toHaveBeenCalled()
     expect(publish).not.toHaveBeenCalled()
+  })
+
+  it('while sharing is not set up, main refuses (and records NOT_SET_UP); nothing retries until the next save', async () => {
+    publish.mockRejectedValueOnce(Object.assign(new Error('Sharing is not set up on this computer yet.'), { code: 'NOT_SET_UP' }))
+    noteBoardSaved(ROOT, P)
+    await vi.advanceTimersByTimeAsync(SETTLE_MS * 3)
+    await flush()
+    expect(publish).toHaveBeenCalledTimes(1)
+    expect(isPending(P)).toBe(false)
   })
 
   it('one upload in flight; a save that lands mid-upload runs exactly one more after it (latest wins)', async () => {

@@ -13,15 +13,13 @@ import type { ShareListEntry } from '@shared/types'
 import { api } from '../api'
 import type { ShareBadge } from '../sidebar/Tree'
 import { isPending, onLiveShareChange } from './liveShare'
-import { liveLine } from './ShareDialog'
+import { liveLine } from './shareText'
 
 export function useShareBadges(root: string): ReadonlyMap<string, ShareBadge> {
   const [rows, setRows] = useState<readonly ShareListEntry[]>([])
   const [localTick, setLocalTick] = useState(0)
   useEffect(() => {
     setRows([])
-    // A harness (or an older preload) without the share bridge simply shows no marks.
-    if (typeof window === 'undefined' || window.yaseenDraw?.share === undefined) return
     let live = true
     let seq = 0
     const refresh = async () => {
