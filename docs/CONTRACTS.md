@@ -150,7 +150,7 @@ calls that go through it; `state`, `window`, `menu`, `link` and `watch` are call
 | `components.onChanged` | `components:changed` | pushed to EVERY window when the components library changes — any vault, any writer, no payload |
 | `secrets.set(req)` / `has(req)` | `secrets:set` / `secrets:has` | `{ name, value \| null }` writes or clears a secret; `{ name }` → boolean. NO channel answers a value (🔒 YAZ-1775 D4, YAZ-1842 D1) |
 | `github.status` / `syncNow` / `setEnabled` / `onStatus` | `github:*` | per-vault GitHub sync |
-| `storage.stats(root)` / `storage.shrink(root, skip)` | `storage:stats` / `storage:shrink` | Settings › Storage (YAZ-1801): the vault's sizes from the disk and the LOCAL git (never the network), measured on a worker thread (D8), and "Move pictures out of boards" — every legacy board rewritten lean, pictures into `assets/`, its `yaseendraw` block kept verbatim (`updatedAt` does not move); `skip` = absolute paths with unsaved edits in a tab → `{ shrunk, skipped, bytesMoved }` |
+| `storage.stats(root)` / `storage.shrink(root, skip)` | `storage:stats` / `storage:shrink` | Settings › Storage (YAZ-1801): the vault's sizes from the disk and the LOCAL git (never the network), measured on a worker thread (D8), and "Move pictures out of boards" (on the same worker, 🔒 D11) — every legacy board rewritten lean, pictures into `assets/`, its `yaseendraw` block kept verbatim (`updatedAt` does not move); `skip` = absolute paths with unsaved edits in a tab → `{ shrunk, skipped, bytesMoved }` |
 
 Rules that hold across the whole surface:
 
@@ -510,10 +510,13 @@ GitHub refuses any file over 100 MiB (and rejects the WHOLE push that carries on
   the ordinary watcher rule.
 - **D6 — no history reset.** Settings › Storage shows "Old versions" (history minus the current
   snapshot's on-disk size) in the bar's muted line and offers no button for it.
-- **D8 — measuring never freezes the window.** `storage:stats` runs `vaultStorage` on a
-  `worker_threads` Worker (`git/storageWorker.ts`, built as its own main chunk by electron-vite's
-  `?modulePath` import): the walk JSON.parses every board, which held the main process for ~1.3 s
-  on a 230 MB vault. Same function, same numbers; one short-lived thread per measure.
+- **D8 + 🔒 D11 — neither measuring nor shrinking freezes the window.** `storage:stats` and
+  `storage:shrink` both go through `runOffThread` (`main/storageJob.ts`) to ONE `worker_threads`
+  Worker (`main/storageWorker.ts`, built as its own main chunk by electron-vite's `?modulePath`
+  import), told which job by a tagged message: `{ kind: 'stats', root }` | `{ kind: 'shrink', root,
+  skip }`. In the main process the walk held the window ~1.3 s on a 230 MB vault and shrink ~4 s on
+  the demo vault. Same functions, same answers; one short-lived thread per job. Shrink's mtime
+  re-check before each write (D5) still lets a save that lands while the worker runs win.
 - **One red line.** The page's "Needs attention" lists every file ≥ 50 MiB (`VaultStorageStats.large`,
   any kind — board, picture, video) and turns it red at `GITHUB_FILE_LIMIT_BYTES`, the same 95 MiB the
   sync guard holds files back at, so a red row is exactly a file sync will not push.
