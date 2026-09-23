@@ -117,9 +117,10 @@ favorites live — point it inside a synced vault and they sync too). **Images �
 this vault's GitHub switch. **Storage** (its own page) shows this vault's git history on a bar that
 ends at GitHub's 10 GB maximum (marked at 1 GB and 5 GB), lists any file close to or over GitHub's
 100 MB limit, and offers **Move pictures out** for older boards that still carry their pictures
-inside. A file over GitHub's 100 MB limit is never committed: sync holds it back, says so in a
-banner that stays until it is fixed, turns the sync chip red ("1 file not synced") and marks the
-file with a red cloud in the sidebar — everything else keeps syncing.
+inside; it measures only while Settings is open. A file near GitHub's 100 MB limit (sync draws
+the line a little under it, at 95 MB) is never committed: sync holds it back, says so in a banner
+that stays until it is fixed, turns the sync chip red ("1 file not synced") and marks the file with
+a red cloud in the sidebar — everything else keeps syncing.
 **Hotkeys** lists every shortcut. Settings are global — one file, every window follows a change
 live — and never written into a vault.
 
