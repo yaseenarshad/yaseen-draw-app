@@ -123,14 +123,13 @@ export const api = {
     stats: (root: string) => call<VaultStorageStats>(() => window.yaseenDraw.storage.stats(root)),
     shrink: (root: string, skip: readonly string[]) => call<ShrinkResult>(() => window.yaseenDraw.storage.shrink(root, skip)),
   },
-  /** Share link (YAZ-1799, prototype): main holds the Cloudflare key and the upload password; this side only hands over bytes. */
+  /** Share link (YAZ-1799): main holds the Cloudflare key and the upload password; this side only hands over bytes. */
   share: {
     status: () => call<ShareStatus>(() => window.yaseenDraw.share.status()),
     accounts: (token: string) => call<{ id: string; name: string }[]>(() => window.yaseenDraw.share.accounts({ token })),
     setup: (token: string, accountId?: string) => call<ShareStatus>(() => window.yaseenDraw.share.setup({ token, accountId })),
     onSetupProgress: (listener: (p: ShareSetupProgress) => void) => window.yaseenDraw.share.onSetupProgress(listener),
     openCloudflare: () => call<void>(() => window.yaseenDraw.share.openCloudflare()),
-    openLink: (url: string) => call<void>(() => window.yaseenDraw.share.openLink({ url })),
     get: (req: ShareBoardRequest) => call<ShareEntry | null>(() => window.yaseenDraw.share.get(req)),
     list: (root: string) => call<ShareListEntry[]>(() => window.yaseenDraw.share.list({ root })),
     publish: (req: SharePublishRequest) => call<ShareEntry>(() => window.yaseenDraw.share.publish(req)),

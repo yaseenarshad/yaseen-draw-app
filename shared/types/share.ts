@@ -126,8 +126,6 @@ export interface ShareApi {
   onSetupProgress(listener: (progress: ShareSetupProgress) => void): () => void
   /** Open Cloudflare's "create API token" page (the fake one in the demo) in the browser. */
   openCloudflare(): Promise<void>
-  /** Open a share link in the default browser. */
-  openLink(req: { url: string }): Promise<void>
   get(req: ShareBoardRequest): Promise<ShareEntry | null>
   list(req: { root: string }): Promise<ShareListEntry[]>
   /** First share (new id), or an automatic re-upload after a save (same id): the object is replaced in place, its permission untouched. */

@@ -120,7 +120,7 @@ const makeSharing = () =>
     secrets: createSecrets(path.join(dir, 'secrets.json')),
     configFile: path.join(dir, 'sharing.json'),
     apiBase: API,
-    originOverride: ORIGIN,
+    demoOrigin: ORIGIN,
     modules: { 'worker.js': '// test' },
     readAssets: async () => [{ path: '/assets/viewer.js', bytes: new TextEncoder().encode('// viewer') }],
     fetchImpl: fakeFetch,

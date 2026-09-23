@@ -162,14 +162,13 @@ const api: YaseenDrawApi = {
     stats: (root) => call(CH.storageStats, root),
     shrink: (root, skip) => call(CH.storageShrink, root, skip),
   },
-  // Share link (YAZ-1799, prototype): main owns Cloudflare, the token and the upload password.
+  // Share link (YAZ-1799): main owns Cloudflare, the token and the upload password.
   share: {
     status: () => call(CH.shareStatus),
     accounts: (req) => call(CH.shareAccounts, req),
     setup: (req) => call(CH.shareSetup, req),
     onSetupProgress: on<ShareSetupProgress>(CH.shareSetupProgress),
     openCloudflare: () => call(CH.shareOpenCloudflare),
-    openLink: (req) => call(CH.shareOpenLink, req),
     get: (req) => call(CH.shareGet, req),
     list: (req) => call(CH.shareList, req),
     publish: (req) => call(CH.sharePublish, req),

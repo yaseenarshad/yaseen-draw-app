@@ -97,14 +97,13 @@ export const CH = {
   // Settings › Storage (YAZ-1801): sizes from the disk + local git, and the legacy-picture shrink.
   storageStats: 'storage:stats',
   storageShrink: 'storage:shrink',
-  // Share link (YAZ-1799, prototype): main owns Cloudflare, the token and the upload password; the
+  // Share link (YAZ-1799): main owns Cloudflare, the token and the upload password; the
   // renderer asks for status, hands over bytes, and hears progress and changes as pushes.
   shareStatus: 'share:status',
   shareAccounts: 'share:accounts',
   shareSetup: 'share:setup',
   shareSetupProgress: 'share:setup-progress',
   shareOpenCloudflare: 'share:open-cloudflare',
-  shareOpenLink: 'share:open-link',
   shareGet: 'share:get',
   shareList: 'share:list',
   sharePublish: 'share:publish',

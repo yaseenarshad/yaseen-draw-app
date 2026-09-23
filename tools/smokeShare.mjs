@@ -58,7 +58,7 @@ try {
     secrets: createSecrets(path.join(dir, 'userData', 'secrets.json')),
     configFile: path.join(dir, 'userData', 'sharing.json'),
     apiBase: `${ORIGIN}/client/v4`,
-    originOverride: ORIGIN,
+    demoOrigin: ORIGIN,
     modules: { 'worker.js': await readFile(path.join(REPO, 'share', 'worker.js'), 'utf8') },
     readAssets: async () => [{ path: '/assets/viewer.js', bytes: new TextEncoder().encode('// smoke') }],
   })

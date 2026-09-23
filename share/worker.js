@@ -22,8 +22,7 @@
  *   PATCH  /api/boards/:id   bearer, JSON { allowDownload } — write only the flag on the SAME link, no re-upload
  *   DELETE /api/boards/:id   bearer — stop sharing: the link dies at once
  *   POST   /api/wipe         bearer — "delete all shared links": one page (≤1,000 objects) per call, answers { done }
- *   GET    /api/health       liveness for the app's setup test
- *   GET    /b/:id            the read-only viewer (download buttons only when allowed)
+ *   GET    /b/:id            the read-only viewer (download buttons only when allowed), under a strict CSP
  *   GET    /scene/:id        the scene the viewer draws
  *   GET    /assets/*         the viewer's script, stylesheet and fonts (the Worker's static assets, `env.ASSETS`)
  *   GET    /raw/:id          the .excalidraw download — 403 when download is off (`?download=1` adds a Content-Disposition)
@@ -45,7 +44,19 @@ async function allowsDownload(env, id) {
 }
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } })
-const html = (body, status = 200) => new Response(body, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } })
+/**
+ * Every page is locked down: scripts only from this origin (the page has no inline script — the
+ * board's details ride a JSON data block, which never executes), fetches only back to this origin,
+ * never framed, never sniffed, and no Referer leaks the link to anything the drawing points at.
+ */
+export const PAGE_HEADERS = {
+  'content-type': 'text/html; charset=utf-8',
+  'cache-control': 'no-store',
+  'content-security-policy': "script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'no-referrer',
+}
+const html = (body, status = 200) => new Response(body, { status, headers: PAGE_HEADERS })
 
 /** Constant-time string compare, so the password cannot be guessed a byte at a time. */
 function sameSecret(a, b) {
@@ -123,7 +134,7 @@ async function sceneOrRaw(request, env, id, url, download) {
   if (object === null) return json({ error: 'not_found' }, 404)
   if (download && !(await allowsDownload(env, id))) return json({ error: 'download_not_allowed' }, 403)
   const name = object.customMetadata?.name ?? 'Shared board'
-  const headers = new Headers({ 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'access-control-allow-origin': '*' })
+  const headers = new Headers({ 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' })
   if (download && url.searchParams.has('download')) headers.set('content-disposition', `attachment; filename*=UTF-8''${rfc5987(`${name}.excalidraw`)}`)
   headers.set('x-board-name', encodeURIComponent(name))
   return new Response(request.method === 'HEAD' ? null : object.body, { status: 200, headers })
@@ -136,7 +147,6 @@ export async function handle(request, env) {
   const method = request.method
 
   if (parts[0] === 'api') {
-    if (parts[1] === 'health' && method === 'GET') return json({ ok: true, bucket: env.BUCKET !== undefined, password: typeof env.UPLOAD_PASSWORD === 'string' })
     if (!authorised(request, env)) return json({ error: 'unauthorised' }, 401)
     if (parts[1] === 'wipe' && method === 'POST') return wipe(env)
     if (parts[1] === 'boards' && parts.length === 3 && ID_RE.test(parts[2])) {
