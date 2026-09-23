@@ -499,6 +499,13 @@ GitHub refuses any file over 100 MiB (and rejects the WHOLE push that carries on
   until a pass stops finding the file; the chip reads "N files not synced"; the sidebar row wears a
   red cloud-off icon. The manager carries `tooLarge` through `pending` / `syncing` and arms no retry
   for it. Out of scope: a file already COMMITTED over the limit (the push fails as `error`).
+- **🔒 D12 — a held-back tracked file never blocks the rebase.** It is still modified after the
+  commit, and `git rebase` refuses an unstaged change. So, only when the remote is ahead, exactly
+  the held-back TRACKED files are parked (`stash push -- <paths>`), the rebase runs, and their bytes
+  are copied back (`checkout stash@{0} -- <paths>`, unstaged, `stash drop`) whether it landed or
+  aborted — a copy, never a merge. The pass still ends `too-large`, never a false `conflict`. The
+  parked blob stays unreachable in `.git` until git's own gc, so "Git history" can read high by
+  that file's size until then. This is the sync pass's only stash.
 - **D4 — transfers get 10 minutes.** `fetch origin` and the ordinary `push` run with
   `TRANSFER_TIMEOUT_MS`; every local call keeps 30 s; the quit flush's push keeps 5 s.
 - **D5 — one extraction.** `liftEmbedded` + `landAssets` (`desktop/src/main/fs/drawing.ts`) are

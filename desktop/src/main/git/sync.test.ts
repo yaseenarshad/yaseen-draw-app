@@ -1,4 +1,5 @@
-import { existsSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { createReadStream, existsSync } from 'node:fs'
 import { mkdtemp, rm, truncate, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -7,6 +8,13 @@ import { GIT_TIMEOUT_CODE, git, type GitResult } from './exec'
 import { makeBareRemote, makeGitRepo, REAL_GIT_TIMEOUT_MS, requireGit, wireOrigin, type BareRemote, type GitRepo } from './gitFixture'
 import { GITHUB_FILE_LIMIT_BYTES } from '@shared/types'
 import { classifyGitFailure, commitMessage, syncPass, TRANSFER_TIMEOUT_MS } from './sync'
+
+/** A file's SHA-1, streamed (the D12 test's file is 95 MiB). */
+async function sha1(file: string): Promise<string> {
+  const hash = createHash('sha1')
+  for await (const chunk of createReadStream(file)) hash.update(chunk as Buffer)
+  return hash.digest('hex')
+}
 
 // Real git throughout; the spy only records the options each call was given (YAZ-1801 D4).
 vi.mock('./exec', async (actual) => {
@@ -139,7 +147,6 @@ describe('syncPass', { timeout: REAL_GIT_TIMEOUT_MS }, () => {
     const status = await syncPass(repo.root)
 
     expect(status).toMatchObject({ state: 'attention', attention: 'too-large', tooLarge: ['Folder/Huge board.excalidraw'] })
-    expect(status.message).toContain('Huge board.excalidraw')
     const tracked = await repo.run(['ls-files'])
     expect(tracked).toContain('small.md')
     expect(tracked).not.toContain('Huge board')
@@ -181,6 +188,36 @@ describe('syncPass', { timeout: REAL_GIT_TIMEOUT_MS }, () => {
 
     expect(status).toMatchObject({ attention: 'too-large', tooLarge: ['note.md'] })
     expect(await repo.run(['show', 'HEAD:note.md'])).toBe('line one')
+  })
+
+  it('D12: a held-back TRACKED file never blocks the rebase — the rest syncs both ways and its bytes stay exactly as they were', async () => {
+    const { repo, remote } = await pushedRepo()
+    const other = await secondClone(remote)
+    const bin = await requireGit()
+    // The other machine changes the big file's committed version AND adds a note, and pushes first.
+    await writeFile(path.join(other, 'note.md'), 'line one\nfrom the other machine\n', 'utf8')
+    await writeFile(path.join(other, 'other.md'), '# other\n', 'utf8')
+    for (const args of [['add', '-A'], ['commit', '-m', 'other'], ['push']]) expect((await git(bin, other, args)).code).toBe(0)
+    // Here: note.md grows past the line (a distinctive head, then a sparse tail), and a small edit.
+    const big = path.join(repo.root, 'note.md')
+    await writeFile(big, 'our head\n')
+    await truncate(big, GITHUB_FILE_LIMIT_BYTES + 1)
+    const before = await sha1(big)
+    await repo.write('small.md', '# small\n')
+
+    const status = await syncPass(repo.root)
+
+    expect(status).toMatchObject({ state: 'attention', attention: 'too-large', tooLarge: ['note.md'] })
+    // Both ways: their commit is under ours, ours is on the remote.
+    expect(await repo.run(['log', '--format=%s'])).toBe('sync: small.md\nother\nbase')
+    expect(await remoteHead(repo, remote)).toBe(await repo.run(['rev-parse', 'HEAD']))
+    // Our bytes on disk, untouched; theirs is what history holds; nothing staged, nothing stashed.
+    expect(await sha1(big)).toBe(before)
+    expect(await repo.run(['show', 'HEAD:note.md'])).toBe('line one\nfrom the other machine')
+    expect(await repo.run(['diff', '--cached', '--name-only'])).toBe('')
+    expect(await repo.run(['stash', 'list'])).toBe('')
+    // And the next pass is the same calm answer, not a conflict.
+    expect(await syncPass(repo.root)).toMatchObject({ attention: 'too-large', tooLarge: ['note.md'] })
   })
 
   it('clears once the file is gone: the next pass is plain synced, with no list', async () => {

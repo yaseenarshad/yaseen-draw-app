@@ -12,7 +12,11 @@ import { git, GIT_TIMEOUT_CODE, installGitHint, resolveGit, type GitResult } fro
  * The order is fixed and load-bearing — commit, fetch, rebase, push:
  *   - COMMIT FIRST so the rebase has a clean tree to move. Nothing here ever stashes; a stash is
  *     a place work can be forgotten, and this app's promise is that the user's notes are always
- *     on disk exactly as they left them.
+ *     on disk exactly as they left them. ONE exception (🔒 YAZ-1801 D12): a TRACKED file held back
+ *     as too large is the one edit a commit can never absorb, and it would make the rebase refuse
+ *     ("unstaged changes"). Only those files are parked for the length of the rebase and their
+ *     exact bytes copied back straight after (`parkWhileRebasing`) — files sync will never commit
+ *     anyway, restored by a copy, never a merge.
  *   - REBASE, never merge. Two machines editing different notes replay cleanly and the history
  *     stays a line anyone can read in the GitHub UI.
  *   - A rebase that CONFLICTS is aborted immediately (the lossless rule, YAZ-1081): git puts the
@@ -255,14 +259,18 @@ export async function syncPass(root: string, opts?: { candidates?: readonly stri
     ahead = Number.parseInt(a, 10) || 0
   }
 
-  // ---------- 3. replay our commits on top of theirs (never a merge, never a stash) ----------
+  // ---------- 3. replay our commits on top of theirs (never a merge; see D12 for the one stash) ----------
   if (behind > 0 && !flush) {
-    const rebased = await git(bin, root, ['rebase', '@{u}'])
-    if (rebased.code !== 0) {
+    const outcome = await parkWhileRebasing(bin, root, tooLarge, async () => {
+      const rebased = await git(bin, root, ['rebase', '@{u}'])
       // The lossless rule. `--abort` restores the pre-rebase tree AND HEAD; its own exit code is
       // ignored on purpose — if even the abort failed there is nothing further this pass can do,
       // and `attention/conflict` is still the right thing to put in front of the user.
-      await git(bin, root, ['rebase', '--abort'])
+      if (rebased.code !== 0) await git(bin, root, ['rebase', '--abort'])
+      return rebased.code === 0
+    })
+    if (outcome !== true && outcome !== false) return withTooLarge(fromFailure(root, repo, outcome), tooLarge)
+    if (!outcome) {
       return withTooLarge({ root, state: 'attention', attention: 'conflict', message: 'the same lines changed on two machines — nothing was lost, but this needs a human', repo }, tooLarge)
     }
   }
@@ -275,11 +283,34 @@ export async function syncPass(root: string, opts?: { candidates?: readonly stri
 
   // D3: everything else is pushed; the held-back files are the one thing left to say, and saying
   // it is an `attention` — the banner stays up (no Dismiss) until a pass no longer finds any.
-  if (tooLarge.length > 0) {
-    const names = tooLarge.map((p) => path.posix.basename(p)).join(', ')
-    return { root, state: 'attention', attention: 'too-large', tooLarge, message: `${names} ${tooLarge.length === 1 ? 'is' : 'are'} over GitHub's 100 MB limit and stayed on this computer`, repo }
-  }
+  // The words are the renderer's (`syncAttention.ts`), built from the list, so there is no `message`.
+  if (tooLarge.length > 0) return { root, state: 'attention', attention: 'too-large', tooLarge, repo }
   return { root, state: 'synced', repo }
+}
+
+/**
+ * 🔒 YAZ-1801 D12 — the one stash. A held-back TRACKED file is still modified after the commit
+ * (the commit left it out), and `git rebase` refuses to run over an unstaged change — which, with
+ * the remote ahead, used to report a false `conflict` on every pass. So exactly those files are
+ * parked (`stash push -- <paths>`), `rebase` runs, and their bytes are copied back from the stash
+ * (`checkout stash@{0} -- <paths>`, then unstaged so the index matches HEAD again) and the stash
+ * dropped — whether the rebase landed or aborted. A copy, never a merge: it cannot conflict, and
+ * the remote's version of the file stays in history. Untracked held-back files never block a
+ * rebase and are not touched. Answers `rebase()`'s verdict, or the git failure that stopped the park.
+ */
+async function parkWhileRebasing(bin: string, root: string, tooLarge: readonly string[], rebase: () => Promise<boolean>): Promise<boolean | GitResult> {
+  const tracked = tooLarge.length === 0 ? [] : zList(await git(bin, root, ['ls-files', '-z', '--', ...tooLarge.map((p) => `:(literal)${p}`)]))
+  if (tracked.length === 0) return rebase()
+  const specs = tracked.map((p) => `:(literal)${p}`)
+  const parked = await git(bin, root, ['stash', 'push', '-q', '-m', 'yaseendraw: held back while rebasing', '--', ...specs])
+  if (parked.code !== 0) return parked
+  try {
+    return await rebase()
+  } finally {
+    await git(bin, root, ['checkout', 'stash@{0}', '--', ...specs])
+    await git(bin, root, ['reset', '-q', '--', ...specs])
+    await git(bin, root, ['stash', 'drop', '-q'])
+  }
 }
 
 /** A failure status still carries the held-back list, so the sidebar icons do not blink off while offline. */
