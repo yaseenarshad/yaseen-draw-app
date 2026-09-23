@@ -330,4 +330,5 @@ const state = {
 }
 write(REAL_ROOT, 'yaseendraw.json', `${JSON.stringify(state, null, 2)}\n`)
 console.log(`app state: ${path.join(REAL_ROOT, 'yaseendraw.json')}`)
-console.log(`\nlaunch: YASEEN_DRAW_USER_DATA_DIR="${REAL_ROOT}" npm run dev`)
+// `--watch`, not `npm run dev`: plain dev never restarts main, so a main-process edit during the demo is silently not running.
+console.log(`\nlaunch (from the repo root): cd desktop && YASEEN_DRAW_USER_DATA_DIR="${REAL_ROOT}" npx electron-vite dev --watch`)
