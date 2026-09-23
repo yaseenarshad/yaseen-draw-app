@@ -37,6 +37,12 @@ describe('storage IPC (YAZ-1801)', () => {
     await expect(registered(CH.storageShrink)(undefined, root, ['relative.excalidraw'])).resolves.toEqual(bad('NOT_ABSOLUTE'))
   })
 
+  it('a vault that is gone answers NOT_FOUND from main, before any worker starts — for both doors', async () => {
+    const gone = path.join(root, 'moved-away')
+    await expect(registered(CH.storageStats)(undefined, gone)).resolves.toEqual(bad('NOT_FOUND'))
+    await expect(registered(CH.storageShrink)(undefined, gone, [])).resolves.toEqual(bad('NOT_FOUND'))
+  })
+
   it('shrink answers the counts', async () => {
     await expect(registered(CH.storageShrink)(undefined, root, [])).resolves.toEqual({ ok: true, value: { shrunk: 0, skipped: 0, bytesMoved: 0 } })
   })
