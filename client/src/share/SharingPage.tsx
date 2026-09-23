@@ -328,7 +328,7 @@ const TURN_OFF = {
     done: 'Key forgotten. Your links keep showing their last version; set sharing up again to update or stop them.',
   },
   delete: {
-    ask: 'Delete every shared board, the Worker and the storage bucket from your Cloudflare account, and forget the key on this Mac? Every link stops working at once, for good. Your boards on this Mac are not touched. Only the open vault's list of shared boards is cleared: another vault still lists its old links until you stop them there.',
+    ask: "Delete every shared board, the Worker and the storage bucket from your Cloudflare account, and forget the key on this Mac? Every link stops working at once, for good. Your boards on this Mac are not touched. Only the open vault's list of shared boards is cleared: another vault still lists its old links until you stop them there.",
     go: 'Delete all shared links',
     done: 'Every shared link was deleted from Cloudflare, and this Mac forgot the key.',
   },
