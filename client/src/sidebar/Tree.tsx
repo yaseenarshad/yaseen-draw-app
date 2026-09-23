@@ -1,5 +1,6 @@
 import type { TreeNode } from '@shared/types'
 import type { FileNode } from '@shared/treeSort'
+import { LinkIcon } from '../components/icons'
 import { stripExt } from '../lib/paths'
 import { TOO_LARGE_LABEL } from '../lib/syncAttention'
 import { CreateInline } from './CreateInline'
@@ -133,13 +134,10 @@ export interface ShareBadge {
   title: string
 }
 
-/** The shared-board mark: a small link glyph. */
+/** The shared-board mark (YAZ-1890): a small link glyph right of the name; its title is the link's status. */
 const ShareMark = ({ badge }: { badge: ShareBadge }) => (
   <span className="tree__share" data-tone={badge.tone} title={badge.title} aria-label={badge.title} role="img">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
-      <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
-    </svg>
+    <LinkIcon size={12} />
   </span>
 )
 
@@ -305,7 +303,7 @@ export function Tree({
             >
               <span className="tree__label">{stripExt(node.name)}</span>
               {tooLarge?.has(node.path) === true && <CloudOffIcon />}
-              {shareBadges?.get(node.path) !== undefined && <ShareMark badge={shareBadges.get(node.path) as ShareBadge} />}
+              {shareBadges?.has(node.path) === true && <ShareMark badge={shareBadges.get(node.path) as ShareBadge} />}
             </button>
           </li>
         ),
