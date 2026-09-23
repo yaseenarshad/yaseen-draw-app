@@ -11,10 +11,10 @@
  *
  * ONE PAGE, NOT PAGES (Yasin's call after the demo): every setting is on the page at once, so a
  * nav click is a scroll, not a route, and the active nav item is DERIVED from where the page is
- * scrolled to. Opening always starts at the top. The one exception is a `standalone` section
- * (Hotkeys — a reference table, noise among settings): it is its own page inside the dialog,
- * listed under a divider in the nav, and `page` names it while it is showing; `null` is the
- * settings page.
+ * scrolled to. Opening always starts at the top. The exceptions are the `standalone` sections
+ * (Hotkeys — a reference table, noise among settings; Storage — a per-vault report, YAZ-1801): each
+ * is its own page inside the dialog, listed under a divider in the nav, and `page` names the one
+ * showing; `null` is the settings page.
  *
  * ⚡ KEYS ARE THE OVERLAY'S, NEVER `window`'s (⚡ YAZ-888): React
  * flushes mount effects inside the dispatch of the event that opened the dialog, so a `window`

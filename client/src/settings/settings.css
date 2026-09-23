@@ -426,6 +426,7 @@
 }
 
 .storage__meter {
+  --storage-bar-w: 240px;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -440,7 +441,7 @@
 .storage__bar {
   position: relative;
   display: block;
-  width: 240px;
+  width: var(--storage-bar-w);
   height: 8px;
   border-radius: 4px;
   background: var(--bg-hover-row);
@@ -459,17 +460,17 @@
   top: 0;
   bottom: 0;
   width: 1px;
-  background: var(--fg-muted, currentColor);
+  background: var(--fg-muted);
   opacity: 0.5;
 }
 
 .storage__marks {
   position: relative;
   display: block;
-  width: 240px;
+  width: var(--storage-bar-w);
   height: 12px;
   font-size: 10px;
-  color: var(--fg-muted, inherit);
+  color: var(--fg-muted);
 }
 
 .storage__mark {
