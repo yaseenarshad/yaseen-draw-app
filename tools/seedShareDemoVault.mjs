@@ -275,12 +275,17 @@ the next save retries.
 | \`demo-bad-perms\` | Fails at the bucket step, names the missing "Workers R2 Storage: Edit" permission |
 | \`demo-no-card\` | Fails at the bucket step: R2 not switched on, explains the card-on-file step |
 | \`demo-two-accounts\` | The key sees two accounts: a picker appears; Continue sets up on the one picked |
+| \`cfat_demo-good\` | An account-owned key (checked at its account, not at /user): setup succeeds |
+| \`demo-no-subdomain\` | The account has no workers.dev address yet: setup claims one (\`<account>-xxxx\`) |
+| \`demo-subdomain-taken\` | Like the above, but the first name is taken: setup tries another |
 
 Offline: \`../stop-demo.sh fake\` stops only the fake server → every action says it can't reach
 Cloudflare / the Worker; \`../start-demo.sh\` brings everything back.
 Custom domain: the fake account holds the zones yasin.dev, example.com, example.co.uk and
 yaseendraw.app — \`share.yasin.dev\` and \`share.example.co.uk\` attach (the longest matching zone
-wins); \`share.missingzone.com\` is "not on your Cloudflare account yet".
+wins); \`share.missingzone.com\` is "not on your Cloudflare account yet"; \`share.pending-zone.dev\`
+is on the account but "not active yet"; \`cname.yasin.dev\` already has a DNS record, so it is refused
+with a plain explanation.
 
 Reconnect: Settings › Sharing › *Forget key on this Mac*, then set up again with the same token —
 the progress list says the bucket and Worker were **found and reused**, the custom domain comes
