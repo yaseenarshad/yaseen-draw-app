@@ -36,7 +36,7 @@ export function registerFsIpc(store: Store, windows: WindowLookup): void {
   // tree answers immediately, and its own notice reaches the asking window later, if at all.
   handleWithEvent(CH.fsTree, async (e, root: string) => {
     const res = await tree(root)
-    sweepVaultOnce(res.root, e.sender)
+    void sweepVaultOnce(res.root, e.sender)
     return res
   })
   handle(CH.fsCreateDir, createDir)

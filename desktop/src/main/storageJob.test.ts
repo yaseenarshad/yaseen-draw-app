@@ -54,13 +54,22 @@ const png = (fill: string) => ({ mimeType: 'image/png', dataURL: `data:image/png
 // What freezes a parse is many small objects, not one long string: ~20 MB of freedraw strokes
 // takes V8 a few hundred ms, while 40 MB of base64 in one string takes ~20.
 const stroke = (i: number) => ({ id: `e${i}`, type: 'freedraw', x: i, y: i, points: Array.from({ length: 20 }, (_, k) => [k, 2 * k]) })
-const heavy = () =>
-  JSON.stringify({ type: 'excalidraw', elements: [{ id: 'img', type: 'image', fileId: 'a' }, ...Array.from({ length: 100_000 }, (_, i) => stroke(i))], files: { a: png('A') } })
+const heavy = (strokes: number) =>
+  JSON.stringify({ type: 'excalidraw', elements: [{ id: 'img', type: 'image', fileId: 'a' }, ...Array.from({ length: strokes }, (_, i) => stroke(i))], files: { a: png('A') } })
 const legacy = () => JSON.stringify({ type: 'excalidraw', elements: [{ id: 'img', type: 'image', fileId: 'b' }], files: { b: png('B') } })
 
-/** A vault heavy enough to freeze the loop in-thread: one 20 MB board of strokes, a nested legacy board, a corrupt one. */
-async function heavyVault(root: string): Promise<void> {
-  await write(root, 'Heavy.excalidraw', heavy())
+/**
+ * A vault heavy enough to freeze the loop in-thread: one board of strokes, a nested legacy board, a
+ * corrupt one. Each job gets only the weight its own claim needs. Stats only parses, so it takes the
+ * full ~20 MB (100k strokes, ~250 ms in-thread on an M1 Max). Shrink also rewrites the board as pretty
+ * JSON (about 5x the bytes), and the test then reads back and compares both copies, so it freezes
+ * ~290 ms with 40k strokes (~8 MB). At 100k it moved ~430 MB per run and outlasted its 20 s budget
+ * once the full suite loaded the machine.
+ */
+const STATS_STROKES = 100_000
+const SHRINK_STROKES = 40_000
+async function heavyVault(root: string, strokes: number): Promise<void> {
+  await write(root, 'Heavy.excalidraw', heavy(strokes))
   await write(root, 'Folder/Legacy.excalidraw', legacy())
   await write(root, 'Corrupt.excalidraw', '{ not json')
 }
@@ -78,7 +87,7 @@ describe('runOffThread (YAZ-1801 D8, 🔒 D11)', { timeout: REAL_GIT_TIMEOUT_MS 
   it('stats: answers exactly what the in-thread walk answers, while the event loop keeps turning', async () => {
     const repo = await makeGitRepo()
     cleanups.push(repo.cleanup)
-    await heavyVault(repo.root)
+    await heavyVault(repo.root, STATS_STROKES)
     await write(repo.root, 'assets/abc.png', 'png bytes')
     await repo.run(['add', '-A'])
     await repo.run(['commit', '-m', 'v1'])
@@ -97,8 +106,8 @@ describe('runOffThread (YAZ-1801 D8, 🔒 D11)', { timeout: REAL_GIT_TIMEOUT_MS 
     const work = await mkdtemp(path.join(tmpdir(), 'draw-storage-job-'))
     cleanups.push(() => rm(work, { recursive: true, force: true }))
     const [direct, viaWorker] = [path.join(work, 'direct'), path.join(work, 'worker')]
-    await heavyVault(direct)
-    await heavyVault(viaWorker)
+    await heavyVault(direct, SHRINK_STROKES)
+    await heavyVault(viaWorker, SHRINK_STROKES)
     const worker = await bundleStorageWorker()
 
     let inThread: unknown

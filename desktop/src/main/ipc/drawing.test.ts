@@ -95,53 +95,46 @@ describe('sweepVaultOnce', () => {
     await utimes(file, when, when)
   }
 
-  /** Lets the detached sweep settle — it is deliberately not awaited by its caller. */
-  const settle = () => new Promise((r) => setTimeout(r, 50))
-
   it('sweeps a root ONCE per session, however many windows open it', async () => {
     await seedOrphan()
     const trash = vi.fn(async () => undefined)
     const sender = fakeSender()
-    sweepVaultOnce(root, sender, { trash })
-    sweepVaultOnce(root, sender, { trash })
-    await settle()
+    // The app never awaits the sweep; the tests do, rather than guessing how long a walk takes.
+    await Promise.all([sweepVaultOnce(root, sender, { trash }), sweepVaultOnce(root, sender, { trash })])
     expect(trash).toHaveBeenCalledTimes(1)
   })
 
   it('tells the asking window what it did, in the singular and the plural', async () => {
     await seedOrphan('a.png')
     const sender = fakeSender()
-    sweepVaultOnce(root, sender, { trash: async () => undefined })
-    await settle()
+    await sweepVaultOnce(root, sender, { trash: async () => undefined })
     expect(sender.send).toHaveBeenCalledWith(CH.linkNotice, 'Cleaned 1 unused image')
 
     _resetSweeps()
     await seedOrphan('b.png')
     const second = fakeSender()
-    sweepVaultOnce(root, second, { trash: async () => undefined })
-    await settle()
+    await sweepVaultOnce(root, second, { trash: async () => undefined })
     expect(second.send).toHaveBeenCalledWith(CH.linkNotice, 'Cleaned 2 unused images')
   })
 
   it('says NOTHING when it found nothing — silence is the right report for housekeeping', async () => {
     const sender = fakeSender()
-    sweepVaultOnce(root, sender, { trash: async () => undefined })
-    await settle()
+    await sweepVaultOnce(root, sender, { trash: async () => undefined })
     expect(sender.send).not.toHaveBeenCalled()
   })
 
   it('does not send to a window that closed while the vault was being walked', async () => {
     await seedOrphan()
     const sender = { isDestroyed: () => true, send: vi.fn() }
-    sweepVaultOnce(root, sender, { trash: async () => undefined })
-    await settle()
+    await sweepVaultOnce(root, sender, { trash: async () => undefined })
     expect(sender.send).not.toHaveBeenCalled()
   })
 
   it('never throws at its caller, whatever the vault does', async () => {
     const sender = fakeSender()
-    expect(() => sweepVaultOnce(path.join(root, 'does-not-exist'), sender)).not.toThrow()
-    await settle()
+    let sweep: Promise<void> | undefined
+    expect(() => (sweep = sweepVaultOnce(path.join(root, 'does-not-exist'), sender))).not.toThrow()
+    await sweep
     expect(sender.send).not.toHaveBeenCalled()
   })
 })
