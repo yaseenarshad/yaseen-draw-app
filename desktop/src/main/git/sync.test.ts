@@ -2,11 +2,17 @@ import { existsSync } from 'node:fs'
 import { mkdtemp, rm, truncate, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GIT_TIMEOUT_CODE, git, type GitResult } from './exec'
 import { makeBareRemote, makeGitRepo, REAL_GIT_TIMEOUT_MS, requireGit, wireOrigin, type BareRemote, type GitRepo } from './gitFixture'
 import { GITHUB_FILE_LIMIT_BYTES } from '@shared/types'
-import { classifyGitFailure, commitMessage, syncPass } from './sync'
+import { classifyGitFailure, commitMessage, syncPass, TRANSFER_TIMEOUT_MS } from './sync'
+
+// Real git throughout; the spy only records the options each call was given (YAZ-1801 D4).
+vi.mock('./exec', async (actual) => {
+  const mod = await actual<typeof import('./exec')>()
+  return { ...mod, git: vi.fn(mod.git) }
+})
 
 /**
  * `syncPass` against REAL git and a bare-repo "GitHub" on the filesystem — the same posture as
@@ -119,10 +125,10 @@ describe('syncPass', { timeout: REAL_GIT_TIMEOUT_MS }, () => {
 
   // ---------- YAZ-1801 D3: a file over GitHub's limit never jams the rest ----------
 
-  /** A SPARSE file just over the guard: `truncate` sets the size without writing a byte, so this costs nothing. */
-  async function oversize(repo: GitRepo, name: string): Promise<void> {
+  /** A SPARSE file at `bytes` (default: exactly the guard): `truncate` sets the size without writing a byte, so this costs nothing. */
+  async function oversize(repo: GitRepo, name: string, bytes = GITHUB_FILE_LIMIT_BYTES): Promise<void> {
     await repo.write(name, '')
-    await truncate(path.join(repo.root, name), GITHUB_FILE_LIMIT_BYTES + 1)
+    await truncate(path.join(repo.root, name), bytes)
   }
 
   it('holds an oversize file back, commits and pushes everything else, and says so as attention/too-large', async () => {
@@ -141,7 +147,6 @@ describe('syncPass', { timeout: REAL_GIT_TIMEOUT_MS }, () => {
     expect(await remoteHead(repo, remote)).toBe(await repo.run(['rev-parse', 'HEAD']))
     expect(await repo.run(['log', '-1', '--format=%s'])).toBe('sync: small.md')
     // Never even hashed: excluded BEFORE the add, so no 95 MB blob lands in .git/objects.
-    expect(await repo.run(['count-objects'])).toMatch(/, \d+ kilobytes$/)
     expect(Number(/(\d+) kilobytes/.exec(await repo.run(['count-objects']))?.[1])).toBeLessThan(1024)
   })
 
@@ -157,6 +162,15 @@ describe('syncPass', { timeout: REAL_GIT_TIMEOUT_MS }, () => {
     // The ONLY dirty file was oversize: nothing was staged, so nothing was committed.
     expect(await repo.run(['rev-parse', 'HEAD'])).toBe(head)
     expect(await repo.run(['diff', '--cached', '--name-only'])).toBe('')
+  })
+
+  it('draws the line AT the limit: a file one byte under it syncs, a file exactly at it is held back', async () => {
+    const { repo } = await pushedRepo()
+    await oversize(repo, 'under.mov', GITHUB_FILE_LIMIT_BYTES - 1)
+    await oversize(repo, 'at.mov')
+
+    expect(await syncPass(repo.root)).toMatchObject({ attention: 'too-large', tooLarge: ['at.mov'] })
+    expect(await repo.run(['ls-files'])).toContain('under.mov')
   })
 
   it('holds back a TRACKED file that grew past the limit; the committed version stays as it was', async () => {
@@ -179,6 +193,34 @@ describe('syncPass', { timeout: REAL_GIT_TIMEOUT_MS }, () => {
 
     expect(status.state).toBe('synced')
     expect(status.tooLarge).toBeUndefined()
+  })
+
+  it('syncs a held-back board on the next pass once it has shrunk under the line', async () => {
+    const { repo, remote } = await pushedRepo()
+    await oversize(repo, 'Huge.excalidraw')
+    expect((await syncPass(repo.root)).attention).toBe('too-large')
+
+    await repo.write('Huge.excalidraw', '{"type":"excalidraw"}\n')
+    const status = await syncPass(repo.root)
+
+    expect(status.state).toBe('synced')
+    expect(status.tooLarge).toBeUndefined()
+    expect(await repo.run(['show', 'HEAD:Huge.excalidraw'])).toBe('{"type":"excalidraw"}')
+    expect(await remoteHead(repo, remote)).toBe(await repo.run(['rev-parse', 'HEAD']))
+  })
+
+  it('gives fetch and push the transfer budget and every local call the default (YAZ-1801 D4)', async () => {
+    const { repo } = await pushedRepo()
+    await repo.write('a.md', '# a\n')
+    vi.mocked(git).mockClear()
+
+    expect((await syncPass(repo.root)).state).toBe('synced')
+
+    const calls = vi.mocked(git).mock.calls.filter(([, root]) => root === repo.root)
+    const timeoutOf = (verb: string) => calls.filter(([, , args]) => args[0] === verb).map(([, , , opts]) => opts?.timeoutMs)
+    expect(timeoutOf('fetch')).toEqual([TRANSFER_TIMEOUT_MS])
+    expect(timeoutOf('push')).toEqual([TRANSFER_TIMEOUT_MS])
+    expect(calls.filter(([, , args]) => args[0] !== 'fetch' && args[0] !== 'push').every(([, , , opts]) => opts?.timeoutMs === undefined)).toBe(true)
   })
 
   it('summarises past three files in the subject', async () => {
@@ -281,9 +323,14 @@ describe('flush mode (YAZ-1111)', { timeout: REAL_GIT_TIMEOUT_MS }, () => {
   it('pushes to a reachable remote exactly like a normal pass', async () => {
     const { repo, remote } = await pushedRepo()
     await repo.write('note.md', 'line one\nline two\n')
+    vi.mocked(git).mockClear()
     const status = await syncPass(repo.root, { flush: true })
     expect(status.state).toBe('synced')
     expect(await remoteHead(repo, remote)).toBe(await repo.run(['rev-parse', 'HEAD']))
+    // No fetch on a flush, and its push keeps the short cap rather than the 10 min transfer budget.
+    const calls = vi.mocked(git).mock.calls.filter(([, root]) => root === repo.root)
+    expect(calls.some(([, , args]) => args[0] === 'fetch')).toBe(false)
+    expect(calls.filter(([, , args]) => args[0] === 'push').map(([, , , opts]) => opts?.timeoutMs)).toEqual([5_000])
   })
 
   it('never sits out the 30s wall: an unreachable remote still lands the commit and returns fast', async () => {

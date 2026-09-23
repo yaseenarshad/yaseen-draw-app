@@ -75,12 +75,12 @@ export const TRANSFER_TIMEOUT_MS = 10 * 60_000
 /** One `-z` listing as paths; a failed listing is an empty one (the guard is then a no-op, never a stop). */
 const zList = (res: GitResult): string[] => (res.code === 0 ? res.stdout.split('\0').filter((p) => p !== '') : [])
 
-/** The vault-relative paths in `rel` whose working-tree file is over the GitHub guard. A path that will not stat (deleted) is not over it. */
+/** The vault-relative paths in `rel` whose working-tree file is at or over the GitHub guard. A path that will not stat (deleted) is not. */
 async function oversize(root: string, rel: readonly string[]): Promise<string[]> {
   const out: string[] = []
   for (const p of rel) {
     const st = await stat(path.join(root, p)).catch(() => null)
-    if (st !== null && st.isFile() && st.size > GITHUB_FILE_LIMIT_BYTES) out.push(p)
+    if (st !== null && st.isFile() && st.size >= GITHUB_FILE_LIMIT_BYTES) out.push(p)
   }
   return out
 }
