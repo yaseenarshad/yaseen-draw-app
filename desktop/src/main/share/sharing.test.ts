@@ -280,6 +280,16 @@ describe('sharing (YAZ-1799) against the real Worker', () => {
     expect(puts().map((c) => c.allow)).toEqual([null]) // live again: back to plain re-uploads
   })
 
+  it("list(check: false) — the sidebar badges' call — sends no HEAD per share; the Settings list does", async () => {
+    await sharing.setup('tok', () => {})
+    const first = await sharing.publish(vault, board(), '{"v":1}')
+    workerCalls = []
+    expect(await sharing.list(vault, { check: false })).toEqual([expect.objectContaining({ id: first.id, live: 'unknown', fileExists: true })])
+    expect(workerCalls).toEqual([])
+    expect((await sharing.list(vault))[0]).toMatchObject({ live: 'live' })
+    expect(workerCalls).toEqual([expect.objectContaining({ method: 'HEAD', route: `/scene/${first.id}` })])
+  })
+
   it('a re-upload names its link: it lands on the record wherever a rename moved it, and never re-creates a stopped one', async () => {
     await sharing.setup('tok', () => {})
     const first = await sharing.publish(vault, board(), '{"v":1}')

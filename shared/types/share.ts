@@ -127,7 +127,8 @@ export interface ShareApi {
   /** Open Cloudflare's "create API token" page (the fake one in the demo) in the browser. */
   openCloudflare(): Promise<void>
   get(req: ShareBoardRequest): Promise<ShareEntry | null>
-  list(req: { root: string }): Promise<ShareListEntry[]>
+  /** `check: false` skips the live check (no network): the sidebar badges' call. Settings checks. */
+  list(req: { root: string; check?: boolean }): Promise<ShareListEntry[]>
   /** First share (new id), or an automatic re-upload after a save (same id): the object is replaced in place, its permission untouched. */
   publish(req: SharePublishRequest): Promise<ShareEntry>
   /** Flip "view and download" / "view only" on the SAME link — no re-upload. */

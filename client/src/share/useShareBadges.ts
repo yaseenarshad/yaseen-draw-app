@@ -4,8 +4,9 @@
  * (`error`) when the last automatic update failed or the link is stale (its copy is gone from
  * Cloudflare). A rename or move re-keys the record in main, whose `share:changed` refetches here.
  *
- * The list is fetched on mount and on `share:changed` only — it checks every link over the
- * network. The local upload scheduler's changes (a save waiting to upload) just re-derive.
+ * The list is fetched on mount and on `share:changed`, WITHOUT the live check (`check: false`), so a
+ * save costs no network call per share; only Settings asks the Worker. The local upload
+ * scheduler's changes (a save waiting to upload) just re-derive.
  */
 import { useEffect, useMemo, useState } from 'react'
 import type { ShareListEntry } from '@shared/types'
@@ -26,7 +27,7 @@ export function useShareBadges(root: string): ReadonlyMap<string, ShareBadge> {
     const refresh = async () => {
       const mine = ++seq
       try {
-        const next = await api.share.list(root)
+        const next = await api.share.list(root, false)
         if (live && mine === seq) setRows(next)
       } catch {
         // No marks is the honest fallback when the list cannot be read.

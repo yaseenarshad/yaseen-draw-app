@@ -57,8 +57,6 @@ const chains = new Map<string, ReturnType<typeof createChain>>()
 const chainFor = (root: string) => chains.get(root) ?? chains.set(root, createChain()).get(root)!
 const write = (root: string, shares: ShareMap) => writeConfig(root, SHARES_FILE, { version: VERSION, shares })
 
-export const writeShares = (root: string, shares: ShareMap): Promise<void> => chainFor(root).run(() => write(root, shares))
-
 /**
  * Read, change and write back as one step on the vault's chain. `change` edits the map in place
  * and returns whether it changed anything — nothing is written (or created) when it did not.

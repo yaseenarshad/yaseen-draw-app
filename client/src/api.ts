@@ -131,7 +131,7 @@ export const api = {
     onSetupProgress: (listener: (p: ShareSetupProgress) => void) => window.yaseenDraw.share.onSetupProgress(listener),
     openCloudflare: () => call<void>(() => window.yaseenDraw.share.openCloudflare()),
     get: (req: ShareBoardRequest) => call<ShareEntry | null>(() => window.yaseenDraw.share.get(req)),
-    list: (root: string) => call<ShareListEntry[]>(() => window.yaseenDraw.share.list({ root })),
+    list: (root: string, check = true) => call<ShareListEntry[]>(() => window.yaseenDraw.share.list({ root, check })),
     publish: (req: SharePublishRequest) => call<ShareEntry>(() => window.yaseenDraw.share.publish(req)),
     setPermission: (req: SharePermissionRequest) => call<ShareEntry>(() => window.yaseenDraw.share.setPermission(req)),
     stop: (req: ShareBoardRequest) => call<void>(() => window.yaseenDraw.share.stop(req)),

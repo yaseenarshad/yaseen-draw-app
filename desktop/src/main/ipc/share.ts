@@ -94,7 +94,11 @@ export function registerShareIpc(userData: string, secrets: Secrets, where: { vi
     const r = req(body)
     return sharing.get(str(r.root, 'root'), str(r.path, 'path'))
   })
-  handle(CH.shareList, async (body: unknown) => sharing.list(str(req(body).root, 'root')))
+  handle(CH.shareList, async (body: unknown) => {
+    const r = req(body)
+    if (r.check !== undefined && typeof r.check !== 'boolean') throw new BridgeFailure('BAD_REQUEST', "'check' must be a boolean")
+    return sharing.list(str(r.root, 'root'), { check: r.check !== false })
+  })
   handle(CH.sharePublish, async (body: unknown) => {
     const r = req(body)
     if (r.id !== undefined && typeof r.id !== 'string') throw new BridgeFailure('BAD_REQUEST', "'id' must be a string")

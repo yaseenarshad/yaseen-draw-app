@@ -117,4 +117,13 @@ describe('shared-board marks (YAZ-1890)', () => {
     expect(mark(A)?.dataset.tone).toBe('ok')
     expect(list).toHaveBeenCalledTimes(1)
   })
+
+  it('never asks for the live check: a save (three share:changed) costs no network call per share', async () => {
+    list.mockResolvedValue([row(A), row(B)])
+    await mount([file(A), file(B)])
+    for (let i = 0; i < 3; i++) act(() => changed())
+    await flush()
+    expect(list.mock.calls.length).toBeGreaterThan(1)
+    for (const call of list.mock.calls) expect(call).toEqual(['/v', false])
+  })
 })
