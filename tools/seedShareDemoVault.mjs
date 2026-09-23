@@ -2,7 +2,7 @@
 /**
  * USAGE: node tools/seedShareDemoVault.mjs --dir <demo-dir> [--port 8787] [--force]
  *
- * The SHARE LINK prototype's demo (YAZ-1799). Writes, under `<demo-dir>`:
+ * The share-link demo (YAZ-1799). Writes, under `<demo-dir>`:
  *   - `Share Button (YAZ-1799)/`  the vault: 13 boards, one per share case, each name saying what it
  *                                 tests, plus a README.md listing the scenarios
  *   - `profile/`                  an isolated Electron profile (`yaseendraw.json`) whose one window is
@@ -202,7 +202,7 @@ board('Clients/Acme Corp/2026/Q3 workshop/09 Deep nested — four folders down',
 const board10 = scene([...label('10 Already shared', 'Its link works the moment the app launches — before you set sharing up.'), rect(0, 0, 260, 120, '#b2f2bb'), text(20, 45, 'shared yesterday', 24)])
 write('10 Already shared — link works on launch.excalidraw', board10)
 board('11 Stale share — in shares.json but gone from Cloudflare', [
-  ...label('11 Stale share', 'shares.json says it is shared; the object is missing on the server. Settings flags it; Update restores it.'),
+  ...label('11 Stale share', 'shares.json says it is shared; the object is missing on the server. Settings flags it; one save restores it.'),
   ellipse(0, 0, 240, 140, '#ffd8a8'),
 ])
 const board12 = scene([...label('12 Shared, then renamed & moved', 'shares.json still has the OLD path (“12 Renamed — old name”). The link still works.'), diamond(0, 0, 200, 160, '#fcc2d7')])
@@ -260,24 +260,15 @@ with the link*, and when shared, *can view and download* (default) or *can view 
 board (\`/b/<id>\`); switching the permission is instant on the same link. View only hides the
 download buttons AND the Worker refuses \`/raw/<id>\` with 403.
 
-Links are **always live**: after a board is shared, every save re-uploads it (both links follow)
-once the saves settle (~10 s quiet). There is no Update button. A failed upload keeps the links on
+Links are **always live**: after a board is shared, every save re-uploads it
+once the saves settle (~10 s quiet). A failed upload keeps the link on
 their last good version, shows "Couldn't update: …" in the Share dialog and Settings › Sharing, and
 the next save retries.
 
 ## Magic tokens (Settings › Sharing › paste key)
 
-| Token | What happens |
-|---|---|
-| \`demo-good\` | Setup succeeds: ✅ Sharing ready |
-| \`demo-slow\` | Succeeds, ~1.5 s per step so you can watch the progress list |
-| \`demo-invalid\` | "Cloudflare didn't accept this key" |
-| \`demo-bad-perms\` | Fails at the bucket step, names the missing "Workers R2 Storage: Edit" permission |
-| \`demo-no-card\` | Fails at the bucket step: R2 not switched on, explains the card-on-file step |
-| \`demo-two-accounts\` | The key sees two accounts: a picker appears; Continue sets up on the one picked |
-| \`cfat_demo-good\` | An account-owned key (checked at its account, not at /user): setup succeeds |
-| \`demo-no-subdomain\` | The account has no workers.dev address yet: setup claims one (\`<account>-xxxx\`) |
-| \`demo-subdomain-taken\` | Like the above, but the first name is taken: setup tries another |
+Press *Open Cloudflare*: the fake token page lists every magic token and what it does
+(\`demo-good\` just works).
 
 Offline: \`../stop-demo.sh fake\` stops only the fake server → every action says it can't reach
 Cloudflare / the Worker; \`../start-demo.sh\` brings everything back.
@@ -306,7 +297,7 @@ not seen — Settings flags it like board 12.
 | 01 | Simple — shapes, arrows and text | Share dialog → *Anyone with the link* → Copy link → open it: both download buttons work. Switch to *view only* → refresh: buttons gone, \`/raw/<id>\` is 403. Switch back → buttons return. *Not shared* → the link says "stopped" |
 | 02 | Lean images (assets/) | Viewer shows all 3 images. LIVE: edit + save, wait ~10 s, refresh the link → the edit is there, same link. Edit while offline → "Couldn't update", next save (online) fixes it |
 | 03 | Legacy (embedded base64) | Same as 02 for a file that embeds its own images |
-| 04 | Big (~45 MB shared) | Slow upload succeeds; progress text shows the size |
+| 04 | Big (~45 MB shared) | Slow upload succeeds (the dialog says Uploading… until it lands) |
 | 05 | Too big (~115 MB shared) | Refused BEFORE upload with the 100 MB explanation — it never shares |
 | 06 | Empty | Shares; viewer shows an empty canvas; PNG button disabled |
 | 07 | Deleted images | Downloaded file holds exactly 2 images (no red ones) |

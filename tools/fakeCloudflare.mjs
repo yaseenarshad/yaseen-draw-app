@@ -14,17 +14,9 @@
  *     running the SAME `share/worker.js` handler against a disk-backed fake R2 bucket in
  *     `<data>/bucket/`. Point the app's links at it with `YASEEN_DRAW_SHARE_ORIGIN=http://localhost:<port>`.
  *
- * MAGIC TOKENS (paste them in Settings › Sharing):
- *   demo-good       everything succeeds
- *   demo-invalid    the token is rejected (so is any token not in this list)
- *   demo-bad-perms  the token works but lacks "Workers R2 Storage: Edit" (every R2 call is refused)
- *   demo-no-card    R2 is not enabled on the account (Cloudflare wants a card on file first)
- *   demo-slow       like demo-good, but every API call takes ~1.5 s so the progress list is visible
- *   demo-two-accounts  like demo-good, but the key sees TWO accounts, so setup shows a picker
- *   cfat_demo-good  like demo-good, but an ACCOUNT-owned key: /user/tokens/verify refuses it, its account's verify accepts it
- *   demo-no-subdomain     the account has no workers.dev subdomain yet (10007): setup claims one
- *   demo-subdomain-taken  like demo-no-subdomain, but the first name setup tries is taken (10036), so it retries
- * Stop this process to test the offline case.
+ * MAGIC TOKENS (paste them in Settings › Sharing): the one list is TOKEN_PAGE below — the page
+ * "Open Cloudflare" shows in the demo. Any other token is rejected. Stop this process to test the
+ * offline case.
  *
  * Extra pages: /__fake/token-page (what "Open Cloudflare" shows in the demo), /__fake/state (JSON).
  * Custom domains: the account's zones are yasin.dev, example.com, example.co.uk and yaseendraw.app
@@ -374,13 +366,13 @@ const TOKEN_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>Fake
 <ul>
 <li><code>demo-good</code> — everything succeeds</li>
 <li><code>demo-slow</code> — succeeds, ~1.5 s per step (watch the progress list)</li>
-<li><code>demo-invalid</code> — Cloudflare rejects the token</li>
+<li><code>demo-invalid</code> — Cloudflare rejects the token (so does any token not listed here)</li>
 <li><code>demo-bad-perms</code> — token lacks the R2 permission</li>
 <li><code>demo-no-card</code> — R2 not enabled yet (needs a card on file)</li>
 <li><code>demo-two-accounts</code> — the key sees two accounts (a picker appears)</li>
-<li><code>cfat_demo-good</code> — an account-owned key; succeeds</li>
-<li><code>demo-no-subdomain</code> — no workers.dev subdomain yet; setup claims one</li>
-<li><code>demo-subdomain-taken</code> — like the above, but the first name is taken; setup retries</li>
+<li><code>cfat_demo-good</code> — an account-owned key (/user/tokens/verify refuses it, its account's verify accepts it); succeeds</li>
+<li><code>demo-no-subdomain</code> — no workers.dev subdomain yet (10007); setup claims one</li>
+<li><code>demo-subdomain-taken</code> — like the above, but the first name is taken (10036); setup retries</li>
 </ul></body></html>`
 
 async function onRequest(req, res) {
