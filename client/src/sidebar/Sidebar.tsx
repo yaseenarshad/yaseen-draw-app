@@ -52,6 +52,8 @@ interface SidebarProps {
    * another vault never replays it).
    */
   switcherOpenRequest: number
+  /** The vault menu's "Open in this window" (YAZ-1798 D8): App's in-place switch, threaded to the `VaultSwitcher`. */
+  onOpenVaultHere: (path: string) => Promise<boolean>
   /** Hide the sidebar (GRO-2023); TabBar leads its nav row with the Show-sidebar button while hidden (YAZ-1759). */
   onCollapse: () => void
   /**
@@ -283,6 +285,7 @@ export function Sidebar({
   onPickFolder,
   pickDisabled,
   switcherOpenRequest,
+  onOpenVaultHere,
   onCollapse,
   lens,
   onLensChange,
@@ -1203,7 +1206,17 @@ export function Sidebar({
       >
         {/* The vault switcher (YAZ-1767): the trigger is the header's top-left button (name + chevron,
             D6); its panel hangs off this header's rect (D5). "Open folder…" is its last row (D4). */}
-        <VaultSwitcher root={root} onPickFolder={onPickFolder} pickDisabled={pickDisabled} openRequest={switcherOpenRequest} />
+        <VaultSwitcher
+          root={root}
+          onPickFolder={onPickFolder}
+          pickDisabled={pickDisabled}
+          openRequest={switcherOpenRequest}
+          // The right-click menu (YAZ-1798): the file menu's own OS verbs and notice, App's in-place switch.
+          onOpenHere={onOpenVaultHere}
+          onReveal={reveal}
+          onOpenVsCode={openVsCode}
+          onNotice={onNotice}
+        />
         <button type="button" className="sidebar__collapse" onClick={onCollapse} title="Hide sidebar" aria-label="Hide sidebar">
           <SidebarPanelIcon />
         </button>

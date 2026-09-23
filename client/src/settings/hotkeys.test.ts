@@ -25,6 +25,8 @@ describe('HOTKEYS source of truth', () => {
     expect(byKeys('Right-click file')?.label).toMatch(/new window/i)
     // The context menu's create group leads on the one document birth (⚡ YAZ-1775 D8 amended).
     expect(byKeys('Right-click file')?.label).toMatch(/new drawing/i)
+    // The vault menu (YAZ-1941): the one in-place open lives there, so the tip names it.
+    expect(byKeys('Right-click vault')?.label).toMatch(/Open in this window/)
     // Multi-select (YAZ-1336 🔒 YAZ-1775 D2 → YAZ-1337): ⇧-click toggles rows, and the tip has to say what
     // that is FOR — the two plural items a right-click then offers.
     expect(byKeys('⇧-click file or folder')?.label).toMatch(/multi-selection/i)
