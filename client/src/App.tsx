@@ -239,7 +239,13 @@ export function App() {
     return true
   }, [resetTabs])
 
-  const { pick, picking } = usePickFolder({ onPicked: openRoot })
+  // A vault window never has its vault swapped (YAZ-1913 🔒 D2): a picked folder goes to main's one
+  // open-recent door (a new window, or that vault's windows raised). Only Welcome fills in place.
+  const openPicked = useCallback((path: string) => {
+    if (root === null) void openRoot(path)
+    else void window.yaseenDraw.window.openRecent(path).catch((err: unknown) => console.error('[open-folder] openRecent failed:', err))
+  }, [root, openRoot])
+  const { pick, picking } = usePickFolder({ onPicked: openPicked })
 
   // ⌘W ladder (Tabs rule 7): close the active tab; with zero tabs open (incl. Welcome) close
   // the WINDOW through the real close path so the close/flush handshake runs.
@@ -257,7 +263,7 @@ export function App() {
   // ⌘O (YAZ-1767 D8): the ⌘K handshake for the vault switcher — un-collapse first, then bump a
   // request counter the sidebar header's panel consumes. The request is pinned to the root it was
   // made on: the Sidebar remounts `key={root}`, and a stale counter must not reopen the panel on
-  // the vault an in-place "Open folder…" just switched to. Welcome (root null) has no switcher.
+  // the new root of a vault that was just moved or renamed. Welcome (root null) has no switcher.
   const [switcherRequest, setSwitcherRequest] = useState<{ seq: number; root: string | null }>({ seq: 0, root: null })
   const openVaultSwitcher = useCallback(() => {
     if (root === null) return
