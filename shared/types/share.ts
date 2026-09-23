@@ -43,7 +43,7 @@ export interface ShareStatus {
 }
 
 /** The setup flow's steps, in order — the progress list renders exactly these. */
-export const SHARE_SETUP_STEPS = ['verify', 'account', 'bucket', 'viewer', 'worker', 'secret', 'subdomain', 'test'] as const
+export const SHARE_SETUP_STEPS = ['verify', 'account', 'bucket', 'viewer', 'worker', 'subdomain', 'test'] as const
 export type ShareSetupStep = (typeof SHARE_SETUP_STEPS)[number]
 
 export const SHARE_SETUP_LABELS: Record<ShareSetupStep, string> = {
@@ -51,8 +51,7 @@ export const SHARE_SETUP_LABELS: Record<ShareSetupStep, string> = {
   account: 'Finding your Cloudflare account',
   bucket: 'Creating the storage bucket (R2)',
   viewer: 'Uploading the viewer page',
-  worker: 'Uploading the share Worker',
-  secret: 'Setting the upload password',
+  worker: 'Uploading the share Worker and its upload password',
   subdomain: 'Turning on the workers.dev address',
   test: 'Test upload',
 }

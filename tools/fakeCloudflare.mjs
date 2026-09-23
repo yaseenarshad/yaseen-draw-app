@@ -6,8 +6,9 @@
  * real Cloudflare. One port serves two things:
  *
  *  1. /client/v4/…  — ONLY the handful of Cloudflare API endpoints the app's "Set up sharing" flow
- *     calls (verify token, list accounts, create/delete an R2 bucket, upload/delete a Worker, set
- *     a secret, the workers.dev subdomain, zones + custom domains). Point the app at it with
+ *     calls (verify token, list accounts, create/delete an R2 bucket, upload/delete a Worker with its
+ *     secret binding, the workers.dev subdomain, zones + custom domains), answering with Cloudflare's
+ *     real error codes. Point the app at it with
  *     `YASEEN_DRAW_CLOUDFLARE_API=http://127.0.0.1:<port>/client/v4`.
  *  2. everything else — the share Worker's own routes (/b/:id, /scene/…, /raw/…, /api/…), answered by
  *     running the SAME `share/worker.js` handler against a disk-backed fake R2 bucket in
@@ -16,15 +17,20 @@
  * MAGIC TOKENS (paste them in Settings › Sharing):
  *   demo-good       everything succeeds
  *   demo-invalid    the token is rejected (so is any token not in this list)
- *   demo-bad-perms  the token works but lacks "Workers R2 Storage: Edit" (bucket creation is refused)
+ *   demo-bad-perms  the token works but lacks "Workers R2 Storage: Edit" (every R2 call is refused)
  *   demo-no-card    R2 is not enabled on the account (Cloudflare wants a card on file first)
  *   demo-slow       like demo-good, but every API call takes ~1.5 s so the progress list is visible
  *   demo-two-accounts  like demo-good, but the key sees TWO accounts, so setup shows a picker
+ *   cfat_demo-good  like demo-good, but an ACCOUNT-owned key: /user/tokens/verify refuses it, its account's verify accepts it
+ *   demo-no-subdomain     the account has no workers.dev subdomain yet (10007): setup claims one
+ *   demo-subdomain-taken  like demo-no-subdomain, but the first name setup tries is taken (10036), so it retries
  * Stop this process to test the offline case.
  *
  * Extra pages: /__fake/token-page (what "Open Cloudflare" shows in the demo), /__fake/state (JSON).
  * Custom domains: the account's zones are yasin.dev, example.com, example.co.uk and yaseendraw.app
- * (so share.yasin.dev and share.example.co.uk attach; share.missingzone.com is "not on your account").
+ * (so share.yasin.dev and share.example.co.uk attach; share.missingzone.com is "not on your account"),
+ * plus pending-zone.dev, still pending (share.pending-zone.dev is "not active yet"). cname.yasin.dev
+ * already has a DNS record, so attaching it is refused (100117).
  */
 import fs from 'node:fs'
 import http from 'node:http'
@@ -56,9 +62,14 @@ fs.mkdirSync(ASSET_DIR, { recursive: true })
 const ACCOUNT = { id: 'f00dfeedc0ffee0000demo0account01', name: "Yasin's Account (demo)" }
 const SECOND_ACCOUNT = { id: 'f00dfeedc0ffee0000demo0account02', name: 'GrowProfit (demo)' }
 /** The zones every demo account holds (custom domains must end with one of these; the longest match wins). */
-const ZONES = ['yasin.dev', 'example.com', 'example.co.uk', 'yaseendraw.app'].map((name) => ({ id: `zone-${name.replace(/\W/g, '-')}`, name, status: 'active' }))
+const ZONES = [...['yasin.dev', 'example.com', 'example.co.uk', 'yaseendraw.app'].map((name) => ({ name, status: 'active' })), { name: 'pending-zone.dev', status: 'pending' }].map((z) => ({ id: `zone-${z.name.replace(/\W/g, '-')}`, ...z }))
+/** A hostname that already has a DNS record: Cloudflare refuses to attach a Worker to it. */
+const CNAME_HOST = 'cname.yasin.dev'
 const SUBDOMAIN = 'yasin-demo'
-const TOKENS = new Set(['demo-good', 'demo-invalid', 'demo-bad-perms', 'demo-no-card', 'demo-slow', 'demo-two-accounts'])
+const TOKENS = new Set(['demo-good', 'demo-invalid', 'demo-bad-perms', 'demo-no-card', 'demo-slow', 'demo-two-accounts', 'cfat_demo-good', 'demo-no-subdomain', 'demo-subdomain-taken'])
+/** The workers.dev subdomain each no-subdomain token has claimed (this run only), and whether the "taken" one was refused yet. */
+const claimed = new Map()
+let refusedTakenClaim = false
 
 // ------------------------------------------------------------------ persisted fake-account state
 const emptyState = () => ({ buckets: [], scripts: {}, domains: [], assetSessions: {} })
@@ -185,7 +196,15 @@ async function api(req, res, url) {
   let r
 
   if (req.method === 'GET' && route === '/user/tokens/verify') {
+    if (token.startsWith('cfat_')) {
+      log('401 an account token is not a user token')
+      return cfError(res, 401, 1000, 'Invalid API Token')
+    }
     log('active')
+    return cf(res, 200, { id: `tok-${token}`, status: 'active' })
+  }
+  if (m(/^\/accounts\/([^/]+)\/tokens\/verify$/) && req.method === 'GET') {
+    log('active (account token)')
     return cf(res, 200, { id: `tok-${token}`, status: 'active' })
   }
   if (req.method === 'GET' && route === '/accounts') {
@@ -196,19 +215,20 @@ async function api(req, res, url) {
     log('1 account')
     return cf(res, 200, [ACCOUNT])
   }
+  // Every R2 call — the existence check included — is refused for these two, as Cloudflare does.
+  if (m(/^\/accounts\/([^/]+)\/r2\//) && token === 'demo-bad-perms') {
+    log('403 bad perms')
+    return cfError(res, 403, 10000, 'Authentication error')
+  }
+  if (m(/^\/accounts\/([^/]+)\/r2\//) && token === 'demo-no-card') {
+    log('403 R2 not enabled')
+    return cfError(res, 403, 10042, 'Please enable R2 through the Cloudflare Dashboard.')
+  }
   if ((r = m(/^\/accounts\/([^/]+)\/r2\/buckets$/)) && req.method === 'POST') {
-    if (token === 'demo-bad-perms') {
-      log('403 bad perms')
-      return cfError(res, 403, 10000, 'Authentication error')
-    }
-    if (token === 'demo-no-card') {
-      log('403 R2 not enabled')
-      return cfError(res, 403, 10042, 'Please enable R2 through the Cloudflare Dashboard.')
-    }
     const { name } = JSON.parse((await readBody(req)).toString() || '{}')
     if (state.buckets.includes(name)) {
       log('409 exists')
-      return cfError(res, 409, 10004, 'The bucket you tried to create already exists, and you own it.')
+      return cfError(res, 409, 10073, 'The bucket you tried to create already exists, and you own it.')
     }
     state.buckets.push(name)
     saveState()
@@ -252,7 +272,9 @@ async function api(req, res, url) {
     const previous = state.scripts[name]
     // Static assets arrive as a completion token from the upload session; it names the manifest.
     const assets = metadata.assets?.jwt !== undefined ? state.assetSessions[metadata.assets.jwt] : previous?.assets
-    state.scripts[name] = { metadata, modules, secrets: previous?.secrets ?? {}, subdomain: previous?.subdomain ?? false, assets, uploadedAt: new Date().toISOString() }
+    // Secrets arrive as `secret_text` bindings in the same upload.
+    const secrets = Object.fromEntries((metadata.bindings ?? []).filter((b) => b.type === 'secret_text').map((b) => [b.name, b.text]))
+    state.scripts[name] = { metadata: { ...metadata, bindings: (metadata.bindings ?? []).map((b) => (b.type === 'secret_text' ? { ...b, text: '(hidden)' } : b)) }, modules, secrets, subdomain: previous?.subdomain ?? false, assets, uploadedAt: new Date().toISOString() }
     saveState()
     log(`uploaded worker ${name} (${modules.join(', ')})`)
     return cf(res, 200, { id: name, etag: `demo-${Date.now()}` })
@@ -288,18 +310,26 @@ async function api(req, res, url) {
     // The session token doubles as the completion token in this fake.
     return cf(res, 201, { jwt: token })
   }
-  if ((r = m(/^\/accounts\/([^/]+)\/workers\/scripts\/([^/]+)\/secrets$/)) && req.method === 'PUT') {
-    const script = state.scripts[decodeURIComponent(r[2])]
-    if (script === undefined) return cfError(res, 404, 10007, 'This Worker does not exist on your account.')
-    const { name, text } = JSON.parse((await readBody(req)).toString())
-    script.secrets[name] = text
-    saveState()
-    log(`secret ${name} set (${String(text).length} chars)`)
-    return cf(res, 200, { name, type: 'secret_text' })
-  }
   if (m(/^\/accounts\/([^/]+)\/workers\/subdomain$/) && req.method === 'GET') {
-    log(`subdomain ${SUBDOMAIN}`)
-    return cf(res, 200, { subdomain: SUBDOMAIN })
+    const noSubdomain = token === 'demo-no-subdomain' || token === 'demo-subdomain-taken'
+    const sub = noSubdomain ? claimed.get(token) : SUBDOMAIN
+    if (sub === undefined) {
+      log('10007 no workers.dev subdomain yet')
+      return cfError(res, 404, 10007, 'This account does not have a workers.dev subdomain.')
+    }
+    log(`subdomain ${sub}`)
+    return cf(res, 200, { subdomain: sub })
+  }
+  if (m(/^\/accounts\/([^/]+)\/workers\/subdomain$/) && req.method === 'PUT') {
+    const { subdomain } = JSON.parse((await readBody(req)).toString())
+    if (token === 'demo-subdomain-taken' && !refusedTakenClaim) {
+      refusedTakenClaim = true
+      log(`10036 ${subdomain} is taken`)
+      return cfError(res, 409, 10036, 'Subdomain is unavailable.')
+    }
+    claimed.set(token, subdomain)
+    log(`claimed subdomain ${subdomain}`)
+    return cf(res, 200, { subdomain })
   }
   if ((r = m(/^\/accounts\/([^/]+)\/workers\/scripts\/([^/]+)\/subdomain$/)) && req.method === 'POST') {
     const script = state.scripts[decodeURIComponent(r[2])]
@@ -310,11 +340,17 @@ async function api(req, res, url) {
     return cf(res, 200, { enabled: true })
   }
   if (route === '/zones' && req.method === 'GET') {
-    log(`${ZONES.length} zones`)
-    return cf(res, 200, ZONES)
+    const name = url.searchParams.get('name')
+    const found = ZONES.filter((z) => name === null || z.name === name)
+    log(`${found.length} zones named ${name}`)
+    return cf(res, 200, found)
   }
   if (m(/^\/accounts\/([^/]+)\/workers\/domains$/) && req.method === 'PUT') {
     const { hostname, service, zone_id } = JSON.parse((await readBody(req)).toString())
+    if (hostname === CNAME_HOST) {
+      log('409 existing DNS record')
+      return cfError(res, 409, 100117, "Hostname already has externally managed DNS records (A, CNAME, etc). Either delete them, try a different hostname, or use the option 'override_existing_dns_record' to override.")
+    }
     const id = `dom-${hostname.replace(/\W/g, '-')}`
     state.domains = [...state.domains.filter((d) => d.hostname !== hostname), { id, hostname, service, zone_id }]
     saveState()
@@ -334,13 +370,17 @@ async function api(req, res, url) {
 const TOKEN_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>Fake Cloudflare — API tokens</title>
 <style>body{font:15px/1.5 -apple-system,sans-serif;max-width:720px;margin:40px auto;padding:0 16px;color:#222}code{background:#f2f2f5;padding:2px 6px;border-radius:4px;font-size:14px}li{margin:10px 0}.box{border:1px solid #f5a623;background:#fff8ec;padding:12px 16px;border-radius:8px}</style></head>
 <body><h1>Fake Cloudflare — create API token</h1>
-<p class="box">This is the DEMO stand-in for <b>dash.cloudflare.com/profile/api-tokens</b>. In the real app this button opens Cloudflare with a pre-filled token template (Workers Scripts: Edit, Workers R2 Storage: Edit, Account Settings: Read). Copy one of these magic tokens and paste it back into Yaseen Draw:</p>
+<p class="box">This is the DEMO stand-in for <b>dash.cloudflare.com/profile/api-tokens</b>. In the real app this button opens Cloudflare with a pre-filled token template (Workers Scripts: Edit, Workers R2 Storage: Edit, Account Settings: Read, Zone: Read, Workers Routes: Edit). Copy one of these magic tokens and paste it back into Yaseen Draw:</p>
 <ul>
 <li><code>demo-good</code> — everything succeeds</li>
 <li><code>demo-slow</code> — succeeds, ~1.5 s per step (watch the progress list)</li>
 <li><code>demo-invalid</code> — Cloudflare rejects the token</li>
 <li><code>demo-bad-perms</code> — token lacks the R2 permission</li>
 <li><code>demo-no-card</code> — R2 not enabled yet (needs a card on file)</li>
+<li><code>demo-two-accounts</code> — the key sees two accounts (a picker appears)</li>
+<li><code>cfat_demo-good</code> — an account-owned key; succeeds</li>
+<li><code>demo-no-subdomain</code> — no workers.dev subdomain yet; setup claims one</li>
+<li><code>demo-subdomain-taken</code> — like the above, but the first name is taken; setup retries</li>
 </ul></body></html>`
 
 async function onRequest(req, res) {
