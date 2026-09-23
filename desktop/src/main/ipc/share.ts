@@ -14,7 +14,7 @@ import { broadcastAll } from './broadcast'
 import { handle, handleWithEvent } from './envelope'
 
 /**
- * The `share.*` half of `window.yaseenDraw` (YAZ-1799, prototype). Every request is shape-checked
+ * The `share.*` half of `window.yaseenDraw` (YAZ-1799). Every request is shape-checked
  * here; the token crosses the bridge exactly once (renderer → main, in `share:setup`) and is never
  * sent back. Progress goes to the window that asked; changes go to every window.
  *
@@ -93,7 +93,8 @@ export function registerShareIpc(userData: string, secrets: Secrets, viewerAsset
   handle(CH.shareList, async (body: unknown) => sharing.list(str(req(body).root, 'root')))
   handle(CH.sharePublish, async (body: unknown) => {
     const r = req(body)
-    return sharing.publish(str(r.root, 'root'), str(r.path, 'path'), str(r.content, 'content'))
+    if (r.id !== undefined && typeof r.id !== 'string') throw new BridgeFailure('BAD_REQUEST', "'id' must be a string")
+    return sharing.publish(str(r.root, 'root'), str(r.path, 'path'), str(r.content, 'content'), r.id)
   })
   handle(CH.shareSetPermission, async (body: unknown) => {
     const r = req(body)

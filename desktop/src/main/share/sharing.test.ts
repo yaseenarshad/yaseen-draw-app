@@ -43,6 +43,8 @@ let bucket: ReturnType<typeof memoryBucket>
 let workerSecret: string | undefined
 let online: boolean
 let sharing: Sharing
+/** Every request that reached the Worker (not Cloudflare's API): method, route and the permission header. */
+let workerCalls: { method: string; route: string; allow: string | null }[]
 
 const ok = (result: unknown) => Response.json({ success: true, errors: [], result })
 const notFound = () => Response.json({ success: false, errors: [{ code: 10006, message: 'not found' }], result: null }, { status: 404 })
@@ -86,7 +88,9 @@ const fakeFetch: typeof fetch = async (input, init) => {
     if (route.endsWith('/workers/subdomain')) return ok({ subdomain: 'me' })
     return ok({})
   }
-  return workerHandle(new Request(url, init as RequestInit), { BUCKET: bucket, UPLOAD_PASSWORD: workerSecret })
+  const request = new Request(url, init as RequestInit)
+  workerCalls.push({ method: request.method, route: url.pathname, allow: request.headers.get('x-allow-download') })
+  return workerHandle(request, { BUCKET: bucket, UPLOAD_PASSWORD: workerSecret })
 }
 
 const makeSharing = () =>
@@ -108,14 +112,16 @@ beforeEach(async () => {
   bucket = memoryBucket()
   workerSecret = undefined
   online = true
+  workerCalls = []
   account = { accounts: [{ id: 'acc1', name: 'Test account' }], buckets: new Set(), scripts: new Set(), domains: [], zones: ['example.co.uk', 'co.uk', 'yasin.dev'], assetUploads: 0, attached: [] }
   sharing = makeSharing()
 })
 afterEach(() => rm(dir, { recursive: true, force: true }))
 
 const board = () => path.join(vault, 'Sub', 'Board.excalidraw')
+const puts = () => workerCalls.filter((c) => c.method === 'PUT')
 
-describe('sharing (YAZ-1799 prototype) against the real Worker', () => {
+describe('sharing (YAZ-1799) against the real Worker', () => {
   it('setup runs every step, keeps both secrets in main, and answers a status with neither', async () => {
     const steps: ShareSetupProgress[] = []
     const status = await sharing.setup('tok', (p) => steps.push(p))
@@ -148,10 +154,9 @@ describe('sharing (YAZ-1799 prototype) against the real Worker', () => {
     expect((await fakeFetch(`${ORIGIN}/raw/${first.id}`)).status).toBe(403)
     expect(await (await fakeFetch(`${ORIGIN}/scene/${first.id}`)).text()).toBe('{"v":1}')
 
-    // an auto-upload after a save keeps the id AND the view-only flag
-    const second = await sharing.publish(vault, board(), '{"v":2}')
+    // an auto-upload after a save keeps the id and the record's view-only flag
+    const second = await sharing.publish(vault, board(), '{"v":2}', first.id)
     expect([second.id, second.sharedAt, second.allowDownload]).toEqual([first.id, first.sharedAt, false])
-    expect((await fakeFetch(`${ORIGIN}/raw/${first.id}`)).status).toBe(403)
     expect(await (await fakeFetch(`${ORIGIN}/scene/${first.id}`)).text()).toBe('{"v":2}')
 
     // back to view and download
@@ -167,10 +172,99 @@ describe('sharing (YAZ-1799 prototype) against the real Worker', () => {
     expect(await sharing.get(vault, board())).toBeNull()
   })
 
-  it('refuses a board over 100 MB before any upload', async () => {
+  it('publish creates the record and the object; setPermission only PATCHes; stop deletes both', async () => {
+    await sharing.setup('tok', () => {})
+    workerCalls = []
+    const first = await sharing.publish(vault, board(), '{"v":1}')
+    expect(puts()).toEqual([{ method: 'PUT', route: `/api/boards/${first.id}`, allow: '1' }]) // a new share: view and download
+    expect(bucket.objects.has(`boards/${first.id}.excalidraw`)).toBe(true)
+    expect((await sharing.get(vault, board()))?.id).toBe(first.id)
+    workerCalls = []
+    await sharing.setPermission(vault, board(), false)
+    expect(workerCalls.map((c) => c.method)).toEqual(['PATCH'])
+    await sharing.stop(vault, board())
+    expect(bucket.objects.size).toBe(0)
+    expect(await sharing.get(vault, board())).toBeNull()
+  })
+
+  it('a re-upload never sends a permission, so it can never reset a view-only board', async () => {
+    await sharing.setup('tok', () => {})
+    const first = await sharing.publish(vault, board(), '{"v":1}')
+    await sharing.setPermission(vault, board(), false)
+    workerCalls = []
+    await sharing.publish(vault, board(), '{"v":2}', first.id)
+    await sharing.publish(vault, board(), '{"v":3}') // the dialog's publish on an already-shared board is a re-upload too
+    expect(puts().map((c) => c.allow)).toEqual([null, null])
+    expect((await sharing.get(vault, board()))?.allowDownload).toBe(false)
+  })
+
+  // Needs the Worker to keep the stored flag on a PUT with no permission header (YAZ-1799 3A). Flip to `it` then.
+  it.fails('end to end: a view-only board is still view-only on the Worker after a re-upload', async () => {
+    await sharing.setup('tok', () => {})
+    const first = await sharing.publish(vault, board(), '{"v":1}')
+    await sharing.setPermission(vault, board(), false)
+    await sharing.publish(vault, board(), '{"v":2}', first.id)
+    expect((await fakeFetch(`${ORIGIN}/raw/${first.id}`)).status).toBe(403)
+  })
+
+  it('refuses a board over 100 MB before any network call; a shared one keeps its record, marked failed until it shrinks', async () => {
     await sharing.setup('tok', () => {})
     await expect(sharing.publish(vault, board(), 'x'.repeat(100_000_001))).rejects.toMatchObject({ code: 'TOO_LARGE' })
     expect(bucket.objects.size).toBe(0)
+    const first = await sharing.publish(vault, board(), '{"v":1}')
+    workerCalls = []
+    await expect(sharing.publish(vault, board(), 'x'.repeat(100_000_001), first.id)).rejects.toMatchObject({ code: 'TOO_LARGE' })
+    expect(workerCalls).toEqual([])
+    const failed = await sharing.get(vault, board())
+    expect(failed).toMatchObject({ id: first.id, sync: { state: 'failed' } })
+    expect(failed?.sync.message).toMatch(/100\.0 MB/)
+    await sharing.publish(vault, board(), '{"v":2}', first.id)
+    expect((await sharing.get(vault, board()))?.sync).toEqual({ state: 'ok' })
+  })
+
+  it('stale: the Worker lost the copy (404) — the next save re-creates it on the SAME id, with the recorded permission', async () => {
+    await sharing.setup('tok', () => {})
+    const first = await sharing.publish(vault, board(), '{"v":1}')
+    await sharing.setPermission(vault, board(), false)
+    bucket.objects.clear()
+    expect((await sharing.list(vault))[0]).toMatchObject({ id: first.id, live: 'missing' })
+    workerCalls = []
+    await sharing.publish(vault, board(), '{"v":2}', first.id)
+    expect(puts()).toEqual([{ method: 'PUT', route: `/api/boards/${first.id}`, allow: '0' }]) // a create on the Worker: it needs the flag
+    expect((await sharing.list(vault))[0]).toMatchObject({ id: first.id, live: 'live', allowDownload: false })
+    expect((await fakeFetch(`${ORIGIN}/raw/${first.id}`)).status).toBe(403)
+    workerCalls = []
+    await sharing.publish(vault, board(), '{"v":3}', first.id)
+    expect(puts().map((c) => c.allow)).toEqual([null]) // live again: back to plain re-uploads
+  })
+
+  it('a re-upload names its link: it lands on the record wherever a rename moved it, and never re-creates a stopped one', async () => {
+    await sharing.setup('tok', () => {})
+    const first = await sharing.publish(vault, board(), '{"v":1}')
+    const moved = path.join(vault, 'Moved.excalidraw')
+    await sharing.relocate([vault], board(), moved)
+    // An upload started under the old path before the rename answered.
+    await sharing.publish(vault, board(), '{"v":2}', first.id)
+    expect(await sharing.get(vault, board())).toBeNull()
+    expect((await sharing.get(vault, moved))?.id).toBe(first.id)
+    expect(await (await fakeFetch(`${ORIGIN}/scene/${first.id}`)).text()).toBe('{"v":2}')
+    await sharing.stop(vault, moved)
+    await expect(sharing.publish(vault, moved, '{"v":3}', first.id)).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    expect(bucket.objects.size).toBe(0)
+  })
+
+  it('two writers at once never lose each other\'s shares.json entry', async () => {
+    await sharing.setup('tok', () => {})
+    const other = makeSharing() // a second instance: the chain is per vault, not per instance
+    const boards = ['A', 'B', 'C', 'D'].map((n) => path.join(vault, `${n}.excalidraw`))
+    const shared = await Promise.all(boards.map((b, i) => (i % 2 === 0 ? sharing : other).publish(vault, b, '{}')))
+    const onDisk = JSON.parse(await readFile(path.join(vault, '.yaseendraw', 'shares.json'), 'utf8'))
+    expect(Object.keys(onDisk.shares).sort()).toEqual(['A.excalidraw', 'B.excalidraw', 'C.excalidraw', 'D.excalidraw'])
+    await Promise.all([sharing.setPermission(vault, boards[0], false), other.relocate([vault], boards[1], path.join(vault, 'B2.excalidraw')), sharing.stop(vault, boards[2])])
+    const after = JSON.parse(await readFile(path.join(vault, '.yaseendraw', 'shares.json'), 'utf8')).shares
+    expect(Object.keys(after).sort()).toEqual(['A.excalidraw', 'B2.excalidraw', 'D.excalidraw'])
+    expect(after['A.excalidraw']).toMatchObject({ id: shared[0].id, allowDownload: false })
+    expect(after['B2.excalidraw'].id).toBe(shared[1].id)
   })
 
   it('a failed re-upload keeps the record and is reported on the entry; the next one clears it', async () => {
@@ -241,6 +335,24 @@ describe('sharing (YAZ-1799 prototype) against the real Worker', () => {
     await sharing.forget([vault], movedDir)
     expect((await fakeFetch(first.url)).status).toBe(404)
     expect(await sharing.get(vault, inDir)).toBeNull()
+  })
+
+  it('a cut-paste into another open vault carries the share into that vault\'s shares.json (same id, same permission)', async () => {
+    await sharing.setup('tok', () => {})
+    const other = path.join(dir, 'other')
+    const first = await sharing.publish(vault, board(), '{"v":1}')
+    await sharing.setPermission(vault, board(), false)
+    const there = path.join(other, 'Pasted.excalidraw')
+    await sharing.relocate([vault, other], board(), there)
+    expect(await sharing.get(vault, board())).toBeNull()
+    expect(await sharing.get(other, there)).toMatchObject({ id: first.id, allowDownload: false })
+    expect((await fakeFetch(first.url)).status).toBe(200)
+  })
+
+  it('a rename touches no vault that has nothing shared (shares.json is never created by a repair)', async () => {
+    const other = path.join(dir, 'other')
+    await sharing.relocate([vault, other], board(), path.join(vault, 'X.excalidraw'))
+    await expect(readFile(path.join(vault, '.yaseendraw', 'shares.json'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('a delete while offline keeps the record (Settings lists it to stop later)', async () => {

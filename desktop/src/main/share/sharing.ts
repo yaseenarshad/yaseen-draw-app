@@ -1,5 +1,5 @@
 /**
- * SHARING, MAIN'S HALF (YAZ-1799, prototype). Owns everything a renderer must never hold:
+ * SHARING, MAIN'S HALF (YAZ-1799). Owns everything a renderer must never hold:
  * the Cloudflare API token, the Worker's upload password, and every HTTP call. Electron-free —
  * `fetch`, `secrets.ts`, `vaultConfig.ts` and a JSON file in userData — so it tests against a stub.
  *
@@ -30,7 +30,7 @@ import { isRecord } from '@shared/guards'
 import { atomicWrite, BridgeFailure, requireAbsPath } from '../fs/fsUtils'
 import type { Secrets } from '../secrets'
 import { CloudflareError, createCloudflareClient, offline, STEP_PERMISSION, type AssetFile, type CloudflareClient } from './cloudflare'
-import { absFromKey, readShares, relKey, writeShares, type ShareMap, type ShareRecord } from './shareLinks'
+import { absFromKey, readShares, relKey, updateShares, writeShares, type ShareRecord } from './shareLinks'
 
 export const WORKER_NAME = 'yaseen-draw-share'
 export const BUCKET_NAME = 'yaseen-draw-shares'
@@ -76,7 +76,8 @@ export interface Sharing {
   setup(token: string, progress: (p: ShareSetupProgress) => void, accountId?: string): Promise<ShareStatus>
   get(root: string, path: string): Promise<ShareEntry | null>
   list(root: string): Promise<ShareListEntry[]>
-  publish(root: string, path: string, content: string): Promise<ShareEntry>
+  /** A first share, or (with the `id` the board is shared under) a re-upload after a save. */
+  publish(root: string, path: string, content: string, id?: string): Promise<ShareEntry>
   setPermission(root: string, path: string, allowDownload: boolean): Promise<ShareEntry>
   stop(root: string, path: string): Promise<void>
   /** A board (or folder) was renamed or moved inside the app: its shares follow. */
@@ -114,16 +115,23 @@ export function createSharing(deps: SharingDeps): Sharing {
   const doFetch = deps.fetchImpl ?? fetch
   const now = deps.now ?? Date.now
   /**
-   * Each shared board's live-link state, keyed by absolute path (ALWAYS-LIVE amendment). Memory
-   * only: an upload in flight or a failure is a fact about THIS run; the next save re-tells it.
+   * Each shared board's live-link state, keyed by share id — the id survives a rename, a path does
+   * not (ALWAYS-LIVE, D3). Memory only: an upload in flight or a failure is a fact about THIS run;
+   * the next save re-tells it.
    */
   const syncs = new Map<string, ShareSync>()
-  const syncOf = (abs: string): ShareSync => syncs.get(abs) ?? { state: 'ok' }
-  const setSync = (abs: string, sync: ShareSync | null) => {
-    if (sync === null) syncs.delete(abs)
-    else syncs.set(abs, sync)
+  const syncOf = (id: string): ShareSync => syncs.get(id) ?? { state: 'ok' }
+  const setSync = (id: string, sync: ShareSync | null) => {
+    if (sync === null) syncs.delete(id)
+    else syncs.set(id, sync)
     deps.onChanged?.()
   }
+  /**
+   * Ids the Worker last answered 404 for (the Settings check, or a permission change): the record
+   * is here but its copy is gone. The next save re-creates it on the same id — and because that
+   * PUT is a create on the Worker, it is the one re-upload that carries the permission.
+   */
+  const stale = new Set<string>()
 
   async function readConfig(): Promise<SharingConfig | null> {
     try {
@@ -300,7 +308,7 @@ export function createSharing(deps: SharingDeps): Sharing {
   async function entryFor(root: string, key: string, rec: ShareRecord): Promise<ShareEntry> {
     const origin = linkOrigin(await readConfig())
     const abs = absFromKey(root, key)
-    return { path: abs, ...links(origin, rec), sharedAt: rec.sharedAt, updatedAt: rec.updatedAt, sync: syncOf(abs) }
+    return { path: abs, ...links(origin, rec), sharedAt: rec.sharedAt, updatedAt: rec.updatedAt, sync: syncOf(rec.id) }
   }
 
   async function get(root: string, path: string): Promise<ShareEntry | null> {
@@ -324,11 +332,13 @@ export function createSharing(deps: SharingDeps): Sharing {
             // `/scene`, not `/raw`: a view-only board answers 403 on `/raw` and would read as broken.
             const res = await doFetch(`${origin}/scene/${rec.id}`, { method: 'HEAD', signal: AbortSignal.timeout(LIVE_CHECK_MS) })
             live = res.status === 200 ? 'live' : res.status === 404 ? 'missing' : 'unknown'
+            if (live === 'missing') stale.add(rec.id)
+            else if (live === 'live') stale.delete(rec.id)
           } catch {
             live = 'unknown'
           }
         }
-        return { path: abs, ...links(origin, rec), sharedAt: rec.sharedAt, updatedAt: rec.updatedAt, sync: syncOf(abs), fileExists, live }
+        return { path: abs, ...links(origin, rec), sharedAt: rec.sharedAt, updatedAt: rec.updatedAt, sync: syncOf(rec.id), fileExists, live }
       }),
     ).then((rows) => rows.sort((a, b) => b.updatedAt - a.updatedAt))
   }
@@ -338,49 +348,65 @@ export function createSharing(deps: SharingDeps): Sharing {
    * shared is recorded in `syncs` (uploading → ok | failed + reason) so the Share dialog and the
    * Settings list can say "Up to date", "Uploading…" or "Couldn't update: …". The record in
    * shares.json is kept on failure — the next save retries.
+   *
+   * A re-upload names the link (`id`) it is for, and lands on that record wherever an in-app
+   * rename has moved it since the save; if the board was stopped meanwhile it is refused, never
+   * quietly shared again under a new link.
    */
-  async function publish(root: string, path: string, content: string): Promise<ShareEntry> {
+  async function publish(root: string, path: string, content: string, id?: string): Promise<ShareEntry> {
     const r = requireAbsPath(root, 'root')
-    const abs = requireAbsPath(path, 'path')
-    const key = relKey(r, abs)
-    const known = (await readShares(r))[key] !== undefined
-    if (known) setSync(abs, { state: 'uploading' })
+    const key = relKey(r, requireAbsPath(path, 'path'))
+    const shares = await readShares(r)
+    const found = id === undefined ? (shares[key] === undefined ? undefined : ([key, shares[key]] as const)) : Object.entries(shares).find(([, rec]) => rec.id === id)
+    if (id !== undefined && found === undefined) throw new BridgeFailure('NOT_FOUND', 'This board is not shared any more.')
+    const existing = found?.[1]
+    if (existing !== undefined) setSync(existing.id, { state: 'uploading' })
     try {
-      const entry = await upload(r, abs, key, content)
-      setSync(abs, null)
+      const entry = await upload(r, found?.[0] ?? key, existing, content)
+      if (existing !== undefined) setSync(existing.id, null)
       return { ...entry, sync: { state: 'ok' } }
     } catch (err) {
-      if (known) setSync(abs, { state: 'failed', message: err instanceof Error ? err.message : String(err), failedAt: now() })
+      if (existing !== undefined) setSync(existing.id, { state: 'failed', message: err instanceof Error ? err.message : String(err), failedAt: now() })
       throw err
     }
   }
 
-  async function upload(r: string, abs: string, key: string, content: string): Promise<ShareEntry> {
+  async function upload(r: string, key: string, existing: ShareRecord | undefined, content: string): Promise<ShareEntry> {
     if (typeof content !== 'string' || content === '') throw new BridgeFailure('BAD_REQUEST', "'content' must be the board's text")
     const size = Buffer.byteLength(content)
     if (size > MAX_SHARE_BYTES)
       throw new BridgeFailure('TOO_LARGE', `This board is ${mb(size)} once its images are packed in, and Cloudflare's free plan accepts at most ${mb(MAX_SHARE_BYTES)} per upload. Use fewer or smaller images, or split the board.`)
     const { password, origin } = await ready()
-    const shares: ShareMap = await readShares(r)
-    const existing = shares[key]
     const id = existing?.id ?? newShareId()
-    // A re-upload keeps the owner's choice; a new share starts at "can view and download".
-    const allowDownload = existing?.allowDownload ?? true
+    const headers: Record<string, string> = { 'content-type': 'application/json', 'x-board-name': encodeURIComponent(stripName(key)) }
+    // The permission travels only when the PUT creates the object: a new share ("can view and
+    // download") or a stale one coming back. A plain re-upload never carries it, so it can never
+    // undo a permission change — that is PATCH's alone.
+    if (existing === undefined || stale.has(id)) headers['x-allow-download'] = (existing?.allowDownload ?? true) ? '1' : '0'
     // Big boards get more time: a minute plus ~2 s per MB (a slow uplink moves ~0.5 MB/s).
-    const res = await worker(origin, 'PUT', `/api/boards/${id}`, password, content, { 'content-type': 'application/json', 'x-allow-download': allowDownload ? '1' : '0', 'x-board-name': encodeURIComponent(stripName(abs)) }, Math.round(60_000 + (size / 1_000_000) * 2_000))
+    const res = await worker(origin, 'PUT', `/api/boards/${id}`, password, content, headers, Math.round(60_000 + (size / 1_000_000) * 2_000))
     if (res.status === 401) throw new BridgeFailure('PROVIDER_FAILED', "Your share Worker didn't accept this app's upload password. Open Settings › Sharing and run Set up sharing again.")
     if (res.status === 413) throw new BridgeFailure('TOO_LARGE', `Cloudflare refused the upload as too large (${mb(size)}; the limit is ${mb(MAX_SHARE_BYTES)}).`)
     if (!res.ok) throw new BridgeFailure('PROVIDER_FAILED', `The upload failed (HTTP ${res.status}). Try again in a moment.`)
+    stale.delete(id)
     const t = now()
-    // Re-read before writing: another window may have shared a different board meanwhile.
-    const latest = await readShares(r)
-    const flag = latest[key]?.allowDownload ?? allowDownload
-    // The permission was flipped while this upload ran: the PUT carried the old flag, so re-apply the new one.
-    if (flag !== allowDownload) await worker(origin, 'PATCH', `/api/boards/${id}`, password, JSON.stringify({ allowDownload: flag }), { 'content-type': 'application/json' })
-    latest[key] = { id, allowDownload: flag, sharedAt: existing?.sharedAt ?? t, updatedAt: t }
-    await writeShares(r, latest)
+    let saved: [string, ShareRecord] | undefined
+    await updateShares(r, (shares) => {
+      // Found by id: a rename may have moved the record while the upload ran.
+      const at = existing === undefined ? key : Object.keys(shares).find((k) => shares[k].id === id)
+      if (at === undefined) return false
+      shares[at] = { id, allowDownload: shares[at]?.allowDownload ?? true, sharedAt: shares[at]?.sharedAt ?? t, updatedAt: t }
+      saved = [at, shares[at]]
+      return true
+    })
+    if (saved === undefined) {
+      // Stopped while this upload ran: the stop's DELETE may have landed first, so this PUT put the
+      // board back. Take it down again — a stopped link stays dead.
+      await worker(origin, 'DELETE', `/api/boards/${id}`, password).catch(() => undefined)
+      throw new BridgeFailure('NOT_FOUND', 'This board is not shared any more.')
+    }
     deps.onChanged?.()
-    return entryFor(r, key, latest[key])
+    return entryFor(r, saved[0], saved[1])
   }
 
   /** "can view and download" ⇄ "can view only" on the SAME link: one PATCH, no re-upload. */
@@ -392,13 +418,21 @@ export function createSharing(deps: SharingDeps): Sharing {
     const { password, origin } = await ready()
     const res = await worker(origin, 'PATCH', `/api/boards/${rec.id}`, password, JSON.stringify({ allowDownload }), { 'content-type': 'application/json' })
     if (res.status === 401) throw new BridgeFailure('PROVIDER_FAILED', "Your share Worker didn't accept this app's upload password. Open Settings › Sharing and run Set up sharing again.")
-    if (res.status === 404) throw new BridgeFailure('PROVIDER_FAILED', "The shared copy is gone from Cloudflare, so there is nothing to change. Save the board once to put it back, then try again.")
+    if (res.status === 404) {
+      stale.add(rec.id)
+      throw new BridgeFailure('PROVIDER_FAILED', 'The shared copy is gone from Cloudflare, so there is nothing to change. Save the board once to put it back, then try again.')
+    }
     if (!res.ok) throw new BridgeFailure('PROVIDER_FAILED', `Changing access failed (HTTP ${res.status}). Try again.`)
-    const latest = await readShares(r)
-    if (latest[key] !== undefined) latest[key] = { ...latest[key], allowDownload }
-    await writeShares(r, latest)
+    let saved: [string, ShareRecord] = [key, { ...rec, allowDownload }]
+    await updateShares(r, (shares) => {
+      const at = Object.keys(shares).find((k) => shares[k].id === rec.id)
+      if (at === undefined) return false
+      shares[at] = { ...shares[at], allowDownload }
+      saved = [at, shares[at]]
+      return true
+    })
     deps.onChanged?.()
-    return entryFor(r, key, latest[key] ?? { ...rec, allowDownload })
+    return entryFor(r, saved[0], saved[1])
   }
 
   async function stop(root: string, path: string): Promise<void> {
@@ -410,10 +444,13 @@ export function createSharing(deps: SharingDeps): Sharing {
     const res = await worker(origin, 'DELETE', `/api/boards/${rec.id}`, password)
     if (res.status === 401) throw new BridgeFailure('PROVIDER_FAILED', "Your share Worker didn't accept this app's upload password, so the link is still live. Run Set up sharing again, then Stop.")
     if (!res.ok && res.status !== 404) throw new BridgeFailure('PROVIDER_FAILED', `Stopping failed (HTTP ${res.status}); the link may still work. Try again.`)
-    const latest = await readShares(r)
-    delete latest[key]
-    await writeShares(r, latest)
-    setSync(absFromKey(r, key), null)
+    await updateShares(r, (shares) => {
+      const at = Object.keys(shares).find((k) => shares[k].id === rec.id)
+      if (at !== undefined) delete shares[at]
+      return at !== undefined
+    })
+    stale.delete(rec.id)
+    setSync(rec.id, null)
   }
 
   async function setDomain(hostname: string | null): Promise<ShareStatus> {
@@ -468,33 +505,30 @@ export function createSharing(deps: SharingDeps): Sharing {
   const rootOf = (roots: readonly string[], abs: string) => [...roots].filter((r) => within(abs, r) && abs !== r).sort((a, b) => b.length - a.length)[0] ?? null
 
   async function relocate(roots: readonly string[], oldPath: string, newPath: string): Promise<void> {
-    const seen = new Set<string>()
     for (const root of new Set(roots)) {
-      const shares = await readShares(root)
-      const moving = Object.entries(shares).filter(([key]) => within(absFromKey(root, key), oldPath))
-      if (moving.length === 0) continue
-      for (const [key, rec] of moving) {
-        const fromAbs = absFromKey(root, key)
-        if (seen.has(fromAbs)) continue
-        seen.add(fromAbs)
-        const toAbs = newPath + fromAbs.slice(oldPath.length)
-        const target = rootOf(roots, toAbs)
-        const latest = await readShares(root)
-        delete latest[key]
-        if (target === root) latest[relKey(root, toAbs)] = rec
-        await writeShares(root, latest)
-        // Moved into ANOTHER open vault: the record goes with it. Out of every open vault: it is
-        // dropped from shares.json and the link keeps its last upload (nothing can update it).
-        if (target !== null && target !== root) {
-          const there = await readShares(target)
-          there[relKey(target, toAbs)] = rec
-          await writeShares(target, there)
+      // Records leaving this vault for another open one: [that vault, new path, record].
+      const leaving: [string, string, ShareRecord][] = []
+      await updateShares(root, (shares) => {
+        let changed = false
+        for (const [key, rec] of Object.entries(shares)) {
+          const fromAbs = absFromKey(root, key)
+          if (!within(fromAbs, oldPath)) continue
+          const toAbs = newPath + fromAbs.slice(oldPath.length)
+          const target = rootOf(roots, toAbs)
+          delete shares[key]
+          changed = true
+          // Out of every open vault: dropped here, and the link keeps its last upload (nothing can update it).
+          if (target === root) shares[relKey(root, toAbs)] = rec
+          else if (target !== null) leaving.push([target, toAbs, rec])
         }
-        const sync = syncs.get(fromAbs)
-        if (sync !== undefined) {
-          syncs.delete(fromAbs)
-          syncs.set(toAbs, sync)
-        }
+        return changed
+      })
+      // Moved into ANOTHER open vault (a cross-vault cut-paste): the record goes with it.
+      for (const [target, toAbs, rec] of leaving) {
+        await updateShares(target, (shares) => {
+          shares[relKey(target, toAbs)] = rec
+          return true
+        })
       }
     }
     deps.onChanged?.()
