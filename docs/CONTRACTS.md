@@ -521,9 +521,15 @@ GitHub refuses any file over 100 MiB (and rejects the WHOLE push that carries on
   `storage:shrink` both go through `runOffThread` (`main/storageJob.ts`) to ONE `worker_threads`
   Worker (`main/storageWorker.ts`, built as its own main chunk by electron-vite's `?modulePath`
   import), told which job by a tagged message: `{ kind: 'stats', root }` | `{ kind: 'shrink', root,
-  skip }`. In the main process the walk held the window ~1.3 s on a 230 MB vault and shrink ~4 s on
-  the demo vault. Same functions, same answers; one short-lived thread per job. Shrink's mtime
-  re-check before each write (D5) still lets a save that lands while the worker runs win.
+  skip }`. Same functions, same answers; one short-lived thread per job. Both walk the vault with
+  the one `vaultFiles` (`fs/fsUtils.ts`), so they agree on which files are the vault's. Shrink's
+  mtime re-check before each write (D5) still lets a save that lands while the worker runs win.
+- **🔒 D13 — measured only while Settings is open.** `useVaultStorage` measures on the Storage
+  page's open, on a sync pass FINISHING (`syncing` → synced / attention / off) while Settings is
+  open — App passes `settingsOpen ? syncState : null` — and after a shrink; one measure at a time,
+  a trigger mid-measure queuing one re-run. A vault change clears the numbers and measures nothing.
+  A failed first measure reads "Couldn't measure this vault" (not "Measuring…" forever); the next
+  page open retries.
 - **One red line.** The page's "Needs attention" lists every file ≥ 50 MiB (`VaultStorageStats.large`,
   any kind — board, picture, video) and turns it red at `GITHUB_FILE_LIMIT_BYTES`, the same 95 MiB the
   sync guard holds files back at, so a red row is exactly a file sync will not push.
@@ -814,7 +820,7 @@ two that do not — the Pixabay key and the GitHub switch — are marked below.
 | Files | Confirm before deleting · Library folder (🔒 YAZ-1775 D5: resolved path, Choose…, Reset to default) |
 | Images | Pixabay API key (🔒 YAZ-1775 D4: a password field, Save / Clear, "Key set" / "No key" from `secrets:has`, never echoed) — NOT in `SettingsState`, it lives in main's owner-only `secrets.json` (YAZ-1842 D1) |
 | Sync | the per-vault GitHub switch — the other setting NOT in `SettingsState` (it lives in `.yaseendraw/github.json`) |
-| Storage | its own page, like Hotkeys (YAZ-1801), present only while a vault is open — a report, not settings: **GitHub** (a bar of the git history on a fixed scale ending at 10 GB, marked at 1 GB and 5 GB; green to 1 GB, amber to 5 GB, red past it, "10 GB — over GitHub's max" past 10 GB; "Not synced with git" for a plain folder) with two muted lines, "Your files N" and "Old versions N" · **Needs attention** (only when non-empty: every file ≥ 50 MiB, red "Stays on this Mac" at the sync guard's 95 MiB, amber "Close to the limit" below) · **Make boards smaller** (only while pictures are inside boards, or a result from this session is showing: one sentence, "Move pictures out", the result line). Measured on page open (not on Settings open — that measured twice), vault change, a finished sync pass and after a shrink — one measure at a time, a trigger mid-measure queuing one re-run |
+| Storage | its own page, like Hotkeys (YAZ-1801), present only while a vault is open — a report, not settings: **GitHub** (a bar of the git history on a fixed scale ending at 10 GB, marked at 1 GB and 5 GB; green to 1 GB, amber to 5 GB, red past it, "10 GB — over GitHub's max" past 10 GB; "Not synced with git" for a plain folder) with two muted lines, "Your files N" and "Old versions N" · **Needs attention** (only when non-empty: every file ≥ 50 MiB, red "Stays on this Mac" at the sync guard's 95 MiB, amber "Close to the limit" below) · **Make boards smaller** (only while pictures are inside boards, or a result from this session is showing: one sentence, "Move pictures out", the result line). Measured only while Settings is open (🔒 D13): on the page's open, a sync pass finishing, and after a shrink — one measure at a time, a trigger mid-measure queuing one re-run; a failed first measure reads "Couldn't measure this vault" |
 | Hotkeys | its own page: the Window, Canvas and Mouse tables, from `hotkeys.ts` |
 
 A group may declare `available(ctx)` (Storage's two conditional groups), and a row may be `bare`

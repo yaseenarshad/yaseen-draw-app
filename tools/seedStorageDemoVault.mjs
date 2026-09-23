@@ -38,7 +38,10 @@ const USAGE = 'usage: node tools/seedStorageDemoVault.mjs --root <dir> [--force]
 const args = process.argv.slice(2)
 const flagAt = args.indexOf('--root')
 const ROOT_ARG = flagAt === -1 ? undefined : args[flagAt + 1]
-if (ROOT_ARG === undefined || ROOT_ARG === '' || ROOT_ARG.startsWith('--')) {
+// Strict, like `lib/seedDemoVault.mjs`'s parseArgs: a typo'd flag must not seed somewhere unexpected.
+const unknown = args.filter((a, i) => a !== '--force' && a !== '--root' && i !== flagAt + 1)
+if (ROOT_ARG === undefined || ROOT_ARG === '' || ROOT_ARG.startsWith('--') || unknown.length > 0) {
+  if (unknown.length > 0) console.error(`unknown argument: ${unknown[0]}`)
   console.error(USAGE)
   process.exit(2)
 }
