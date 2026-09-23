@@ -252,6 +252,43 @@ button {
   white-space: nowrap;
 }
 
+/* A notice with a button (YAZ-1897 "See changes") is news to act on: it wraps instead of cutting
+   the sentence short, and carries its button and a dismiss. */
+.link-notice--action {
+  max-width: 440px;
+}
+
+.link-notice--action .link-notice__text {
+  white-space: normal;
+}
+
+.link-notice__action {
+  flex: none;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.link-notice__action:hover {
+  background: var(--accent-soft);
+}
+
+.link-notice__close {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--fg-muted);
+  border-radius: 5px;
+}
+
+.link-notice__close:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
 @keyframes link-notice-in {
   from {
     opacity: 0;

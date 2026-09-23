@@ -26,6 +26,9 @@ import { windowTitle } from './lib/windowTitle'
 import { SettingsDialog } from './settings/SettingsDialog'
 import type { SettingsSectionId } from './settings/registry'
 import { ShareDialog } from './share/ShareDialog'
+import { VersionHistory } from './history/VersionHistory'
+import { mergeNotice } from './history/mergeNotice'
+import { noteBoardSaved } from './share/liveShare'
 import { noteBoardRenamed } from './share/liveShare'
 import { type SidebarClipboard, Sidebar } from './sidebar/Sidebar'
 import type { SidebarRevealRequest } from './sidebar/revealRow'
@@ -308,6 +311,9 @@ export function App() {
   const shareActive = useCallback(() => {
     if (fileRef.current !== null) setSharePath(fileRef.current)
   }, [])
+  // Version history (YAZ-1897 D4): the sidebar's right-click, or "See changes" on a merge notice (`fromMerge`).
+  const [history, setHistory] = useState<{ path: string; fromMerge: boolean } | null>(null)
+  const openHistory = useCallback((path: string) => setHistory({ path, fromMerge: false }), [])
 
   // File › Open Folder… / Open Recent (GRO-2161) reuse the same flows as the in-app buttons;
   // File › Close Tab and Window › Next/Previous Tab (GRO-2232) drive the tab model.
@@ -341,11 +347,22 @@ export function App() {
   // `'info'` unless the caller names one — so nothing that already said `onNotice(text)` changed.
   const notify = useCallback((text: string, icon: NoticeKind = 'info') => setNotice({ text, icon }), [])
   useEffect(() => {
-    if (notice === null) return
+    if (notice === null || notice.action !== undefined) return
     const timer = setTimeout(() => setNotice(null), LINK_NOTICE_MS)
     return () => clearTimeout(timer)
   }, [notice])
   useLinkEvents({ onOpenFile: openCurrent, onNotice: notify })
+
+  // A sync pass that merged says so ONCE (YAZ-1897 D4): `merged` rides only that pass's broadcast.
+  // A shared board the merge rewrote re-uploads its link, as a local save would (`liveShare`).
+  const merged = githubSync.status?.merged
+  useEffect(() => {
+    if (merged === undefined || merged.length === 0 || root === null) return
+    const { text, firstBoard } = mergeNotice(merged)
+    const run = firstBoard === null ? null : () => setHistory({ path: vaultPath(root, firstBoard), fromMerge: true })
+    setNotice(run === null ? { text, icon: 'info' } : { text, icon: 'info', action: { label: 'See changes', run } })
+    for (const m of merged) if (m.copy === undefined) noteBoardSaved(root, vaultPath(root, m.path))
+  }, [merged, root])
 
   /**
    * ⌘C / ⌘X / ⌘V for the sidebar's FILE clipboard (D6 amended, YAZ-1674). A WINDOW listener: a
@@ -484,9 +501,26 @@ export function App() {
     <div className="app">
       {notice !== null && (
         // `data-icon` is a test / observability hook — nothing in the CSS selects it; the glyph is the SVG.
-        <div className="link-notice" role="status" data-icon={notice.icon}>
+        <div className={`link-notice${notice.action === undefined ? '' : ' link-notice--action'}`} role="status" data-icon={notice.icon}>
           <NoticeIcon icon={notice.icon} />
           <span className="link-notice__text">{notice.text}</span>
+          {notice.action !== undefined && (
+            <>
+              <button
+                type="button"
+                className="link-notice__action"
+                onClick={() => {
+                  notice.action?.run()
+                  setNotice(null)
+                }}
+              >
+                {notice.action.label}
+              </button>
+              <button type="button" className="link-notice__close" aria-label="Dismiss" onClick={() => setNotice(null)}>
+                ✕
+              </button>
+            </>
+          )}
         </div>
       )}
       {/* YAZ-1679: unmounted when closed, never hidden. ONE useGithubSync per window (above): the
@@ -500,6 +534,7 @@ export function App() {
         />
       )}
       {sharePath !== null && root !== null && <ShareDialog key={sharePath} root={root} path={sharePath} onClose={() => setSharePath(null)} onOpenSettings={openSharingSettings} />}
+      {history !== null && root !== null && <VersionHistory key={history.path} root={root} path={history.path} fromMerge={history.fromMerge} onClose={() => setHistory(null)} onNotice={notify} />}
       {/* YAZ-1818: sync needs attention. Two of the six reasons are things this app cannot fix from
           inside itself (git missing, credentials rejected), so the offer is a prompt to paste
           into any LLM — an assistant that CAN drive the terminal — rather than a wizard. */}
@@ -547,6 +582,7 @@ export function App() {
           onRenameFile={renameFile}
           onDeleteFile={deleteFile}
           onShareFile={setSharePath}
+          onHistoryFile={openHistory}
           onNotice={notify}
           // YAZ-1801 D3: rows over GitHub's limit wear a cloud-off icon — from the one sync status above.
           tooLarge={tooLargePaths}

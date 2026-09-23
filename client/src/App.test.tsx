@@ -41,6 +41,7 @@ interface SidebarStubProps {
 
 const captured = vi.hoisted(() => ({
   sidebar: null as SidebarStubProps | null,
+  history: null as { path: string; fromMerge?: boolean } | null,
 }))
 
 vi.mock('./Editor', () => ({
@@ -53,7 +54,16 @@ vi.mock('./sidebar/Sidebar', () => ({
   },
 }))
 
+vi.mock('./history/VersionHistory', () => ({
+  VersionHistory: (props: { path: string; fromMerge?: boolean }) => {
+    captured.history = props
+    return <div data-version-history={props.path} />
+  },
+}))
+vi.mock('./share/liveShare', async (importOriginal) => ({ ...(await importOriginal<typeof import('./share/liveShare')>()), noteBoardSaved: vi.fn() }))
+
 import { App } from './App'
+import { noteBoardSaved } from './share/liveShare'
 
 
 /** The `window.yaseenDraw` surface the App tree touches, all observable. */
@@ -384,6 +394,35 @@ describe('App files held back as too large (YAZ-1801 D3)', () => {
     await act(async () => emitSyncStatus({ root: '/v', state: 'synced', enabled: true }))
     expect(el.querySelector('.sync-banner')).toBeNull()
     expect([...(captured.sidebar?.tooLarge ?? [])]).toEqual([])
+  })
+})
+
+describe('App after a sync pass that merged (YAZ-1897 D4)', () => {
+  it('says so once with "See changes", which opens Version history on the merged board; shared links re-upload', async () => {
+    const { el, emitSyncStatus } = await mount(defaultAppState(), { id: 'w1', root: '/v', file: null, tabs: [] })
+    await act(async () => emitSyncStatus({ root: '/v', state: 'synced', enabled: true, merged: [{ path: 'Plans/Roadmap.excalidraw', author: 'Sam', clashes: 2 }] }))
+    const toast = el.querySelector<HTMLElement>('.link-notice')
+    expect(toast?.querySelector('.link-notice__text')?.textContent).toBe("Merged Sam's changes into “Roadmap” · 2 shapes edited on both — kept the newest.")
+    expect(noteBoardSaved).toHaveBeenCalledWith('/v', '/v/Plans/Roadmap.excalidraw')
+    // The next ordinary status must not replay it.
+    await act(async () => emitSyncStatus({ root: '/v', state: 'synced', enabled: true }))
+    await act(async () => el.querySelector<HTMLButtonElement>('.link-notice__action')?.click())
+    expect(captured.history).toMatchObject({ path: '/v/Plans/Roadmap.excalidraw', fromMerge: true })
+    expect(el.querySelector('.link-notice')).toBeNull()
+  })
+
+  it('a notice with an action waits to be dismissed instead of fading', async () => {
+    vi.useFakeTimers()
+    try {
+      const { el, emitSyncStatus } = await mount(defaultAppState(), { id: 'w1', root: '/v', file: null, tabs: [] })
+      await act(async () => emitSyncStatus({ root: '/v', state: 'synced', enabled: true, merged: [{ path: 'a.excalidraw', author: 'Sam', clashes: 0 }] }))
+      await act(async () => vi.advanceTimersByTime(60_000))
+      expect(el.querySelector('.link-notice')).not.toBeNull()
+      await act(async () => el.querySelector<HTMLButtonElement>('.link-notice__close')?.click())
+      expect(el.querySelector('.link-notice')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
