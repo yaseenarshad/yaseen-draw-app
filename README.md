@@ -5,7 +5,8 @@
 Yaseen Draw — a local whiteboard for a folder of drawings, as an Electron macOS desktop app: a
 React renderer around a vendored [Excalidraw](https://excalidraw.com) fork, and a main process
 that reads and writes the files on this machine (the renderer only ever talks to the
-`window.yaseenDraw` bridge — there is no server of any kind). Pick a folder, browse its
+`window.yaseenDraw` bridge — there is no server of any kind, except the optional share Worker on
+your own Cloudflare account). Pick a folder, browse its
 `.excalidraw` files in the sidebar, draw, and changes are saved back to disk (debounced, atomic).
 Files changed outside the app (another editor, sync) are reloaded live; if you have unsaved edits
 you get a Reload / Keep mine choice. Lineage in one line: the shell follows Obsidian, the
@@ -40,11 +41,27 @@ npm run desktop:build
 
 produces `desktop/dist-app/mac-arm64/Yaseen Draw.app` and `desktop/dist-app/Yaseen Draw-<version>-arm64.dmg` (arm64, ad-hoc signed). Drag the `.app` into `/Applications`, or send someone the dmg.
 
-## Sharing it
+## Installing on another Mac/PC
 
 Every packaged version is downloadable from the repo's [Releases page](https://github.com/yaseenarshad/yaseen-draw-app/releases) — the `.dmg` for a Mac (Apple Silicon), the `-win-x64-setup.exe` for Windows — no build toolchain needed on the installing machine.
 
 The Mac app is ad-hoc signed, not notarized, so on someone else's Mac (macOS 15) the first open is blocked with "Apple could not verify…". Once: open **System Settings › Privacy & Security**, scroll to the blocked-app notice, click **Open Anyway**, and confirm. After that it opens normally. The Windows installer is unsigned, so SmartScreen shows "Windows protected your PC" the first time: click **More info › Run anyway**, once.
+
+## Share links
+
+Right-click a board › **Share**, or **File › Share Link** (`⌘⇧L`), and turn on *Anyone with the
+link*: the board gets one link anyone can open in a browser — no account, no app, no editing.
+Pick *View and download* (the default) or *View only*; the link stays the same either way. The
+link is **always live**: every save updates it about ten seconds after you stop drawing. A rename
+inside the app keeps the link; deleting the board stops it. Shared boards wear a small link mark
+in the sidebar, red when the last update failed.
+
+The link is served from **your own free Cloudflare account** — one storage bucket and one small
+Worker, which **Settings › Sharing** sets up from one pasted API key (Open Cloudflare opens the
+token page with every permission pre-filled). Nothing goes through anyone else's server, and it
+costs $0 on Cloudflare's free tier (Cloudflare asks for a card on file before it turns R2 on). The
+same page lists the vault's shared boards, attaches your own domain, and turns sharing off. The
+contract is in `docs/CONTRACTS.md` › Share links.
 
 ## Sync
 

@@ -1,7 +1,7 @@
 /**
  * SHARE LINK (YAZ-1799): one board, uploaded to the user's OWN Cloudflare (one R2
- * bucket + one small Worker), reachable by anyone with its long random link. ALWAYS LIVE (Yasin's
- * amendment of D3): every save of a shared board re-uploads it to the same link (`liveShare.ts`).
+ * bucket + one small Worker), reachable by anyone with its long random link. ALWAYS LIVE
+ * (🔒 YAZ-1799 D3): every save of a shared board re-uploads it to the same link (`liveShare.ts`).
  *
  * WHO OWNS WHAT:
  *  - MAIN owns Cloudflare: the API token and the Worker's upload password live in `secrets.json`
@@ -16,7 +16,7 @@
  */
 
 /**
- * The Workers free-plan request body limit — the Worker enforces it and the app pre-checks it,
+ * The Workers free-plan request body limit — the Worker enforces it and main pre-checks it,
  * so a board over it is refused with an explanation instead of a failed upload. Decimal megabytes,
  * as Cloudflare states the limit.
  */
