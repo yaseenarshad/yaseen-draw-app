@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * USAGE: node tools/buildShareViewer.mjs
+ * USAGE: node tools/buildShareViewer.mjs   (also the last step of `npm run build`)
  *
  * Builds the share viewer's static assets (YAZ-1799) into `share/dist/assets/`:
  *   viewer.js   — share/viewer/entry.js + React + the app's own vendored Excalidraw, one ES module
  *   viewer.css  — Excalidraw's stylesheet
  *   fonts/…     — Excalidraw's font files (a scene with text fetches them from /assets/fonts/)
- * The app uploads this folder as the share Worker's static assets during setup, and
- * `tools/fakeCloudflare.mjs` serves it in the demo. Nothing comes from a CDN at view time.
+ * The app ships this folder (extraResources → `share-viewer`) and uploads it as the share Worker's
+ * static assets during setup; `tools/fakeCloudflare.mjs` serves it in the demo. Nothing comes from a CDN at view time.
  *
  * React is pinned to the client's copy for the same reason `electron.vite.config.ts` dedupes it:
  * npm hoists a second, older React to the repo root.

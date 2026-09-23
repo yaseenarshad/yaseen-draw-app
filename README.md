@@ -29,7 +29,7 @@ and `docs/CONTRACTS.md` for the bridge, app-state and packaging contracts.
 ```sh
 npm test         # unit tests (vitest, three projects: client jsdom, desktop node, tools node)
 npm run typecheck
-npm run build    # electron-vite build into desktop/out
+npm run build    # electron-vite build into desktop/out + the share viewer into share/dist
 ```
 
 ## Build the app

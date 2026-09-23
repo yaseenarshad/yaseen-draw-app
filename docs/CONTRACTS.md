@@ -47,7 +47,7 @@ nothing to do with each other. A bare `D3` would be unresolvable, so there are n
 | `npm test` | vitest, three projects — `client` (jsdom), `desktop` (node), `tools` (node) |
 | `npm run test:watch` | the same suites, re-run on save |
 | `npm run typecheck` | `tsc --noEmit` over client, shared and desktop |
-| `npm run build` | `electron-vite build` into `desktop/out` |
+| `npm run build` | `electron-vite build` into `desktop/out`, then `tools/buildShareViewer.mjs` into `share/dist/assets` (wiped first, gitignored) |
 | `npm run desktop:build` | build + electron-builder → `desktop/dist-app` (`--win` variant for Windows) |
 
 There is no e2e script. 🔒 (OD1 on YAZ-1805, resolved by Yasin at execution start): behaviour is
@@ -901,9 +901,11 @@ unsupported or missing file shows the window's one passive notice, never a dialo
   document type named "Excalidraw Drawing" with role `Editor` and `LSHandlerRank` `Owner`, so
   Finder hands `.excalidraw` files to this app (🔒 YAZ-1775 D1).
 - Windows: unsigned x64 NSIS installer.
-- `files: ["out/**"]` is the whole payload: the main bundle carries its dependencies (chokidar is
-  pure JS and gets bundled), so the packaged app ships no `node_modules`. There are no
-  `extraResources` — the CLI shim that needed them was deleted (🔒 OD3).
+- `files: ["out/**"]` is the whole app payload: the main bundle carries its dependencies (chokidar is
+  pure JS and gets bundled), so the packaged app ships no `node_modules`. The one `extraResources`
+  entry is the share viewer's built assets (`share/dist/assets` → `Contents/Resources/share-viewer`,
+  YAZ-1883), which main uploads at share setup; `viewerAssetsDir` in `ipc/share.ts` reads there when
+  packaged and from the repo checkout in dev.
 - The renderer serves from the custom `app://yaseen/` protocol; Excalidraw's fonts are copied
   beside the bundle at build time so a scene with text never reaches a CDN (🔒 the offline rule).
 - `.github/workflows/release.yml` builds both on a `v*` tag (node 22, `CSC_IDENTITY_AUTO_DISCOVERY:

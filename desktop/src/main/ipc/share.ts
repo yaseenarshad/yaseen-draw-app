@@ -32,12 +32,18 @@ const str = (v: unknown, name: string): string => {
 }
 
 /**
- * The viewer's built assets (`tools/buildShareViewer.mjs` → `share/dist/assets/`), served as `/assets/…`.
- * ⚠ PROTOTYPE: read from the repo checkout; a packaged app would ship them as extraResources.
+ * Where the viewer's built assets live (`tools/buildShareViewer.mjs` → `share/dist/assets/`, part of
+ * `npm run build`): the packaged app carries them as the `share-viewer` extraResource; dev reads the
+ * repo checkout beside `desktop/`.
  */
+export function viewerAssetsDir({ isPackaged, resourcesPath, appPath }: { isPackaged: boolean; resourcesPath: string; appPath: string }): string {
+  return isPackaged ? join(resourcesPath, 'share-viewer') : join(appPath, '..', 'share', 'dist', 'assets')
+}
+
+/** The viewer's built assets, served as `/assets/…`. */
 async function readViewerAssets(dir: string): Promise<AssetFile[]> {
   const entries = await readdir(dir, { recursive: true, withFileTypes: true }).catch(() => {
-    throw new BridgeFailure('NOT_FOUND', 'The viewer page is not built on this computer (run: node tools/buildShareViewer.mjs), so sharing cannot be set up yet.')
+    throw new BridgeFailure('NOT_FOUND', 'The viewer page is not built on this computer (run: npm run build), so sharing cannot be set up yet.')
   })
   const files = entries.filter((e) => e.isFile())
   return Promise.all(
