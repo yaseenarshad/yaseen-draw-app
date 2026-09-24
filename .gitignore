@@ -5,3 +5,4 @@ desktop/dist-app/
 *.log
 .claude/*
 share/dist/
+desktop/.cache/

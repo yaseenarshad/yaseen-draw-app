@@ -18,10 +18,16 @@
  * merge brought in. "As it was" draws the chosen version itself. Restore writes it over the board
  * as an ordinary edit (main); an open editor reloads through its watcher rule, a shared board's
  * link re-uploads (`noteBoardSaved`), and the version it replaced stays in history.
+ *
+ * 🔒 YAZ-1802 D10: a draw.io diagram's versions are pictures too, drawn by the D9 renderer in the
+ * app's theme and dark-mode colours, and Restore works the same (main writes through
+ * `diagram:save`). There are no change marks for a diagram in v1, so it shows "As it was" only.
  */
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
-import type { BoardVersion, BoardVersionScene, DrawingFileEntry } from '@shared/types'
+import type { BoardVersion, BoardVersionScene, DiagramDarkColors, DrawingFileEntry } from '@shared/types'
+import { isDiagram } from '@shared/fileKind'
 import { api, BridgeRequestError } from '../api'
+import { renderDiagramPreview } from '../diagrams/renderDiagram'
 import { loadExcalidraw, type ExcalidrawModule } from '../drawings/engine'
 import { parseSceneText, type DrawingScene } from '../drawings/drawingScene'
 import { basename, stripExt } from '../lib/paths'
@@ -38,6 +44,8 @@ interface VersionHistoryProps {
   path: string
   /** Opened from a merge notice: start on "your version before the merge" when there is one. */
   fromMerge?: boolean
+  /** 🔒 YAZ-1802 D16: a diagram's pictures follow the app's dark-mode colour setting, as its editor does. */
+  darkColors: DiagramDarkColors
   onClose: () => void
   onNotice: (text: string) => void
 }
@@ -49,10 +57,19 @@ interface Board {
   files: Record<string, DrawingFileEntry>
 }
 
+/**
+ * What a drawing's version is drawn against: the board as it is now plus the engine (for "Changes
+ * since this version"). A diagram has none — no change marks in v1 (🔒 YAZ-1802 D10).
+ */
+interface DrawingBase {
+  board: Board
+  engine: ExcalidrawModule
+}
+
 interface Picture {
   key: string
-  /** A PNG data URL; '' for a board with nothing visible; null when it could not be drawn. */
-  png: string | null
+  /** A data URL (PNG for a drawing, SVG for a diagram); '' for a board with nothing visible; null when it could not be drawn. */
+  src: string | null
   changes: BoardChanges | null
 }
 
@@ -69,7 +86,7 @@ function engineFiles(...maps: Record<string, DrawingFileEntry>[]): Record<string
 /** A failure in this dialog's own words: the bridge's message, or "not a board" for a file that will not parse. */
 function problemText(err: unknown): string {
   if (err instanceof BridgeRequestError) return err.message
-  return err instanceof SyntaxError ? "This board's file isn't valid JSON, so its history can't be compared." : err instanceof Error ? err.message : String(err)
+  return err instanceof SyntaxError ? "This Excalidraw drawing's file isn't valid JSON, so its history can't be compared." : err instanceof Error ? err.message : String(err)
 }
 
 export function versionLabel(v: BoardVersion): string {
@@ -80,15 +97,15 @@ export function versionMeta(v: BoardVersion, now: number): string {
   return [relativeTime(v.at, now), v.merged ? 'merged' : null, v.localOnly ? 'only on this computer' : null].filter((x) => x !== null).join(' · ')
 }
 
-export function VersionHistory({ root, path, fromMerge = false, onClose, onNotice }: VersionHistoryProps) {
+export function VersionHistory({ root, path, fromMerge = false, darkColors, onClose, onNotice }: VersionHistoryProps) {
   const name = stripExt(basename(path))
+  const diagram = isDiagram(path)
   const theme = useAppliedTheme()
   const dialogRef = useRef<HTMLDivElement>(null)
   const [versions, setVersions] = useState<BoardVersion[] | null>(null)
-  const [current, setCurrent] = useState<Board | null>(null)
-  const [engine, setEngine] = useState<ExcalidrawModule | null>(null)
+  const [drawingBase, setDrawingBase] = useState<DrawingBase | null>(null)
   const [selected, setSelected] = useState(0)
-  const [view, setView] = useState<View>('changes')
+  const [view, setView] = useState<View>(diagram ? 'version' : 'changes')
   const [picture, setPicture] = useState<Picture | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -103,21 +120,23 @@ export function VersionHistory({ root, path, fromMerge = false, onClose, onNotic
 
   useEffect(() => {
     let live = true
-    Promise.all([api.github.history(root, path), api.drawing.load({ root, path }), loadExcalidraw()]).then(
-      ([list, board, mod]) => {
+    const loadBase: Promise<DrawingBase | null> = diagram
+      ? Promise.resolve(null)
+      : Promise.all([api.drawing.load({ root, path }), loadExcalidraw()]).then(([board, engine]) => ({ board: { scene: parseSceneText(board.json), files: board.files }, engine }))
+    Promise.all([api.github.history(root, path), loadBase]).then(
+      ([list, base]) => {
         if (!live) return
         const before = fromMerge ? list.findIndex((v) => v.localOnly) : -1
         setVersions(list)
         setSelected(Math.max(0, before))
-        setCurrent({ scene: parseSceneText(board.json), files: board.files })
-        setEngine(mod)
+        setDrawingBase(base)
       },
       (err: unknown) => live && setProblem(problemText(err)),
     )
     return () => {
       live = false
     }
-  }, [root, path, fromMerge])
+  }, [root, path, diagram, fromMerge])
 
   const listRef = useRef<HTMLUListElement>(null)
   // Once the list is there, it takes focus, so ↑ / ↓ work straight away.
@@ -126,11 +145,12 @@ export function VersionHistory({ root, path, fromMerge = false, onClose, onNotic
   }, [versions])
 
   const version = versions?.[selected]
-  const key = version === undefined ? null : `${version.ref}\n${view}\n${theme}`
+  const key = version === undefined ? null : `${version.ref}\n${view}\n${theme}\n${darkColors}`
 
-  // Draw the chosen version — the fetch is cached per ref, the drawing is redone per view and theme.
+  // Draw the chosen version — the fetch is cached per ref, the drawing is redone per view, theme and colour setting.
   useEffect(() => {
-    if (version === undefined || current === null || engine === null || key === null) return
+    // `version` exists only once the list AND the drawing base have landed (one update, above).
+    if (version === undefined || key === null) return
     let live = true
     let scene = scenes.current.get(version.ref)
     if (scene === undefined) {
@@ -140,21 +160,29 @@ export function VersionHistory({ root, path, fromMerge = false, onClose, onNotic
     void (async () => {
       try {
         const then = await scene
-        const thenScene = parseSceneText(then.json)
-        const changes = compareBoards(thenScene.elements, current.scene.elements)
-        const elements = view === 'changes' ? changesScene(engine, current.scene.elements, changes) : thenScene.elements
-        const files = view === 'changes' ? engineFiles(then.files, current.files) : engineFiles(then.files)
-        const appState = { ...(view === 'changes' ? current.scene.appState : thenScene.appState), theme }
-        const png = visibleElements(elements).length === 0 ? '' : await createScenePreviewPng(engine, { elements, appState, files }, PICTURE_BOUNDS)
-        if (live) setPicture({ key, png, changes })
+        if (then.kind === 'diagram') {
+          const src = await renderDiagramPreview(then.xml, theme, darkColors, PICTURE_BOUNDS)
+          if (live) setPicture({ key, src, changes: null })
+        } else {
+          // A drawing version with nothing to compare against is "could not be drawn", never "Drawing…" forever.
+          if (drawingBase === null) throw new Error('no drawing base')
+          const { board: current, engine } = drawingBase
+          const thenScene = parseSceneText(then.json)
+          const changes = compareBoards(thenScene.elements, current.scene.elements)
+          const elements = view === 'changes' ? changesScene(engine, current.scene.elements, changes) : thenScene.elements
+          const files = view === 'changes' ? engineFiles(then.files, current.files) : engineFiles(then.files)
+          const appState = { ...(view === 'changes' ? current.scene.appState : thenScene.appState), theme }
+          const src = visibleElements(elements).length === 0 ? '' : await createScenePreviewPng(engine, { elements, appState, files }, PICTURE_BOUNDS)
+          if (live) setPicture({ key, src, changes })
+        }
       } catch {
-        if (live) setPicture({ key, png: null, changes: null })
+        if (live) setPicture({ key, src: null, changes: null })
       }
     })()
     return () => {
       live = false
     }
-  }, [version, current, engine, key, view, theme, root, path])
+  }, [version, drawingBase, key, view, theme, darkColors, root, path])
 
   const shown = picture !== null && picture.key === key ? picture : null
   const unchanged = shown?.changes !== null && shown?.changes !== undefined && !hasChanges(shown.changes)
@@ -223,27 +251,31 @@ export function VersionHistory({ root, path, fromMerge = false, onClose, onNotic
             </ul>
 
             <section className="history-view">
-              <div className="history-view__tabs" role="tablist">
-                {(['changes', 'version'] as const).map((v) => (
-                  <button key={v} type="button" role="tab" aria-selected={view === v} className={`history-view__tab${view === v ? ' history-view__tab--on' : ''}`} onClick={() => setView(v)}>
-                    {v === 'changes' ? 'Changes since this version' : 'As it was'}
-                  </button>
-                ))}
-              </div>
+              {!diagram && (
+                <div className="history-view__tabs" role="tablist">
+                  {(['changes', 'version'] as const).map((v) => (
+                    <button key={v} type="button" role="tab" aria-selected={view === v} className={`history-view__tab${view === v ? ' history-view__tab--on' : ''}`} onClick={() => setView(v)}>
+                      {v === 'changes' ? 'Changes since this version' : 'As it was'}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="history-view__picture" data-testid="history-picture">
                 {shown === null ? (
                   <span className="history-dialog__muted">Drawing…</span>
-                ) : shown.png === null ? (
+                ) : shown.src === null ? (
                   <span className="history-dialog__muted">This version can't be drawn.</span>
-                ) : shown.png === '' ? (
+                ) : shown.src === '' ? (
                   <span className="history-dialog__muted">Empty board</span>
                 ) : (
-                  <img src={shown.png} alt={view === 'changes' ? `${name} now, with the changes since this version marked` : `${name} as it was in this version`} />
+                  <img src={shown.src} alt={view === 'changes' ? `${name} now, with the changes since this version marked` : `${name} as it was in this version`} />
                 )}
               </div>
-              <p className="history-view__legend" data-testid="history-legend">
-                {shown === null || shown.changes === null ? ' ' : unchanged ? 'No changes since this version.' : view === 'changes' ? <Legend changes={shown.changes} /> : 'The board as it was in this version.'}
-              </p>
+              {!diagram && (
+                <p className="history-view__legend" data-testid="history-legend">
+                  {shown === null || shown.changes === null ? ' ' : unchanged ? 'No changes since this version.' : view === 'changes' ? <Legend changes={shown.changes} /> : 'The board as it was in this version.'}
+                </p>
+              )}
             </section>
           </div>
         )}

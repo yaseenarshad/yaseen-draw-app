@@ -24,6 +24,7 @@ describe('settingCandidates', () => {
   it('covers every setting of every available section, one candidate each, in registry order', () => {
     expect(ids(settingCandidates(ctx()))).toEqual([
       'theme',
+      'diagramDarkColors',
       'canvas.gridModeEnabled',
       'canvas.objectsSnapModeEnabled',
       'canvas.snapToMidpoints',
@@ -44,6 +45,7 @@ describe('settingCandidates', () => {
       'pixabayApiKey',
       'hotkeys-window',
       'hotkeys-canvas',
+      'hotkeys-drawio',
       'hotkeys-mouse',
     ])
   })
@@ -61,7 +63,7 @@ describe('settingCandidates', () => {
 
   it('a candidate carries label, hint, keywords and section title, case-folded in `lower`', () => {
     const confirm = settingCandidates(ctx()).find((h) => h.item.id === 'confirmDelete')
-    expect(confirm?.name).toBe('Confirm before deleting Deleted drawings and folders move to the Trash either way. Files')
+    expect(confirm?.name).toBe('Confirm before deleting Deleted files and folders move to the Trash either way. Files')
     expect(confirm?.lower).toBe(confirm?.name.toLowerCase())
     const theme = settingCandidates(ctx()).find((h) => h.item.id === 'theme')
     expect(theme?.name).toBe('Theme dark light system Appearance')
@@ -92,13 +94,14 @@ describe('searchSettings', () => {
   })
 
   it('matches on a keyword the label does not contain', () => {
-    expect(ids(searchSettings(settingCandidates(ctx()), 'dark'))).toEqual(['theme'])
+    expect(ids(searchSettings(settingCandidates(ctx()), 'dark'))).toEqual(['theme', 'diagramDarkColors'])
+    expect(ids(searchSettings(settingCandidates(ctx()), 'drawio'))).toEqual(['diagramDarkColors'])
     expect(ids(searchSettings(settingCandidates(ctx()), 'trash'))).toEqual(['confirmDelete'])
     expect(ids(searchSettings(settingCandidates(ctx()), 'iconify'))).toEqual(['pixabayApiKey'])
   })
 
   it('matches on the section title, returning every row of that section', () => {
-    expect(ids(searchSettings(settingCandidates(ctx()), 'appearance'))).toEqual(['theme'])
+    expect(ids(searchSettings(settingCandidates(ctx()), 'appearance'))).toEqual(['theme', 'diagramDarkColors'])
     expect(ids(searchSettings(settingCandidates(ctx({ status: null, setEnabled: () => undefined })), 'sync this vault'))).toEqual(['githubSync'])
   })
 
@@ -109,7 +112,7 @@ describe('searchSettings', () => {
   it('a hotkey label or key finds its Hotkeys table: "close tab" → Window', () => {
     expect(ids(searchSettings(settingCandidates(ctx()), 'close tab'))).toEqual(['hotkeys-window'])
     expect(ids(searchSettings(settingCandidates(ctx()), '⌘W'))).toEqual(['hotkeys-window'])
-    expect(ids(searchSettings(settingCandidates(ctx()), 'keyboard shortcuts'))).toEqual(['hotkeys-window', 'hotkeys-canvas', 'hotkeys-mouse'])
+    expect(ids(searchSettings(settingCandidates(ctx()), 'keyboard shortcuts'))).toEqual(['hotkeys-window', 'hotkeys-canvas', 'hotkeys-drawio', 'hotkeys-mouse'])
   })
 
   it('no match is an empty list', () => {

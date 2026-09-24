@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { ipcMain } from 'electron'
 import { CH, type Envelope } from '../../channels'
 import { CLOUDFLARE_API, CLOUDFLARE_TOKEN_PAGE } from '../share/cloudflare'
 import { createSecrets } from '../secrets'
-import { registerShareIpc, shareEndpoints, viewerAssetsDir } from './share'
+import { readViewerAssets, registerShareIpc, shareEndpoints, viewerAssetsDir } from './share'
 
 vi.mock('electron', () => ({ shell: { openExternal: vi.fn() }, BrowserWindow: { getAllWindows: () => [] }, ipcMain: { handle: vi.fn(), on: vi.fn() } }))
 
@@ -19,6 +19,40 @@ describe('viewerAssetsDir', () => {
 
   it('reads the repo checkout beside desktop/ in dev', () => {
     expect(viewerAssetsDir({ ...where, isPackaged: false })).toBe(path.join('/repo', 'share', 'dist', 'assets'))
+  })
+})
+
+describe('readViewerAssets (🔒 YAZ-1802 D5 / D11)', () => {
+  let root = ''
+  beforeEach(async () => void (root = await mkdtemp(path.join(tmpdir(), 'yaz-1973-assets-'))))
+  afterEach(async () => rm(root, { recursive: true, force: true }))
+  const put = async (file: string, text: string) => {
+    await mkdir(path.dirname(file), { recursive: true })
+    await writeFile(file, text)
+  }
+
+  it("publishes the viewer build as /assets/…, and draw.io's viewer, stencils, licence, image and MathJax folders from the app's own webapp", async () => {
+    const viewer = path.join(root, 'share-viewer')
+    const drawio = path.join(root, 'drawio')
+    await put(path.join(viewer, 'viewer.js'), 'viewer')
+    await put(path.join(viewer, 'drawio', 'config.js'), 'config')
+    for (const file of ['js/viewer-static.min.js', 'js/stencils.min.js', 'LICENSE-drawio.txt', 'js/app.min.js', 'img/lib/azure/VM.svg', 'math4/es5/startup.js']) await put(path.join(drawio, file), file)
+    const assets = await readViewerAssets(viewer, drawio)
+    expect(Object.fromEntries(assets.map((a) => [a.path, new TextDecoder().decode(a.bytes)]))).toEqual({
+      '/assets/viewer.js': 'viewer',
+      '/assets/drawio/config.js': 'config',
+      '/assets/drawio/js/viewer-static.min.js': 'js/viewer-static.min.js',
+      '/assets/drawio/js/stencils.min.js': 'js/stencils.min.js',
+      '/assets/drawio/LICENSE-drawio.txt': 'LICENSE-drawio.txt',
+      '/assets/drawio/img/lib/azure/VM.svg': 'img/lib/azure/VM.svg',
+      '/assets/drawio/math4/es5/startup.js': 'math4/es5/startup.js',
+    })
+  })
+
+  it('refuses to set up with no viewer build or no draw.io webapp, rather than upload a page that cannot draw', async () => {
+    await put(path.join(root, 'share-viewer', 'viewer.js'), 'viewer')
+    await expect(readViewerAssets(path.join(root, 'nothing'), root)).rejects.toMatchObject({ code: 'NOT_FOUND', message: expect.stringContaining('npm run build') })
+    await expect(readViewerAssets(path.join(root, 'share-viewer'), path.join(root, 'no-drawio'))).rejects.toMatchObject({ code: 'NOT_FOUND', message: expect.stringContaining('npm run drawio:pack') })
   })
 })
 
@@ -51,7 +85,7 @@ describe('registerShareIpc refuses malformed requests before sharing sees them',
   beforeEach(async () => {
     vi.mocked(ipcMain.handle).mockClear()
     userData = await mkdtemp(path.join(tmpdir(), 'yd-share-ipc-'))
-    registerShareIpc(userData, createSecrets(path.join(userData, 'secrets.json')), { viewerAssetsDir: path.join(userData, 'none'), isPackaged: true })
+    registerShareIpc(userData, createSecrets(path.join(userData, 'secrets.json')), { viewerAssetsDir: path.join(userData, 'none'), drawioDir: path.join(userData, 'none'), isPackaged: true })
   })
   afterEach(() => rm(userData, { recursive: true, force: true }))
 

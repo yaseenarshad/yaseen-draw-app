@@ -42,6 +42,14 @@ describe('sortTree (🔒 YAZ-1835 D1/D2)', () => {
     expect(names(sortTree([t2, t1], 'updated'))).toEqual(['Tie 1.excalidraw', 'Tie 2.excalidraw'])
   })
 
+  it('🔒 YAZ-1802 D7: a diagram sorts among the drawings by its own dates, an unstamped one by its mtime', () => {
+    const flow = file('Flow.drawio', { kind: 'diagram', meta: { createdAt: 500, updatedAt: 980 } })
+    const plain = file('Plain.drawio', { kind: 'diagram', mtime: 970 })
+    const nodes = [apple, banana, cherry, flow, plain]
+    expect(names(sortTree(nodes, 'updated'))).toEqual(['Banana.excalidraw', 'Flow.drawio', 'Plain.drawio', 'Cherry.excalidraw', 'Apple.excalidraw'])
+    expect(names(sortTree(nodes, 'created'))).toEqual(['Banana.excalidraw', 'Plain.drawio', 'Flow.drawio', 'Apple.excalidraw', 'Cherry.excalidraw'])
+  })
+
   it('never mutates the tree it was given', () => {
     const inner = [banana, apple]
     const nodes = [file('b.excalidraw'), dir('d', inner), file('a.excalidraw')]

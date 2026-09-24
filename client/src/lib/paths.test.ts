@@ -15,6 +15,12 @@ describe('stripExt', () => {
     expect(stripExt('Board.EXCALIDRAW')).toBe('Board')
   })
 
+  it('hides a diagram’s .drawio too (🔒 YAZ-1802 D13) — but not a picture that holds one', () => {
+    expect(stripExt('Flow.drawio')).toBe('Flow')
+    expect(stripExt('UPPERCASE.DRAWIO')).toBe('UPPERCASE')
+    expect(stripExt('image.drawio.svg')).toBe('image.drawio.svg')
+  })
+
   it('leaves every other name alone — nothing else vouches for what its bytes are', () => {
     expect(stripExt('notes.txt')).toBe('notes.txt')
     expect(stripExt('note.md')).toBe('note.md')

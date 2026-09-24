@@ -19,13 +19,13 @@ interface UseMenuEventsOptions {
   onNextTab: () => void
   /** Window › Previous Tab (⌃⇧Tab / ⌘⇧[): activate the tab to the left, wrapping (GRO-2234). */
   onPrevTab: () => void
-  /** File › Export Image… (⌘⇧E, 🔒 YAZ-1775 D10): the visible drawing opens the engine's export dialog. */
+  /** File › Export Image… (⌘⇧E, 🔒 YAZ-1775 D10): the visible drawing opens the engine's export dialog; a diagram saves a PNG or SVG (🔒 YAZ-1802 D9). */
   onExportImage: () => void
   /** View › Canvas Background › a pick (🔒 YAZ-1775 D10): the visible drawing takes `color`. */
   onCanvasBackground: (color: string) => void
   /** File › Export Drawing… (⌘⇧S, 🔒 YAZ-1775 D3): the visible drawing writes a standalone `.excalidraw`. */
   onExportDrawing: () => void
-  /** File › Share Link (⌘⇧L, YAZ-1799): open the Share dialog for the visible drawing. */
+  /** File › Share Link (⌘⇧L, YAZ-1799): open the Share dialog for the visible board — a diagram too (🔒 YAZ-1802 D11). */
   onShareLink: () => void
 }
 

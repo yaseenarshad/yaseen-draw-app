@@ -1,6 +1,7 @@
 /** `window.yaseenDraw` itself: every namespace of the one door the renderer has. */
 
 import type { AppState, FolderState, SIDEBAR_MAX_W, SIDEBAR_MIN_W, SettingsState, SidebarLens, WindowEntry } from './appState'
+import type { DiagramApi } from './diagram'
 import type { DrawingApi } from './drawing'
 import type { BridgeErrorCode } from './errors'
 import type { CreateDirResponse, CreateFileRequest, CreateFileResponse, DialogApi, FileClipRequest, FileClipState, FileRenamedEvent, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, TreeResponse, WatchEvent } from './files'
@@ -148,24 +149,24 @@ export interface MenuApi {
   onPrevTab(listener: () => void): () => void
   /**
    * File › Export Image… (⌘⇧E, 🔒 YAZ-1775 D10) targeted this window: the VISIBLE drawing opens the
-   * engine's own image-export dialog. There is no canvas main menu to reach it from any more, so
-   * it is the application menu's; main enables the item only while the focused window's active
-   * tab is a drawing. Returns an unsubscribe.
+   * engine's own image-export dialog, a visible diagram saves a PNG or SVG (🔒 YAZ-1802 D9). There
+   * is no canvas main menu to reach it from any more, so it is the application menu's; main enables
+   * the item only while the focused window's active tab is a board. Returns an unsubscribe.
    */
   onExportImage(listener: () => void): () => void
   /**
    * View › Canvas Background › a pick (🔒 YAZ-1775 D10) targeted this window: the VISIBLE drawing takes
    * `color` as its `viewBackgroundColor`, which the engine then writes into the file — the one
-   * canvas value that IS per board. Same enablement rule as Export Image…. Returns an unsubscribe.
+   * canvas value that IS per board. Enabled only while the active tab is a drawing. Returns an unsubscribe.
    */
   onCanvasBackground(listener: (color: string) => void): () => void
   /**
    * File › Export Drawing… (⌘⇧S, 🔒 YAZ-1775 D3, YAZ-1821) targeted this window: the VISIBLE drawing
    * assembles a standalone `.excalidraw` with every image embedded and offers it to a save sheet.
-   * Same enablement rule as Export Image…. Returns an unsubscribe.
+   * Enabled only while the active tab is a drawing. Returns an unsubscribe.
    */
   onExportDrawing(listener: () => void): () => void
-  /** File › Share Link (⌘⇧L, YAZ-1799): open the Share dialog for the visible drawing. Same enablement rule. */
+  /** File › Share Link (⌘⇧L, YAZ-1799): open the Share dialog for the visible board, a drawing or a diagram (🔒 YAZ-1802 D11). */
   onShareLink(listener: () => void): () => void
 }
 
@@ -280,6 +281,8 @@ export interface YaseenDrawApi {
   createFile(req: CreateFileRequest): Promise<CreateFileResponse>
   /** The drawing DOCUMENT's two doors (🔒 YAZ-1810): the only way a `.excalidraw` tab reads and writes. */
   drawing: DrawingApi
+  /** The draw.io DIAGRAM document's two doors (🔒 YAZ-1802 D6): the only way a `.drawio` tab reads and writes. */
+  diagram: DiagramApi
   /** Native open-directory dialog parented to the calling window (GRO-2163). */
   pickFolder(): Promise<PickFolderResponse>
   /** Native file dialogs: pick a `.excalidraw` to import (YAZ-1833). */

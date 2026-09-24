@@ -212,12 +212,28 @@ export type SaveDrawingResponse =
       cancelled: true
     }
 
+/**
+ * File › Export Image… for a draw.io diagram (🔒 YAZ-1802 D9): the same one-door rule as
+ * `SaveDrawingRequest`. The sheet offers PNG and SVG, and the picked name's extension decides
+ * which of the two pictures is written — so both arrive with the request, already drawn.
+ */
+export interface SaveImageRequest {
+  /** The name the sheet opens on, extension included (`<board name>.png`). */
+  defaultName: string
+  /** The picture as a `data:image/png;base64,` URL. */
+  png: string
+  /** The same picture as a `data:image/svg+xml;base64,` URL. */
+  svg: string
+}
+
 /** Native file dialogs that answer a DOCUMENT rather than a folder (`pickFolder()` predates this namespace). */
 export interface DialogApi {
   /** Pick one `.excalidraw` and get its bytes back; `{ cancelled: true }` when dismissed (YAZ-1833). */
   openDrawing(): Promise<OpenDrawingResponse>
   /** Pick a destination and write a standalone `.excalidraw` there (🔒 YAZ-1775 D3, YAZ-1821). */
   saveDrawing(req: SaveDrawingRequest): Promise<SaveDrawingResponse>
+  /** Pick a destination and write a diagram's picture there as PNG or SVG (🔒 YAZ-1802 D9); same answer as `saveDrawing`. */
+  saveImage(req: SaveImageRequest): Promise<SaveDrawingResponse>
 }
 
 // ---------- watch(root, listener) ----------

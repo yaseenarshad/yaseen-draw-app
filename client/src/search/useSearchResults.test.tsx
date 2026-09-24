@@ -106,7 +106,7 @@ describe('useSearchResults', () => {
 
   describe('the lazy, latching feed (YAZ-1814)', () => {
     it('builds NOTHING until the first non-empty query', () => {
-      const build = vi.spyOn(catalog, 'buildDrawingCatalog')
+      const build = vi.spyOn(catalog, 'buildBoardCatalog')
       const { rerender } = mount([file('Alpha')], '')
       expect(build).not.toHaveBeenCalled()
       rerender('a')
@@ -116,7 +116,7 @@ describe('useSearchResults', () => {
 
     it('keeps the catalog after the query is cleared — the second search pays nothing', () => {
       const { rerender } = mount([file('Alpha')], 'a')
-      const build = vi.spyOn(catalog, 'buildDrawingCatalog')
+      const build = vi.spyOn(catalog, 'buildBoardCatalog')
       rerender('')
       rerender('al')
       rerender('alp')
@@ -126,7 +126,7 @@ describe('useSearchResults', () => {
 
     it('rebuilds once per NEW tree while latched, and not per keystroke', () => {
       const { rerender } = mount([file('Alpha')], 'a')
-      const build = vi.spyOn(catalog, 'buildDrawingCatalog')
+      const build = vi.spyOn(catalog, 'buildBoardCatalog')
       rerender('al')
       rerender('alp')
       expect(build).not.toHaveBeenCalled()

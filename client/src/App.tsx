@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { SIDEBAR_MAX_W, SIDEBAR_MIN_W, type CanvasPanelState, type CanvasPrefs, type SettingsState, type SidebarLens } from '@shared/types'
 import { prefsEqual } from '@shared/canvasPrefs'
 import { api, BridgeRequestError } from './api'
-import { requestDrawingCommand } from './drawings/drawingCommand'
+import { requestBoardCommand } from './drawings/boardCommand'
 import { Editor } from './Editor'
 import { useGithubSync } from './hooks/useGithubSync'
 import { useVaultStorage } from './hooks/useVaultStorage'
@@ -312,7 +312,7 @@ export function App() {
   const vaultStorage = useVaultStorage(root, settingsOpen ? syncState : null)
   // Settings › Sharing (YAZ-1799 D7): main's share status and this vault's shared boards, read only while Settings is open.
   const sharing = useSharing(root, settingsOpen)
-  // The ONE Share dialog (YAZ-1799 D6): File › Share Link (the active drawing) and the sidebar's "Share".
+  // The ONE Share dialog (YAZ-1799 D6): File › Share Link (the active board) and the sidebar's "Share".
   const [sharePath, setSharePath] = useState<string | null>(null)
   const fileRef = useRef(file)
   fileRef.current = file
@@ -325,12 +325,12 @@ export function App() {
 
   // File › Open Folder… / Open Recent (GRO-2161) reuse the same flows as the in-app buttons;
   // File › Close Tab and Window › Next/Previous Tab (GRO-2232) drive the tab model.
-  // 🔒 YAZ-1775 D10: File › Export Image… and View › Canvas Background act on the VISIBLE drawing layer,
-  // which `requestDrawingCommand` finds by DOM — several tabs are mounted at once and only one is
-  // in front. Main greys both items out off a drawing tab, so a miss here is already impossible.
-  const exportImage = useCallback(() => void requestDrawingCommand({ kind: 'export-image' }), [])
-  const setCanvasBackground = useCallback((color: string) => void requestDrawingCommand({ kind: 'canvas-background', color }), [])
-  const exportDrawing = useCallback(() => void requestDrawingCommand({ kind: 'export-drawing' }), [])
+  // 🔒 YAZ-1775 D10: File › Export Image… and View › Canvas Background act on the VISIBLE board layer,
+  // which `requestBoardCommand` finds by DOM — several tabs are mounted at once and only one is
+  // in front. Main greys each item out off a board it does not work for, so a miss here is already impossible.
+  const exportImage = useCallback(() => void requestBoardCommand({ kind: 'export-image' }), [])
+  const setCanvasBackground = useCallback((color: string) => void requestBoardCommand({ kind: 'canvas-background', color }), [])
+  const exportDrawing = useCallback(() => void requestBoardCommand({ kind: 'export-drawing' }), [])
   useMenuEvents({
     onOpenFolder: pick,
     onOpenRoot: openRoot,
@@ -542,7 +542,7 @@ export function App() {
         />
       )}
       {sharePath !== null && root !== null && <ShareDialog key={sharePath} root={root} path={sharePath} onClose={() => setSharePath(null)} onOpenSettings={openSharingSettings} />}
-      {history !== null && root !== null && <VersionHistory key={history.path} root={root} path={history.path} fromMerge={history.fromMerge} onClose={() => setHistory(null)} onNotice={notify} />}
+      {history !== null && root !== null && <VersionHistory key={history.path} root={root} path={history.path} fromMerge={history.fromMerge} darkColors={settings.diagramDarkColors} onClose={() => setHistory(null)} onNotice={notify} />}
       {/* YAZ-1818: sync needs attention. Two of the six reasons are things this app cannot fix from
           inside itself (git missing, credentials rejected), so the offer is a prompt to paste
           into any LLM — an assistant that CAN drive the terminal — rather than a wizard. */}
@@ -628,7 +628,7 @@ export function App() {
             onNotice={notify}
           />
           <div className="tabstack">
-            {mounted.length === 0 && <Editor path={null} root={root} watch={watch} />}
+            {mounted.length === 0 && <Editor path={null} root={root} watch={watch} diagramDarkColors={settings.diagramDarkColors} />}
             {mounted.map((path) => (
               // Every VISITED tab keeps its document mounted so its view state survives a switch
               // (rule 6); inactive layers hide via visibility — see tabs.css for why
@@ -646,7 +646,9 @@ export function App() {
                   onCanvasPrefsChange={changeCanvasPrefs}
                   canvasPanel={settings.canvasPanel}
                   onCanvasPanelChange={changeCanvasPanel}
+                  diagramDarkColors={settings.diagramDarkColors}
                   onNotice={notify}
+                  onToggleSidebar={toggleSidebar}
                 />
               </div>
             ))}

@@ -11,6 +11,7 @@
 export * from './types/errors'
 export * from './types/files'
 export * from './types/drawing'
+export * from './types/diagram'
 export * from './types/canvas'
 export * from './types/appState'
 export * from './types/vault'

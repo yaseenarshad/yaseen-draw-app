@@ -244,7 +244,7 @@ export async function saveDrawing(req: DrawingSaveRequest): Promise<DrawingSaveR
   if (expectedMtime !== undefined && prior !== null && prior.mtime !== expectedMtime) {
     // A file that is GONE is not a conflict: the tab's own copy is the only one left, and
     // refusing here would strand it. Only a file that is there and DIFFERENT blocks the write.
-    throw new BridgeFailure('CONFLICT', 'drawing changed on disk since last read', { path: file, mtime: prior.mtime })
+    throw new BridgeFailure('CONFLICT', 'Excalidraw drawing changed on disk since last read', { path: file, mtime: prior.mtime })
   }
   // Assets first (see the module doc), and only once the conflict guard has passed — a refused
   // save must leave the vault exactly as it found it.

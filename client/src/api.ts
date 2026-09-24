@@ -1,4 +1,4 @@
-import type { BridgeError, BridgeErrorCode, ComponentItem, ComponentReadResponse, ComponentRenameRequest, ComponentSaveRequest, ComponentSlugRequest, CreateDirResponse, CreateFileRequest, CreateFileResponse, DeleteRequest, DeleteResponse, DrawingLoadRequest, DrawingLoadResponse, DrawingSaveRequest, DrawingSaveResponse, FileClipRequest, FileClipState, BoardVersion, BoardVersionScene, GithubSyncStatus, MediaFavoritesRequest, MediaImportRequest, MediaImportResponse, MediaPreviewRequest, MediaPreviewResponse, MediaRecentRequest, MediaSearchRequest, MediaSearchResponse, OpenDrawingResponse, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, RevealRequest, RevealResponse, SaveDrawingRequest, SaveDrawingResponse, SecretHasRequest, SecretSetRequest, ShareBoardRequest, ShareEntry, ShareListEntry, SharePermissionRequest, SharePublishRequest, ShareSetupProgress, ShareStatus, ShrinkResult, StoredMediaItem, TreeResponse, VaultStorageStats } from '@shared/types'
+import type { BridgeError, BridgeErrorCode, ComponentItem, DiagramLoadRequest, DiagramLoadResponse, DiagramSaveRequest, DiagramSaveResponse, ComponentReadResponse, ComponentRenameRequest, ComponentSaveRequest, ComponentSlugRequest, CreateDirResponse, CreateFileRequest, CreateFileResponse, DeleteRequest, DeleteResponse, DrawingLoadRequest, DrawingLoadResponse, DrawingSaveRequest, DrawingSaveResponse, FileClipRequest, FileClipState, BoardVersion, BoardVersionScene, GithubSyncStatus, MediaFavoritesRequest, MediaImportRequest, MediaImportResponse, MediaPreviewRequest, MediaPreviewResponse, MediaRecentRequest, MediaSearchRequest, MediaSearchResponse, OpenDrawingResponse, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, RevealRequest, RevealResponse, SaveDrawingRequest, SaveDrawingResponse, SaveImageRequest, SecretHasRequest, SecretSetRequest, ShareBoardRequest, ShareEntry, ShareListEntry, SharePermissionRequest, SharePublishRequest, ShareSetupProgress, ShareStatus, ShrinkResult, StoredMediaItem, TreeResponse, VaultStorageStats } from '@shared/types'
 
 /** Typed failure from the main process (see docs/CONTRACTS.md "Bridge API"). */
 export class BridgeRequestError extends Error {
@@ -63,6 +63,14 @@ export const api = {
     /** The RESOLVED library folder (🔒 YAZ-1775 D5): the setting, or `<userData>/library` — main's answer. */
     libraryFolder: () => call<string>(() => window.yaseenDraw.drawing.libraryFolder()),
   },
+  /**
+   * The draw.io DIAGRAM document's two doors (🔒 YAZ-1802 D6): the XML in, the XML back under the
+   * same mtime guard as a drawing. Nothing else reads or writes a `.drawio` tab's bytes.
+   */
+  diagram: {
+    load: (req: DiagramLoadRequest) => call<DiagramLoadResponse>(() => window.yaseenDraw.diagram.load(req)),
+    save: (req: DiagramSaveRequest) => call<DiagramSaveResponse>(() => window.yaseenDraw.diagram.save(req)),
+  },
   /** Native open-directory dialog parented to this window; resolves when the user picks or cancels. */
   pickFolder: () => call<PickFolderResponse>(() => window.yaseenDraw.pickFolder()),
   /** Native file dialogs (YAZ-1833): `openDrawing()` picks one `.excalidraw` and answers its bytes. */
@@ -70,6 +78,8 @@ export const api = {
     openDrawing: () => call<OpenDrawingResponse>(() => window.yaseenDraw.dialog.openDrawing()),
     /** Pick a destination and write a standalone `.excalidraw` there — dialog AND write in one call (🔒 YAZ-1775 D3). */
     saveDrawing: (req: SaveDrawingRequest) => call<SaveDrawingResponse>(() => window.yaseenDraw.dialog.saveDrawing(req)),
+    /** The same for a draw.io diagram's picture: the sheet offers PNG and SVG, the picked name decides (🔒 YAZ-1802 D9). */
+    saveImage: (req: SaveImageRequest) => call<SaveDrawingResponse>(() => window.yaseenDraw.dialog.saveImage(req)),
   },
   /** The Favorites list over `.yaseendraw/favorites.json` (YAZ-1766 6A): absolute paths in the user's order; a malformed file rejects `set` with INVALID_CONFIG. */
   favorites: {

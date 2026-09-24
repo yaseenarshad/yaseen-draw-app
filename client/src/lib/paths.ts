@@ -1,11 +1,13 @@
+import { boardBaseName } from '@shared/fileKind'
+
 /** Last path segment (trailing slashes ignored); the input itself for `/`. */
 export function basename(p: string): string {
   const trimmed = p.replace(/\/+$/, '')
   return trimmed.slice(trimmed.lastIndexOf('/') + 1) || p
 }
 
-/** File name without its vault extension (`.excalidraw`); every other name is returned whole. */
-export const stripExt = (name: string) => name.replace(/\.excalidraw$/i, '')
+/** File name without its board extension (`fileKind`'s contract); every other name is returned whole. */
+export const stripExt = boardBaseName
 
 /** The folder a board sits in, relative to the vault — `/` at the root (Info 🔒 YAZ-1835 D7, the hover preview 🔒 YAZ-1800 D4). */
 export function boardFolder(root: string, path: string): string {
