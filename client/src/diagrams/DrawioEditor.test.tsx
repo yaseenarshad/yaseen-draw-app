@@ -8,23 +8,28 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import type { WatchEvent } from '@shared/types'
+import type { DiagramDarkColors, WatchEvent } from '@shared/types'
 
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),
-  api: { diagram: { load: vi.fn(), save: vi.fn() } },
+  api: { diagram: { load: vi.fn(), save: vi.fn() }, dialog: { saveImage: vi.fn() } },
 }))
 vi.mock('../share/liveShare', () => ({ noteBoardSaved: vi.fn() }))
+vi.mock('./renderDiagram', () => ({ renderDiagramImage: vi.fn() }))
 
 import { api, BridgeRequestError } from '../api'
+import { DRAWING_COMMAND_EVENT } from '../drawings/drawingCommand'
 import { _resetRenameContinuity, flushRenamedPath, retirePath } from '../lib/renameContinuity'
 import { noteBoardSaved } from '../share/liveShare'
 import { BROKEN_DIAGRAM_DOCUMENT, DrawioEditor } from './DrawioEditor'
 import { DRAWIO_ORIGIN } from './drawioProtocol'
+import { renderDiagramImage } from './renderDiagram'
 
 const load = vi.mocked(api.diagram.load)
 const save = vi.mocked(api.diagram.save)
+const saveImage = vi.mocked(api.dialog.saveImage)
 const toggleSidebar = vi.fn()
+const notice = vi.fn()
 
 const ROOT = '/vault'
 const PATH = '/vault/Flow.drawio'
@@ -48,8 +53,8 @@ let container: HTMLElement
 let posted: Array<Record<string, unknown>> = []
 let flushListener: (() => Promise<void> | void) | null = null
 
-function render(): void {
-  act(() => root?.render(<DrawioEditor root={ROOT} path={PATH} watch={watch} onToggleSidebar={toggleSidebar} />))
+function render(darkColors: DiagramDarkColors = 'adapt'): void {
+  act(() => root?.render(<DrawioEditor root={ROOT} path={PATH} watch={watch} darkColors={darkColors} onNotice={notice} onToggleSidebar={toggleSidebar} />))
 }
 
 async function settle(): Promise<void> {
@@ -114,6 +119,8 @@ beforeEach(() => {
     },
   })
   load.mockResolvedValue({ path: PATH, xml: XML, mtime: 100, size: XML.length })
+  vi.mocked(renderDiagramImage).mockImplementation(async (_xml, format) => (format === 'png' ? 'data:image/png;base64,UE5H' : 'data:image/svg+xml;base64,U1ZH'))
+  saveImage.mockResolvedValue({ path: '/Users/y/Desktop/Flow.png' })
   save.mockResolvedValue({ path: PATH, mtime: 200, size: 50 })
   container = document.createElement('div')
   document.body.appendChild(container)
@@ -217,6 +224,83 @@ describe('the theme (🔒 YAZ-1802 D12)', () => {
     drawio({ event: 'init' })
     expect(posted.map((m) => m.action)).toEqual(['configure', 'invokeAction', 'load'])
     expect(posted[1]).toMatchObject({ actionName: 'darkMode' })
+  })
+})
+
+describe('the dark-mode colour setting (🔒 YAZ-1802 D16)', () => {
+  it('rides the configure reply as draw.io’s defaultAdaptiveColors', async () => {
+    render('keep')
+    await settle()
+    tapFrame()
+    drawio({ event: 'yaseenReady' })
+    drawio({ event: 'configure' })
+    expect((posted[0].config as Record<string, unknown>).defaultAdaptiveColors).toBe('none')
+  })
+
+  it('a change is ONE message to our PostConfig — no reload, nothing saved', async () => {
+    await opened()
+    const src = frame()!.src
+    posted = []
+    render('keep')
+    await settle()
+    expect(posted).toEqual([{ action: 'yaseenAdaptiveColors', value: 'none', _origin: DRAWIO_ORIGIN }])
+    render('keep')
+    await settle()
+    expect(posted).toHaveLength(1)
+    expect(frame()!.src).toBe(src)
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('a change before draw.io listens is sent the moment it does', async () => {
+    render()
+    await settle()
+    tapFrame()
+    drawio({ event: 'yaseenReady' })
+    drawio({ event: 'configure' })
+    render('keep')
+    await settle()
+    expect(posted.map((m) => m.action)).toEqual(['configure'])
+    drawio({ event: 'init' })
+    expect(posted.map((m) => m.action)).toEqual(['configure', 'yaseenAdaptiveColors', 'load'])
+  })
+})
+
+describe('File › Export Image… (🔒 YAZ-1802 D9)', () => {
+  const exportImage = async (): Promise<void> => {
+    container.querySelector('.editor--diagram')!.dispatchEvent(new CustomEvent(DRAWING_COMMAND_EVENT, { detail: { kind: 'export-image' } }))
+    await settle()
+    await settle()
+  }
+
+  it('draws what is on screen — unsaved edits too — as PNG and SVG, and main’s sheet writes the one picked', async () => {
+    await opened()
+    drawio({ event: 'autosave', xml: EDITED })
+    await exportImage()
+    expect(vi.mocked(renderDiagramImage).mock.calls).toEqual([
+      [EDITED, 'png'],
+      [EDITED, 'svg'],
+    ])
+    expect(saveImage).toHaveBeenCalledExactlyOnceWith({ defaultName: 'Flow.png', png: 'data:image/png;base64,UE5H', svg: 'data:image/svg+xml;base64,U1ZH' })
+    expect(notice).toHaveBeenCalledWith('Exported to Flow.png')
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('an empty diagram says so and opens no sheet; a failure says why', async () => {
+    await opened()
+    vi.mocked(renderDiagramImage).mockResolvedValue('')
+    await exportImage()
+    expect(saveImage).not.toHaveBeenCalled()
+    expect(notice).toHaveBeenLastCalledWith('This draw.io diagram is empty, so there is no image to export.')
+    vi.mocked(renderDiagramImage).mockRejectedValue(new Error('timed out'))
+    await exportImage()
+    expect(notice).toHaveBeenLastCalledWith("The draw.io diagram couldn't be exported.", 'error')
+  })
+
+  it('a dismissed sheet is silent', async () => {
+    await opened()
+    saveImage.mockResolvedValueOnce({ cancelled: true })
+    await exportImage()
+    expect(notice).not.toHaveBeenCalled()
   })
 })
 

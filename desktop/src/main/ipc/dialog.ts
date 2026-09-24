@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { BrowserWindow, dialog, type IpcMainInvokeEvent } from 'electron'
-import { MAX_DRAWING_BYTES, type OpenDrawingResponse, type PickFolderResponse, type SaveDrawingRequest, type SaveDrawingResponse } from '@shared/types'
+import { MAX_DRAWING_BYTES, type OpenDrawingResponse, type PickFolderResponse, type SaveDrawingRequest, type SaveDrawingResponse, type SaveImageRequest } from '@shared/types'
 import { CH } from '../../channels'
 import { readBoundedRegularFile } from '../fs/boundedRead'
 import { atomicWrite, BridgeFailure, fsCall, requireDrawingFile } from '../fs/fsUtils'
@@ -22,6 +22,19 @@ const SAVE_FILE_OPTIONS: Omit<Electron.SaveDialogOptions, 'defaultPath'> = {
   filters: [{ name: 'Excalidraw', extensions: ['excalidraw'] }],
   properties: ['createDirectory', 'showOverwriteConfirmation'],
 }
+
+/** Export Image… for a diagram (🔒 YAZ-1802 D9): PNG first, the format Yasin reuses as content. */
+const SAVE_IMAGE_OPTIONS: Omit<Electron.SaveDialogOptions, 'defaultPath'> = {
+  title: 'Export Image',
+  filters: [
+    { name: 'PNG image', extensions: ['png'] },
+    { name: 'SVG image', extensions: ['svg'] },
+  ],
+  properties: ['createDirectory', 'showOverwriteConfirmation'],
+}
+
+/** The data URL each picture arrives as, by the extension it is written under. */
+const IMAGE_DATA_URL = { '.png': 'data:image/png;base64,', '.svg': 'data:image/svg+xml;base64,' } as const
 
 const TOO_LARGE = `drawing exceeds ${MAX_DRAWING_BYTES} bytes`
 
@@ -110,9 +123,38 @@ export async function saveDrawingFile(e: IpcMainInvokeEvent, inFlight: Set<Brows
   return { path: file }
 }
 
+function requireSaveImageRequest(v: unknown): SaveImageRequest {
+  if (!isRecord(v)) throw new BridgeFailure('BAD_REQUEST', 'missing request')
+  const { defaultName, png, svg } = v
+  if (typeof defaultName !== 'string' || defaultName === '') throw new BridgeFailure('BAD_REQUEST', "'defaultName' must be a non-empty string")
+  if (typeof png !== 'string' || !png.startsWith(IMAGE_DATA_URL['.png'])) throw new BridgeFailure('BAD_REQUEST', "'png' must be a PNG data URL")
+  if (typeof svg !== 'string' || !svg.startsWith(IMAGE_DATA_URL['.svg'])) throw new BridgeFailure('BAD_REQUEST', "'svg' must be an SVG data URL")
+  return { defaultName, png, svg }
+}
+
+/**
+ * `window.yaseenDraw.dialog.saveImage(req)` (🔒 YAZ-1802 D9): a diagram's Export Image… — `saveDrawingFile`'s
+ * one-door rule, with a PNG / SVG sheet. The name the user picks decides the format; any other
+ * extension is refused, because a sheet lets a name be typed freely. The vault is not touched.
+ */
+export async function saveImageFile(e: IpcMainInvokeEvent, inFlight: Set<BrowserWindow | null>, body: unknown): Promise<SaveDrawingResponse> {
+  const req = requireSaveImageRequest(body)
+  const result = await showOnce(e, inFlight, saveDialog({ ...SAVE_IMAGE_OPTIONS, defaultPath: req.defaultName }))
+  if (result === null) return { cancelled: true }
+  const picked = result.filePath
+  if (result.canceled || picked === undefined || picked === '') return { cancelled: true }
+  const file = path.resolve(picked)
+  const ext = path.extname(file).toLowerCase()
+  if (ext !== '.png' && ext !== '.svg') throw new BridgeFailure('UNSUPPORTED_EXTENSION', 'an image exports as .png or .svg', { path: file })
+  const dataUrl = ext === '.png' ? req.png : req.svg
+  await fsCall(file, () => atomicWrite(file, Buffer.from(dataUrl.slice(IMAGE_DATA_URL[ext].length), 'base64')))
+  return { path: file }
+}
+
 export function registerDialogIpc(): void {
   const inFlight = new Set<BrowserWindow | null>()
   handleWithEvent(CH.dialogPickFolder, (e) => pickFolder(e, inFlight))
   handleWithEvent(CH.dialogOpenFile, (e) => openDrawingFile(e, inFlight))
   handleWithEvent(CH.dialogSaveFile, (e, body: unknown) => saveDrawingFile(e, inFlight, body))
+  handleWithEvent(CH.dialogSaveImage, (e, body: unknown) => saveImageFile(e, inFlight, body))
 }

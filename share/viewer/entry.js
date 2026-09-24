@@ -1,5 +1,6 @@
 /**
- * THE VIEWER'S SCRIPT (YAZ-1799), bundled by `tools/buildShareViewer.mjs` into
+ * THE VIEWER'S SCRIPT (YAZ-1799) for an Excalidraw drawing — a draw.io diagram's is `diagram.js`
+ * (🔒 YAZ-1802 D11) — bundled by `tools/buildShareViewer.mjs` into
  * `share/dist/assets/viewer.js` + `viewer.css` — React and the SAME vendored Excalidraw fork the
  * desktop app draws with — and served by the Worker from its own static assets. Nothing is
  * fetched from a third-party CDN at view time: the fonts come from `/assets/fonts/` too.
@@ -10,49 +11,21 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { Excalidraw, exportToBlob } from '@excalidraw/excalidraw'
 import '@excalidraw/excalidraw/index.css'
+import { board, loadBoard, note, safeName, save, wireDownload } from './board.js'
 
-const { id, allowDownload, name, updatedAt } = JSON.parse(document.getElementById('board').textContent)
-if (updatedAt > 0) document.getElementById('meta').textContent = `${allowDownload ? 'View and download' : 'View only'} · updated ${new Date(updatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`
-const note = document.getElementById('note')
-const safeName = name.replace(/[\\/:*?"<>|]+/g, '_').trim() || 'drawing'
+const { allowDownload, name } = board
 const PNG_SCALE = 2
 
-function save(blob, filename) {
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(a.href), 10_000)
-}
-
 async function main() {
-  let text
-  try {
-    const res = await fetch(`/scene/${id}`, { cache: 'no-store' })
-    if (res.status === 404) {
-      location.reload()
-      return
-    }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    text = await res.text()
-  } catch (err) {
-    note.textContent = 'This drawing could not be loaded. The link may have just been stopped.'
-    throw err
-  }
+  const text = await loadBoard('drawing')
+  if (text === null) return
   const scene = JSON.parse(text)
   const elements = (scene.elements ?? []).filter((el) => !el.isDeleted)
   const files = scene.files ?? {}
   const viewBackgroundColor = scene.appState?.viewBackgroundColor ?? '#ffffff'
 
   if (allowDownload) {
-    // The real download route: the Worker refuses it (403) if the owner turned downloads off since this page loaded.
-    document.getElementById('dl-excalidraw').onclick = async () => {
-      const res = await fetch(`/raw/${id}?download=1`, { cache: 'no-store' })
-      if (!res.ok) return alert(res.status === 403 ? 'The owner turned off downloads for this drawing.' : `Download failed (HTTP ${res.status}).`)
-      save(await res.blob(), `${safeName}.excalidraw`)
-    }
+    wireDownload(document.getElementById('dl-excalidraw'), 'excalidraw', 'drawing')
     const pngButton = document.getElementById('dl-png')
     pngButton.disabled = elements.length === 0
     pngButton.title = elements.length === 0 ? 'This drawing is empty' : ''

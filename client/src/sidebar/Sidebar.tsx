@@ -206,13 +206,11 @@ export interface MenuTargets {
   favoritePaths: string[] | null
   /** True only when EVERY `favoritePaths` entry is already a favorite — a mixed selection reads as Add. */
   favoriteIsOn: boolean
-  /** "Info" (🔒 YAZ-1835 D6): the ONE board row under the pointer; null on blank space, a folder, or a 2+ selection. Its OWN field. */
-  infoPath: string | null
   /**
-   * "Share" and "Version history" (YAZ-1799 / YAZ-1897): `infoPath`'s gate, but an EXCALIDRAW board
-   * only — a diagram has neither yet (YAZ-1802 3B / 3C). Its OWN field.
+   * "Info" (🔒 YAZ-1835 D6): the ONE board row under the pointer; null on blank space, a folder, or a 2+
+   * selection. "Share" (🔒 YAZ-1802 D11) and "Version history" (🔒 YAZ-1802 D10) take it too. Its OWN field.
    */
-  sharePath: string | null
+  infoPath: string | null
 }
 
 /**
@@ -270,11 +268,6 @@ const LENS_LABEL: Record<SidebarLens, string> = { files: 'Files', favorites: 'Fa
 function isBoardRow(tree: readonly TreeNode[], path: string): boolean {
   const node = findNode(tree, path)
   return node !== null && node.type === 'file' && node.kind !== null
-}
-/** An EXCALIDRAW board row: what Share and Version history require until diagrams have them (YAZ-1802 3B / 3C). */
-function isDrawingRow(tree: readonly TreeNode[], path: string): boolean {
-  const node = findNode(tree, path)
-  return node !== null && node.type === 'file' && node.kind === 'drawing'
 }
 /** The sort control's labels (🔒 YAZ-1835 D5), in `SORT_ORDERS` order. */
 const SORT_LABEL: Record<SortOrder, string> = { name: 'Name', updated: 'Last updated', created: 'Created' }
@@ -785,7 +778,6 @@ export function Sidebar({
         // Info (🔒 YAZ-1835 D6): one BOARD, on its own — the live tree says whether the row is a drawing;
         // a plural gesture has no single thing to describe.
         infoPath: plural === null && filePath !== null && isBoardRow(tree?.tree ?? [], filePath) ? filePath : null,
-        sharePath: plural === null && filePath !== null && isDrawingRow(tree?.tree ?? [], filePath) ? filePath : null,
       })
     },
     [root, tree, selectedPaths, orderedSelectedPaths, favorites],
@@ -1518,7 +1510,7 @@ export function Sidebar({
         </ContextMenuSurface>
       )}
       {hover?.shown === true && hoverNode !== null && previewsOn && (
-        <BoardPreview key={hoverNode.path} root={root} node={hoverNode} cacheKey={boardPreviewKey(root, hoverNode, theme)} anchor={asideRef} />
+        <BoardPreview key={hoverNode.path} root={root} node={hoverNode} cacheKey={boardPreviewKey(root, hoverNode, theme, settings.diagramDarkColors)} anchor={asideRef} />
       )}
       {confirmingDelete !== null && <ConfirmDelete target={confirmingDelete} onConfirm={confirmDelete} onCancel={() => setConfirmingDelete(null)} />}
     </aside>

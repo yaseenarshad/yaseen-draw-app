@@ -13,14 +13,26 @@
  *   iframe → `{ event: 'init' }`         → host `{ action: 'load', xml, autosave: 1 }`
  *   iframe → `{ event: 'load', xml }`    the document is on screen: the autosave baseline
  *   iframe → `{ event: 'autosave', xml }` on every change; `{ event: 'save', xml }` on ⌘S
- * and, from the host at any time: `{ action: 'load', … }` again (an outside change on a clean tab)
- * and `{ action: 'invokeAction', actionName: 'darkMode' | 'lightMode' }` (the app's theme, live).
+ * and, from the host at any time: `{ action: 'load', … }` again (an outside change on a clean tab),
+ * `{ action: 'invokeAction', actionName: 'darkMode' | 'lightMode' }` (the app's theme, live) and
+ * `{ action: 'yaseenAdaptiveColors', value }` (the dark-mode colour setting, live — ours, answered
+ * by our PostConfig.js, because draw.io has no embed action for it).
  * From the iframe at any time: `{ event: 'shortcut', command: 'toggleSidebar' }` — an APP shortcut
  * pressed inside draw.io, where the host page never sees the key (see `DrawioMessage`).
  */
+import type { DiagramDarkColors } from '@shared/types'
 
 /** The iframe's origin — main's `app://` scheme, `drawio` host (🔒 YAZ-1802 D4). */
 export const DRAWIO_ORIGIN = 'app://drawio'
+
+/**
+ * 🔒 YAZ-1802 D16: the app's "draw.io diagrams in dark mode" setting as draw.io's own
+ * `Graph.defaultAdaptiveColors` — `auto` re-colours a diagram for dark mode, `none` keeps its
+ * colours. It is the default a file's own `adaptiveColors` attribute overrides.
+ */
+export function drawioAdaptiveColors(setting: DiagramDarkColors): 'auto' | 'none' {
+  return setting === 'adapt' ? 'auto' : 'none'
+}
 
 /**
  * The iframe URL (🔒 YAZ-1802 D4): embed mode over JSON, configured by us, no save or exit button
@@ -107,10 +119,12 @@ const MENU_CHORDS = [
  * `@font-face` sheet lives on the drawio origin and our PostConfig.js hands it to
  * `Editor.configureFontCss` itself, so the host never needs to know the files.
  */
-export function drawioConfig(): Record<string, unknown> {
+export function drawioConfig(darkColors: DiagramDarkColors): Record<string, unknown> {
   return {
     // D3: plain, uncompressed XML on every save (sets Editor.compressXml and defaultCompressed).
     compressXml: false,
+    // D16: the dark-mode colour setting at startup; a change afterwards goes by `yaseenAdaptiveColors`.
+    defaultAdaptiveColors: drawioAdaptiveColors(darkColors),
     // D12a: page view and grid off for anything new. Alignment guides start off the same way — a new
     // diagram is born `guides="0"` (Excalidraw's "object snap" off) — but stay a per-diagram toggle
     // (View › Guides), like the grid; connection snapping and arrow binding stay draw.io's own.

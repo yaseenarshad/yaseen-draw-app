@@ -108,7 +108,7 @@ export interface AssetFile {
   bytes: Uint8Array
 }
 
-const MIME: Record<string, string> = { '.js': 'application/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.html': 'text/html' }
+const MIME: Record<string, string> = { '.js': 'application/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.html': 'text/html', '.xml': 'application/xml', '.txt': 'text/plain' }
 export const assetMime = (path: string): string => MIME[extname(path).toLowerCase()] ?? 'application/octet-stream'
 /** The manifest hash: 32 hex chars of the content (+ extension, so a renamed type re-uploads). Wrangler uses blake3; Cloudflare only needs a stable 32-hex id. */
 export const assetHash = (file: AssetFile): string => createHash('sha256').update(Buffer.from(file.bytes).toString('base64') + extname(file.path).slice(1)).digest('hex').slice(0, 32)

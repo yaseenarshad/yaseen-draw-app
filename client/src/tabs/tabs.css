@@ -108,6 +108,14 @@
   text-overflow: ellipsis;
 }
 
+/* 🔒 YAZ-1802 D15: a draw.io diagram's type mark before its label; `flex: none`, so a long name
+   ellipses and the ✕ keeps its place before the mark ever shrinks. */
+.tabbar__kind {
+  flex: none;
+  display: inline-flex;
+  color: var(--fg-muted);
+}
+
 .tabbar__btn:hover {
   background: var(--bg-side);
 }

@@ -37,8 +37,8 @@ const pick = () => registered(CH.dialogPickFolder)({ sender })
 const open = () => registered(CH.dialogOpenFile)({ sender })
 
 describe('dialog:pick-folder', () => {
-  it('registers exactly the three dialog channels', () => {
-    expect(vi.mocked(ipcMain.handle).mock.calls.map(([ch]) => ch)).toEqual([CH.dialogPickFolder, CH.dialogOpenFile, CH.dialogSaveFile])
+  it('registers exactly the four dialog channels', () => {
+    expect(vi.mocked(ipcMain.handle).mock.calls.map(([ch]) => ch)).toEqual([CH.dialogPickFolder, CH.dialogOpenFile, CH.dialogSaveFile, CH.dialogSaveImage])
   })
 
   it('opens an openDirectory dialog parented to the calling window and answers { path }', async () => {
@@ -286,5 +286,71 @@ describe('dialog:save-file', () => {
     expect(showSaveDialog).not.toHaveBeenCalled()
     settle({ canceled: true, filePaths: [] })
     await first
+  })
+})
+
+/**
+ * A draw.io diagram's Export Image… (🔒 YAZ-1802 D9): the same one-door rule, a PNG / SVG sheet, and
+ * the picked extension decides which of the two pictures lands.
+ */
+describe('dialog:save-image', () => {
+  let dir = ''
+  const made: string[] = []
+  const destination = async (name: string) => {
+    if (dir === '') {
+      dir = await mkdtemp(path.join(tmpdir(), 'yd-image-'))
+      made.push(dir)
+    }
+    return path.join(dir, name)
+  }
+  afterAll(async () => {
+    for (const d of made) await rm(d, { recursive: true, force: true })
+  })
+
+  const save = (body: unknown) => registered(CH.dialogSaveImage)({ sender }, body)
+  const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  const SVG_TEXT = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+  const PICTURES = { defaultName: 'Flow.png', png: `data:image/png;base64,${PNG_BYTES.toString('base64')}`, svg: `data:image/svg+xml;base64,${Buffer.from(SVG_TEXT).toString('base64')}` }
+
+  it('opens a PNG / SVG sheet on the diagram`s own name and writes the PNG`s bytes for a .png', async () => {
+    const win = { id: 'w' } as unknown as BrowserWindow
+    fromWebContents.mockReturnValue(win)
+    const target = await destination('Flow.png')
+    showSaveDialog.mockResolvedValue({ canceled: false, filePath: target })
+    expect(await save(PICTURES)).toEqual({ ok: true, value: { path: target } })
+    expect(await readFile(target)).toEqual(PNG_BYTES)
+    expect(showSaveDialog).toHaveBeenCalledWith(win, {
+      title: 'Export Image',
+      filters: [
+        { name: 'PNG image', extensions: ['png'] },
+        { name: 'SVG image', extensions: ['svg'] },
+      ],
+      properties: ['createDirectory', 'showOverwriteConfirmation'],
+      defaultPath: 'Flow.png',
+    })
+  })
+
+  it('writes the SVG for a .svg, whatever the case of the extension', async () => {
+    const target = await destination('Flow.SVG')
+    showSaveDialog.mockResolvedValue({ canceled: false, filePath: target })
+    expect(await save(PICTURES)).toEqual({ ok: true, value: { path: target } })
+    expect(await readFile(target, 'utf8')).toBe(SVG_TEXT)
+  })
+
+  it('refuses any other extension, and a dismissed sheet writes NOTHING', async () => {
+    const target = await destination('Flow.jpg')
+    showSaveDialog.mockResolvedValueOnce({ canceled: false, filePath: target })
+    expect(await save(PICTURES)).toEqual({ ok: false, error: { code: 'UNSUPPORTED_EXTENSION', message: 'an image exports as .png or .svg', path: target } })
+    showSaveDialog.mockResolvedValueOnce({ canceled: true, filePath: '' })
+    expect(await save(PICTURES)).toEqual({ ok: true, value: { cancelled: true } })
+  })
+
+  it('a request without both pictures as data URLs never reaches a sheet', async () => {
+    for (const body of [undefined, { ...PICTURES, defaultName: '' }, { ...PICTURES, png: '' }, { ...PICTURES, png: PICTURES.svg }, { ...PICTURES, svg: 'data:text/html;base64,AA' }]) {
+      const answer = (await save(body)) as { ok: false; error: { code: string } }
+      expect(answer.ok).toBe(false)
+      expect(answer.error.code).toBe('BAD_REQUEST')
+    }
+    expect(showSaveDialog).not.toHaveBeenCalled()
   })
 })

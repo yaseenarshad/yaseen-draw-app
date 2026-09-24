@@ -6,7 +6,7 @@
  * lives in `main/index.ts`.
  */
 import type { MenuItemConstructorOptions } from 'electron'
-import type { RecentRoots, ZoomStep } from '@shared/types'
+import type { FileKind, RecentRoots, ZoomStep } from '@shared/types'
 import { CH } from '../channels'
 import type { Store } from './store'
 import type { WindowManager } from './windows'
@@ -37,11 +37,14 @@ export interface MenuHandlers {
   toggleSidebar(): void
   /** View › Zoom In / Out / Actual Size (⌘+ / ⌘− / ⌘0): app-wide zoom on the focused window (YAZ-1710). */
   zoom(step: ZoomStep): void
-  /** File › Export Image… (⌘⇧E, 🔒 YAZ-1775 D10): the focused renderer's visible drawing opens the engine's export dialog. */
+  /**
+   * File › Export Image… (⌘⇧E, 🔒 YAZ-1775 D10): the focused renderer's visible board exports a picture — a drawing
+   * through the engine's export dialog, a diagram through the D9 renderer (🔒 YAZ-1802 D9).
+   */
   exportImage(): void
   /** File › Export Drawing… (⌘⇧S, 🔒 YAZ-1775 D3): the focused renderer's visible drawing writes a standalone `.excalidraw`. */
   exportDrawing(): void
-  /** File › Share Link (⌘⇧L, YAZ-1799): the focused renderer opens the Share dialog for its visible drawing. */
+  /** File › Share Link (⌘⇧L, YAZ-1799): the focused renderer opens the Share dialog for its visible board. */
   shareLink(): void
   /** View › Canvas Background › a pick (🔒 YAZ-1775 D10): the focused renderer's visible drawing takes `color`. */
   canvasBackground(color: string): void
@@ -54,12 +57,13 @@ export interface MenuInputs {
   /** Dev builds get View › Toggle Developer Tools. */
   isDev: boolean
   /**
-   * Whether the focused window's ACTIVE TAB is a drawing (🔒 YAZ-1775 D10). The two canvas items are
-   * enabled only then — they act on a canvas, and a menu row that silently does nothing is worse
-   * than a greyed-out one. `main/index.ts` recomputes it on every rebuild, and
+   * The kind of the focused window's ACTIVE TAB, null when it is no board (🔒 YAZ-1775 D10). The board
+   * items are enabled only on a kind they work for — Export Image… (🔒 YAZ-1802 D9) and Share Link
+   * (🔒 YAZ-1802 D11) on any board, the Excalidraw-only ones on a drawing — because a menu row that
+   * silently does nothing is worse than a greyed-out one. `main/index.ts` recomputes it on every rebuild, and
    * `subscribeMenuRebuildOnActiveFile` plus the focus hook are what make a rebuild happen.
    */
-  activeIsDrawing: boolean
+  activeKind: FileKind | null
 }
 
 /**
@@ -80,7 +84,7 @@ export const CANVAS_BACKGROUND_PICKS: ReadonlyArray<{ label: string; color: stri
  * The whole menu bar as a template. Item `id`s are stable so a live check can drive items
  * through `Menu.getApplicationMenu().getMenuItemById(...)`.
  */
-export function buildMenuTemplate({ recents, isDev, activeIsDrawing }: MenuInputs, handlers: MenuHandlers): MenuItemConstructorOptions[] {
+export function buildMenuTemplate({ recents, isDev, activeKind }: MenuInputs, handlers: MenuHandlers): MenuItemConstructorOptions[] {
   const recentItems: MenuItemConstructorOptions[] =
     recents.length === 0
       ? [{ label: 'No Recent Folders', enabled: false }]
@@ -89,6 +93,7 @@ export function buildMenuTemplate({ recents, isDev, activeIsDrawing }: MenuInput
           label: r.path,
           click: () => handlers.openRecent(r.path),
         }))
+  const activeIsDrawing = activeKind === 'drawing'
   return [
     // macOS titles the first menu with the running app's name; the label only matters off-mac.
     {
@@ -124,15 +129,17 @@ export function buildMenuTemplate({ recents, isDev, activeIsDrawing }: MenuInput
         { type: 'separator' },
         // 🔒 YAZ-1775 D10: the drawing's image export left the canvas hamburger for the app menu bar. It
         // opens the ENGINE's own export dialog (`openDialog: { name: 'imageExport' }`) — a
-        // standalone `.excalidraw` export is YAZ-1821's.
-        { id: 'menu.file.export-image', label: 'Export Image…', accelerator: 'CmdOrCtrl+Shift+E', enabled: activeIsDrawing, click: () => handlers.exportImage() },
+        // standalone `.excalidraw` export is YAZ-1821's. A diagram exports through the D9 renderer
+        // (🔒 YAZ-1802), so the item works on any board.
+        { id: 'menu.file.export-image', label: 'Export Image…', accelerator: 'CmdOrCtrl+Shift+E', enabled: activeKind !== null, click: () => handlers.exportImage() },
         // 🔒 YAZ-1775 D3: the ONE place a `.excalidraw` embeds its images, so a board can be handed to
         // someone with no vault and no `assets/` folder. ⌘⇧S is free in this menu — the engine's
         // own "Save as" is off (`saveToActiveFile: false`) and a registered accelerator never
         // reaches the page on macOS anyway — and it is the key the gesture means.
         { id: 'menu.file.export-drawing', label: 'Export Excalidraw Drawing…', accelerator: 'CmdOrCtrl+Shift+S', enabled: activeIsDrawing, click: () => handlers.exportDrawing() },
-        // YAZ-1799 D6: the Share dialog for the same drawing — its standalone file, kept live on the user's own Cloudflare.
-        { id: 'menu.file.share-link', label: 'Share Link', accelerator: 'CmdOrCtrl+Shift+L', enabled: activeIsDrawing, click: () => handlers.shareLink() },
+        // YAZ-1799 D6: the Share dialog for the same board — its standalone file, kept live on the user's
+        // own Cloudflare. A diagram shares its XML (🔒 YAZ-1802 D11), so the item works on any board.
+        { id: 'menu.file.share-link', label: 'Share Link', accelerator: 'CmdOrCtrl+Shift+L', enabled: activeKind !== null, click: () => handlers.shareLink() },
         { type: 'separator' },
         // ⌘W is Close Tab (GRO-2232, locked): the renderer owns tab state, so the gesture goes to
         // the focused window's renderer. Close Window moves to ⌘⇧W and keeps `role: 'close'` — the
@@ -344,13 +351,13 @@ export function subscribeMenuRebuild(store: Store, rebuild: () => void): () => v
   })
 }
 
-/** The one fact the three canvas items are gated on: which file each window has in front. */
+/** The one fact the board items are gated on: which file each window has in front. */
 const activeFilesKey = (state: { windows: ReadonlyArray<{ id: string; file: string | null }> }): string => state.windows.map((w) => `${w.id}=${w.file ?? ''}`).join('\n')
 
 /**
  * Rebuild when any window's ACTIVE FILE changes (🔒 YAZ-1775 D10): File › Export Image…, File › Export
  * Drawing… and View › Canvas Background are enabled only while the focused window's active tab is
- * a drawing, so a tab switch
+ * a board of their kind, so a tab switch
  * has to re-evaluate them. A second subscription rather than a widening of `subscribeMenuRebuild`,
  * so the recents rule — and its test — stays exactly what it was. Focus changes are the host's to
  * report (`browser-window-focus` in `main/index.ts`): they move which window is asked, not what

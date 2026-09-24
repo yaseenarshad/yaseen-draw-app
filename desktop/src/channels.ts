@@ -34,6 +34,8 @@ export const CH = {
   // The native SAVE dialog plus the write behind it (🔒 YAZ-1775 D3, YAZ-1821): File › Export Drawing…
   // writes a standalone `.excalidraw` OUTSIDE the vault, which is why it is not `fs:write`.
   dialogSaveFile: 'dialog:save-file',
+  // The same sheet for a draw.io diagram's picture (🔒 YAZ-1802 D9): PNG or SVG, by the picked extension.
+  dialogSaveImage: 'dialog:save-image',
   watchSubscribe: 'watch:subscribe',
   watchUnsubscribe: 'watch:unsubscribe',
   watchEvent: 'watch:event',
@@ -64,7 +66,7 @@ export const CH = {
   // File › Export Drawing… (🔒 YAZ-1775 D3, YAZ-1821): same gating and same delivery as `menu:export-image`.
   menuExportDrawing: 'menu:export-drawing',
   menuCanvasBackground: 'menu:canvas-background',
-  // File › Share Link… (⌘⇧L, YAZ-1799): same gating and delivery as `menu:export-drawing`.
+  // File › Share Link… (⌘⇧L, YAZ-1799): same delivery as `menu:export-drawing`, enabled on any board (🔒 YAZ-1802 D11).
   menuShareLink: 'menu:share-link',
   linkOpenFile: 'link:open-file',
   linkNotice: 'link:notice',

@@ -3,7 +3,7 @@
  * registry hands to `Segmented`, in the order the controls show them. Every list mirrors a type
  * in shared/types.ts, which owns validation; App owns what each value DOES.
  */
-import type { GithubSyncStatus, Theme } from '@shared/types'
+import type { DiagramDarkColors, GithubSyncStatus, Theme } from '@shared/types'
 
 export interface Option<T> {
   label: string
@@ -15,6 +15,12 @@ export const THEME_OPTIONS: readonly Option<Theme>[] = [
   { label: 'System', value: 'system' },
   { label: 'Light', value: 'light' },
   { label: 'Dark', value: 'dark' },
+]
+
+/** 🔒 YAZ-1802 D16: how draw.io diagrams look in dark mode; the default leads. */
+export const DIAGRAM_DARK_COLORS_OPTIONS: readonly Option<DiagramDarkColors>[] = [
+  { label: 'Adapt colours', value: 'adapt' },
+  { label: 'Keep original colours', value: 'keep' },
 ]
 
 /** The On-first pair the guards use ("Confirm before deleting", GitHub sync): the safe answer leads. */

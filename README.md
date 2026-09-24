@@ -113,8 +113,14 @@ closed, 2 px lines with 8 px corners in Assistant, plain scroll pans and `⌘`-s
 zooms, and dragging a text box by its corner scales the text. Excalidraw's keys work too — with
 nothing selected `R` / `O` / `T` / `A` / `W` pick a tool; with a selection the colour letters
 (`R` red, `U` blue, `G` green…) colour it, `⇧` + a letter colours the outline, and `1`…`0` size
-it. Settings › Hotkeys has the full table. Share links, Version history and Present are
-Excalidraw-only for now.
+it. Settings › Hotkeys has the full table.
+
+A diagram is marked with a small linked-boxes glyph in the sidebar and on its tab (an Excalidraw
+board is unmarked). Hover it for a preview, right-click › **Version history** to see and restore
+older versions, and **File › Export Image…** (`⌘⇧E`) saves what is on screen as a PNG or an SVG.
+In dark mode draw.io re-colours diagrams so they stay readable; **Settings › Appearance › draw.io
+diagrams in dark mode** can keep their original colours instead, and a diagram that asks to keep
+its own colours (`adaptiveColors="none"`) always does. Present is Excalidraw-only for now.
 
 ## Sidebar and windows
 
@@ -156,7 +162,7 @@ the one file this app writes that is not lean, because it has no `assets/` folde
 ## Settings
 
 The cog bottom-left, or `⌘,`. **Appearance › Theme** (System / Light / Dark — System follows the
-OS live). **Excalidraw canvas** holds the fourteen drawing preferences the engine used to keep to
+OS live) and **draw.io diagrams in dark mode** (Adapt colours / Keep original colours). **Excalidraw canvas** holds the fourteen drawing preferences the engine used to keep to
 itself — grid, snapping, binding, zen and writing modes, tool lock, frame visibility, the pen widths
 and what a new element looks like — and they apply to every Excalidraw drawing, every window and
 every relaunch (draw.io diagrams have fixed defaults).

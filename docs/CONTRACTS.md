@@ -23,7 +23,7 @@ nothing to do with each other. A bare `D3` would be unresolvable, so there are n
 |---|---|
 | `client/` | the renderer: React 19, Vite. Talks to nothing but `window.yaseenDraw`. |
 | `client/src/drawings/` | the drawing document: the engine seam (`ExcalidrawSurface`, the ONE importer of the package), its host, and what a scene is |
-| `client/src/diagrams/` | the draw.io diagram document (YAZ-1802): `DrawioEditor` (the iframe host), `drawioProtocol.ts` (the postMessage dialect and the configure object) and `renderDiagramPreview.ts` (the hover picture) |
+| `client/src/diagrams/` | the draw.io diagram document (YAZ-1802): `DrawioEditor` (the iframe host), `drawioProtocol.ts` (the postMessage dialect and the configure object) and `renderDiagram.ts` (the D9 renderer: the hover picture, Version history's pictures, Export Image…) |
 | `desktop/drawio-overlay/` | OUR files laid over the draw.io webapp by `tools/packDrawio.mjs`: the `PreConfig.js` / `PostConfig.js` config hooks (page view off, ⌘-wheel zoom, the keymap) and the preview page `yaseen-render.html` — draw.io's own files are never modified |
 | `client/src/drawings/presentation/` | the canvas panel's Present tab: the slide rules, the panel and the full-pane player |
 | `client/src/image-studio/` | the canvas panel's Images tab: the Image Studio, the shapes catalog, both insert paths |
@@ -76,8 +76,8 @@ Two kinds of BOARD, one extension each (🔒 YAZ-1802 D1 / D2).
   (`drawing:*`, the create's JSON stamp, board merge, history, previews, shrink, the orphan sweep,
   storage, the Import / Export Drawing dialogs) keeps asking it. The GENERIC surfaces (tree row
   kind, the file head's dates, Info, search, hover preview, the files a launch is handed, link
-  routing, `Editor`) ask `isBoard` / `fileKind`. Share, Version history and the menu bar's Export
-  Image / Share Link stay drawing-only until diagrams get them (YAZ-1802 3A–3C).
+  routing, `Editor`) ask `isBoard` / `fileKind`, and so do Version history and the menu bar's
+  Export Image… (🔒 YAZ-1802 D9 / D10); Share and Share Link are YAZ-1802 3C's (see Share links).
 - A rename never converts between the two kinds, in the sidebar (`renamedPath` re-appends the old
   suffix) and in main (`fs:rename` → `UNSUPPORTED_EXTENSION`). A copy keeps its extension as
   spelled: `Flow copy.drawio`, `UP copy.DRAWIO`.
@@ -86,6 +86,10 @@ Two kinds of BOARD, one extension each (🔒 YAZ-1802 D1 / D2).
 - `.excalidraw` and `.drawio` hide their extension wherever a name is shown — tree rows, tab
   labels, the window title, the rename field (⚡ YAZ-1775 D8 amended, 🔒 YAZ-1802 D13). Every other
   file shows its full name.
+- 🔒 YAZ-1802 D15: so a draw.io diagram wears a type mark — a muted linked-boxes glyph (`DiagramMark`,
+  aria-label "draw.io diagram"), never draw.io's logo — in its tree row's chevron slot (every other
+  file row keeps that 14 px slot empty, so names line up with folders and lose no width) and before
+  its tab label. An Excalidraw board is unmarked: the usual kind.
 - Image bytes do NOT live in the scene JSON: they are content-addressed at
   `<vault>/assets/<fileId>.<ext>` (🔒 YAZ-1775 D3) and travel with the scene through
   `drawing:load` / `drawing:save`. The id is Excalidraw's own — the SHA-1 of the bytes — so an
@@ -143,6 +147,7 @@ calls that go through it; `state`, `window`, `menu`, `link` and `watch` are call
 | `pickFolder()` | `dialog:pick-folder` | the native open-directory dialog |
 | `dialog.openDrawing()` | `dialog:open-file` | the native OPEN-FILE dialog, `.excalidraw` filter → `{ path, name, content }` or `{ cancelled: true }`; the bytes come back because the picked file is outside the vault |
 | `dialog.saveDrawing(req)` | `dialog:save-file` | the native SAVE sheet AND the atomic write behind it → `{ path }` or `{ cancelled: true }`; the only path ever written is the one the user just typed |
+| `dialog.saveImage(req)` | `dialog:save-image` | the same one door for a draw.io diagram's Export Image… (🔒 YAZ-1802 D9): `{ defaultName, png, svg }` (both data URLs, both drawn before the sheet opens); a PNG / SVG sheet, and the picked name's extension decides which is written — any other is `UNSUPPORTED_EXTENSION` |
 | `watch(root, cb)` | `watch:*` | chokidar under the root; `ready` / `change` / `add` / `unlink` / `error` |
 | `file.rename(req)` | `fs:rename` | same-parent rename or a move; never overwrites |
 | `file.delete(req)` | `fs:delete` | `shell.trashItem` ONLY — never `fs.rm`, no permanent fallback |
@@ -172,7 +177,7 @@ calls that go through it; `state`, `window`, `menu`, `link` and `watch` are call
 | `components.onChanged` | `components:changed` | pushed to EVERY window when the components library changes — any vault, any writer, no payload |
 | `secrets.set(req)` / `has(req)` | `secrets:set` / `secrets:has` | `{ name, value \| null }` writes or clears a secret — `pixabayApiKey` only, any other name is `BAD_REQUEST`; `{ name }` → boolean. NO channel answers a value (🔒 YAZ-1775 D4, YAZ-1842 D1) |
 | `github.status` / `syncNow` / `setEnabled` / `onStatus` | `github:*` | per-vault GitHub sync; a pass that merged carries `merged` (below) |
-| `github.history` / `version` / `restore` | `github:history` / `github:version` / `github:restore` | Version history (YAZ-1897 D4): `(root, path)` → a board's versions newest first; `(root, path, ref)` → one version's `{ json, files }` (pictures from `assets/`, as `drawing:load`); `(root, path, ref)` writes it over the board. `ref` is opaque (`<sha>:<path>`), anything else is `BAD_REQUEST` |
+| `github.history` / `version` / `restore` | `github:history` / `github:version` / `github:restore` | Version history (YAZ-1897 D4): `(root, path)` → a board's versions newest first; `(root, path, ref)` → one version's `{ kind: 'drawing', json, files }` (pictures from `assets/`, as `drawing:load`) or `{ kind: 'diagram', xml }` (🔒 YAZ-1802 D10, a version that is no diagram is `IO_ERROR`); a diagram restores through `diagram:save`'s write; `(root, path, ref)` writes it over the board. `ref` is opaque (`<sha>:<path>`), anything else is `BAD_REQUEST` |
 | `share.status` / `accounts` / `setup` / `onSetupProgress` / `openCloudflare` | `share:status` / `share:accounts` / `share:setup` / `share:setup-progress` / `share:open-cloudflare` | Share links (YAZ-1799, below): the setup status (no secret), the accounts a pasted key sees, set up from `{ token, accountId? }` with progress pushed to the asking window, and the pre-filled token page in the browser |
 | `share.get` / `list` / `publish` / `setPermission` / `stop` | `share:get` / `share:list` / `share:publish` / `share:set-permission` / `share:stop` | one board's record; the vault's records (`{ root, check? }` — `check: false` skips the live check); share or re-upload `{ root, path, content, id? }`; flip the download flag on the same link; stop. `NOT_SET_UP` before setup, `TOO_LARGE` over 100 MB |
 | `share.setDomain` / `disconnect` / `onChanged` | `share:set-domain` / `share:disconnect` / `share:changed` | attach or remove the custom domain; forget the key (or delete everything first); any status or shares.json change, pushed to EVERY window |
@@ -234,6 +239,7 @@ AppState {
     confirmDelete: boolean
     canvas: CanvasPrefs                  // 🔒 YAZ-1775 D9, below
     canvasPanel: { tab: 'image-studio' | 'components' | 'presentation'; docked: boolean }
+    diagramDarkColors: 'adapt' | 'keep'  // 🔒 YAZ-1802 D16, default 'adapt'
   }
   sidebarWidth: number                     // clamped to [180, 520]
   recents: { path: string; lastOpened: number }[]   // MRU, max 10
@@ -606,7 +612,9 @@ YAZ-1897; the scenario catalogue (S1–S28) is the 📘 comment there.
   dismissed. Right-click a board › **Version history** (`client/src/history/`) lists its versions;
   the picture is the board NOW with what changed since the chosen version marked (added green,
   changed amber, removed faded red, `compare.ts`), or the version **as it was**. **Restore**
-  writes it back as an ordinary edit and re-uploads a shared link.
+  writes it back as an ordinary edit and re-uploads a shared link. A draw.io diagram's versions
+  are pictures too (🔒 YAZ-1802 D10), drawn by the D9 renderer, **as it was** only — no change
+  marks in v1 — and Restore writes through `diagram:save` (checked, D7 dates stamped).
 - **D5 — no per-board hold.** Every board syncs.
 
 The demo vault for this is `tools/seedMergeDemoVault.mjs` (two computers and a bare origin; the
@@ -703,7 +711,7 @@ filter ignores ↑/↓/⏎/Esc meanwhile. Every right-click swallows Electron's 
 | File | Open Folder… | ⌘⇧O |
 | File | Open Recent ▸ | — (from a vault window it opens beside; Welcome fills in place) |
 | File | Search Vault | ⌘K |
-| File | Export Image… (a drawing tab only) | ⌘⇧E |
+| File | Export Image… (a board tab) | ⌘⇧E |
 | File | Export Excalidraw Drawing… (a drawing tab only) | ⌘⇧S |
 | File | Share Link (a drawing tab only) | ⌘⇧L |
 | File | Close Tab | ⌘W |
@@ -722,13 +730,16 @@ macOS, so main applies the step to the focused window's `webContents` itself.
 Export Image…, Export Excalidraw Drawing… and Canvas Background are the canvas's own three items, moved out
 of the engine's main menu by 🔒 YAZ-1775 D10 (there is no `<MainMenu>` in a drawing and the engine's stock
 trigger is hidden). Main enables them only while the window a menu action would target has a
-`.excalidraw` in front, rebuilding the menu when any window's active file changes and when focus
+board of their kind in front, rebuilding the menu when any window's active file changes and when focus
 moves between windows. Each is pushed to that window's renderer, which dispatches it as a DOM
 event on the VISIBLE drawing layer (`client/src/drawings/drawingCommand.ts`) — several tabs are
 mounted at once, each with its own engine, so a prop or a `window` listener would reach the wrong
 canvas. The drawing then calls the engine's own door: `openDialog: { name: 'imageExport' }` (the
 engine's PNG / SVG export dialog), or `viewBackgroundColor`, which the engine writes into the
-file — or, for Export Drawing…, the assembly below.
+file — or, for Export Drawing…, the assembly below. Export Image… also works on a draw.io diagram
+(🔒 YAZ-1802 D9): main enables it on any board tab (`MenuInputs.activeKind`), the event lands on the
+visible `.editor--diagram`, and the diagram's picture comes from the D9 renderer ("draw.io
+diagrams").
 
 ### Sidebar sort and Info (🔒 YAZ-1835)
 
@@ -777,8 +788,9 @@ save" for the two dates (🔒 YAZ-1834 D7). No new IPC. The demo vault behind th
 (`lib/scenePreview.ts`) fit to 1200 × 800 with 16 px padding. Nothing visible answers `''` ("Empty
 board"); a refused load or a failed draw is the cache's `null` ("Preview unavailable"). Nothing is
 written to the vault or to userData; a relaunch redraws. The key is `root \n path \n mtime \n
-theme` — mtime, not the `updatedAt` block, because every write moves it and the block's one
-advantage (surviving a clone) means nothing to a memory cache.
+theme \n diagramDarkColors` — mtime, not the `updatedAt` block, because every write moves it and
+the block's one advantage (surviving a clone) means nothing to a memory cache. A draw.io diagram
+is `diagram:load` → the D9 renderer instead (🔒 YAZ-1802 D9), same bounds, `''` and `null`.
 
 **🔒 D2 / D3 — the switch.** `SettingsState.hoverPreview`, app-wide, default `true`, in
 `yaseendraw.json`; flipped by Settings › Files › Preview on hover and by the picture-frame button in
@@ -935,7 +947,7 @@ two that do not — the Pixabay key and the GitHub switch — are marked below.
 
 | Section | Rows |
 |---|---|
-| Appearance | Theme (the only one — 🔒 YAZ-1775 D9 put everything else about the canvas in Excalidraw canvas) |
+| Appearance | Theme · draw.io diagrams in dark mode (🔒 YAZ-1802 D16: Adapt colours / Keep original colours) — 🔒 YAZ-1775 D9 put everything else about the canvas in Excalidraw canvas |
 | Excalidraw canvas | the fourteen `CanvasPrefs` (🔒 YAZ-1775 D9) in three groups: Drawing aids, Modes, New elements — Excalidraw's alone; a draw.io diagram has fixed defaults (🔒 YAZ-1802 D12) |
 | Files | Confirm before deleting · Library folder (🔒 YAZ-1775 D5: resolved path, Choose…, Reset to default) |
 | Images | Pixabay API key (🔒 YAZ-1775 D4: a password field, Save / Clear, "Key set" / "No key" from `secrets:has`, never echoed) — NOT in `SettingsState`, it lives in main's owner-only `secrets.json` (YAZ-1842 D1) |
@@ -967,8 +979,9 @@ is no encryption (🔒 YAZ-1799 D2): the link's random id is its only secret, 14
   no `share:*` answer or push carries it or the password.
 - The RENDERER assembles the bytes (`client/src/share/shareContent.ts`): the same standalone
   `.excalidraw` Export Drawing… writes, images embedded, read from DISK (Share can start from the
-  sidebar on a board that is not open; an open one is flushed first). Main checks the size and
-  uploads; it never assembles.
+  sidebar on a board that is not open; an open one is flushed first). A draw.io diagram is its
+  `.drawio` XML exactly as saved (🔒 YAZ-1802 D11) — its pictures already live inside it. Main
+  checks the size and uploads; it never assembles.
 
 **Storage.**
 - `<userData>/sharing.json` — which account, bucket and Worker, the workers.dev address, the custom
@@ -998,6 +1011,33 @@ link's download flag is its OWN object, `perm/<id>` (`"0"` | `"1"`, missing = al
 - Auth is `Authorization: Bearer <password>`, compared in constant time. The board name rides
   `x-board-name` (URI-encoded, capped at 300) and is HTML-escaped in the page; the page's JSON data
   block is `<`-escaped; the download's `filename*` is RFC 5987.
+
+**Diagrams** (🔒 YAZ-1802 D11). A board is a `drawing` (scene JSON) or a `diagram` (`.drawio` XML).
+- Main uploads a diagram with `content-type: application/xml` and `x-board-kind: diagram`; a drawing
+  sends no kind. The Worker stores it as the R2 custom metadata `kind` and answers it on `/scene`
+  and `/raw` as `x-board-kind` (a diagram served as `application/xml`, downloaded as
+  `<name>.drawio`). The key stays `boards/<id>.excalidraw` for both, and anything but `diagram` —
+  a board stored before kinds included — is a drawing, so every old link keeps working.
+- `/b/<id>` picks the viewer by kind. A diagram's page runs draw.io's own read-only viewer
+  (`GraphViewer`, the D9 renderer's `viewer-static.min.js` from the pinned draw.io): first
+  `/assets/drawio/config.js`, which points every path it would take from viewer.diagrams.net at
+  `/assets/drawio/`, then the viewer, then `/assets/diagram.js`. It opens fitted (never past 100%);
+  the viewer's hover toolbar zooms and turns pages, and dragging or scrolling pans. It offers
+  Download .drawio only — no PNG: draw.io draws labels as HTML inside the SVG, which a canvas cannot
+  read back out. Same CSP, still no inline script.
+- The viewer build ships, under `/assets/drawio/` (`tools/buildShareViewer.mjs` `DRAWIO_FILES`):
+  `viewer-static.min.js` (4.2 MB), EVERY stencil set — 206 files, 43.3 MB, the largest 6.6 MB, all
+  far under Cloudflare's 25 MiB per static asset — because a library shape (AWS, Cisco, …) loads its
+  set on first use and draws as nothing without it, draw.io's `LICENSE-drawio.txt`, and a
+  `fonts.css` for the editor's five font families pointing at the Excalidraw fonts already under
+  `/assets/fonts/`. The static assets grow from ~23 MB to ~71 MB (638 files).
+- **An outdated Worker.** The Worker echoes the stored kind on every PUT (`x-board-kind`). A Worker
+  deployed before kinds answers a diagram's upload without it, and would serve the XML to the
+  Excalidraw viewer: main refuses the upload with `WORKER_OUTDATED` ("… run Set up sharing again").
+  A first share is taken back down (nobody has its link yet); an already-shared diagram keeps its
+  record and shows the failure as its status line, and the first save after setup puts it right.
+  Set up sharing again is the one redeploy every user needs: it reuses the bucket and the Worker
+  (D11 of YAZ-1799), uploads the new code and assets, and every link keeps its id.
 
 **Always live** (🔒 YAZ-1799 D3). Every successful save of a shared board re-uploads it to the SAME
 id (`client/src/share/liveShare.ts`), per board in the window that saved it: after 10 s with no
@@ -1149,8 +1189,23 @@ but for two config hooks, inside an iframe on its OWN origin.
 - **🔒 D8 — sync keeps both.** `.git/info/attributes` carries the case-proof `.drawio` `-merge` rule
   ("Two computers, one vault"), and a diagram changed on both machines keeps both copies —
   `<name> (conflict, <date>).drawio`, the extension as the file spelled it.
-- **🔒 D9 — the hover picture** is draw.io's own viewer on our page `app://drawio/yaseen-render.html`
-  in one hidden iframe: page 1 as an SVG data URL, same bounds, theme and cache as a drawing's.
+- **🔒 D9 — one renderer** for every picture of a diagram outside its editor: draw.io's own viewer
+  on our page `app://drawio/yaseen-render.html` in one hidden iframe (`renderDiagram.ts`). Page 1
+  (compressed or not) is drawn by `getSvg` with the diagram's fonts and images inside it; a PNG is
+  that same SVG on a canvas. The hover preview (same bounds, theme and cache as a drawing's),
+  Version history's pictures and File › Export Image… all go through it — Export draws the XML
+  draw.io last posted (unsaved edits too) light, in its own colours, as a PNG (2×) and an SVG, and
+  `dialog:save-image` writes the one the user picks. A page that never starts is thrown away so
+  the next picture retries; a picture that never comes back fails after 15 s.
+- **🔒 D10 — history.** Version history lists a diagram's versions and draws each through D9;
+  Restore goes through `diagram:save`'s write. No change marks in v1 (Future, with cell-level merge).
+- **🔒 D16 — dark-mode colours.** `SettingsState.diagramDarkColors` (Settings › Appearance) is
+  draw.io's `defaultAdaptiveColors` — `adapt` → `auto`, `keep` → `none` — in the configure reply,
+  and live afterwards by our `{ action: 'yaseenAdaptiveColors' }` message, which `PostConfig.js`
+  answers (draw.io has no embed action for it): it moves the default and re-draws, never edits the
+  file, so nothing autosaves and undo is untouched. A file whose `<mxGraphModel>` says
+  `adaptiveColors="none"` keeps its colours whatever the setting. The D9 renderer honours the same
+  setting, so previews and history pictures match the editor.
 - **🔒 D12a — feel**, in the configure reply (`drawioConfig`) and `PostConfig.js`: page view off
   on open (`pv=0`), grid and alignment guides off for new diagrams (both stay per-diagram
   toggles: the right-click Grid item, View › Guides), 2 px lines with 8 px corners in Assistant, the fonts (Assistant, Inter,
@@ -1170,9 +1225,7 @@ but for two config hooks, inside an iframe on its OWN origin.
   letter no longer starts typing into a selected label (Enter / F2 do). Settings › Hotkeys'
   "draw.io diagram" table lists them; `tools/drawioOverlay.test.mjs` runs `PostConfig.js` against a
   stand-in draw.io and checks every action name against the pinned bundle.
-- **Not yet:** share links and version history (YAZ-1802 3B / 3C) — Share and Version history are
-  offered for Excalidraw boards only (`MenuTargets.sharePath`); Present and merging diagrams are
-  Future (🔒 D1).
+- **Not yet:** Present and merging diagrams are Future (🔒 D1).
 
 ## Packaging
 

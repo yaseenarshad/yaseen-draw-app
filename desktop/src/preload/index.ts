@@ -45,7 +45,7 @@ const api: YaseenDrawApi = {
   },
   pickFolder: () => call(CH.dialogPickFolder),
   // The import picker (YAZ-1833): a native open-file dialog that answers the picked file's bytes.
-  dialog: { openDrawing: () => call(CH.dialogOpenFile), saveDrawing: (req) => call(CH.dialogSaveFile, req) },
+  dialog: { openDrawing: () => call(CH.dialogOpenFile), saveDrawing: (req) => call(CH.dialogSaveFile, req), saveImage: (req) => call(CH.dialogSaveImage, req) },
   watch: (root, listener) => {
     const id = crypto.randomUUID()
     const onEvent = (_e: unknown, msg: { id: string; ev: WatchEvent }) => {
@@ -93,7 +93,7 @@ const api: YaseenDrawApi = {
     onNextTab: on<void>(CH.menuNextTab),
     onPrevTab: on<void>(CH.menuPrevTab),
     // 🔒 YAZ-1775 D10: File › Export Image… and View › Canvas Background ▸, which main enables only while
-    // the focused window's active tab is a drawing.
+    // the focused window's active tab is a board they work for (Export Image… on a diagram too).
     onExportImage: on<void>(CH.menuExportImage),
     onCanvasBackground: on<string>(CH.menuCanvasBackground),
     onExportDrawing: on<void>(CH.menuExportDrawing),

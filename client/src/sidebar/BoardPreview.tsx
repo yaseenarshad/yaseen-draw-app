@@ -62,7 +62,7 @@ function usePlacement(anchor: RefObject<HTMLElement | null>): BoardPreviewPlacem
 interface BoardPreviewProps {
   root: string
   node: FileNode
-  /** `boardPreviewKey(root, node, theme)` — a new key (a save, a theme flip) swaps the picture in place. */
+  /** `boardPreviewKey(root, node, theme, darkColors)` — a new key (a save, a theme flip) swaps the picture in place. */
   cacheKey: string
   /** The `<aside className="sidebar">` the panel sits beside. */
   anchor: RefObject<HTMLElement | null>

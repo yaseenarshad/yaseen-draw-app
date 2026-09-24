@@ -3,6 +3,7 @@ import { dirname, isAbsolute } from 'node:path'
 import {
   DEFAULT_CANVAS_PANEL,
   DEFAULT_SETTINGS,
+  DIAGRAM_DARK_COLORS,
   MAX_RECENT_ROOTS,
   SIDEBAR_DEFAULT_W,
   SIDEBAR_MAX_W,
@@ -16,6 +17,7 @@ import {
   isSortOrder,
   type AppState,
   type CanvasPanelState,
+  type DiagramDarkColors,
   type FolderState,
   type RecentRoots,
   type SettingsState,
@@ -102,6 +104,8 @@ const SETTINGS_FIELD_OK: { [K in keyof SettingsState]: (v: unknown) => v is Sett
   // 🔒 YAZ-1775 D9: STRICT at the bridge — a sandboxed renderer hands over a whole `CanvasPrefs` or nothing.
   canvas: isCanvasPrefs,
   canvasPanel: isCanvasPanel,
+  // 🔒 YAZ-1802 D16: a state file from before the setting (or a value this build does not know) reads `adapt`.
+  diagramDarkColors: (v): v is DiagramDarkColors => typeof v === 'string' && (DIAGRAM_DARK_COLORS as readonly string[]).includes(v),
 }
 const SETTINGS_KEYS = Object.keys(SETTINGS_FIELD_OK) as Array<keyof SettingsState>
 

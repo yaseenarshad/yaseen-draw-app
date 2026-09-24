@@ -148,7 +148,10 @@ export interface GithubApi {
    * `path` is the board (absolute, or vault-relative), exactly as `drawing.load` takes it.
    */
   history(root: string, path: string): Promise<BoardVersion[]>
-  /** One version's scene and its pictures, resolved from `assets/` the way `drawing.load` does. */
+  /**
+   * One version: a drawing's scene and its pictures, resolved from `assets/` the way `drawing.load`
+   * does, or a diagram's XML (🔒 YAZ-1802 D10).
+   */
   version(root: string, path: string, ref: string): Promise<BoardVersionScene>
   /** Writes that version over the board as an ordinary edit; the watcher and sync take it from there. */
   restore(root: string, path: string, ref: string): Promise<void>
@@ -167,10 +170,7 @@ export interface BoardVersion {
   localOnly: boolean
 }
 
-export interface BoardVersionScene {
-  json: string
-  files: Record<string, DrawingFileEntry>
-}
+export type BoardVersionScene = { kind: 'drawing'; json: string; files: Record<string, DrawingFileEntry> } | { kind: 'diagram'; xml: string }
 
 // ---------- Storage (Settings › Storage — YAZ-1801) ----------
 
