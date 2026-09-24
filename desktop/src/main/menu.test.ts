@@ -178,7 +178,7 @@ describe('buildMenuTemplate', () => {
     const handlers = noopHandlers()
     const file = menuOf(build(RECENTS, false, handlers, true), 'File')
     const item = file.find((i) => i.id === 'menu.file.export-drawing')
-    expect(item?.label).toBe('Export Drawing…')
+    expect(item?.label).toBe('Export Excalidraw Drawing…')
     expect(item?.accelerator).toBe('CmdOrCtrl+Shift+S')
     expect(item?.enabled).toBe(true)
     click(item)

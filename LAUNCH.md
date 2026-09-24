@@ -1,7 +1,8 @@
 # LAUNCH — how to run this app (for humans and agents)
 
-Yaseen Draw: a local whiteboard for a folder of `.excalidraw` drawings, as an Electron macOS
-desktop app — React renderer around the vendored Excalidraw fork, main-process file layer. See
+Yaseen Draw: a local whiteboard for a folder of boards — `.excalidraw` drawings and `.drawio`
+diagrams — as an Electron macOS desktop app: React renderer around the vendored Excalidraw fork and
+a bundled draw.io, main-process file layer. See
 `README.md` for the human overview and `docs/CONTRACTS.md` for the bridge, state and packaging
 contracts.
 

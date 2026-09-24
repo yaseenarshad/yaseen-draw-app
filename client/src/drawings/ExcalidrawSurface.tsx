@@ -190,7 +190,7 @@ export interface DrawingSurfaceProps {
 }
 
 /** The one failure this seam can raise on its own (the file's own failures are the host's). */
-export const ENGINE_LOAD_FAILED = "Can't open the drawing editor."
+export const ENGINE_LOAD_FAILED = "Can't open the Excalidraw editor."
 
 /** How long the engine's own toggles settle before the shell hears about them (🔒 YAZ-1775 D9). */
 const PREFS_DEBOUNCE_MS = 300

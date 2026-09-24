@@ -647,6 +647,7 @@ export function App() {
                   canvasPanel={settings.canvasPanel}
                   onCanvasPanelChange={changeCanvasPanel}
                   onNotice={notify}
+                  onToggleSidebar={toggleSidebar}
                 />
               </div>
             ))}

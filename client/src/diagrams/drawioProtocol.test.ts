@@ -16,15 +16,37 @@ describe('drawioFrameUrl (🔒 YAZ-1802 D4)', () => {
   })
 })
 
-describe('drawioConfig (🔒 YAZ-1802 D3 / D12)', () => {
-  it('saves plain XML, page view and grid off, guides off', () => {
-    expect(drawioConfig()).toMatchObject({ compressXml: false, defaultPageVisible: false, defaultGridEnabled: false, enablePositionGuides: false, enableDistanceGuides: false, enableSizeGuides: false, zoomWheel: false })
+describe('drawioConfig (🔒 YAZ-1802 D3 / D12a / D12b)', () => {
+  type Shortcut = { keyCode: string | number; control?: boolean; shift?: boolean; action: string | null }
+  const config = drawioConfig() as { defaultFonts: string[]; presetColors: string[]; defaultColors: string[]; keyboardShortcuts: Shortcut[] }
+
+  it('saves plain XML, page view and grid off, and leaves guides a per-diagram toggle', () => {
+    expect(config).toMatchObject({ compressXml: false, defaultPageVisible: false, defaultGridEnabled: false, zoomWheel: false })
+    expect(config).not.toHaveProperty('enablePositionGuides')
   })
 
   it('offers our fonts first and draws colours without a #', () => {
-    const config = drawioConfig() as { defaultFonts: string[]; presetColors: string[]; defaultColors: string[] }
-    expect(config.defaultFonts[0]).toBe('Assistant')
+    expect(config.defaultFonts).toEqual(['Assistant', 'Inter', 'Roboto', 'IBM Plex Mono', 'Liberation Serif'])
     for (const colour of [...config.presetColors, ...config.defaultColors]) expect(colour).toMatch(/^(none|[0-9A-F]{6})$/)
+  })
+
+  it('lays the open-colour palette out as draw.io draws it, twelve to a row: a column per family, lightest first', () => {
+    const column = (i: number) => [0, 1, 2, 3, 4].map((row) => config.defaultColors[row * 12 + i])
+    expect(column(1)).toEqual(['FFF5F5', 'FFC9C9', 'FF8787', 'FA5252', 'E03131']) // red
+    expect(column(11)).toEqual(['F8F1EE', 'EADDD7', 'D2BAB0', 'A18072', '846358']) // bronze
+    expect(config.defaultColors.slice(60)).toEqual(['none', 'FFFFFF', '1E1E1E'])
+  })
+
+  it('binds the Excalidraw tool letters and clears draw.io’s clashing S and F — with nothing selected', () => {
+    const bare = Object.fromEntries(config.keyboardShortcuts.filter((s) => typeof s.keyCode === 'string').map((s) => [s.keyCode, s.action]))
+    expect(bare).toEqual({ R: 'insertRectangle', O: 'insertEllipse', T: 'insertText', A: 'insertEdge', D: 'insertEdge', L: 'insertEdge', W: 'insertFreehand', P: 'insertFreehand', S: null, F: null })
+    expect(config.keyboardShortcuts).toContainEqual({ keyCode: 220, control: true, action: 'removeFormat' })
+  })
+
+  it('clears draw.io’s own ⌘K, ⌘, ⌘⇧O and zoom keys, so the app menu gets them on every platform', () => {
+    const cleared = config.keyboardShortcuts.filter((s) => s.action === null && s.control === true)
+    expect(cleared.filter((s) => s.shift !== true).map((s) => s.keyCode)).toEqual(expect.arrayContaining([75, 188, 48, 187, 189]))
+    expect(cleared).toContainEqual({ keyCode: 79, control: true, shift: true, action: null })
   })
 })
 
@@ -39,6 +61,13 @@ describe('readDrawioMessage — only THAT iframe, only the drawio origin (🔒 Y
     expect(msg('{"event":"load","xml":"<mxfile/>","scale":1}')).toEqual({ event: 'load', xml: '<mxfile/>' })
     expect(msg('{"event":"autosave","xml":"<mxfile/>"}')).toEqual({ event: 'autosave', xml: '<mxfile/>' })
     expect(msg('{"event":"save","xml":"<mxfile/>","exit":false}')).toEqual({ event: 'save', xml: '<mxfile/>' })
+  })
+
+  it('reads a forwarded app shortcut only when it is one the host knows', () => {
+    expect(msg('{"event":"shortcut","command":"toggleSidebar"}')).toEqual({ event: 'shortcut', command: 'toggleSidebar' })
+    expect(msg('{"event":"shortcut","command":"closeTab"}')).toBeNull()
+    expect(msg('{"event":"shortcut"}')).toBeNull()
+    expect(msg('{"event":"shortcut","command":"toggleSidebar"}', { origin: 'https://app.diagrams.net' })).toBeNull()
   })
 
   it('ignores another window, another origin, a missing frame, non-strings, junk and unknown events', () => {

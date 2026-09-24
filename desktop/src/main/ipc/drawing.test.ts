@@ -74,7 +74,7 @@ describe('drawing IPC', () => {
     await writeFile(file, SCENE)
     const st = await stat(file)
     const res = (await registered(CH.drawingSave)({}, { root, path: file, json: SCENE, expectedMtime: st.mtimeMs - 5, newFiles: [] })) as Envelope<unknown>
-    expect(res).toEqual({ ok: false, error: { code: 'CONFLICT', message: 'drawing changed on disk since last read', path: file, mtime: st.mtimeMs } })
+    expect(res).toEqual({ ok: false, error: { code: 'CONFLICT', message: 'Excalidraw drawing changed on disk since last read', path: file, mtime: st.mtimeMs } })
   })
 })
 

@@ -24,12 +24,19 @@
  * `load` action again — undo history starts over, as it does for a drawing) and a DIRTY one gets
  * the Reload / Keep mine bar. A `CONFLICT` from the save door raises the same bar.
  *
- * ⌘S is draw.io's own: its `save` event carries the XML and the host flushes at once. Keys never
- * reach this document while the iframe has focus, which is why there is no capture handler here.
+ * KEYS pressed inside the iframe never reach this document, which is why there is no capture
+ * handler here (🔒 YAZ-1802 D17). ⌘S is draw.io's own: its `save` event carries the XML and the
+ * host flushes at once. The app's MENU chords (⌘W, ⌘K, ⌘O, ⌘, …) are accelerators and fire
+ * whatever frame has focus (`MENU_CHORDS` keeps draw.io's own bindings off them). The one
+ * renderer-owned chord that means something here, ⌘B, comes up from our PostConfig.js as a
+ * `shortcut` event when nothing is selected, and toggles the sidebar.
  *
  * 🔒 YAZ-1802 D12 — THE THEME FOLLOWS THE APP, LIVE: the first theme rides the URL (`dark=`), and
  * a flip afterwards is draw.io's own `darkMode` / `lightMode` action, invoked by message — no
- * reload, no lost undo.
+ * reload, no lost undo. A flip before draw.io listens (its `init`) is sent at `init`.
+ *
+ * SHARE LINKS stay live the drawing's way: every successful save tells `liveShare`, which
+ * re-uploads a shared board once its saves settle.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GithubSyncStatus } from '@shared/types'
@@ -39,6 +46,7 @@ import { Autosave, SaveConflict, type SaveStatus } from '../lib/autosave'
 import { basename, stripExt } from '../lib/paths'
 import { registerRenameContinuity } from '../lib/renameContinuity'
 import { useAppliedTheme } from '../lib/theme'
+import { noteBoardSaved } from '../share/liveShare'
 import { ConflictBar } from '../drawings/ConflictBar'
 import { mayTakeFocus } from '../drawings/focusHandoff'
 import { SaveIndicator } from '../drawings/SaveIndicator'
@@ -48,7 +56,7 @@ import '../drawings/statusChips.css'
 import './drawioEditor.css'
 
 /** What a diagram that will not open says; main's reason follows it when there is one. */
-export const BROKEN_DIAGRAM_DOCUMENT = "This diagram can't be opened"
+export const BROKEN_DIAGRAM_DOCUMENT = "This draw.io diagram can't be opened"
 
 /**
  * How long the host waits for our PostConfig.js to say it is ready before configuring draw.io
@@ -64,6 +72,8 @@ export interface DrawioEditorProps {
   /** The vault's sync status (YAZ-1081), App-owned; null while fetching, undefined = no chip. */
   sync?: GithubSyncStatus | null
   onSyncNow?: () => void
+  /** App's sidebar toggle: ⌘B pressed inside draw.io with nothing selected (see the module doc). */
+  onToggleSidebar?: () => void
 }
 
 interface LoadedDiagram {
@@ -71,7 +81,7 @@ interface LoadedDiagram {
   mtime: number
 }
 
-export function DrawioEditor({ root, path, watch, sync, onSyncNow }: DrawioEditorProps) {
+export function DrawioEditor({ root, path, watch, sync, onSyncNow, onToggleSidebar }: DrawioEditorProps) {
   const [loaded, setLoaded] = useState<LoadedDiagram | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -104,7 +114,7 @@ export function DrawioEditor({ root, path, watch, sync, onSyncNow }: DrawioEdito
       )}
       {error === null && loaded === null && <p className="editor-msg">Loading…</p>}
       {/* Keyed by path so a rename mounts a fresh host rather than re-pointing a live iframe. */}
-      {error === null && loaded !== null && <DiagramHost key={path} root={root} path={path} loaded={loaded} watch={watch} sync={sync} onSyncNow={onSyncNow} />}
+      {error === null && loaded !== null && <DiagramHost key={path} root={root} path={path} loaded={loaded} watch={watch} sync={sync} onSyncNow={onSyncNow} onToggleSidebar={onToggleSidebar} />}
     </section>
   )
 }
@@ -114,7 +124,7 @@ interface DiagramHostProps extends DrawioEditorProps {
 }
 
 /** Mounts exactly one draw.io iframe for `loaded` and owns everything that writes. */
-function DiagramHost({ root, path, loaded, watch, sync, onSyncNow }: DiagramHostProps) {
+function DiagramHost({ root, path, loaded, watch, sync, onSyncNow, onToggleSidebar }: DiagramHostProps) {
   const theme = useAppliedTheme()
   const hostRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLIFrameElement>(null)
@@ -129,10 +139,11 @@ function DiagramHost({ root, path, loaded, watch, sync, onSyncNow }: DiagramHost
   const version = useRef(0)
   /** The mtime of the document a `load` action carried, until draw.io answers `load`. */
   const pendingLoad = useRef<number | null>(null)
-  /** The handshake (drawioProtocol.ts): our PostConfig is in, and draw.io asked to be configured. */
-  const handshake = useRef({ overlayReady: false, configureAsked: false, configured: false })
-  /** The theme draw.io is showing, so a flip is sent once and the first render sends nothing. */
+  /** The handshake (drawioProtocol.ts): our PostConfig is in, draw.io asked to be configured, draw.io listens. */
+  const handshake = useRef({ overlayReady: false, configureAsked: false, configured: false, initialised: false })
+  /** The theme draw.io is showing (the URL's, then each flip sent), and the one the app wants now. */
   const shownTheme = useRef(theme)
+  const wantedTheme = useRef(theme)
   /** A retired host never writes again (a delete, or a rename that moved this path away). */
   const retired = useRef(false)
 
@@ -143,7 +154,9 @@ function DiagramHost({ root, path, loaded, watch, sync, onSyncNow }: DiagramHost
   const save = useCallback(
     async (_version: number, expectedMtime: number): Promise<{ mtime: number }> => {
       try {
-        return await api.diagram.save({ root, path, xml: latestXml.current, expectedMtime })
+        const res = await api.diagram.save({ root, path, xml: latestXml.current, expectedMtime })
+        noteBoardSaved(root, path)
+        return res
       } catch (err) {
         // A stale guard is the conflict bar's business, not an error chip.
         if (err instanceof BridgeRequestError && err.mtime !== undefined) throw new SaveConflict(err.mtime)
@@ -170,6 +183,13 @@ function DiagramHost({ root, path, loaded, watch, sync, onSyncNow }: DiagramHost
     post({ action: 'configure', config: drawioConfig() })
   }, [post])
 
+  /** Show the app's theme, once draw.io listens: its own `darkMode` / `lightMode` action. */
+  const syncTheme = useCallback(() => {
+    if (!handshake.current.initialised || shownTheme.current === wantedTheme.current) return
+    shownTheme.current = wantedTheme.current
+    post({ action: 'invokeAction', actionName: wantedTheme.current === 'dark' ? 'darkMode' : 'lightMode' })
+  }, [post])
+
   // The one message listener: the protocol, in the order drawioProtocol.ts documents.
   useEffect(() => {
     let fallback: ReturnType<typeof setTimeout> | undefined
@@ -188,6 +208,8 @@ function DiagramHost({ root, path, loaded, watch, sync, onSyncNow }: DiagramHost
           else fallback = setTimeout(configure, READY_FALLBACK_MS)
           return
         case 'init':
+          h.initialised = true
+          syncTheme()
           sendLoad(latestXml.current, autosave.current?.mtime ?? loaded.mtime)
           return
         case 'load': {
@@ -209,6 +231,9 @@ function DiagramHost({ root, path, loaded, watch, sync, onSyncNow }: DiagramHost
           if (msg.event === 'save') void a.flush()
           return
         }
+        case 'shortcut':
+          onToggleSidebar?.()
+          return
       }
     }
     window.addEventListener('message', onMessage)
@@ -216,7 +241,7 @@ function DiagramHost({ root, path, loaded, watch, sync, onSyncNow }: DiagramHost
       window.removeEventListener('message', onMessage)
       if (fallback !== undefined) clearTimeout(fallback)
     }
-  }, [configure, sendLoad, save, loaded.mtime])
+  }, [configure, syncTheme, sendLoad, save, loaded.mtime, onToggleSidebar])
 
   /** Disk truth into draw.io, then a fresh baseline: the clean editor's answer to a change. */
   const reload = useCallback(async () => {
@@ -256,12 +281,11 @@ function DiagramHost({ root, path, loaded, watch, sync, onSyncNow }: DiagramHost
     void a.adopt(conflictMtime)
   }, [conflictMtime])
 
-  // 🔒 YAZ-1802 D12: the app's theme, live, through draw.io's own actions.
+  // 🔒 YAZ-1802 D12: the app's theme, live.
   useEffect(() => {
-    if (shownTheme.current === theme) return
-    shownTheme.current = theme
-    post({ action: 'invokeAction', actionName: theme === 'dark' ? 'darkMode' : 'lightMode' })
-  }, [theme, post])
+    wantedTheme.current = theme
+    syncTheme()
+  }, [theme, syncTheme])
 
   // The close/quit handshake and the unmount flush — `DrawingEditor`'s, unchanged. A retired host
   // does neither: that is what keeps a delete deleted.

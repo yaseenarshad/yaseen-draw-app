@@ -434,9 +434,9 @@ export function ImageStudio({ engine, excalidrawAPI, searchFocusRequest = 0 }: I
               ? 'Search once, then add anything from the mixed results.'
               : `No graphics match “${searchedQuery}”`
             : view === 'favorites'
-              ? 'Star an item and it will stay available in every board.'
+              ? 'Star an item and it will stay available in every Excalidraw drawing.'
               : view === 'recent'
-                ? 'Items you add will appear here across every board.'
+                ? 'Items you add will appear here across every Excalidraw drawing.'
                 : shapeQuery
                   ? 'No shapes match your search.'
                   : 'No items found.'}

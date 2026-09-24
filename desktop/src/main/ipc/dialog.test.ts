@@ -236,7 +236,7 @@ describe('dialog:save-file', () => {
     // An export is a snapshot, not a board: the bytes land verbatim, with no `yaseendraw` block (🔒 YAZ-1834 D3).
     expect(await readFile(target, 'utf8')).toBe(SCENE)
     expect(showSaveDialog).toHaveBeenCalledWith(win, {
-      title: 'Export Drawing',
+      title: 'Export Excalidraw Drawing',
       filters: [{ name: 'Excalidraw', extensions: ['excalidraw'] }],
       properties: ['createDirectory', 'showOverwriteConfirmation'],
       defaultPath: 'Roadmap.excalidraw',

@@ -2,12 +2,13 @@
 
 > Seeded from yaseen-docs-app @ 66c9806
 
-Yaseen Draw — a local whiteboard for a folder of drawings, as an Electron macOS desktop app: a
-React renderer around a vendored [Excalidraw](https://excalidraw.com) fork, and a main process
+Yaseen Draw — a local whiteboard for a folder of boards (Excalidraw drawings and draw.io
+diagrams), as an Electron macOS desktop app: a React renderer around a vendored
+[Excalidraw](https://excalidraw.com) fork and a bundled, offline draw.io, and a main process
 that reads and writes the files on this machine (the renderer only ever talks to the
 `window.yaseenDraw` bridge — there is no server of any kind, except the optional share Worker on
 your own Cloudflare account). Pick a folder, browse its
-`.excalidraw` files in the sidebar, draw, and changes are saved back to disk (debounced, atomic).
+`.excalidraw` and `.drawio` files in the sidebar, draw, and changes are saved back to disk (debounced, atomic).
 Files changed outside the app (another editor, sync) are reloaded live; if you have unsaved edits
 you get a Reload / Keep mine choice. Lineage in one line: the shell follows Obsidian, the
 transport mechanism follows VS Code (sandboxed renderer + typed preload bridge + main-process fs),
@@ -83,7 +84,7 @@ Right-click a board › **Version history** to see every version as a picture: t
 what changed since that version marked in green (added), amber (changed) and faded red (removed).
 **Restore** puts any version back.
 
-## Drawings
+## Excalidraw drawings
 
 A drawing is one `.excalidraw` file — Excalidraw's own scene JSON, readable by excalidraw.com and
 by any other tool that speaks the format. The app never invents a wrapper around it.
@@ -100,10 +101,25 @@ Saving is debounced and atomic (tmp file + rename), the mtime you read is the mt
 match, and a file that changed underneath an unsaved buffer raises the conflict bar instead of
 silently losing either side.
 
+## draw.io diagrams
+
+A diagram is one `.drawio` file — draw.io's own XML, always saved plain (uncompressed) so an AI
+agent, git and a person can all read it. It opens in the real draw.io, bundled with the app and
+fully offline, and saves, reloads and syncs exactly like a drawing. Excalidraw is the whiteboard;
+draw.io is for clean, screenshot-ready diagrams.
+
+draw.io is set up to feel like the Excalidraw canvas: an endless canvas (no page), the shapes panel
+closed, 2 px lines with 8 px corners in Assistant, plain scroll pans and `⌘`-scroll or a pinch
+zooms, and dragging a text box by its corner scales the text. Excalidraw's keys work too — with
+nothing selected `R` / `O` / `T` / `A` / `W` pick a tool; with a selection the colour letters
+(`R` red, `U` blue, `G` green…) colour it, `⇧` + a letter colours the outline, and `1`…`0` size
+it. Settings › Hotkeys has the full table. Share links, Version history and Present are
+Excalidraw-only for now.
+
 ## Sidebar and windows
 
 - **Two lenses**: the sidebar shows your vault two ways, switched by the tabs at the top. **Files** is the ordinary folder tree on disk — every file, not just the drawings: a file the app cannot open is listed muted and a click hands it to the OS default app, as does right-click → Open in ▸ "Default app" on any row. The **♥** tab is your favorites (below). Same vault, two readings; both offer the same right-click menu.
-- **Create**: right-click a folder, a file, or the blank space under the tree → "New drawing" / "New folder" / "New dated folder" (a folder pre-named with today's `MM_DD- `, cursor ready for the title); name it inline (Enter confirms, Esc cancels). Drawings get `.excalidraw` automatically and open at once; nothing is ever overwritten.
+- **Create**: right-click a folder, a file, or the blank space under the tree → "New Excalidraw drawing" / "New draw.io diagram" / "New folder" / "New dated folder" (a folder pre-named with today's `MM_DD- `, cursor ready for the title); name it inline (Enter confirms, Esc cancels). A drawing gets `.excalidraw` and a diagram `.drawio` automatically, and either opens at once; nothing is ever overwritten.
 - **Rename and delete**: both are in the same right-click menu, in both lenses. Renaming edits the name inline and commits on Enter; deleting moves the file to the system Trash — never a permanent delete — and closes its tabs.
 - **Cut, copy, paste**: right-click a row (or a selection) → **Cut** / **Copy**, then right-click a folder → **Paste** (`⌘X` / `⌘C` / `⌘V` do the same on the selected rows; `⌘V` pastes into the selected folder, beside the selected file, or into the vault root when nothing is selected). One clipboard for the whole app, so you can copy in one window and paste into another vault's window. A copy that lands on an existing name becomes "Board copy.excalidraw", then "Board copy 2.excalidraw" — pasting into the same folder is how you duplicate; a cut never overwrites, moves tabs along like drag-drop, and pastes once. Folders copy whole. The menu itself is five groups: open, clipboard, new, this row, favorites + **Open in ▸** (new window, VS Code, default app, Finder), delete.
 - **Search**: `⌘K` searches file and folder names across the vault from the sidebar; ↑/↓ pick, Enter opens, ⌘-Enter opens in a background tab.
@@ -133,16 +149,17 @@ The hamburger at the top-left of a drawing opens the canvas's own docked panel, 
   camera. The order is stored in the board, so it travels with the file.
 
 **File › Export Image…** (`⌘⇧E`) opens the engine's own PNG / SVG dialog, and **File › Export
-Drawing…** (`⌘⇧S`) writes a standalone `.excalidraw` anywhere on disk with its images embedded —
+Excalidraw Drawing…** (`⌘⇧S`) writes a standalone `.excalidraw` anywhere on disk with its images embedded —
 the one file this app writes that is not lean, because it has no `assets/` folder to point at.
 **View › Canvas Background** sets the board's own colour.
 
 ## Settings
 
 The cog bottom-left, or `⌘,`. **Appearance › Theme** (System / Light / Dark — System follows the
-OS live). **Canvas** holds the fourteen drawing preferences the engine used to keep to itself —
-grid, snapping, binding, zen and writing modes, tool lock, frame visibility, the pen widths and
-what a new element looks like — and they apply to every board, every window and every relaunch.
+OS live). **Excalidraw canvas** holds the fourteen drawing preferences the engine used to keep to
+itself — grid, snapping, binding, zen and writing modes, tool lock, frame visibility, the pen widths
+and what a new element looks like — and they apply to every Excalidraw drawing, every window and
+every relaunch (draw.io diagrams have fixed defaults).
 **Files › Confirm before deleting** (on by default: the sheet is the only guard, because the
 system Trash has no programmatic undo) and **Files › Library folder** (where components and image
 favorites live — point it inside a synced vault and they sync too). **Images › Pixabay API key**

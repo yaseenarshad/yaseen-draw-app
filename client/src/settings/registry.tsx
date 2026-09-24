@@ -124,7 +124,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
             // actually means rather than being a bare switch.
             id: 'confirmDelete',
             label: 'Confirm before deleting',
-            hint: 'Deleted drawings and folders move to the Trash either way.',
+            hint: 'Deleted files and folders move to the Trash either way.',
             render: ({ settings, onChange }) => (
               <Segmented options={ON_OFF_OPTIONS} value={settings.confirmDelete} onChange={(confirmDelete) => onChange({ ...settings, confirmDelete })} ariaLabel="Confirm before deleting" />
             ),
@@ -133,7 +133,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
             // YAZ-1800: the sidebar's hover preview; the picture button in the sidebar header toggles the same flag.
             id: 'hoverPreview',
             label: 'Preview on hover',
-            hint: 'Rest the mouse on a board in the sidebar to see the whole drawing.',
+            hint: 'Rest the mouse on a board in the sidebar to see the whole board.',
             render: ({ settings, onChange }) => (
               <Segmented options={ON_OFF_OPTIONS} value={settings.hoverPreview} onChange={(hoverPreview) => onChange({ ...settings, hoverPreview })} ariaLabel="Preview on hover" />
             ),
@@ -212,14 +212,14 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     id: 'hotkeys',
     title: 'Hotkeys',
     standalone: true,
-    // One group per table, so "Window" is a heading search knows. The id is the table's title
-    // lower-cased (`hotkeys-window`); every key and label of the table is a keyword, so "close
-    // tab" or "⌘W" finds it, and "keyboard shortcuts" reaches every table.
-    groups: HOTKEY_GROUPS.map(({ title, entries }) => ({
+    // One group per table, so "Window" is a heading search knows. The id is the table's own
+    // (`hotkeys-window`); every key and label of the table is a keyword, so "close tab" or "⌘W"
+    // finds it, and "keyboard shortcuts" reaches every table.
+    groups: HOTKEY_GROUPS.map(({ id, title, entries }) => ({
       title,
       items: [
         {
-          id: `hotkeys-${title.toLowerCase()}`,
+          id: `hotkeys-${id}`,
           label: `${title} shortcuts`,
           keywords: ['keyboard shortcuts', ...entries.flatMap((entry) => [entry.keys, entry.label])],
           wide: true,

@@ -8,13 +8,15 @@
  * comes from THAT iframe's window AND from `DRAWIO_ORIGIN` — anything else on `window` is ignored.
  *
  * The conversation, in order:
- *   iframe → `{ event: 'yaseenReady' }`  our PostConfig.js has patched draw.io (D12)
+ *   iframe → `{ event: 'yaseenReady' }`  our PostConfig.js has patched draw.io (D12a / D12b)
  *   iframe → `{ event: 'configure' }`    → host `{ action: 'configure', config }` (after yaseenReady)
  *   iframe → `{ event: 'init' }`         → host `{ action: 'load', xml, autosave: 1 }`
  *   iframe → `{ event: 'load', xml }`    the document is on screen: the autosave baseline
  *   iframe → `{ event: 'autosave', xml }` on every change; `{ event: 'save', xml }` on ⌘S
  * and, from the host at any time: `{ action: 'load', … }` again (an outside change on a clean tab)
  * and `{ action: 'invokeAction', actionName: 'darkMode' | 'lightMode' }` (the app's theme, live).
+ * From the iframe at any time: `{ event: 'shortcut', command: 'toggleSidebar' }` — an APP shortcut
+ * pressed inside draw.io, where the host page never sees the key (see `DrawioMessage`).
  */
 
 /** The iframe's origin — main's `app://` scheme, `drawio` host (🔒 YAZ-1802 D4). */
@@ -53,25 +55,55 @@ export function drawioFrameUrl(theme: 'light' | 'dark'): string {
   return `${DRAWIO_ORIGIN}/index.html?${params.toString()}`
 }
 
-/** Excalidraw's open-colour palette, lightest to darkest per family — the colour dialog's grid (D12). */
-const OPEN_COLOUR: readonly (readonly string[])[] = [
-  ['F8F9FA', 'E9ECEF', 'CED4DA', '868E96', '343A40'],
-  ['FFF5F5', 'FFC9C9', 'FF8787', 'FA5252', 'E03131'],
-  ['FFF0F6', 'FCC2D7', 'F783AC', 'E64980', 'C2255C'],
-  ['F8F0FC', 'EEBEFA', 'DA77F2', 'BE4BDB', '9C36B5'],
-  ['F3F0FF', 'D0BFFF', '9775FA', '7950F2', '6741D9'],
-  ['E7F5FF', 'A5D8FF', '4DABF7', '228BE6', '1971C2'],
-  ['E3FAFC', '99E9F2', '3BC9DB', '15AABF', '0C8599'],
-  ['E6FCF5', '96F2D7', '38D9A9', '12B886', '099268'],
-  ['EBFBEE', 'B2F2BB', '69DB7C', '40C057', '2F9E44'],
-  ['FFF9DB', 'FFEC99', 'FFD43B', 'FAB005', 'F08C00'],
-  ['FFF4E6', 'FFD8A8', 'FFA94D', 'FD7E14', 'E8590C'],
-  ['F8F1EE', 'EADDD7', 'D2BAB0', 'A18072', '846358'],
+/**
+ * Excalidraw's open-colour palette as the colour dialog's grid (🔒 YAZ-1802 D12a): draw.io lays
+ * `defaultColors` out twelve to a row, so each row is one shade across the twelve families (gray,
+ * red, pink, grape, violet, blue, cyan, teal, green, yellow, orange, bronze), lightest first, and
+ * each column one family.
+ */
+const OPEN_COLOUR_GRID = [
+  'F8F9FA', 'FFF5F5', 'FFF0F6', 'F8F0FC', 'F3F0FF', 'E7F5FF', 'E3FAFC', 'E6FCF5', 'EBFBEE', 'FFF9DB', 'FFF4E6', 'F8F1EE',
+  'E9ECEF', 'FFC9C9', 'FCC2D7', 'EEBEFA', 'D0BFFF', 'A5D8FF', '99E9F2', '96F2D7', 'B2F2BB', 'FFEC99', 'FFD8A8', 'EADDD7',
+  'CED4DA', 'FF8787', 'F783AC', 'DA77F2', '9775FA', '4DABF7', '3BC9DB', '38D9A9', '69DB7C', 'FFD43B', 'FFA94D', 'D2BAB0',
+  '868E96', 'FA5252', 'E64980', 'BE4BDB', '7950F2', '228BE6', '15AABF', '12B886', '40C057', 'FAB005', 'FD7E14', 'A18072',
+  '343A40', 'E03131', 'C2255C', '9C36B5', '6741D9', '1971C2', '0C8599', '099268', '2F9E44', 'F08C00', 'E8590C', '846358',
 ]
 
 /**
- * The `configure` reply (🔒 YAZ-1802 D3 / D12). Every key is one draw.io v31.5.2 reads in
- * `Editor.configure` (verified in `js/diagramly/Editor.js`). Fonts are NOT here: their
+ * 🔒 YAZ-1802 D12b, the NO-SELECTION half of the keymap (PostConfig.js has the selection half):
+ * Excalidraw's tool letters on draw.io's own insert actions, and draw.io's clashing S (note) and
+ * F (ellipse — Excalidraw's F is the frame tool, which draw.io has not got) cleared. X already is
+ * draw.io's freehand pen.
+ */
+const TOOL_KEYS = [
+  { keyCode: 'R', action: 'insertRectangle' },
+  { keyCode: 'O', action: 'insertEllipse' },
+  { keyCode: 'T', action: 'insertText' },
+  { keyCode: 'A', action: 'insertEdge' },
+  { keyCode: 'D', action: 'insertEdge' },
+  { keyCode: 'L', action: 'insertEdge' },
+  { keyCode: 'W', action: 'insertFreehand' },
+  { keyCode: 'P', action: 'insertFreehand' },
+  { keyCode: 'S', action: null },
+  { keyCode: 'F', action: null },
+  { keyCode: 220, control: true, action: 'removeFormat' }, // ⌘\ clears the formatting
+]
+
+/**
+ * draw.io's own bindings on chords the app's MENU owns (`desktop/src/main/menu.ts`): ⌘K Search,
+ * ⌘, Settings, ⌘⇧O Open Folder, ⌘0 / ⌘+ / ⌘− zoom (every key code draw.io reads as plus or
+ * minus). On macOS a menu accelerator fires before the page sees the key anyway; off macOS the page
+ * handles it first and draw.io's binding would swallow it. Cleared, the menu gets it everywhere.
+ */
+const MENU_CHORDS = [
+  ...[75, 188, 48, 61, 107, 187, 222, 109, 173, 189].map((keyCode) => ({ keyCode, control: true, action: null })),
+  { keyCode: 79, control: true, shift: true, action: null },
+]
+
+/**
+ * The `configure` reply (🔒 YAZ-1802 D3 / D12a / D12b). Every key is one draw.io v31.5.2 reads in
+ * `Editor.configure` (verified in `js/diagramly/Editor.js`), and every action name one it defines
+ * (`tools/drawioOverlay.test.mjs` checks the pinned bundle). Fonts are NOT here: their
  * `@font-face` sheet lives on the drawio origin and our PostConfig.js hands it to
  * `Editor.configureFontCss` itself, so the host never needs to know the files.
  */
@@ -79,34 +111,31 @@ export function drawioConfig(): Record<string, unknown> {
   return {
     // D3: plain, uncompressed XML on every save (sets Editor.compressXml and defaultCompressed).
     compressXml: false,
-    // D12: page view and grid off for anything new; the snapping GUIDES off (Excalidraw's
-    // "object snap off") while connection snapping and arrow binding stay draw.io's own.
+    // D12a: page view and grid off for anything new. Alignment guides start off the same way — a new
+    // diagram is born `guides="0"` (Excalidraw's "object snap" off) — but stay a per-diagram toggle
+    // (View › Guides), like the grid; connection snapping and arrow binding stay draw.io's own.
     defaultPageVisible: false,
     defaultGridEnabled: false,
-    enablePositionGuides: false,
-    enableDistanceGuides: false,
-    enableSizeGuides: false,
     zoomWheel: false,
     compact: true,
     enableInlineToolbar: true,
+    // D12a: 2 px lines, 8 px corners (16 on the absolute arc scale), Assistant — Excalidraw's look.
     defaultVertexStyle: { strokeWidth: 2, rounded: 1, absoluteArcSize: 1, arcSize: 16, fontFamily: 'Assistant' },
     defaultEdgeStyle: { strokeWidth: 2, fontFamily: 'Assistant' },
     defaultFonts: ['Assistant', 'Inter', 'Roboto', 'IBM Plex Mono', 'Liberation Serif'],
+    // Excalidraw's quick picks: transparent, black and its four stroke colours, its four backgrounds.
     presetColors: ['none', '1E1E1E', 'E03131', '2F9E44', '1971C2', 'F08C00', 'FFC9C9', 'B2F2BB', 'A5D8FF', 'FFEC99'],
-    defaultColors: ['none', 'FFFFFF', '1E1E1E', ...OPEN_COLOUR.flat()],
-    // D12 keymap, the no-selection half (the colour letters branch in PostConfig.js): clear
-    // draw.io's own bare-letter tools that now mean something else, map the rest.
-    keyboardShortcuts: [
-      { keyCode: 'S', action: null }, // was insertNote
-      { keyCode: 'F', action: null }, // was insertEllipse — Excalidraw's F is the frame tool, which draw.io has not got
-      { keyCode: 'L', action: 'insertEdge' }, // was insertLink
-      { keyCode: 'X', action: 'insertFreehand' },
-      { keyCode: 220, control: true, action: 'removeFormat' }, // ⌘\
-    ],
+    defaultColors: [...OPEN_COLOUR_GRID, 'none', 'FFFFFF', '1E1E1E'],
+    keyboardShortcuts: [...TOOL_KEYS, ...MENU_CHORDS],
   }
 }
 
-/** Every message the iframe sends that the host acts on. */
+/**
+ * Every message the iframe sends that the host acts on. `shortcut` is draw.io's own event for a
+ * chord the host claims; our PostConfig.js sends it. Only a RENDERER-owned chord needs it — a menu
+ * accelerator fires whatever frame has focus — and of those only ⌘B means something in a diagram:
+ * the sidebar toggle with nothing selected (with a selection it stays draw.io's bold).
+ */
 export type DrawioMessage =
   | { event: 'yaseenReady' }
   | { event: 'configure' }
@@ -114,6 +143,7 @@ export type DrawioMessage =
   | { event: 'load'; xml?: string }
   | { event: 'autosave'; xml: string }
   | { event: 'save'; xml: string }
+  | { event: 'shortcut'; command: 'toggleSidebar' }
 
 /**
  * One `message` event, if it is the iframe speaking: the right window, the right origin, a JSON
@@ -129,7 +159,7 @@ export function readDrawioMessage(ev: { source: unknown; origin: string; data: u
     return null
   }
   if (typeof msg !== 'object' || msg === null) return null
-  const { event, xml } = msg as Record<string, unknown>
+  const { event, xml, command } = msg as Record<string, unknown>
   switch (event) {
     case 'yaseenReady':
     case 'configure':
@@ -140,6 +170,8 @@ export function readDrawioMessage(ev: { source: unknown; origin: string; data: u
     case 'autosave':
     case 'save':
       return typeof xml === 'string' ? { event, xml } : null
+    case 'shortcut':
+      return command === 'toggleSidebar' ? { event, command } : null
     default:
       return null
   }

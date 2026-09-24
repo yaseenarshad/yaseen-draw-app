@@ -14,9 +14,12 @@
 - See YAZ-1802 🔒 comments. Prototype = starting point (this worktree's uncommitted diff at start).
 
 ## State
-- Now: [→] 1- Deep scope (YAZ-1948)
+- Done:
+  - [x] 1- Deep scope (YAZ-1948) — findings on every child; 4 small defaults decided
+  - [x] 2A classify (YAZ-1950) · [x] 2B bundle (YAZ-1951) · [x] 2C doors (YAZ-1952) · [x] 2F sync (YAZ-1955) — commit 7075e93, 2,429 tests
+- Now: [→] 2D host (YAZ-1953) · 2E feel (YAZ-1954) · 2G naming (YAZ-1956)
 - Remaining:
-  - [ ] 2A classify (YAZ-1950) · [ ] 2B bundle (YAZ-1951) · [ ] 2C doors (YAZ-1952) · [ ] 2D host (YAZ-1953) · [ ] 2E feel (YAZ-1954) · [ ] 2F sync (YAZ-1955) · [ ] 2G naming (YAZ-1956)
+  - [ ] 2B1 trim bundled draw.io (YAZ-1973) — packaged app ~475 MB
   - [ ] 3A render/preview/export (YAZ-1958) · [ ] 3B history (YAZ-1959) · [ ] 3C share (YAZ-1960) · [ ] 3D type mark (YAZ-1961) · [ ] 3E dark setting (YAZ-1962)
   - [ ] 4A core E2E (YAZ-1964) · [ ] 4B everywhere-else E2E (YAZ-1965)
   - [ ] 5A audit (YAZ-1967) · [ ] 5B apply (YAZ-1968)

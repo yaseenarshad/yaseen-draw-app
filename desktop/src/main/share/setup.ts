@@ -138,7 +138,7 @@ export function createSetup(ctx: ShareContext) {
           const files = await deps.readAssets()
           return { jwt: await cf.uploadAssets(chosen, WORKER_NAME, files), count: files.length }
         },
-        ({ count }) => `${count} files (the drawing viewer and its fonts)`,
+        ({ count }) => `${count} files (the board viewer and its fonts)`,
       )
       // Always a NEW upload password — on reconnect too: the old one was forgotten with the key. It
       // rides in the Worker upload as a secret binding. The code is re-uploaded either way so the

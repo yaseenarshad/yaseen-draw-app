@@ -10,7 +10,7 @@ export type Line = { tone: 'ok' | 'busy' | 'error'; text: string }
 
 export function errorText(err: unknown): string {
   if (err instanceof BridgeRequestError) return err.message
-  if (err instanceof SyntaxError) return "This board's file isn't valid JSON, so it can't be shared."
+  if (err instanceof SyntaxError) return "This Excalidraw drawing's file isn't valid JSON, so it can't be shared."
   return err instanceof Error ? err.message : String(err)
 }
 

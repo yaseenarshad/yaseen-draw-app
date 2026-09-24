@@ -20,6 +20,12 @@ export function fileKind(name: string): FileKind | null {
 }
 
 /**
+ * What the app calls each kind wherever a TYPE is meant (🔒 YAZ-1802 D13): the engine is named, so
+ * "Excalidraw drawing" and "draw.io diagram" never blur into each other. Generic surfaces say "board".
+ */
+export const BOARD_TYPE_NAME: Record<FileKind, string> = { drawing: 'Excalidraw drawing', diagram: 'draw.io diagram' }
+
+/**
  * An EXCALIDRAW scene, and only that (🔒 YAZ-1802 D2): every door that reads or writes scene JSON —
  * `drawing:load` / `drawing:save`, the create's JSON stamping, board merge, history, previews,
  * shrink, the orphan sweep, storage — keeps asking this, so a diagram never reaches them.

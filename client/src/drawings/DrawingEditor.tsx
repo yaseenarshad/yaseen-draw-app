@@ -75,10 +75,10 @@ import './drawingEditor.css'
 import './statusChips.css'
 
 /** What a document that will not open says — one message for its three causes (missing, corrupt, empty). */
-export const BROKEN_DRAWING_DOCUMENT = "This drawing can't be opened: its file is missing or is not a scene."
+export const BROKEN_DRAWING_DOCUMENT = "This Excalidraw drawing can't be opened: its file is missing or is not a scene."
 
 /** What File › Export Drawing… says when the save sheet or the write refused (🔒 YAZ-1775 D3, YAZ-1821). */
-const EXPORT_FAILED = "The drawing couldn't be exported."
+const EXPORT_FAILED = "The Excalidraw drawing couldn't be exported."
 
 export interface DrawingEditorProps {
   root: string

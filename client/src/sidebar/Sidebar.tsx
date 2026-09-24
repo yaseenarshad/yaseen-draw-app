@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { SIDEBAR_LENSES, SORT_ORDERS, type FileClipState, type FileKind, type SettingsState, type SidebarLens, type SortOrder, type TreeNode, type TreeResponse } from '@shared/types'
 import { EMPTY_DIAGRAM_XML } from '@shared/diagramFile'
+import { BOARD_TYPE_NAME } from '@shared/fileKind'
 import { api, BridgeRequestError } from '../api'
 import { EMPTY_SCENE_JSON } from '../drawings/drawingScene'
 import { ContextMenuSurface } from '../components/ContextMenuSurface'
@@ -1019,11 +1020,11 @@ export function Sidebar({
           taken.push(path.slice(path.lastIndexOf('/') + 1))
           continue
         }
-        onNotice(`Can't create ${board}: ${err instanceof Error ? err.message : String(err)}`, 'error')
+        onNotice(`Can't create ${BOARD_TYPE_NAME[board]}: ${err instanceof Error ? err.message : String(err)}`, 'error')
         return
       }
     }
-    onNotice(`Can't create ${board}: too many untitled ${board}s here`, 'error')
+    onNotice(`Can't create ${BOARD_TYPE_NAME[board]}: too many untitled ones here`, 'error')
   }, [menu, root, lens, favoriteNodes, onLensChange, tree, refresh, onOpenFile, onNotice])
 
   const cancelCreate = useCallback(() => setCreating(null), [])
@@ -1325,7 +1326,7 @@ export function Sidebar({
           type="text"
           placeholder="Search"
           title="Search (⌘K)"
-          aria-label="Search drawings"
+          aria-label="Search boards"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value)
@@ -1439,7 +1440,7 @@ export function Sidebar({
             {error !== null && <p className="sidebar__msg sidebar__msg--error">{error}</p>}
             {tree === null && error === null && <p className="sidebar__msg">Loading…</p>}
             {tree !== null && tree.tree.length === 0 && pending === null && (
-              <p className="sidebar__msg">No drawings here.</p>
+              <p className="sidebar__msg">No boards here.</p>
             )}
             {tree !== null && (
               <Tree
