@@ -9,6 +9,7 @@ function installBridge(): { [K in keyof YaseenDrawApi]: ReturnType<typeof vi.fn>
     createDir: vi.fn(),
     createFile: vi.fn(),
     drawing: vi.fn(),
+    diagram: vi.fn(),
     pickFolder: vi.fn(),
     dialog: vi.fn(),
     watch: vi.fn(),

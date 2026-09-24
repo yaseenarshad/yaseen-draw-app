@@ -1,14 +1,15 @@
 import type { CanvasPanelState, CanvasPrefs, GithubSyncStatus } from '@shared/types'
 import { fileKind } from '@shared/fileKind'
 import { DrawingEditor } from './drawings/DrawingEditor'
+import { DrawioEditor } from './diagrams/DrawioEditor'
 import type { WatchSource } from './hooks/useWatch'
 import type { NoticeKind } from './lib/notice'
 
 /**
  * The document pane: one dispatcher on the active file's KIND and nothing else. Every kind's
- * surface mounts from here, and today there is exactly one — `'drawing'` (🔒 YAZ-1810). The
- * dispatcher stays even so: `fileKind` is the app's one classifier, and a file of no kind has to
- * land somewhere honest rather than in a blank pane.
+ * surface mounts from here: `'drawing'` → `DrawingEditor` (🔒 YAZ-1810), `'diagram'` →
+ * `DrawioEditor` (🔒 YAZ-1802 D2). `fileKind` is the app's one classifier, and a file of no kind
+ * has to land somewhere honest rather than in a blank pane.
  *
  * Everything below is App's, handed through: the vault root (a drawing is read relative to it),
  * the window's single watcher subscription, the vault's sync status — one per window, so the chip
@@ -40,7 +41,9 @@ export function Editor({ path, root, watch, sync, onSyncNow, canvasPrefs, onCanv
       </section>
     )
   }
-  if (fileKind(path) !== 'drawing') {
+  const kind = fileKind(path)
+  if (kind === 'diagram') return <DrawioEditor root={root} path={path} watch={watch} sync={sync} onSyncNow={onSyncNow} />
+  if (kind !== 'drawing') {
     return (
       <section className="editor">
         <p className="editor-msg editor-msg--error">Unsupported file type.</p>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TreeNode } from '@shared/types'
-import { datedFolderSeed, entryPath, renamedPath, renameInputName, targetDirFor, untitledDrawingName, validateEntryName } from './createEntry'
+import { datedFolderSeed, entryPath, renamedPath, renameInputName, targetDirFor, untitledBoardName, validateEntryName } from './createEntry'
 
 const dir = (path: string): TreeNode => ({ type: 'dir', name: path.split('/').pop()!, path, children: [] })
 const file = (path: string): TreeNode => ({ type: 'file', name: path.split('/').pop()!, path, size: 0, mtime: 1, kind: 'drawing' })
@@ -140,27 +140,55 @@ describe('renamedPath (Links E1, GRO-2194)', () => {
  * "New drawing" names itself (🔒 YAZ-1775 R1): the context menu no longer asks for a name, so
  * the birth has to pick one the folder does not already hold — and never overwrite.
  */
-describe('untitledDrawingName', () => {
+describe('untitledBoardName', () => {
   it('an empty folder gets the bare name', () => {
-    expect(untitledDrawingName([])).toBe('Untitled')
-    expect(untitledDrawingName(['Board.excalidraw', 'Plan.excalidraw'])).toBe('Untitled')
+    expect(untitledBoardName([])).toBe('Untitled')
+    expect(untitledBoardName(['Board.excalidraw', 'Plan.excalidraw'])).toBe('Untitled')
   })
 
   it('counts UP from 2, never reusing a taken name', () => {
-    expect(untitledDrawingName(['Untitled.excalidraw'])).toBe('Untitled 2')
-    expect(untitledDrawingName(['Untitled.excalidraw', 'Untitled 2.excalidraw'])).toBe('Untitled 3')
-    expect(untitledDrawingName(['Untitled.excalidraw', 'Untitled 2.excalidraw', 'Untitled 3.excalidraw'])).toBe('Untitled 4')
+    expect(untitledBoardName(['Untitled.excalidraw'])).toBe('Untitled 2')
+    expect(untitledBoardName(['Untitled.excalidraw', 'Untitled 2.excalidraw'])).toBe('Untitled 3')
+    expect(untitledBoardName(['Untitled.excalidraw', 'Untitled 2.excalidraw', 'Untitled 3.excalidraw'])).toBe('Untitled 4')
   })
 
   it('fills a gap rather than running past it', () => {
-    expect(untitledDrawingName(['Untitled.excalidraw', 'Untitled 3.excalidraw'])).toBe('Untitled 2')
+    expect(untitledBoardName(['Untitled.excalidraw', 'Untitled 3.excalidraw'])).toBe('Untitled 2')
   })
 
   it('compares case-insensitively — the Mac`s own filesystem does, so `untitled` is in the way', () => {
-    expect(untitledDrawingName(['untitled.EXCALIDRAW'])).toBe('Untitled 2')
+    expect(untitledBoardName(['untitled.EXCALIDRAW'])).toBe('Untitled 2')
   })
 
   it('a folder or a non-drawing of the same stem is NOT in the way — only the exact file name is', () => {
-    expect(untitledDrawingName(['Untitled', 'Untitled.png'])).toBe('Untitled')
+    expect(untitledBoardName(['Untitled', 'Untitled.png'])).toBe('Untitled')
+  })
+})
+
+/** "New draw.io diagram" (🔒 YAZ-1802 D13): the same birth rules, on the `.drawio` names. */
+describe('untitledBoardName for a diagram', () => {
+  it('counts on .drawio names only — an Excalidraw Untitled is a different file', () => {
+    expect(untitledBoardName(['Untitled.excalidraw', 'Untitled 2.excalidraw'], 'diagram')).toBe('Untitled')
+    expect(untitledBoardName(['Untitled.drawio'], 'diagram')).toBe('Untitled 2')
+    expect(untitledBoardName(['Untitled.drawio', 'Untitled 3.drawio'], 'diagram')).toBe('Untitled 2')
+    expect(untitledBoardName(['UNTITLED.DRAWIO', 'untitled 2.Drawio'], 'diagram')).toBe('Untitled 3')
+    expect(untitledBoardName(['Untitled.drawio.svg'], 'diagram')).toBe('Untitled')
+  })
+
+  it('builds the path with .drawio, keeping one that was typed', () => {
+    expect(entryPath('/v', 'Untitled', 'file', 'diagram')).toBe('/v/Untitled.drawio')
+    expect(entryPath('/v', 'Flow.DRAWIO', 'file', 'diagram')).toBe('/v/Flow.DRAWIO')
+    expect(entryPath('/v', 'Flow.excalidraw', 'file', 'diagram')).toBe('/v/Flow.excalidraw.drawio')
+    expect(entryPath('/v', 'Flow.drawio', 'file')).toBe('/v/Flow.drawio.excalidraw')
+  })
+
+  it('a diagram hides its suffix in the rename field and keeps its kind through a rename', () => {
+    expect(renameInputName('/v/Flow.drawio')).toBe('Flow')
+    expect(renameInputName('/v/image.drawio.svg')).toBe('image.drawio.svg')
+    expect(renamedPath('/v/Flow.drawio', 'Pipeline')).toBe('/v/Pipeline.drawio')
+    expect(renamedPath('/v/Flow.drawio', 'Pipeline.DRAWIO')).toBe('/v/Pipeline.DRAWIO')
+    // No conversion either way: the other kind's suffix is part of the name, the old one re-appends.
+    expect(renamedPath('/v/Flow.drawio', 'Flow.excalidraw')).toBe('/v/Flow.excalidraw.drawio')
+    expect(renamedPath('/v/Board.excalidraw', 'Board.drawio')).toBe('/v/Board.drawio.excalidraw')
   })
 })

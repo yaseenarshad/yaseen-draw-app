@@ -37,6 +37,15 @@ describe('freeName (YAZ-1674, D3 — Finder\'s rule)', () => {
     expect(await freeName(dir, 'Note.excalidraw', 'file')).toBe('Note copy 3.excalidraw')
   })
 
+  it('🔒 YAZ-1802 D13: a diagram copies to <name> copy.drawio, its extension case kept', async () => {
+    const dir = path.join(root, 'clash-diagram')
+    await mkdir(dir)
+    await writeFile(path.join(dir, 'Flow.drawio'), '<mxfile/>')
+    await writeFile(path.join(dir, 'UP.DRAWIO'), '<mxfile/>')
+    expect(await freeName(dir, 'Flow.drawio', 'file')).toBe('Flow copy.drawio')
+    expect(await freeName(dir, 'UP.DRAWIO', 'file')).toBe('UP copy.DRAWIO')
+  })
+
   it('a folder keeps the WHOLE name — a dot in it is not an extension', async () => {
     const dir = path.join(root, 'clash-dir')
     await mkdir(path.join(dir, 'v1.2'), { recursive: true })

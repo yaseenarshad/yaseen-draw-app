@@ -1,4 +1,4 @@
-import { DRAWING_VIEW_EXTENSIONS, type FileKind } from './types'
+import { DIAGRAM_EXTENSIONS, DRAWING_VIEW_EXTENSIONS, type FileKind } from './types'
 
 /**
  * Lower-cased extension of a file name or path, dot included; `null` when there is none. A leading
@@ -15,14 +15,30 @@ export function fileKind(name: string): FileKind | null {
   const ext = extensionOf(name)
   if (ext === null) return null
   if ((DRAWING_VIEW_EXTENSIONS as readonly string[]).includes(ext)) return 'drawing'
+  if ((DIAGRAM_EXTENSIONS as readonly string[]).includes(ext)) return 'diagram'
   return null
 }
 
+/**
+ * An EXCALIDRAW scene, and only that (🔒 YAZ-1802 D2): every door that reads or writes scene JSON —
+ * `drawing:load` / `drawing:save`, the create's JSON stamping, board merge, history, previews,
+ * shrink, the orphan sweep, storage — keeps asking this, so a diagram never reaches them.
+ */
 export function isDrawing(name: string): boolean {
   return fileKind(name) === 'drawing'
 }
 
-export function isSupportedFile(name: string): boolean {
+/** A draw.io diagram (🔒 YAZ-1802 D2): its own doors, `diagram:load` / `diagram:save`. */
+export function isDiagram(name: string): boolean {
+  return fileKind(name) === 'diagram'
+}
+
+/**
+ * Any document the app opens in-app — a drawing OR a diagram (🔒 YAZ-1802 D2). What the GENERIC
+ * surfaces ask: the tree row, Info, search, the hover preview, the dates on the file head, the
+ * files a launch was handed.
+ */
+export function isBoard(name: string): boolean {
   return fileKind(name) !== null
 }
 

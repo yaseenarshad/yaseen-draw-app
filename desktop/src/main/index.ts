@@ -1,10 +1,11 @@
 import { app, BrowserWindow, Menu, nativeTheme, net, powerMonitor, protocol, screen, shell } from 'electron'
-import { statSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { isDrawing } from '@shared/fileKind'
 import { fileLink, parseFileLink } from '@shared/links'
 import type { WindowEntry } from '@shared/types'
+import { DRAWIO_HOST, resolveDrawioDir, serveDrawio } from './drawio/assets'
 import type { GitSyncManager } from './git/manager'
 import { registerIpc } from './ipc'
 import { viewerAssetsDir } from './ipc/share'
@@ -79,6 +80,9 @@ const argsSkip = (): number => (app.isPackaged ? 1 : 2)
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }])
 
 const RENDERER_DIR = join(__dirname, '../renderer')
+
+/** The draw.io webapp (🔒 YAZ-1802 D4/D5): the pack cache in dev, `out/drawio` in a build. */
+const DRAWIO_DIR = resolveDrawioDir({ mainDir: __dirname, appPath: app.getAppPath(), isPackaged: app.isPackaged, exists: existsSync })
 
 /** One user-global state file (D9, GRO-2159): `~/Library/Application Support/Yaseen Draw/yaseendraw.json`. */
 const store = createStore(join(app.getPath('userData'), 'yaseendraw.json'))
@@ -163,7 +167,9 @@ app.whenReady().then(() => {
     nativeTheme.themeSource = theme
   })
   protocol.handle('app', (req) => {
-    const { pathname } = new URL(req.url)
+    const { host, pathname } = new URL(req.url)
+    // 🔒 YAZ-1802 D4: routed by HOST — `app://drawio` is the diagram editor's own origin.
+    if (host === DRAWIO_HOST) return serveDrawio(DRAWIO_DIR, pathname, { fetchFile: (url) => net.fetch(url), noStore: !app.isPackaged })
     const file = join(RENDERER_DIR, pathname === '/' ? 'index.html' : pathname)
     return net.fetch(pathToFileURL(file).toString())
   })

@@ -13,6 +13,7 @@ npm run dev
 ```
 
 - `npm run dev` runs `electron-vite dev` in `desktop/`: it builds main + preload, serves the renderer with HMR and launches the Electron app — one command, and every remembered window reopens. There is no server of any kind and nothing listens for the app itself on any port (the only network socket is electron-vite's private HMR channel in dev); renderer ↔ main is the typed `window.yaseenDraw` bridge.
+- draw.io (YAZ-1802): desktop's `dev` and `build` first run `tools/packDrawio.mjs`, which downloads the pinned draw.io webapp ONCE (54 MB, sha256-checked — network needed that one time) into `desktop/.cache/drawio/` and lays `desktop/drawio-overlay/` over it on every run. Run `npm run drawio:pack` yourself before a bare `npx electron-vite dev`; an overlay edit applies the next time a diagram opens (dev serves `app://drawio` with `no-store`).
 - Yasin's vault is `$HOME/Documents/GitHub/yaseen-draw-vault` — a git repo the app's GitHub sync pushes to (the username part of `$HOME` differs per machine — resolve it, don't hardcode). The app repo itself is `yaseen-draw-app`; the vault is `yaseen-draw-vault`. If a window opens the wrong folder, click the vault name in the sidebar header (or ⌘O) and choose **Open folder…** — the vault opens in its own window (YAZ-1913), so close the wrong one — or run `window.yaseenDraw.window.setIdentity({ root: '<abs path>', file: null })` from the devtools console and reload.
 - Folder picking is the native open-directory dialog (`window.yaseenDraw.pickFolder()`), which pops up on Yasin's screen; in an agent session seed `<user-data-dir>/yaseendraw.json` with a `windows[]` entry (`{ id, root, file, tabs, sidebarCollapsed, sidebarLens, focusDirs, focusFavorites, bounds }`) before launch, or call `window.yaseenDraw.window.setIdentity({ root, file: null })` and reload, instead of using the vault switcher's **Open folder…**.
 
@@ -22,12 +23,12 @@ npm run dev
 npm run desktop:build
 ```
 
-- Builds `desktop/out` (electron-vite) and then packages with electron-builder: `desktop/dist-app/mac-arm64/Yaseen Draw.app` (~300 MB) and `desktop/dist-app/Yaseen Draw-0.1.0-arm64.dmg` (~130 MB) — arm64 only, and the version in the dmg name is the ROOT `package.json` version that `tools/packDesktop.mjs` stamps in. The filenames contain spaces, so quote every path.
+- Builds `desktop/out` (electron-vite) and then packages with electron-builder: `desktop/dist-app/mac-arm64/Yaseen Draw.app` (~475 MB, ~145 MB of it the bundled draw.io webapp) and `desktop/dist-app/Yaseen Draw-0.1.0-arm64.dmg` (~200 MB) — arm64 only, and the version in the dmg name is the ROOT `package.json` version that `tools/packDesktop.mjs` stamps in. The filenames contain spaces, so quote every path.
 - `mac.identity: null` makes electron-builder skip signing, so `desktop/build/adhocSign.cjs` (`afterPack`) deep ad-hoc signs the bundle itself — without that seal Gatekeeper reports a downloaded copy as "damaged" instead of offering **Open Anyway**. Check it with `codesign -dv --verbose=2 "desktop/dist-app/mac-arm64/Yaseen Draw.app"`, which prints `Signature=adhoc`. `spctl -a -t install` on the same bundle prints `rejected` — expected, because nothing here is Developer-ID signed.
 - The first packaging run on a clean machine needs network: electron-builder downloads its Electron dist zip and dmgbuild once, then caches them.
 - Install: open the dmg and drag `Yaseen Draw.app` into `/Applications` in Finder (or copy it straight from `desktop/dist-app/mac-arm64/`). The installed app and a `npm run dev` instance coexist — different userData, different single-instance lock.
 - First open is blocked by Gatekeeper (the app is not notarized): right-click › **Open**, or System Settings › Privacy & Security › **Open Anyway** — once, then never again on that Mac. See `README.md` "Installing on another Mac/PC".
-- The app claims `.excalidraw` as Owner, so after that first open Finder double-click opens drawings with it, and from a shell:
+- The app claims `.excalidraw` and `.drawio` as Owner, so after that first open a Finder double-click opens drawings and diagrams with it, and from a shell:
 
 ```bash
 open -a "Yaseen Draw" "/path/to/some drawing.excalidraw"
@@ -106,6 +107,11 @@ A feature's own demo vault can bring its profile: `node tools/seedPreviewDemoVau
 --profile <profile-dir>` (YAZ-1800, the hover preview) writes the vault AND a `yaseendraw.json`
 whose one window is already on it, so the recipe above needs no hand-written JSON — launch with
 `YASEEN_DRAW_USER_DATA_DIR=<profile-dir>`. Every board name says the case it covers.
+
+draw.io support (YAZ-1802) has its own demo vault: `node tools/seedDrawioDemoVault.mjs --vault
+<dir> --profile <profile-dir>`: every draw.io edge case by name, a few Excalidraw boards, and a git
+origin plus "Sam's" clone so the first sync shows the keep-both copies (one `.drawio`, one
+`.DRAWIO`); its `00 READ ME` lists what to try.
 
 Then run the scenario list by hand (or by computer-use). The standing list, from the demo Yasin
 approved on YAZ-1775, is: external disk edit hot-reloads a clean tab · paste → one asset, small

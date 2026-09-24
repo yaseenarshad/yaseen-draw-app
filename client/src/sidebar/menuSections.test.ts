@@ -28,6 +28,7 @@ const targets = (over: Partial<MenuSectionTargets> = {}): MenuSectionTargets => 
   favoritePaths: null,
   favoriteIsOn: false,
   infoPath: null,
+  sharePath: null,
   clip: null,
   ...over,
 })
@@ -45,6 +46,7 @@ const handlers = (over: Partial<MenuHandlers> = {}): MenuHandlers => ({
   onPaste: vi.fn(),
   onNotice: vi.fn(),
   onNewDrawing: vi.fn(),
+  onNewDiagram: vi.fn(),
   onNewFolder: vi.fn(),
   onNewDatedFolder: vi.fn(),
   onToggleFavorite: vi.fn(),
@@ -117,7 +119,7 @@ describe('the six groups (🔒 YAZ-1674 D7, amended)', () => {
     // group leads; the OS verbs live in the "Open in ▸" flyout, a group of its own before Delete.
     expect(groupsOf(build(FILE_ROW))).toEqual([
       ['Cut', 'Copy', 'Paste', 'Copy path'],
-      ['New drawing', 'New folder', 'New dated folder'],
+      ['New Excalidraw drawing', 'New draw.io diagram', 'New folder', 'New dated folder'],
       ['Rename'],
       ['Open in'],
       ['Delete'],
@@ -127,7 +129,7 @@ describe('the six groups (🔒 YAZ-1674 D7, amended)', () => {
   it('BLANK SPACE has no row to rename or delete: the this-row and Delete groups are empty, so the menu ends on "Open in"', () => {
     expect(groupsOf(build(BLANK))).toEqual([
       ['Paste', 'Copy path'],
-      ['New drawing', 'New folder', 'New dated folder'],
+      ['New Excalidraw drawing', 'New draw.io diagram', 'New folder', 'New dated folder'],
       ['Open in'], // the root's own OS verbs — the one this-row item blank space has
     ])
   })
@@ -163,26 +165,29 @@ describe('the six groups (🔒 YAZ-1674 D7, amended)', () => {
  * space alike.
  */
 describe('create group', () => {
-  it('offers New drawing first, then the two folder births', () => {
-    expect(build()[2].map((i) => i.label)).toEqual(['New drawing', 'New folder', 'New dated folder'])
+  it('offers New Excalidraw drawing first, then New draw.io diagram (🔒 YAZ-1802 D13), then the two folder births', () => {
+    expect(build()[2].map((i) => i.label)).toEqual(['New Excalidraw drawing', 'New draw.io diagram', 'New folder', 'New dated folder'])
   })
 
   it('is offered on every row type — the group targets a DIRECTORY, never the clicked row', () => {
-    expect(labelsOf(build(FILE_ROW))).toContain('New drawing')
-    expect(labelsOf(build(BLANK))).toContain('New drawing')
+    expect(labelsOf(build(FILE_ROW))).toContain('New Excalidraw drawing')
+    expect(labelsOf(build(BLANK))).toContain('New Excalidraw drawing')
   })
 
   it('the two disk-folder births share ONE gate (YAZ-948; YAZ-1604): a null handler hides both, never the drawing', () => {
     const labels = labelsOf(build(FILE_ROW, { onNewFolder: null, onNewDatedFolder: null }))
     expect(labels).not.toContain('New folder')
     expect(labels).not.toContain('New dated folder')
-    expect(labels).toContain('New drawing')
+    expect(labels).toContain('New Excalidraw drawing')
   })
 
   it('hands the click to the caller — the handler itself is the item', () => {
     const onNewDrawing = vi.fn()
-    select(build({}, { onNewDrawing }), 'New drawing')
+    select(build({}, { onNewDrawing }), 'New Excalidraw drawing')
     expect(onNewDrawing).toHaveBeenCalledTimes(1)
+    const onNewDiagram = vi.fn()
+    select(build({}, { onNewDiagram }), 'New draw.io diagram')
+    expect(onNewDiagram).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -428,9 +433,14 @@ describe('favorite toggle item (YAZ-1766 D3)', () => {
  */
 describe('Info item (🔒 YAZ-1835 D6)', () => {
   it('is offered for a board row and sits directly above Delete, in the last group', () => {
-    const sections = build({ ...FILE_ROW, infoPath: '/v/Note.excalidraw' })
+    const sections = build({ ...FILE_ROW, infoPath: '/v/Note.excalidraw', sharePath: '/v/Note.excalidraw' })
     expect(sections[5].map((i) => i.label)).toEqual(['Share', 'Version history', 'Info', 'Delete'])
     expect(labelsOf(sections).indexOf('Info')).toBe(labelsOf(sections).indexOf('Delete') - 1)
+  })
+
+  it('a DIAGRAM row gets Info but not Share or Version history — neither exists for draw.io yet (YAZ-1802)', () => {
+    const sections = build({ ...FILE_ROW, infoPath: '/v/Flow.drawio', sharePath: null })
+    expect(sections[5].map((i) => i.label)).toEqual(['Info', 'Delete'])
   })
 
   it('is absent when there is no single board to describe', () => {

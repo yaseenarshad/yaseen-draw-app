@@ -23,6 +23,8 @@ nothing to do with each other. A bare `D3` would be unresolvable, so there are n
 |---|---|
 | `client/` | the renderer: React 19, Vite. Talks to nothing but `window.yaseenDraw`. |
 | `client/src/drawings/` | the drawing document: the engine seam (`ExcalidrawSurface`, the ONE importer of the package), its host, and what a scene is |
+| `client/src/diagrams/` | the draw.io diagram document (YAZ-1802): `DrawioEditor` (the iframe host), `drawioProtocol.ts` (the postMessage dialect and the configure object) and `renderDiagramPreview.ts` (the hover picture) |
+| `desktop/drawio-overlay/` | OUR files laid over the draw.io webapp by `tools/packDrawio.mjs`: the `PreConfig.js` / `PostConfig.js` config hooks (page view off, ⌘-wheel zoom, the keymap) and the preview page `yaseen-render.html` — draw.io's own files are never modified |
 | `client/src/drawings/presentation/` | the canvas panel's Present tab: the slide rules, the panel and the full-pane player |
 | `client/src/image-studio/` | the canvas panel's Images tab: the Image Studio, the shapes catalog, both insert paths |
 | `client/src/components-library/` | the canvas panel's Components tab: the saved-component library, its capture, import, preview and insert (named so it is never confused with `client/src/components/`) |
@@ -47,6 +49,7 @@ nothing to do with each other. A bare `D3` would be unresolvable, so there are n
 | `npm test` | vitest, three projects — `client` (jsdom), `desktop` (node), `tools` (node) |
 | `npm run test:watch` | the same suites, re-run on save |
 | `npm run typecheck` | `tsc --noEmit` over client, shared and desktop |
+| `npm run drawio:pack` | `tools/packDrawio.mjs`: download the pinned draw.io release once (sha256-checked), unpack it into `desktop/.cache/drawio/<tag>/` (gitignored) and lay the overlay over it — idempotent; `desktop`'s `dev` and `build` run it first |
 | `npm run build` | `electron-vite build` into `desktop/out`, then `tools/buildShareViewer.mjs` into `share/dist/assets` (wiped first, gitignored) |
 | `npm run desktop:build` | build + electron-builder → `desktop/dist-app` (`--win` variant for Windows) |
 
@@ -56,20 +59,33 @@ scenario list by hand — never by a UI driver, by an agent or in CI.
 
 ## Supported file capabilities
 
-One kind, one extension.
+Two kinds of BOARD, one extension each (🔒 YAZ-1802 D1 / D2).
 
 | Extension | Kind | Read | Write | Create |
 |---|---|---|---|---|
 | `.excalidraw` | `drawing` | yes | yes | yes |
-| anything else | `null` | no | no | no |
+| `.drawio` | `diagram` | yes | yes | yes |
+| anything else (`x.drawio.svg` included) | `null` | no | no | no |
 
-- `shared/fileKind.ts` is the ONE classifier: `fileKind(name)` returns `'drawing'` or `null`, and
-  `isDrawing` / `isSupportedFile` / `canRenameWithoutConversion` are derived from it. No surface
-  may re-test an extension by hand.
+- `shared/fileKind.ts` is the ONE classifier: `fileKind(name)` returns `'drawing'`, `'diagram'` or
+  `null`, case-insensitively (`UP.DRAWIO` is a diagram), and `isDrawing` / `isDiagram` / `isBoard` /
+  `canRenameWithoutConversion` are derived from it. No surface may re-test an extension by hand.
+  `.drawio` is the only diagram extension (🔒 YAZ-1802 D3): `x.drawio.svg` / `x.drawio.png` are
+  pictures with a diagram inside, files of no kind.
+- 🔒 YAZ-1802 D2: `isDrawing` means EXCALIDRAW only — every door that reads or writes scene JSON
+  (`drawing:*`, the create's JSON stamp, board merge, history, previews, shrink, the orphan sweep,
+  storage, the Import / Export Drawing dialogs) keeps asking it. The GENERIC surfaces (tree row
+  kind, the file head's dates, Info, search, hover preview, the files a launch is handed, link
+  routing, `Editor`) ask `isBoard` / `fileKind`. Share, Version history and the menu bar's Export
+  Image / Share Link stay drawing-only until diagrams get them (YAZ-1802 3A–3C).
+- A rename never converts between the two kinds, in the sidebar (`renamedPath` re-appends the old
+  suffix) and in main (`fs:rename` → `UNSUPPORTED_EXTENSION`). A copy keeps its extension as
+  spelled: `Flow copy.drawio`, `UP copy.DRAWIO`.
 - A file of no kind still LISTS in the tree (YAZ-1577) and opens in the OS default app; it is
   never read or written through the bridge (`UNSUPPORTED_EXTENSION`).
-- `.excalidraw` hides its extension wherever a name is shown — tree rows, tab labels, the window
-  title, the rename field (⚡ YAZ-1775 D8 amended). Every other file shows its full name.
+- `.excalidraw` and `.drawio` hide their extension wherever a name is shown — tree rows, tab
+  labels, the window title, the rename field (⚡ YAZ-1775 D8 amended, 🔒 YAZ-1802 D13). Every other
+  file shows its full name.
 - Image bytes do NOT live in the scene JSON: they are content-addressed at
   `<vault>/assets/<fileId>.<ext>` (🔒 YAZ-1775 D3) and travel with the scene through
   `drawing:load` / `drawing:save`. The id is Excalidraw's own — the SHA-1 of the bytes — so an
@@ -78,8 +94,11 @@ One kind, one extension.
   first save. `assets/` is hidden from the sidebar tree (the TOP-LEVEL one only: a folder the
   user called `assets` inside a subfolder is theirs and shows).
 - There is ONE door that makes a drawing, and it is the sidebar's context menu (🔒 YAZ-1775 R1):
-  the Create group is **New drawing**, New folder, New dated folder, in that order, on
-  a row or on blank space. Nowhere else in the app creates a file.
+  the Create group is **New Excalidraw drawing**, **New draw.io diagram** (🔒 YAZ-1802 D13), New
+  folder, New dated folder, in that order, on a row or on blank space. Nowhere else in the app
+  creates a file. A diagram is born the same way — `Untitled.drawio`, counted on `.drawio` names
+  (`untitledBoardName`), written as `EMPTY_DIAGRAM_XML` (one page; page view, grid and alignment
+  guides off — 🔒 YAZ-1802 D12a) under `wx`, stamped with both dates (D7).
   - "New drawing" does not ask for a name. The board is born `Untitled.excalidraw` — then
     `Untitled 2`, `Untitled 3`… beside its siblings, filling a gap rather than running past it,
     compared case-insensitively because the filesystem is — in the right-clicked FOLDER (a file
@@ -96,7 +115,8 @@ One kind, one extension.
   as the FIRST key (🔒 YAZ-1834, "Board metadata" below). Set by main in those two doors, read by
   `fs:tree` off the file head, never touched by the renderer.
 - `client/src/Editor.tsx` dispatches on the kind: "Select a file from the sidebar." with no file,
-  "Unsupported file type." for a `null` kind, and `DrawingEditor` for a drawing.
+  "Unsupported file type." for a `null` kind, `DrawingEditor` for a drawing and `DrawioEditor` for a
+  diagram ("draw.io diagrams" below).
 
 ## Bridge API
 
@@ -113,11 +133,12 @@ calls that go through it; `state`, `window`, `menu`, `link` and `watch` are call
 
 | `window.yaseenDraw` | Channel | What it does |
 |---|---|---|
-| `tree(root)` | `fs:tree` | the folder tree; dot-entries and `node_modules` are invisible; a drawing carries `meta` (its dates) when its head has a trustworthy block (🔒 YAZ-1834 D6) |
+| `tree(root)` | `fs:tree` | the folder tree; dot-entries and `node_modules` are invisible; a board carries `meta` (its dates) when its head has a trustworthy block or `<mxfile>` attributes (🔒 YAZ-1834 D6, 🔒 YAZ-1802 D7) |
 | `createDir(path)` | `fs:create-dir` | never overwrites (`ALREADY_EXISTS`) |
-| `createFile(req)` | `fs:create-file` | `.excalidraw` only; `{ path, content }`, content-at-create under `wx`; the content must be a JSON object (else `BAD_REQUEST`) and is born stamped with `createdAt = updatedAt = now` (🔒 YAZ-1834 D3) |
+| `createFile(req)` | `fs:create-file` | `.excalidraw` or `.drawio` only; `{ path, content }`, content-at-create under `wx`; a drawing's content must be a JSON object, a diagram's a whole `<mxfile>` (else `BAD_REQUEST`), and either is born stamped with `createdAt = updatedAt = now` (🔒 YAZ-1834 D3, 🔒 YAZ-1802 D7) |
 | `drawing.load(req)` | `drawing:load` | one `.excalidraw` AS A DOCUMENT: its bytes, its mtime, and the images it names |
 | `drawing.save(req)` | `drawing:save` | images first, then the scene, atomically; `expectedMtime` → `CONFLICT` with NOTHING written; the scene lands with its `yaseendraw` block first, `createdAt` carried from the file, `updatedAt` = now (🔒 YAZ-1834 D3) |
+| `diagram.load(req)` / `diagram.save(req)` | `diagram:load` / `diagram:save` | 🔒 YAZ-1802 D6: one `.drawio` AS A DOCUMENT — `{ root, path }` → `{ path, xml, mtime, size }`; a file that is empty, not XML, not draw.io or cut short is `IO_ERROR` with the reason. `{ root, path, xml, expectedMtime }` → `{ path, mtime, size }`, atomic, `CONFLICT` with NOTHING written, `yaseendraw-created` / `-updated` stamped on the root `<mxfile>` (D7); any other extension is `UNSUPPORTED_EXTENSION` |
 | `drawing.libraryFolder()` | `drawing:library-folder` | the RESOLVED library folder — the setting, or `<userData>/library` (🔒 YAZ-1775 D5) |
 | `pickFolder()` | `dialog:pick-folder` | the native open-directory dialog |
 | `dialog.openDrawing()` | `dialog:open-file` | the native OPEN-FILE dialog, `.excalidraw` filter → `{ path, name, content }` or `{ cancelled: true }`; the bytes come back because the picked file is outside the vault |
@@ -555,9 +576,14 @@ YAZ-1897; the scenario catalogue (S1–S28) is the 📘 comment there.
   both sides' `boundElements`; a live shape whose box (`containerId`) or frame (`frameId`) the other
   side deleted gets that parent back. `appState` merges per key, ours winning a clash; the
   `yaseendraw` dates block stays first with the earlier `createdAt` and the later `updatedAt`.
-- **D2 — git never line-merges a board.** Every pass keeps `*.excalidraw -merge` in
-  `.git/info/attributes` (this machine only, never committed, never the user's own
-  `.gitattributes`), so every board both sides changed reaches D1.
+- **D2 — git never line-merges a board.** Every pass keeps `-merge` rules for both board
+  extensions in `.git/info/attributes` (this machine only, never committed, never the user's own
+  `.gitattributes`), so every board both sides changed reaches D1 — or, for a diagram, keep-both
+  (🔒 YAZ-1802 D8). The rules are spelled `*.[eE][xX][cC][aA][lL][iI][dD][rR][aA][wW] -merge` and
+  `*.[dD][rR][aA][wW][iI][oO] -merge` (🔒 YAZ-1802 D17): git folds case in attribute patterns only
+  under `core.ignorecase`, which is per repo and false for a clone made on a case-sensitive volume,
+  and `resolve.ts` classifies through `fileKind`, so `B.EXCALIDRAW` merges and `B.DRAWIO` keeps both
+  like their lower-case twins. A vault that still has the old `*.excalidraw -merge` line keeps it.
 - **D3 — anything else keeps both.** The remote's version stays at the path and ours is written
   beside it as `<name> (conflict, YYYY-MM-DD).<ext>`. Exceptions: `.yaseendraw/shares.json` and
   `favorites.json` merge per entry (a record beats a removal; favorites keep the remote's order,
@@ -818,8 +844,16 @@ not a board — and neither does the saved-components store (`library/componentS
 `.excalidraw` fragments live outside any vault). A copy (Finder or in-app) keeps its origin's
 dates. Dropped from the design on purpose: `openedAt`, an id, tags, description (🔒 D2).
 
-Pure rules: `shared/drawingAssets.ts` (`stampBoardMeta`, `parseBoardMetaBlock`); the one open
-that serves both the tree and the save: `desktop/src/main/fs/boardHead.ts` (`readBoardHead`).
+**🔒 YAZ-1802 D7 — a diagram carries the same two dates** as the first two attributes of its root
+`<mxfile>` — `yaseendraw-created` / `yaseendraw-updated`, epoch ms — because a `.drawio` is XML, not a
+JSON object. Same doors, same rules: `fs:create-file` births both, `diagram:save` keeps `created` from
+the current file's head (else its pre-save mtime, exactly like a drawing), moves `updated`, and
+restores both when draw.io or another editor dropped them. A bare `<mxGraphModel>` file has nowhere
+to carry them and is simply undated until draw.io saves it back as an `<mxfile>`.
+
+Pure rules: `shared/drawingAssets.ts` (`stampBoardMeta`, `parseBoardMetaBlock`) and
+`shared/diagramFile.ts` (`stampDiagramMeta`, `parseDiagramMetaAttrs`); the one open that serves both
+the tree and the save: `desktop/src/main/fs/boardHead.ts` (`readBoardHead`).
 
 ### Export Drawing… (🔒 YAZ-1775 D3, YAZ-1821)
 
@@ -1070,6 +1104,44 @@ the most recent remembered vault that contains the file; and failing that — a 
 open and every remembered vault — **a new window with the file's PARENT FOLDER as the vault**. An
 unsupported or missing file shows the window's one passive notice, never a dialog.
 
+## draw.io diagrams (YAZ-1802)
+
+A `.drawio` opens in jgraph's own draw.io webapp, pinned to release `v31.5.2` (🔒 D5), unmodified
+but for two config hooks, inside an iframe on its OWN origin.
+
+- **🔒 D4 — the origin is the sandbox.** Main serves the webapp on the `drawio` host of the existing
+  `app` scheme (`app://drawio/…`, `serveDrawio` in `desktop/src/main/drawio/assets.ts`), routed by
+  host, path traversal a 404, every answer — a 404 included — carrying `DRAWIO_CSP`: nothing leaves
+  the origin (no fetch, no remote image, no CDN font). Dev adds `Cache-Control: no-store` so a
+  re-pack applies on the next diagram open (🔒 D17); a packaged app caches normally. Our user agent
+  never contains ` draw.io/`, so draw.io's own Electron mode (drawio-desktop's code) never loads.
+  The renderer and the iframe talk by postMessage ONLY, in draw.io's `proto=json` dialect, and a
+  message counts only from that iframe's window and `app://drawio` (`drawioProtocol.ts` documents
+  the conversation). The iframe URL shuts every network door
+  (`offline`, `stealth`, `lockdown`, no plugins / PWA / cloud storage).
+- **🔒 D3 — plain XML.** The configure reply sets `compressXml: false`; a compressed file opens and
+  is written plain on its first edit. Opening and not editing writes nothing.
+- **🔒 D6 — two doors.** `diagram:load` validates the outline first (a draw.io root, closed at the
+  end; comments after it are fine), so a broken file is an error pane and draw.io is never mounted
+  on it — it cannot autosave over what it failed to read — and `diagram:save` refuses anything that
+  is not a whole diagram (`BAD_REQUEST`) before touching the disk. The
+  host reuses `lib/autosave.ts` (500 ms), the watcher rule (echo / reload when clean / Reload–Keep
+  mine when dirty), the quit flush and rename continuity exactly as `DrawingEditor` does.
+- **🔒 D7 — dates.** `yaseendraw-created` / `yaseendraw-updated` on the root `<mxfile>` ("Board
+  metadata" above); `fs:tree` reads them off the head, so sort and Info work.
+- **🔒 D8 — sync keeps both.** `.git/info/attributes` carries the case-proof `.drawio` `-merge` rule
+  ("Two computers, one vault"), and a diagram changed on both machines keeps both copies —
+  `<name> (conflict, <date>).drawio`, the extension as the file spelled it.
+- **🔒 D9 — the hover picture** is draw.io's own viewer on our page `app://drawio/yaseen-render.html`
+  in one hidden iframe: page 1 as an SVG data URL, same bounds, theme and cache as a drawing's.
+- **🔒 D12 — feel.** Page view off on open (`pv=0`), grid and guides off for new diagrams, plain wheel
+  pans, ⌘/ctrl-wheel and pinch zoom, fonts from `yaseen-fonts/` on the drawio origin, the theme
+  follows the app live (draw.io's `darkMode` / `lightMode` actions), and a keymap section in
+  `PostConfig.js`.
+- **Not yet:** share links and version history (YAZ-1802 3B / 3C) — Share and Version history are
+  offered for Excalidraw boards only (`MenuTargets.sharePath`); Present and merging diagrams are
+  Future (🔒 D1).
+
 ## Packaging
 
 `npm run desktop:build` runs `electron-vite build` and then electron-builder through
@@ -1083,9 +1155,9 @@ unsupported or missing file shows the window's one passive notice, never a dialo
   `Signature=adhoc` with `TeamIdentifier=not set`; `spctl -a -t install` therefore REJECTS it, and
   that rejection is the expected result, not a defect — it is what the one-time **Open Anyway**
   below answers.
-- The bundle declares what it owns: `CFBundleURLSchemes` `yaseendraw`, and a `.excalidraw`
-  document type named "Excalidraw Drawing" with role `Editor` and `LSHandlerRank` `Owner`, so
-  Finder hands `.excalidraw` files to this app (🔒 YAZ-1775 D1).
+- The bundle declares what it owns: `CFBundleURLSchemes` `yaseendraw`, a `.excalidraw` document
+  type named "Excalidraw Drawing" and a `.drawio` one named "draw.io Diagram" (🔒 YAZ-1802 D14),
+  both with role `Editor` and `LSHandlerRank` `Owner`, so Finder hands both to this app (🔒 YAZ-1775 D1).
 - Windows: unsigned x64 NSIS installer.
 - `files: ["out/**"]` is the whole app payload: the main bundle carries its dependencies (chokidar is
   pure JS and gets bundled), so the packaged app ships no `node_modules`. The one `extraResources`
@@ -1094,6 +1166,12 @@ unsupported or missing file shows the window's one passive notice, never a dialo
   packaged and from the repo checkout in dev.
 - The renderer serves from the custom `app://yaseen/` protocol; Excalidraw's fonts are copied
   beside the bundle at build time so a scene with text never reaches a CDN (🔒 the offline rule).
+  The draw.io webapp (~150 MB unpacked, 3 400 files) is copied from the pack cache into
+  `out/drawio` the same way (`drawioAssets()` in `electron.vite.config.ts`, replaced whole on every
+  build) and served as `app://drawio/` (🔒 YAZ-1802 D5). It ships unmodified under Apache-2.0: the
+  war carries no licence file of its own, so the overlay adds `LICENSE-drawio.txt` (jgraph/drawio's
+  `LICENSE` at the pinned tag) at its root, and the war's own `stencils/`, `templates/`, `shapes/`,
+  `img/` and `js/libavoid-js/` `LICENSE` files are never pruned.
 - `.github/workflows/release.yml` builds both on a `v*` tag (node 22, `CSC_IDENTITY_AUTO_DISCOVERY:
   false`, `fail_on_unmatched_files: true`) and attaches them to that tag's release.
 - 🔒 **Releases are Yasin's call.** No tag, no GitHub release and no `npm version` without him

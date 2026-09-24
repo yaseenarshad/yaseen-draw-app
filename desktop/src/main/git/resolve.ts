@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, readFile, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { mergeBoards } from '@shared/boardMerge'
+import { isDiagram, isDrawing } from '@shared/fileKind'
 import { VAULT_CONFIG_DIR, type GithubSyncMerge } from '@shared/types'
 import { FAVORITES_FILE, mergeFavoritesFile } from '../favorites'
 import { atomicWrite } from '../fs/fsUtils'
@@ -39,8 +40,17 @@ import { withLines } from './ignore'
 /** Where the vault stood before the pass's first merge — Version history's "before the merge" entry (D4). Local only, replaced by the next merge. */
 export const BEFORE_MERGE_REF = 'refs/yaseendraw/before-merge'
 
-/** D2: every board both machines changed becomes a conflict, so it reaches `mergeBoards` instead of git's line merge. */
-const BOARD_MERGE_RULE = '*.excalidraw -merge'
+/**
+ * D2: every board both machines changed becomes a conflict, so it reaches `mergeBoards` instead of
+ * git's line merge. 🔒 YAZ-1802 D8: a diagram too — a line merge of two `.drawio` files can come out
+ * "clean" and still be broken XML, so it is always a conflict, and `mergeText` keeps both copies.
+ *
+ * Spelled as bracket classes so `B.DRAWIO` / `A.Excalidraw` match too (🔒 YAZ-1802 D17): git folds
+ * case in attribute patterns only under `core.ignorecase`, which is per repo — false for a clone
+ * made on a case-sensitive volume — so a plain `*.drawio` can silently let one through to a line
+ * merge. A vault that already has the old `*.excalidraw -merge` line keeps it; it is harmless.
+ */
+export const BOARD_MERGE_RULES = ['*.[eE][xX][cC][aA][lL][iI][dD][rR][aA][wW] -merge', '*.[dD][rR][aA][wW][iI][oO] -merge']
 
 const SHARES_PATH = `${VAULT_CONFIG_DIR}/${SHARES_FILE}`
 const FAVORITES_PATH = `${VAULT_CONFIG_DIR}/${FAVORITES_FILE}`
@@ -53,7 +63,7 @@ export async function ensureBoardMergeRule(bin: string, root: string): Promise<v
   const where = await git(bin, root, ['rev-parse', '--git-path', 'info/attributes'])
   if (where.code !== 0) return
   const file = path.resolve(root, where.stdout.trim())
-  const next = withLines(await readFile(file, 'utf8').catch(() => null), [BOARD_MERGE_RULE])
+  const next = withLines(await readFile(file, 'utf8').catch(() => null), BOARD_MERGE_RULES)
   if (next === null) return
   await mkdir(path.dirname(file), { recursive: true })
   await atomicWrite(file, next)
@@ -167,7 +177,8 @@ async function settle(bin: string, root: string, rel: string, copies: Map<string
  * needs to hear about (the vault's own config files).
  */
 function mergeText(rel: string, base: string | null, theirs: string, mine: string): { json: string; clashes: number | null } | null {
-  if (rel.endsWith('.excalidraw')) return base === null ? null : mergeBoards(base, theirs, mine) // S10: two new boards are two boards
+  if (isDrawing(rel)) return base === null ? null : mergeBoards(base, theirs, mine) // S10: two new boards are two boards
+  if (isDiagram(rel)) return null // 🔒 YAZ-1802 D8: no diagram merge (yet) — keep both, never a guessed XML splice
   const quiet = (json: string | null) => (json === null ? null : { json, clashes: null })
   if (rel === SHARES_PATH) return quiet(mergeSharesFile(base, theirs, mine))
   if (rel === FAVORITES_PATH) return quiet(mergeFavoritesFile(base, theirs, mine))

@@ -2,6 +2,7 @@ import type { GitSyncManager } from '../git/manager'
 import type { Store } from '../store'
 import type { WindowManagerIpc } from '../windows'
 import { registerComponentsIpc } from './components'
+import { registerDiagramIpc } from './diagram'
 import { registerDialogIpc } from './dialog'
 import { registerDrawingIpc } from './drawing'
 import { registerFavoritesIpc } from './favorites'
@@ -29,6 +30,7 @@ import { registerWindowIpc } from './window'
 export function registerIpc(store: Store, windows: WindowManagerIpc, userData: string, share: { viewerAssetsDir: string; isPackaged: boolean }): GitSyncManager {
   registerFsIpc(store, windows)
   registerDrawingIpc(store, userData)
+  registerDiagramIpc()
   registerDialogIpc()
   registerWatchIpc()
   registerStateIpc(store)
