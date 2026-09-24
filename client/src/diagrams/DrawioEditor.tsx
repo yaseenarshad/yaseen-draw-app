@@ -35,28 +35,43 @@
  * a flip afterwards is draw.io's own `darkMode` / `lightMode` action, invoked by message — no
  * reload, no lost undo. A flip before draw.io listens (its `init`) is sent at `init`.
  *
+ * 🔒 YAZ-1802 D16 — SO DOES THE DARK-MODE COLOUR SETTING: the configure reply carries it as draw.io's
+ * `defaultAdaptiveColors`, and a change afterwards is our `yaseenAdaptiveColors` message, answered
+ * by our PostConfig.js (draw.io has no embed action for it). It re-draws, it never edits: nothing
+ * autosaves, and undo and unsaved work stay exactly as they were.
+ *
+ * FILE › EXPORT IMAGE… (🔒 YAZ-1802 D9) lands on this tab's section as the menu's DOM command
+ * (`drawingCommand.ts`): the XML draw.io last posted — unsaved edits included — goes through the
+ * D9 renderer as a PNG and an SVG, and main's save sheet writes the one the user picks.
+ *
  * SHARE LINKS stay live the drawing's way: every successful save tells `liveShare`, which
  * re-uploads a shared board once its saves settle.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { GithubSyncStatus } from '@shared/types'
+import { DEFAULT_SETTINGS, type DiagramDarkColors, type GithubSyncStatus } from '@shared/types'
 import { api, BridgeRequestError } from '../api'
 import type { WatchSource } from '../hooks/useWatch'
 import { Autosave, SaveConflict, type SaveStatus } from '../lib/autosave'
+import type { NoticeKind } from '../lib/notice'
 import { basename, stripExt } from '../lib/paths'
 import { registerRenameContinuity } from '../lib/renameContinuity'
 import { useAppliedTheme } from '../lib/theme'
 import { noteBoardSaved } from '../share/liveShare'
 import { ConflictBar } from '../drawings/ConflictBar'
+import { DRAWING_COMMAND_EVENT, type DrawingCommand } from '../drawings/drawingCommand'
 import { mayTakeFocus } from '../drawings/focusHandoff'
 import { SaveIndicator } from '../drawings/SaveIndicator'
 import { SyncIndicator } from '../drawings/SyncIndicator'
-import { DRAWIO_ORIGIN, drawioConfig, drawioFrameUrl, readDrawioMessage } from './drawioProtocol'
+import { DRAWIO_ORIGIN, drawioAdaptiveColors, drawioConfig, drawioFrameUrl, readDrawioMessage } from './drawioProtocol'
+import { renderDiagramImage } from './renderDiagram'
 import '../drawings/statusChips.css'
 import './drawioEditor.css'
 
 /** What a diagram that will not open says; main's reason follows it when there is one. */
 export const BROKEN_DIAGRAM_DOCUMENT = "This draw.io diagram can't be opened"
+
+const EXPORT_FAILED = "The draw.io diagram couldn't be exported."
+const EXPORT_EMPTY = 'This draw.io diagram is empty, so there is no image to export.'
 
 /**
  * How long the host waits for our PostConfig.js to say it is ready before configuring draw.io
@@ -72,6 +87,10 @@ export interface DrawioEditorProps {
   /** The vault's sync status (YAZ-1081), App-owned; null while fetching, undefined = no chip. */
   sync?: GithubSyncStatus | null
   onSyncNow?: () => void
+  /** 🔒 YAZ-1802 D16: the app's dark-mode colour setting, applied live (see the module doc). */
+  darkColors?: DiagramDarkColors
+  /** The window's ONE passive notice: where an exported image landed, or why it did not. */
+  onNotice?: (text: string, icon?: NoticeKind) => void
   /** App's sidebar toggle: ⌘B pressed inside draw.io with nothing selected (see the module doc). */
   onToggleSidebar?: () => void
 }
@@ -81,7 +100,7 @@ interface LoadedDiagram {
   mtime: number
 }
 
-export function DrawioEditor({ root, path, watch, sync, onSyncNow, onToggleSidebar }: DrawioEditorProps) {
+export function DrawioEditor({ root, path, watch, sync, onSyncNow, darkColors, onNotice, onToggleSidebar }: DrawioEditorProps) {
   const [loaded, setLoaded] = useState<LoadedDiagram | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -114,7 +133,9 @@ export function DrawioEditor({ root, path, watch, sync, onSyncNow, onToggleSideb
       )}
       {error === null && loaded === null && <p className="editor-msg">Loading…</p>}
       {/* Keyed by path so a rename mounts a fresh host rather than re-pointing a live iframe. */}
-      {error === null && loaded !== null && <DiagramHost key={path} root={root} path={path} loaded={loaded} watch={watch} sync={sync} onSyncNow={onSyncNow} onToggleSidebar={onToggleSidebar} />}
+      {error === null && loaded !== null && (
+        <DiagramHost key={path} root={root} path={path} loaded={loaded} watch={watch} sync={sync} onSyncNow={onSyncNow} darkColors={darkColors} onNotice={onNotice} onToggleSidebar={onToggleSidebar} />
+      )}
     </section>
   )
 }
@@ -124,7 +145,7 @@ interface DiagramHostProps extends DrawioEditorProps {
 }
 
 /** Mounts exactly one draw.io iframe for `loaded` and owns everything that writes. */
-function DiagramHost({ root, path, loaded, watch, sync, onSyncNow, onToggleSidebar }: DiagramHostProps) {
+function DiagramHost({ root, path, loaded, watch, sync, onSyncNow, darkColors = DEFAULT_SETTINGS.diagramDarkColors, onNotice, onToggleSidebar }: DiagramHostProps) {
   const theme = useAppliedTheme()
   const hostRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLIFrameElement>(null)
@@ -144,6 +165,9 @@ function DiagramHost({ root, path, loaded, watch, sync, onSyncNow, onToggleSideb
   /** The theme draw.io is showing (the URL's, then each flip sent), and the one the app wants now. */
   const shownTheme = useRef(theme)
   const wantedTheme = useRef(theme)
+  /** The same pair for the dark-mode colour setting: what the configure reply (then each change) sent, and what the app wants now. */
+  const shownColors = useRef(darkColors)
+  const wantedColors = useRef(darkColors)
   /** A retired host never writes again (a delete, or a rename that moved this path away). */
   const retired = useRef(false)
 
@@ -180,7 +204,8 @@ function DiagramHost({ root, path, loaded, watch, sync, onSyncNow, onToggleSideb
     const h = handshake.current
     if (h.configured || !h.configureAsked) return
     h.configured = true
-    post({ action: 'configure', config: drawioConfig() })
+    shownColors.current = wantedColors.current
+    post({ action: 'configure', config: drawioConfig(wantedColors.current) })
   }, [post])
 
   /** Show the app's theme, once draw.io listens: its own `darkMode` / `lightMode` action. */
@@ -188,6 +213,13 @@ function DiagramHost({ root, path, loaded, watch, sync, onSyncNow, onToggleSideb
     if (!handshake.current.initialised || shownTheme.current === wantedTheme.current) return
     shownTheme.current = wantedTheme.current
     post({ action: 'invokeAction', actionName: wantedTheme.current === 'dark' ? 'darkMode' : 'lightMode' })
+  }, [post])
+
+  /** A change of the dark-mode colour setting since the configure reply, once draw.io listens: our PostConfig's message. */
+  const syncColors = useCallback(() => {
+    if (!handshake.current.initialised || shownColors.current === wantedColors.current) return
+    shownColors.current = wantedColors.current
+    post({ action: 'yaseenAdaptiveColors', value: drawioAdaptiveColors(wantedColors.current) })
   }, [post])
 
   // The one message listener: the protocol, in the order drawioProtocol.ts documents.
@@ -210,6 +242,7 @@ function DiagramHost({ root, path, loaded, watch, sync, onSyncNow, onToggleSideb
         case 'init':
           h.initialised = true
           syncTheme()
+          syncColors()
           sendLoad(latestXml.current, autosave.current?.mtime ?? loaded.mtime)
           return
         case 'load': {
@@ -241,7 +274,7 @@ function DiagramHost({ root, path, loaded, watch, sync, onSyncNow, onToggleSideb
       window.removeEventListener('message', onMessage)
       if (fallback !== undefined) clearTimeout(fallback)
     }
-  }, [configure, syncTheme, sendLoad, save, loaded.mtime, onToggleSidebar])
+  }, [configure, syncTheme, syncColors, sendLoad, save, loaded.mtime, onToggleSidebar])
 
   /** Disk truth into draw.io, then a fresh baseline: the clean editor's answer to a change. */
   const reload = useCallback(async () => {
@@ -286,6 +319,43 @@ function DiagramHost({ root, path, loaded, watch, sync, onSyncNow, onToggleSideb
     wantedTheme.current = theme
     syncTheme()
   }, [theme, syncTheme])
+
+  // 🔒 YAZ-1802 D16: the dark-mode colour setting, live.
+  useEffect(() => {
+    wantedColors.current = darkColors
+    syncColors()
+  }, [darkColors, syncColors])
+
+  /** File › Export Image…: see the module doc. The picture is drawn before the sheet opens, because the sheet's pick decides the format. */
+  const exportImage = useCallback(async () => {
+    try {
+      const xml = latestXml.current
+      const [png, svg] = await Promise.all([renderDiagramImage(xml, 'png'), renderDiagramImage(xml, 'svg')])
+      if (png === '') {
+        onNotice?.(EXPORT_EMPTY)
+        return
+      }
+      const answer = await api.dialog.saveImage({ defaultName: `${stripExt(basename(path))}.png`, png, svg })
+      if ('cancelled' in answer) return
+      onNotice?.(`Exported to ${basename(answer.path)}`)
+    } catch (err) {
+      onNotice?.(err instanceof BridgeRequestError && err.message !== '' ? err.message : EXPORT_FAILED, 'error')
+    }
+  }, [onNotice, path])
+  const exportImageRef = useRef(exportImage)
+  exportImageRef.current = exportImage
+
+  // The menu's command, claimed on THIS tab's section so only the diagram in front answers
+  // (`drawingCommand.ts`); main enables nothing but Export Image… on a diagram tab.
+  useEffect(() => {
+    const section = hostRef.current?.closest('.editor--diagram') ?? null
+    if (section === null) return
+    const onCommand = (event: Event): void => {
+      if ((event as CustomEvent<DrawingCommand>).detail.kind === 'export-image') void exportImageRef.current()
+    }
+    section.addEventListener(DRAWING_COMMAND_EVENT, onCommand)
+    return () => section.removeEventListener(DRAWING_COMMAND_EVENT, onCommand)
+  }, [])
 
   // The close/quit handshake and the unmount flush — `DrawingEditor`'s, unchanged. A retired host
   // does neither: that is what keeps a delete deleted.

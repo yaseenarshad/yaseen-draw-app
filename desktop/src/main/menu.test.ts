@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { MenuItemConstructorOptions } from 'electron'
-import type { RecentRoots, WindowEntry } from '@shared/types'
+import type { FileKind, RecentRoots, WindowEntry } from '@shared/types'
 import { CH } from '../channels'
 import { createStore, type Store } from './store'
 import { HELP_URL, buildContextMenuTemplate, buildMenuTemplate, createMenuHandlers, pickMenuTargetWindow, subscribeMenuRebuild, subscribeMenuRebuildOnActiveFile, CANVAS_BACKGROUND_PICKS, type ContextMenuActions, type MenuHandlers, type MenuHost } from './menu'
@@ -35,8 +35,8 @@ const RECENTS: RecentRoots = [
   { path: '/vaults/old', lastOpened: 1 },
 ]
 
-function build(recents: RecentRoots = RECENTS, isDev = false, handlers: MenuHandlers = noopHandlers(), activeIsDrawing = true) {
-  return buildMenuTemplate({ recents, isDev, activeIsDrawing }, handlers)
+function build(recents: RecentRoots = RECENTS, isDev = false, handlers: MenuHandlers = noopHandlers(), activeKind: FileKind | null = 'drawing') {
+  return buildMenuTemplate({ recents, isDev, activeKind }, handlers)
 }
 
 function menuOf(template: MenuItemConstructorOptions[], label: string): MenuItemConstructorOptions[] {
@@ -162,35 +162,43 @@ describe('buildMenuTemplate', () => {
     expect(vi.mocked(handlers.zoom).mock.calls).toEqual([[0], [1], [1], [-1]])
   })
 
-  it('File › Export Image… is ⌘⇧E, enabled only on a drawing tab, and calls exportImage (🔒 YAZ-1775 D10)', () => {
+  it('File › Export Image… is ⌘⇧E, enabled on a drawing tab, and calls exportImage (🔒 YAZ-1775 D10)', () => {
     const handlers = noopHandlers()
-    const item = menuOf(build(RECENTS, false, handlers, true), 'File').find((i) => i.id === 'menu.file.export-image')
+    const item = menuOf(build(RECENTS, false, handlers, 'drawing'), 'File').find((i) => i.id === 'menu.file.export-image')
     expect(item?.label).toBe('Export Image…')
     expect(item?.accelerator).toBe('CmdOrCtrl+Shift+E')
     expect(item?.enabled).toBe(true)
     click(item)
     expect(handlers.exportImage).toHaveBeenCalledTimes(1)
-    // A non-drawing tab (or no tab at all) greys it out rather than letting it silently no-op.
-    expect(menuOf(build(RECENTS, false, handlers, false), 'File').find((i) => i.id === 'menu.file.export-image')?.enabled).toBe(false)
+    // A non-board tab (or no tab at all) greys it out rather than letting it silently no-op.
+    expect(menuOf(build(RECENTS, false, handlers, null), 'File').find((i) => i.id === 'menu.file.export-image')?.enabled).toBe(false)
+  })
+
+  it('a draw.io diagram tab enables Export Image… but not the Excalidraw-only items (🔒 YAZ-1802 D9)', () => {
+    const template = build(RECENTS, false, noopHandlers(), 'diagram')
+    const enabled = (menu: string, id: string) => menuOf(template, menu).find((i) => i.id === id)?.enabled
+    expect(enabled('File', 'menu.file.export-image')).toBe(true)
+    expect(enabled('File', 'menu.file.export-drawing')).toBe(false)
+    expect(enabled('View', 'menu.view.canvas-background')).toBe(false)
   })
 
   it('File › Export Drawing… is ⌘⇧S, gated the same way, and calls exportDrawing (🔒 YAZ-1775 D3, YAZ-1821)', () => {
     const handlers = noopHandlers()
-    const file = menuOf(build(RECENTS, false, handlers, true), 'File')
+    const file = menuOf(build(RECENTS, false, handlers, 'drawing'), 'File')
     const item = file.find((i) => i.id === 'menu.file.export-drawing')
     expect(item?.label).toBe('Export Excalidraw Drawing…')
     expect(item?.accelerator).toBe('CmdOrCtrl+Shift+S')
     expect(item?.enabled).toBe(true)
     click(item)
     expect(handlers.exportDrawing).toHaveBeenCalledTimes(1)
-    expect(menuOf(build(RECENTS, false, handlers, false), 'File').find((i) => i.id === 'menu.file.export-drawing')?.enabled).toBe(false)
+    expect(menuOf(build(RECENTS, false, handlers, null), 'File').find((i) => i.id === 'menu.file.export-drawing')?.enabled).toBe(false)
     // It sits beside the image export, and the two are not the same gesture.
     expect(file.findIndex((i) => i.id === 'menu.file.export-drawing')).toBe(file.findIndex((i) => i.id === 'menu.file.export-image') + 1)
   })
 
-  it('File › Share Link is ⌘⇧L, right after Export Drawing…, gated the same way (YAZ-1799)', () => {
+  it('File › Share Link is ⌘⇧L, right after Export Drawing…, enabled on any board — a diagram too (YAZ-1799, 🔒 YAZ-1802 D11)', () => {
     const handlers = noopHandlers()
-    const file = menuOf(build(RECENTS, false, handlers, true), 'File')
+    const file = menuOf(build(RECENTS, false, handlers, 'drawing'), 'File')
     const item = file.find((i) => i.id === 'menu.file.share-link')
     expect(item?.label).toBe('Share Link')
     expect(item?.accelerator).toBe('CmdOrCtrl+Shift+L')
@@ -198,7 +206,9 @@ describe('buildMenuTemplate', () => {
     click(item)
     expect(handlers.shareLink).toHaveBeenCalledTimes(1)
     expect(file.findIndex((i) => i.id === 'menu.file.share-link')).toBe(file.findIndex((i) => i.id === 'menu.file.export-drawing') + 1)
-    expect(menuOf(build(RECENTS, false, handlers, false), 'File').find((i) => i.id === 'menu.file.share-link')?.enabled).toBe(false)
+    const shareLinkOn = (kind: FileKind | null) => menuOf(build(RECENTS, false, handlers, kind), 'File').find((i) => i.id === 'menu.file.share-link')?.enabled
+    expect(shareLinkOn('diagram')).toBe(true)
+    expect(shareLinkOn(null)).toBe(false)
   })
 
   it('⌘⇧S and ⌘⇧L are claimed by nothing else in the menu bar', () => {
@@ -213,7 +223,7 @@ describe('buildMenuTemplate', () => {
 
   it('View › Canvas Background carries the engine`s five picks, gated the same way (🔒 YAZ-1775 D10)', () => {
     const handlers = noopHandlers()
-    const item = menuOf(build(RECENTS, false, handlers, true), 'View').find((i) => i.id === 'menu.view.canvas-background')
+    const item = menuOf(build(RECENTS, false, handlers, 'drawing'), 'View').find((i) => i.id === 'menu.view.canvas-background')
     expect(item?.label).toBe('Canvas Background')
     expect(item?.enabled).toBe(true)
     expect(item?.accelerator).toBeUndefined()
@@ -222,7 +232,7 @@ describe('buildMenuTemplate', () => {
     expect(CANVAS_BACKGROUND_PICKS.map((p) => p.color)).toEqual(['#ffffff', '#f8f9fa', '#f5faff', '#fffce8', '#fdf8f6'])
     picks.forEach((pick) => click(pick))
     expect(vi.mocked(handlers.canvasBackground).mock.calls).toEqual(CANVAS_BACKGROUND_PICKS.map((p) => [p.color]))
-    expect(menuOf(build(RECENTS, false, handlers, false), 'View').find((i) => i.id === 'menu.view.canvas-background')?.enabled).toBe(false)
+    expect(menuOf(build(RECENTS, false, handlers, null), 'View').find((i) => i.id === 'menu.view.canvas-background')?.enabled).toBe(false)
   })
 
   it('Window menu: role window (macOS window list) with minimize / zoom, the tab-switching items, front', () => {

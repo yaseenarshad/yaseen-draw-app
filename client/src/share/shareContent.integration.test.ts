@@ -7,7 +7,7 @@
  * renderer's tsconfig must not type-check main-process code, but at test time vitest runs both.
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import type { DrawingLoadRequest, DrawingLoadResponse } from '@shared/types'
+import type { DiagramLoadRequest, DiagramLoadResponse, DrawingLoadRequest, DrawingLoadResponse } from '@shared/types'
 import { buildShareContent } from './shareContent'
 
 interface NodeFs {
@@ -18,11 +18,15 @@ interface NodeFs {
 }
 const nodeImport = <T>(specifier: string): Promise<T> => import(/* @vite-ignore */ specifier) as Promise<T>
 const MAIN_DRAWING = '../../../desktop/src/main/fs/drawing'
+const MAIN_DIAGRAM = '../../../desktop/src/main/fs/diagram'
 
 vi.mock('../api', () => ({
   api: {
     drawing: {
       load: async (req: DrawingLoadRequest): Promise<DrawingLoadResponse> => (await nodeImport<{ loadDrawing: (r: DrawingLoadRequest) => Promise<DrawingLoadResponse> }>(MAIN_DRAWING)).loadDrawing(req),
+    },
+    diagram: {
+      load: async (req: DiagramLoadRequest): Promise<DiagramLoadResponse> => (await nodeImport<{ loadDiagram: (r: DiagramLoadRequest) => Promise<DiagramLoadResponse> }>(MAIN_DIAGRAM)).loadDiagram(req),
     },
   },
 }))
@@ -37,6 +41,8 @@ const image = (fileId: string, extra: Record<string, unknown> = {}) => ({ id: `e
 const rect = () => ({ id: `el${n++}`, type: 'rectangle', x: 0, y: 0, width: 100, height: 50 })
 const scene = (elements: unknown[], files: Record<string, unknown> = {}) => JSON.stringify({ type: 'excalidraw', version: 2, source: 'yaz-1892', elements, appState: { viewBackgroundColor: '#ffffff' }, files })
 const entry = (img: Img) => ({ mimeType: 'image/png', id: img, dataURL: dataURL(img), created: 1 })
+/** A draw.io diagram with a picture inside it, as draw.io saves one. */
+const DIAGRAM = `<mxfile host="yaz-1802"><diagram id="p1" name="Page-1"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" value="" style="shape=image;image=${dataURL('lean1')};" vertex="1" parent="1"><mxGeometry width="40" height="40" as="geometry"/></mxCell></root></mxGraphModel></diagram></mxfile>\n`
 
 let fs: NodeFs
 let root: string
@@ -64,6 +70,7 @@ beforeAll(async () => {
   await write('06 Empty.excalidraw', scene([]))
   await write("08 Tom's “café” board 🎨 — ünïcödé.excalidraw", scene([rect()]))
   await write('Clients/Acme Corp/2026/Q3 workshop/09 Deep.excalidraw', scene([image('lean1')]))
+  await write('10 Flow.drawio', DIAGRAM)
 })
 afterAll(() => fs.rm(root, { recursive: true, force: true }))
 
@@ -91,6 +98,10 @@ describe('the bytes a share uploads, from seeded boards (YAZ-1892 scenario 9)', 
   it('an empty board shares as a valid empty scene', async () => {
     const built = await shared('06 Empty.excalidraw')
     expect(built.scene).toMatchObject({ type: 'excalidraw', elements: [], files: {} })
+  })
+
+  it('a draw.io diagram shares its XML exactly as saved — its pictures already live inside it (🔒 YAZ-1802 D11)', async () => {
+    expect(await buildShareContent(root, at('10 Flow.drawio'), { flush: false })).toBe(DIAGRAM)
   })
 
   it('unicode, emoji and apostrophe names and a board four folders down load and build', async () => {

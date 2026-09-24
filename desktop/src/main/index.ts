@@ -2,7 +2,7 @@ import { app, BrowserWindow, Menu, nativeTheme, net, powerMonitor, protocol, scr
 import { existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { isDrawing } from '@shared/fileKind'
+import { fileKind } from '@shared/fileKind'
 import { fileLink, parseFileLink } from '@shared/links'
 import type { WindowEntry } from '@shared/types'
 import { DRAWIO_HOST, resolveDrawioDir, serveDrawio } from './drawio/assets'
@@ -186,17 +186,17 @@ app.whenReady().then(() => {
     },
     openExternal: (url) => void shell.openExternal(url),
   })
-  // 🔒 YAZ-1775 D10: the two canvas items are enabled only while the window a menu action would target has
-  // a DRAWING in front. Read at build time from the same entry `focusedEntry` uses, so the answer
-  // and the send target can never disagree.
-  const activeFileIsDrawing = (): boolean => {
+  // 🔒 YAZ-1775 D10: the board items are enabled only while the window a menu action would target has
+  // a board of the right kind in front. Read at build time from the same entry `focusedEntry` uses,
+  // so the answer and the send target can never disagree.
+  const activeFileKind = () => {
     const wc = menuTarget()
     const id = wc === undefined ? undefined : manager.idFor(wc)
     const file = id === undefined ? null : (store.get().windows.find((w) => w.id === id)?.file ?? null)
-    return file !== null && isDrawing(file)
+    return file === null ? null : fileKind(file)
   }
   const applyMenu = (): void =>
-    Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenuTemplate({ recents: store.get().recents, isDev: !app.isPackaged, activeIsDrawing: activeFileIsDrawing() }, handlers)))
+    Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenuTemplate({ recents: store.get().recents, isDev: !app.isPackaged, activeKind: activeFileKind() }, handlers)))
   applyMenu()
   subscribeMenuRebuild(store, applyMenu)
   // A tab switch changes which file is in front (🔒 YAZ-1775 D10); focus changes which window is asked.

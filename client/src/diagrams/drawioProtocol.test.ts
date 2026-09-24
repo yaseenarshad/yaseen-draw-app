@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DRAWIO_ORIGIN, drawioConfig, drawioFrameUrl, readDrawioMessage } from './drawioProtocol'
+import { DRAWIO_ORIGIN, drawioAdaptiveColors, drawioConfig, drawioFrameUrl, readDrawioMessage } from './drawioProtocol'
 
 describe('drawioFrameUrl (🔒 YAZ-1802 D4)', () => {
   it('is the drawio origin in embed + JSON + configure mode, with every door to the network shut', () => {
@@ -16,9 +16,21 @@ describe('drawioFrameUrl (🔒 YAZ-1802 D4)', () => {
   })
 })
 
-describe('drawioConfig (🔒 YAZ-1802 D3 / D12a / D12b)', () => {
+describe('drawioAdaptiveColors (🔒 YAZ-1802 D16)', () => {
+  it('is the dark-mode colour setting in draw.io’s own words: adapt → auto, keep → none', () => {
+    expect(drawioAdaptiveColors('adapt')).toBe('auto')
+    expect(drawioAdaptiveColors('keep')).toBe('none')
+  })
+})
+
+describe('drawioConfig (🔒 YAZ-1802 D3 / D12a / D12b / D16)', () => {
   type Shortcut = { keyCode: string | number; control?: boolean; shift?: boolean; action: string | null }
-  const config = drawioConfig() as { defaultFonts: string[]; presetColors: string[]; defaultColors: string[]; keyboardShortcuts: Shortcut[] }
+  const config = drawioConfig('adapt') as { defaultFonts: string[]; presetColors: string[]; defaultColors: string[]; keyboardShortcuts: Shortcut[] }
+
+  it('starts draw.io on the dark-mode colour setting', () => {
+    expect(config).toMatchObject({ defaultAdaptiveColors: 'auto' })
+    expect(drawioConfig('keep')).toMatchObject({ defaultAdaptiveColors: 'none' })
+  })
 
   it('saves plain XML, page view and grid off, and leaves guides a per-diagram toggle', () => {
     expect(config).toMatchObject({ compressXml: false, defaultPageVisible: false, defaultGridEnabled: false, zoomWheel: false })

@@ -21,7 +21,7 @@ import { CANVAS_SECTION } from './canvasSection'
 import { Segmented } from './controls'
 import { HOTKEY_GROUPS, type HotkeyEntry } from './hotkeys'
 import { LibraryFolderControl, LibraryFolderHint } from './LibraryFolderControl'
-import { ON_OFF_OPTIONS, repoHint, THEME_OPTIONS } from './options'
+import { DIAGRAM_DARK_COLORS_OPTIONS, ON_OFF_OPTIONS, repoHint, THEME_OPTIONS } from './options'
 import { PixabayKeyControl } from './PixabayKeyControl'
 import { STORAGE_SECTION } from './storageSection'
 import { SHARING_SECTION } from '../share/SharingPage'
@@ -104,6 +104,16 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
             label: 'Theme',
             keywords: ['dark', 'light', 'system'],
             render: ({ settings, onChange }) => <Segmented options={THEME_OPTIONS} value={settings.theme} onChange={(theme) => onChange({ ...settings, theme })} ariaLabel="Theme" />,
+          },
+          {
+            // 🔒 YAZ-1802 D16: the default for every diagram; a file that sets its own `adaptiveColors` keeps it.
+            id: 'diagramDarkColors',
+            label: 'draw.io diagrams in dark mode',
+            hint: 'Adapt re-colours diagrams so they stay readable in dark mode. A diagram that asks to keep its own colours always does.',
+            keywords: ['drawio', 'draw.io', 'diagram', 'dark', 'colors', 'colours', 'adaptive'],
+            render: ({ settings, onChange }) => (
+              <Segmented options={DIAGRAM_DARK_COLORS_OPTIONS} value={settings.diagramDarkColors} onChange={(diagramDarkColors) => onChange({ ...settings, diagramDarkColors })} ariaLabel="draw.io diagrams in dark mode" />
+            ),
           },
         ],
       },

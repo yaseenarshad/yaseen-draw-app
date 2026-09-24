@@ -5,6 +5,7 @@
  * user's own Worker, with the upload password.
  */
 import { stat } from 'node:fs/promises'
+import { isDiagram } from '@shared/fileKind'
 import { MAX_SHARE_BYTES, type ShareEntry, type ShareListEntry, type ShareSync } from '@shared/types'
 import { BridgeFailure, requireAbsPath } from '../fs/fsUtils'
 import { uploadTimeoutMs } from './cloudflare'
@@ -13,7 +14,9 @@ import { absFromKey, readShares, relKey, updateShares, type ShareRecord } from '
 
 const LIVE_CHECK_MS = 5_000
 const mb = (bytes: number): string => `${(bytes / 1_000_000).toFixed(1)} MB`
-const stripName = (p: string): string => p.split('/').pop()!.replace(/\.excalidraw$/i, '')
+const stripName = (p: string): string => p.split('/').pop()!.replace(/\.(excalidraw|drawio)$/i, '')
+/** 🔒 YAZ-1802 D11: a share Worker deployed before diagrams could be shared (it answers a diagram's upload without `x-board-kind`). */
+export const WORKER_OUTDATED = "Your share Worker is from before diagrams could be shared, so it can't show this one. Open Settings › Sharing and run Set up sharing again: it updates the Worker, and every link keeps working."
 /** `abs` is `base` or inside it. */
 const within = (abs: string, base: string) => abs === base || abs.startsWith(`${base}/`)
 /** The open vault holding `abs` — the deepest one, if vaults nest. */
@@ -119,7 +122,11 @@ export function createBoards(ctx: ShareContext) {
       throw new BridgeFailure('TOO_LARGE', `This board is ${mb(size)} once its images are packed in, and Cloudflare's free plan accepts at most ${mb(MAX_SHARE_BYTES)} per upload. Use fewer or smaller images, or split the board.`)
     const { password, origin } = await ready()
     const id = existing?.id ?? newShareId()
-    const headers: Record<string, string> = { 'content-type': 'application/json', 'x-board-name': encodeURIComponent(stripName(key)) }
+    const diagram = isDiagram(key)
+    const headers: Record<string, string> = { 'content-type': diagram ? 'application/xml' : 'application/json', 'x-board-name': encodeURIComponent(stripName(key)) }
+    // 🔒 YAZ-1802 D11: a diagram goes up as its XML, tagged, and the Worker stores the tag as the
+    // object's `kind` — the viewer and the download follow it. A drawing sends no tag (missing = drawing).
+    if (diagram) headers['x-board-kind'] = 'diagram'
     // The permission travels only when the PUT creates the object: a new share ("can view and
     // download") or a stale one coming back. A plain re-upload never carries it, so it can never
     // undo a permission change — that is PATCH's alone.
@@ -128,6 +135,13 @@ export function createBoards(ctx: ShareContext) {
     if (res.status === 401) throw new BridgeFailure('PROVIDER_FAILED', `${PASSWORD_REFUSED} Open Settings › Sharing and run Set up sharing again.`)
     if (res.status === 413) throw new BridgeFailure('TOO_LARGE', `Cloudflare refused the upload as too large (${mb(size)}; the limit is ${mb(MAX_SHARE_BYTES)}).`)
     if (!res.ok) throw new BridgeFailure('PROVIDER_FAILED', `The upload failed (HTTP ${res.status}). Try again in a moment.`)
+    if (diagram && res.headers.get('x-board-kind') !== 'diagram') {
+      // An outdated Worker stored the XML as a drawing, which its viewer cannot draw. A first share
+      // is taken back down (nobody has its link yet); a shared one keeps its record, and the next
+      // save after Set up sharing puts it right.
+      if (existing === undefined) await worker(origin, 'DELETE', `/api/boards/${id}`, password).catch(() => undefined)
+      throw new BridgeFailure('PROVIDER_FAILED', WORKER_OUTDATED)
+    }
     stale.delete(id)
     const t = now()
     let saved: [string, ShareRecord] | undefined

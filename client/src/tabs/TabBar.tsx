@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import { BOARD_TYPE_NAME, isDiagram } from '@shared/fileKind'
 import { api, BridgeRequestError } from '../api'
 import { ContextMenuSurface } from '../components/ContextMenuSurface'
 import { dropIndex, insertionSlot } from '../lib/dragSlot'
 import { basename, stripExt } from '../lib/paths'
-import { SidebarPanelIcon } from '../components/icons'
+import { DiagramMark, SidebarPanelIcon } from '../components/icons'
 import './tabs.css'
 
 export interface TabBarProps {
@@ -48,11 +49,12 @@ const Chevron = ({ d }: { d: string }) => (
 
 /**
  * The window tab strip (Tabs I2/I3, GRO-2234/2235): one tab per open file, ViewTabs' tablist
- * semantics (role=tab, aria-selected, active underline). Labels hide only a drawing's own
+ * semantics (role=tab, aria-selected, active underline). Labels hide only a board's own
  * extension; view-only labels keep their extension and every full path lives in the title
- * tooltip. Tabs reorder by HTML5 drag (the
- * groupDrag idiom: `dataTransfer` guarded — jsdom's synthetic drags have none) with an accent
- * insertion indicator; the strip scrolls when full and keeps the ACTIVE tab in view. Left of
+ * tooltip. A draw.io diagram's label follows its type mark, as its sidebar row does (🔒 YAZ-1802
+ * D15). Tabs reorder by HTML5 drag (the groupDrag idiom: `dataTransfer` guarded — jsdom's
+ * synthetic drags have none) with an accent insertion indicator; the strip scrolls when full and
+ * keeps the ACTIVE tab in view. Left of
  * the strip sit the ◀ ▶ history buttons (YAZ-721), disabled when the active tab's stack has
  * nowhere to go — buttons only, per LOCKED ruling D2: no shortcut, no menu item.
  * Presentational only — all durable state changes go through workspace callbacks.
@@ -169,6 +171,11 @@ export function TabBar({ tabs, active, onActivate, onClose, onMove, canBack, can
                   if (e.button === 1) onClose(path)
                 }}
               >
+                {isDiagram(path) && (
+                  <span className="tabbar__kind" role="img" aria-label={BOARD_TYPE_NAME.diagram} title={BOARD_TYPE_NAME.diagram}>
+                    <DiagramMark />
+                  </span>
+                )}
                 <span className="tabbar__label">{label}</span>
               </button>
               <button type="button" className="tabbar__close" aria-label={`Close ${label}`} title={`Close ${label}`} onClick={() => onClose(path)}>

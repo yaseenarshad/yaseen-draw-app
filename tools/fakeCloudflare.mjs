@@ -133,7 +133,7 @@ const diskBucket = {
   },
 }
 
-const MIME = { '.js': 'application/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.png': 'image/png', '.svg': 'image/svg+xml' }
+const MIME = { '.js': 'application/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.png': 'image/png', '.svg': 'image/svg+xml', '.xml': 'application/xml', '.txt': 'text/plain' }
 /**
  * The `ASSETS` binding (Workers Static Assets): the uploaded manifest's files, by path. Before any
  * setup uploaded them (board 10's pre-existing link), the repo's `share/dist/assets` stands in.

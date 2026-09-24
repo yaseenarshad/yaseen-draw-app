@@ -19,6 +19,7 @@ const APP_MIN_JS = fileURLToPath(new URL(`../desktop/.cache/drawio/${DRAWIO_TAG}
 function loadPostConfig({ fetchFonts = async () => ({ ok: true, text: async () => '@font-face {}' }) } = {}) {
   const posted = []
   const fontCss = []
+  const listeners = []
   function Graph() {}
   Graph.prototype.isZoomWheelEvent = (evt) => evt.ctrlKey === true
   function EditorUi() {}
@@ -49,11 +50,18 @@ function loadPostConfig({ fetchFonts = async () => ({ ok: true, text: async () =
     fetch: fetchFonts,
     console: { error: vi.fn() },
     parent: { postMessage: (data, origin) => posted.push({ ...JSON.parse(data), origin }) },
+    addEventListener: (type, listener) => listeners.push({ type, listener }),
   }
   env.window = env
   createContext(env)
   runInContext(readFileSync(`${OVERLAY_JS}PostConfig.js`, 'utf8'), env)
-  return { env, posted, fontCss }
+  /** A `message` event as the page sees it — from the host (`window.parent`) unless told otherwise; true when a listener stopped it. */
+  const message = (data, source = env.parent) => {
+    const evt = { data: JSON.stringify(data), source, stopImmediatePropagation: vi.fn() }
+    for (const l of listeners) if (l.type === 'message') l.listener(evt)
+    return evt.stopImmediatePropagation.mock.calls.length > 0
+  }
+  return { env, posted, fontCss, message }
 }
 
 function geometry(x, y, width, height, relative = false) {
@@ -91,6 +99,7 @@ function openEditor(env) {
     toggleCellStyleFlags: (key, flag) => selection.forEach((c) => (c.style[key] = Number(c.style[key] ?? 0) ^ flag)),
     updateCellSize: vi.fn(),
     addListener: (name, listener) => (listeners[name] = listener),
+    refresh: vi.fn(),
   }
   const bold = vi.fn()
   const keyHandler = {
@@ -111,7 +120,7 @@ function openEditor(env) {
       return table[evt.keyCode] ?? null
     },
   }
-  const ui = { editor: { graph }, keyHandler, hsplitPosition: 208 }
+  const ui = { editor: { graph }, keyHandler, hsplitPosition: 208, setAdaptiveColors: vi.fn() }
   env.EditorUi.prototype.createUi.call(ui)
   env.EditorUi.prototype.installKeyboardShortcuts.call(ui)
   return {
@@ -301,6 +310,27 @@ describe('PostConfig.js (🔒 YAZ-1802 D12a / D12b), against a stand-in draw.io'
     expect(posted.filter((m) => m.event === 'shortcut')).toHaveLength(1)
   })
 
+  it('the host’s yaseenAdaptiveColors moves draw.io’s DEFAULT and re-draws — a file’s own value is kept, and draw.io never sees the message (🔒 YAZ-1802 D16)', () => {
+    const { env, message } = loadPostConfig()
+    const editor = openEditor(env)
+    expect(message({ action: 'yaseenAdaptiveColors', value: 'none' })).toBe(true)
+    expect(env.Graph.defaultAdaptiveColors).toBe('none')
+    expect(editor.ui.setAdaptiveColors).toHaveBeenLastCalledWith('default')
+    expect(editor.graph.refresh).toHaveBeenCalledOnce()
+    editor.graph.adaptiveColors = 'none'
+    message({ action: 'yaseenAdaptiveColors', value: 'auto' })
+    expect(env.Graph.defaultAdaptiveColors).toBe('auto')
+    expect(editor.ui.setAdaptiveColors).toHaveBeenLastCalledWith('none')
+  })
+
+  it('leaves every other message, and the same one from anywhere but the host, to draw.io', () => {
+    const { env, message } = loadPostConfig()
+    openEditor(env)
+    expect(message({ action: 'load', xml: '<mxfile/>' })).toBe(false)
+    expect(message({ action: 'yaseenAdaptiveColors', value: 'none' }, {})).toBe(false)
+    expect(env.Graph.defaultAdaptiveColors).toBeUndefined()
+  })
+
   it('a corner drag scales a text’s font with its height; a side drag and a shape’s label do not', () => {
     const { env } = loadPostConfig()
     const text = cell(TEXT, { label: 'Note', geo: geometry(0, 0, 200, 60) })
@@ -319,7 +349,7 @@ describe('PostConfig.js (🔒 YAZ-1802 D12a / D12b), against a stand-in draw.io'
 describe.skipIf(!existsSync(APP_MIN_JS))(`every draw.io action we name exists in the pinned ${DRAWIO_TAG}`, () => {
   it('the configure reply’s keyboard shortcuts, the Grid menu item and the live theme', () => {
     const app = readFileSync(APP_MIN_JS, 'utf8')
-    const shortcuts = drawioConfig().keyboardShortcuts
+    const shortcuts = drawioConfig('adapt').keyboardShortcuts
     const named = [...new Set(shortcuts.map((s) => s.action).filter((a) => a !== null)), 'grid', 'darkMode', 'lightMode']
     for (const action of named) expect(app, action).toMatch(new RegExp(`(addAction|put)\\("${action}"`))
   })

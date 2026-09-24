@@ -1,7 +1,7 @@
 import type { FileKind, TreeNode } from '@shared/types'
 import { BOARD_TYPE_NAME } from '@shared/fileKind'
 import type { FileNode } from '@shared/treeSort'
-import { LinkIcon } from '../components/icons'
+import { DiagramMark, LinkIcon } from '../components/icons'
 import { stripExt } from '../lib/paths'
 import { TOO_LARGE_LABEL } from '../lib/syncAttention'
 import { CreateInline } from './CreateInline'
@@ -132,19 +132,15 @@ function CloudOffIcon() {
 
 /**
  * 🔒 YAZ-1802 D15: a draw.io diagram's mark, since its name no longer says (the extension is
- * hidden) — linked boxes, a generic glyph, never draw.io's logo. An unmarked board is an
- * Excalidraw drawing, the usual kind. The mark sits in the slot a folder's chevron takes, so it
- * costs the name no width; every other row keeps the slot empty so all names line up.
+ * hidden). An unmarked board is an Excalidraw drawing, the usual kind. The mark sits in the slot a
+ * folder's chevron takes, so it costs the name no width; every other row keeps the slot empty so
+ * all names line up.
  */
 function KindIcon({ kind }: { kind: FileKind | null }) {
   if (kind !== 'diagram') return <span className="tree__kind" aria-hidden="true" />
   return (
     <span className="tree__kind" role="img" aria-label={BOARD_TYPE_NAME.diagram} title={BOARD_TYPE_NAME.diagram}>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <rect x="3" y="3" width="7" height="6" rx="1" />
-        <rect x="14" y="15" width="7" height="6" rx="1" />
-        <path d="M6.5 9v4a2 2 0 0 0 2 2H14" />
-      </svg>
+      <DiagramMark />
     </span>
   )
 }

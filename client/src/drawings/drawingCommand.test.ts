@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { activeDrawingSection, DRAWING_COMMAND_EVENT, requestDrawingCommand, type DrawingCommand } from './drawingCommand'
+import { activeBoardSection, DRAWING_COMMAND_EVENT, requestDrawingCommand, type DrawingCommand } from './drawingCommand'
 
 /** Two mounted tabs, as the workspace renders them: one visible layer, one hidden. */
 function stack(html: string): HTMLElement {
@@ -16,18 +16,23 @@ afterEach(() => {
 const VISIBLE = '<div class="tabstack__layer"><section class="editor editor--drawing" data-which="visible"></section></div>'
 const HIDDEN = '<div class="tabstack__layer tabstack__layer--hidden"><section class="editor editor--drawing" data-which="hidden"></section></div>'
 
-describe('activeDrawingSection', () => {
+describe('activeBoardSection', () => {
   it('finds the VISIBLE layer`s drawing and never a hidden one', () => {
     const host = stack(HIDDEN + VISIBLE)
-    expect(activeDrawingSection(host)?.getAttribute('data-which')).toBe('visible')
+    expect(activeBoardSection(host)?.getAttribute('data-which')).toBe('visible')
   })
 
   it('is null when every mounted drawing is hidden', () => {
-    expect(activeDrawingSection(stack(HIDDEN))).toBeNull()
+    expect(activeBoardSection(stack(HIDDEN))).toBeNull()
   })
 
-  it('is null when the visible tab is not a drawing', () => {
-    expect(activeDrawingSection(stack('<div class="tabstack__layer"><section class="editor"></section></div>' + HIDDEN))).toBeNull()
+  it('finds a visible draw.io diagram too — Export Image… works on either kind (🔒 YAZ-1802 D9)', () => {
+    const host = stack(HIDDEN + '<div class="tabstack__layer"><section class="editor editor--diagram" data-which="diagram"></section></div>')
+    expect(activeBoardSection(host)?.getAttribute('data-which')).toBe('diagram')
+  })
+
+  it('is null when the visible tab is not a board', () => {
+    expect(activeBoardSection(stack('<div class="tabstack__layer"><section class="editor"></section></div>' + HIDDEN))).toBeNull()
   })
 })
 

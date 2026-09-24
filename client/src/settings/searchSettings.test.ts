@@ -24,6 +24,7 @@ describe('settingCandidates', () => {
   it('covers every setting of every available section, one candidate each, in registry order', () => {
     expect(ids(settingCandidates(ctx()))).toEqual([
       'theme',
+      'diagramDarkColors',
       'canvas.gridModeEnabled',
       'canvas.objectsSnapModeEnabled',
       'canvas.snapToMidpoints',
@@ -93,13 +94,14 @@ describe('searchSettings', () => {
   })
 
   it('matches on a keyword the label does not contain', () => {
-    expect(ids(searchSettings(settingCandidates(ctx()), 'dark'))).toEqual(['theme'])
+    expect(ids(searchSettings(settingCandidates(ctx()), 'dark'))).toEqual(['theme', 'diagramDarkColors'])
+    expect(ids(searchSettings(settingCandidates(ctx()), 'drawio'))).toEqual(['diagramDarkColors'])
     expect(ids(searchSettings(settingCandidates(ctx()), 'trash'))).toEqual(['confirmDelete'])
     expect(ids(searchSettings(settingCandidates(ctx()), 'iconify'))).toEqual(['pixabayApiKey'])
   })
 
   it('matches on the section title, returning every row of that section', () => {
-    expect(ids(searchSettings(settingCandidates(ctx()), 'appearance'))).toEqual(['theme'])
+    expect(ids(searchSettings(settingCandidates(ctx()), 'appearance'))).toEqual(['theme', 'diagramDarkColors'])
     expect(ids(searchSettings(settingCandidates(ctx({ status: null, setEnabled: () => undefined })), 'sync this vault'))).toEqual(['githubSync'])
   })
 

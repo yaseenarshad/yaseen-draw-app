@@ -1,5 +1,5 @@
 /**
- * Yaseen Draw's PostConfig (🔒 YAZ-1802 D12a / D12b) — laid over draw.io's own stub by `tools/packDrawio.mjs`.
+ * Yaseen Draw's PostConfig (🔒 YAZ-1802 D12a / D12b / D16) — laid over draw.io's own stub by `tools/packDrawio.mjs`.
  * draw.io's `bootstrap.js` loads this right AFTER `app.min.js` whenever the page is not on a
  * draw.io domain. It is a config hook, not draw.io code: the first block is draw.io's stub
  * verbatim, everything below it is ours and only patches draw.io's public prototypes.
@@ -36,14 +36,48 @@ window.ICON_SERVICE_PATH = null;
 		return null;
 	};
 
+	/** The one editor this page builds (embed mode has one), for the host's live messages below. */
+	var editorUi = null;
 	var createUi = EditorUi.prototype.createUi;
 
 	EditorUi.prototype.createUi = function()
 	{
+		editorUi = this;
 		this.hsplitPosition = 0;
 		createUi.apply(this, arguments);
 		installTextScaling(this.editor.graph);
 	};
+
+	// 🔒 YAZ-1802 D16: the app's "draw.io diagrams in dark mode" setting, LIVE. draw.io reads it once,
+	// as the configure reply's `defaultAdaptiveColors`, and has no embed action to change it, so the
+	// host's `yaseenAdaptiveColors` message is answered here — only after draw.io's `init`, when the
+	// editor exists. It moves draw.io's DEFAULT (a file's own `adaptiveColors` still wins) and
+	// re-draws what `EditorUi.setAdaptiveColors` re-draws, minus the file edit draw.io's own menu
+	// makes of it: nothing is marked modified, nothing autosaves, undo is untouched. Added before
+	// draw.io's embed handler exists (the handshake), so it can keep draw.io from answering an
+	// action it does not know with `unknownMessage`.
+	window.addEventListener('message', function(evt)
+	{
+		var msg = null;
+
+		try
+		{
+			msg = (evt.source === window.parent) ? JSON.parse(evt.data) : null;
+		}
+		catch (e)
+		{
+			return;
+		}
+
+		if (msg != null && msg.action == 'yaseenAdaptiveColors')
+		{
+			evt.stopImmediatePropagation();
+			Graph.defaultAdaptiveColors = msg.value;
+			var graph = editorUi.editor.graph;
+			editorUi.setAdaptiveColors((graph.adaptiveColors != null) ? graph.adaptiveColors : 'default');
+			graph.refresh();
+		}
+	});
 
 	// 🔒 YAZ-1802 D12a: right-clicking EMPTY canvas offers draw.io's own Grid toggle (with its check
 	// mark), beside the menu's zoom items. Wrapped last, so it lands at the end of the menu.

@@ -319,18 +319,18 @@ const CREATE_GROUP: readonly Item[] = [newDrawing, newDiagram, newFolder, newDat
 const ROW_GROUP: readonly Item[] = [rename]
 const OPEN_IN_GROUP: readonly Item[] = [toggleFavorite, openIn]
 /**
- * "Share" (YAZ-1799 D6): one EXCALIDRAW board row — Info's gate minus diagrams, which have no share
- * link yet (YAZ-1802) — and just above Info, so Info stays directly above Delete (🔒 YAZ-1835 D6).
+ * "Share" (YAZ-1799 D6): Info's gate — one board row, a drawing or a diagram (🔒 YAZ-1802 D11) — and
+ * just above Info, so Info stays directly above Delete (🔒 YAZ-1835 D6).
  */
 const share: Leaf = (t, h) => {
-  const path = t.sharePath
+  const path = t.infoPath
   if (path === null) return null
   return { id: 'share', label: 'Share', onSelect: () => h.onShare(path) }
 }
 
-/** "Version history" (YAZ-1897 D4): Share's gate (Excalidraw boards only, YAZ-1802), between Share and Info. */
+/** "Version history" (YAZ-1897 D4): Info's gate too — a draw.io diagram has pictures and Restore (🔒 YAZ-1802 D10) — between Share and Info. */
 const history: Leaf = (t, h) => {
-  const path = t.sharePath
+  const path = t.infoPath
   if (path === null) return null
   return { id: 'history', label: 'Version history', onSelect: () => h.onHistory(path) }
 }

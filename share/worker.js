@@ -18,14 +18,22 @@
  *
  * Routes:
  *   PUT    /api/boards/:id   bearer, Content-Length required — store (or replace) the board, streamed
- *                            straight into R2; header x-allow-download (1|0) also writes the flag, its absence leaves it
+ *                            straight into R2; header x-allow-download (1|0) also writes the flag, its absence leaves it;
+ *                            header x-board-kind (diagram) is stored with it, and echoed back
  *   PATCH  /api/boards/:id   bearer, JSON { allowDownload } — write only the flag on the SAME link, no re-upload
  *   DELETE /api/boards/:id   bearer — stop sharing: the link dies at once
  *   POST   /api/wipe         bearer — "delete all shared links": one page (≤1,000 objects) per call, answers { done }
  *   GET    /b/:id            the read-only viewer (download buttons only when allowed), under a strict CSP
  *   GET    /scene/:id        the scene the viewer draws
  *   GET    /assets/*         the viewer's script, stylesheet and fonts (the Worker's static assets, `env.ASSETS`)
- *   GET    /raw/:id          the .excalidraw download — 403 when download is off (`?download=1` adds a Content-Disposition)
+ *   GET    /raw/:id          the .excalidraw / .drawio download — 403 when download is off (`?download=1` adds a Content-Disposition)
+ *
+ * TWO KINDS OF BOARD (🔒 YAZ-1802 D11): an Excalidraw drawing (scene JSON) or a draw.io diagram
+ * (its `.drawio` XML), told apart by the R2 custom metadata `kind`. The key stays
+ * `boards/<id>.excalidraw` for both, and a board stored before kinds existed has no `kind` — it is a
+ * drawing — so every old link keeps working. `/scene` and `/raw` answer the kind (`x-board-kind`),
+ * `/b` picks the viewer by it (a diagram is drawn by draw.io's own read-only viewer), and a diagram
+ * downloads as `<name>.drawio`.
  *
  * 🔒 YAZ-1799 D2: no encryption — the id is the only secret, so it must be long and random (the
  * app makes 144-bit ids); the Worker only checks its shape.
@@ -37,6 +45,15 @@ export const MAX_BODY_BYTES = 100 * 1000 * 1000
 const ID_RE = /^[A-Za-z0-9_-]{16,64}$/
 const key = (id) => `boards/${id}.excalidraw`
 const permKey = (id) => `perm/${id}`
+/**
+ * 🔒 YAZ-1802 D11: what each kind is served as. Anything but `diagram` is a drawing — the header an
+ * older app never sends, and the metadata a board stored before kinds never has.
+ */
+const KINDS = {
+  drawing: { type: 'application/json; charset=utf-8', ext: 'excalidraw' },
+  diagram: { type: 'application/xml; charset=utf-8', ext: 'drawio' },
+}
+const kindOf = (value) => (value === 'diagram' ? 'diagram' : 'drawing')
 /** Anything but a stored '0' counts as allowed (the new-share default). */
 async function allowsDownload(env, id) {
   const flag = await env.BUCKET.get(permKey(id))
@@ -89,14 +106,19 @@ async function putBoard(request, env, id) {
   if (size > MAX_BODY_BYTES) return json({ error: 'too_large', limit: MAX_BODY_BYTES }, 413)
   if (size === 0 || request.body === null) return json({ error: 'empty' }, 400)
   const name = decodeName(request.headers.get('x-board-name'))
+  const kind = kindOf(request.headers.get('x-board-kind'))
   const updatedAt = Date.now()
   await env.BUCKET.put(key(id), request.body, {
-    httpMetadata: { contentType: 'application/json; charset=utf-8' },
-    customMetadata: { name, updatedAt: String(updatedAt) },
+    httpMetadata: { contentType: KINDS[kind].type },
+    customMetadata: { name, updatedAt: String(updatedAt), kind },
   })
   const allow = request.headers.get('x-allow-download')
   if (allow !== null) await env.BUCKET.put(permKey(id), allow === '0' ? '0' : '1')
-  return json({ id, size, updatedAt })
+  const res = json({ id, size, updatedAt })
+  // 🔒 YAZ-1802 D11: the app's proof this Worker knows kinds. A Worker deployed before them answers
+  // without it, stores a diagram as a drawing, and the app then asks for Set up sharing again.
+  res.headers.set('x-board-kind', kind)
+  return res
 }
 
 async function patchBoard(request, env, id) {
@@ -134,9 +156,11 @@ async function sceneOrRaw(request, env, id, url, download) {
   if (object === null) return json({ error: 'not_found' }, 404)
   if (download && !(await allowsDownload(env, id))) return json({ error: 'download_not_allowed' }, 403)
   const name = object.customMetadata?.name ?? 'Shared board'
-  const headers = new Headers({ 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' })
-  if (download && url.searchParams.has('download')) headers.set('content-disposition', `attachment; filename*=UTF-8''${rfc5987(`${name}.excalidraw`)}`)
+  const kind = kindOf(object.customMetadata?.kind)
+  const headers = new Headers({ 'content-type': KINDS[kind].type, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' })
+  if (download && url.searchParams.has('download')) headers.set('content-disposition', `attachment; filename*=UTF-8''${rfc5987(`${name}.${KINDS[kind].ext}`)}`)
   headers.set('x-board-name', encodeURIComponent(name))
+  headers.set('x-board-kind', kind)
   return new Response(request.method === 'HEAD' ? null : object.body, { status: 200, headers })
 }
 
@@ -171,7 +195,7 @@ export async function handle(request, env) {
   if (parts[0] === 'b' && parts.length === 2 && method === 'GET') {
     const object = ID_RE.test(parts[1]) ? await env.BUCKET.head(key(parts[1])) : null
     if (object === null) return html(missingPage(), 404)
-    return html(viewerPage({ id: parts[1], allowDownload: await allowsDownload(env, parts[1]), name: object.customMetadata?.name ?? 'Shared board', updatedAt: Number(object.customMetadata?.updatedAt ?? 0) }))
+    return html(viewerPage({ id: parts[1], kind: kindOf(object.customMetadata?.kind), allowDownload: await allowsDownload(env, parts[1]), name: object.customMetadata?.name ?? 'Shared board', updatedAt: Number(object.customMetadata?.updatedAt ?? 0) }))
   }
 
   if (parts.length === 0) return html(missingPage('Nothing is shared at this address.'), 404)

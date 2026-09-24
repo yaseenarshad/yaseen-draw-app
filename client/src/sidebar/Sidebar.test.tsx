@@ -2865,7 +2865,7 @@ describe('hover preview (YAZ-1800)', () => {
     await dwell(1)
     expect(panel()?.getAttribute('aria-label')).toBe('Preview of a')
     expect(panel()?.querySelector('img')?.getAttribute('src')).toBe('data:image/png;base64,AA')
-    expect(previewLoad).toHaveBeenCalledWith(['/v', '/v/a.excalidraw', 1, 'light'].join('\n'))
+    expect(previewLoad).toHaveBeenCalledWith(['/v', '/v/a.excalidraw', 1, 'light', 'adapt'].join('\n'))
     await leave(row)
     expect(panel()).toBeNull()
   })
@@ -2935,7 +2935,7 @@ describe('hover preview (YAZ-1800)', () => {
     bridge.tree.mockResolvedValue({ root: '/v', tree: TREE.map((n) => (n.path === '/v/a.excalidraw' ? { ...n, mtime: 9 } : n)), generatedAt: 2 })
     await act(async () => w.emit?.({ type: 'change', path: '/v/a.excalidraw', mtime: 9 }))
     expect(panel()).not.toBeNull()
-    expect(previewLoad).toHaveBeenLastCalledWith(['/v', '/v/a.excalidraw', 9, 'light'].join('\n'))
+    expect(previewLoad).toHaveBeenLastCalledWith(['/v', '/v/a.excalidraw', 9, 'light', 'adapt'].join('\n'))
   })
 
   it('the hovered board disappearing from the tree (deleted, renamed, moved) closes the panel', async () => {

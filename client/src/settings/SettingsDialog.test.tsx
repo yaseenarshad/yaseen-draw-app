@@ -163,6 +163,7 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
     expect(sections(el).map((s) => s.id)).toEqual(['settings-appearance', 'settings-canvas', 'settings-files', 'settings-images', 'settings-sync'])
     expect(rowIds(el)).toEqual([
       'theme',
+      'diagramDarkColors',
       // 🔒 YAZ-1775 D9's fourteen, in the order Settings › Canvas shows them.
       'canvas.gridModeEnabled',
       'canvas.objectsSnapModeEnabled',
@@ -195,6 +196,14 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
     expect(el.querySelector('#settings-files .settings-group__title')).toBeNull()
     expect(el.querySelector('#settings-images .settings-group__title')).toBeNull()
     expect(row(el, 'theme')?.querySelector('.setting__label')?.textContent).toBe('Theme')
+    expect(row(el, 'diagramDarkColors')?.querySelector('.setting__label')?.textContent).toBe('draw.io diagrams in dark mode')
+  })
+
+  it('"draw.io diagrams in dark mode" offers Adapt colours / Keep original colours and writes the whole SettingsState (🔒 YAZ-1802 D16)', () => {
+    const { el, onChange } = mount({ ...DEFAULT_SETTINGS })
+    expect(rowButtons(el, 'diagramDarkColors').map((b) => b.textContent)).toEqual(['Adapt colours', 'Keep original colours'])
+    act(() => rowButtons(el, 'diagramDarkColors')[1].click())
+    expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...DEFAULT_SETTINGS, diagramDarkColors: 'keep' })
     expect(row(el, 'confirmDelete')?.querySelector('.setting__label')?.textContent).toBe('Confirm before deleting')
   })
 
@@ -309,11 +318,11 @@ describe('SettingsDialog rows write through the popover contracts', () => {
 })
 
 describe('SettingsDialog search (D6)', () => {
-  it('"dark" shows the Theme row under an Appearance heading and nothing else — and the row still works', () => {
+  it('"dark" shows the Appearance rows under their heading and nothing else — and a row still works', () => {
     const { el, onChange } = mount({ ...DEFAULT_SETTINGS }, status())
     type(searchInput(el), 'dark')
     expect(headings(el)).toEqual(['Appearance'])
-    expect(rowIds(el)).toEqual(['theme'])
+    expect(rowIds(el)).toEqual(['theme', 'diagramDarkColors'])
     expect(sections(el)).toEqual([]) // the page is gone while the query stands
     act(() => rowButtons(el, 'theme')[2].click())
     expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...DEFAULT_SETTINGS, theme: 'dark' })
@@ -363,7 +372,7 @@ describe('SettingsDialog search (D6)', () => {
   it('Escape with a query clears it and brings the page back; the × button does the same', () => {
     const { el, onClose } = mount()
     type(searchInput(el), 'dark')
-    expect(rowIds(el)).toEqual(['theme'])
+    expect(rowIds(el)).toEqual(['theme', 'diagramDarkColors'])
     pressEscape(searchInput(el))
     expect(onClose).not.toHaveBeenCalled()
     expect(searchInput(el).value).toBe('')

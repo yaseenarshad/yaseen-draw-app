@@ -28,7 +28,6 @@ const targets = (over: Partial<MenuSectionTargets> = {}): MenuSectionTargets => 
   favoritePaths: null,
   favoriteIsOn: false,
   infoPath: null,
-  sharePath: null,
   clip: null,
   ...over,
 })
@@ -433,14 +432,20 @@ describe('favorite toggle item (YAZ-1766 D3)', () => {
  */
 describe('Info item (🔒 YAZ-1835 D6)', () => {
   it('is offered for a board row and sits directly above Delete, in the last group', () => {
-    const sections = build({ ...FILE_ROW, infoPath: '/v/Note.excalidraw', sharePath: '/v/Note.excalidraw' })
+    const sections = build({ ...FILE_ROW, infoPath: '/v/Note.excalidraw' })
     expect(sections[5].map((i) => i.label)).toEqual(['Share', 'Version history', 'Info', 'Delete'])
     expect(labelsOf(sections).indexOf('Info')).toBe(labelsOf(sections).indexOf('Delete') - 1)
   })
 
-  it('a DIAGRAM row gets Info but not Share or Version history — neither exists for draw.io yet (YAZ-1802)', () => {
-    const sections = build({ ...FILE_ROW, infoPath: '/v/Flow.drawio', sharePath: null })
-    expect(sections[5].map((i) => i.label)).toEqual(['Info', 'Delete'])
+  it('a DIAGRAM row gets Share (🔒 YAZ-1802 D11), Version history (🔒 YAZ-1802 D10) and Info, like a drawing', () => {
+    const onShare = vi.fn()
+    const onHistory = vi.fn()
+    const sections = build({ ...FILE_ROW, infoPath: '/v/Flow.drawio' }, { onShare, onHistory })
+    expect(sections[5].map((i) => i.label)).toEqual(['Share', 'Version history', 'Info', 'Delete'])
+    select(sections, 'Share')
+    expect(onShare).toHaveBeenCalledExactlyOnceWith('/v/Flow.drawio')
+    select(sections, 'Version history')
+    expect(onHistory).toHaveBeenCalledExactlyOnceWith('/v/Flow.drawio')
   })
 
   it('is absent when there is no single board to describe', () => {
