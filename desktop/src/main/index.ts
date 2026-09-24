@@ -2,10 +2,11 @@ import { app, BrowserWindow, Menu, nativeTheme, net, powerMonitor, protocol, scr
 import { existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { DRAWIO_HOST } from '@shared/drawio'
 import { fileKind } from '@shared/fileKind'
 import { fileLink, parseFileLink } from '@shared/links'
 import type { WindowEntry } from '@shared/types'
-import { DRAWIO_HOST, resolveDrawioDir, serveDrawio } from './drawio/assets'
+import { resolveDrawioDir, serveDrawio } from './drawio/assets'
 import type { GitSyncManager } from './git/manager'
 import { registerIpc } from './ipc'
 import { viewerAssetsDir } from './ipc/share'
@@ -29,7 +30,7 @@ const isPrimaryInstance = app.requestSingleInstanceLock()
 if (!isPrimaryInstance) app.quit()
 app.on('second-instance', (_event, argv) => {
   // Windows/Linux deliver a clicked yaseendraw:// link as an argv entry of the second launch —
-  // and a double-clicked `.excalidraw` as a bare PATH in the same place (YAZ-1815): off macOS there is
+  // and a double-clicked `.excalidraw` or `.drawio` as a bare PATH in the same place (YAZ-1815): off macOS there is
   // no `open-file` event, so argv is the only door the file association has.
   const urls = [...argv.filter((arg) => arg.startsWith('yaseendraw://')), ...openableFileArgs(argv, argsSkip()).map(fileLink)]
   if (urls.length > 0) {
@@ -65,8 +66,9 @@ app.on('open-url', (event, url) => {
 // macOS hands a double-clicked (or `open`ed, or "Open With"-ed) file to `open-file` as a plain
 // absolute path — also before `ready` on a cold start. Encoding it as a yaseendraw:// link reuses
 // the whole E1 pipeline (queue, parse, routing, kind/exists guards); fileLink ↔ parseFileLink is
-// lossless (links.test.ts round trips). The bundle claims `.excalidraw` as an Owner association
-// in `desktop/package.json`, which is what makes the event fire at all (🔒 YAZ-1775 D1, YAZ-1775).
+// lossless (links.test.ts round trips). The bundle claims `.excalidraw` and `.drawio` as Owner
+// associations in `desktop/package.json`, which is what makes the event fire at all (🔒 YAZ-1775 D1,
+// 🔒 YAZ-1802 D14).
 app.on('open-file', (event, path) => {
   event.preventDefault()
   links.push(fileLink(path))

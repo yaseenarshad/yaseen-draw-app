@@ -66,7 +66,7 @@ export function unpackWebapp(archive, dir, pin) {
 }
 
 /**
- * Our files over draw.io's (🔒 YAZ-1802 D17), on EVERY run so an overlay edit lands with the next
+ * Our files over draw.io's (🔒 YAZ-1802 D12a), on EVERY run so an overlay edit lands with the next
  * `npm run dev`: `overlayDir` verbatim (the `PreConfig.js` / `PostConfig.js` hooks replace draw.io's
  * empty stubs, the preview page, draw.io's own Apache-2.0 licence text), then the font families of
  * `DRAWIO_FONT_FAMILIES` copied from `fontsSource` into `yaseen-fonts/` beside their sheet.
@@ -150,7 +150,7 @@ export function isSafeEntryName(name) {
  * from every stencil set and library, math, Mermaid, PlantUML and the template dialog (the request
  * set is pinned in `packDrawio.test.mjs`). A bump re-checks it with the dev 404 log (`serveDrawio`).
  *
- * KEPT on purpose, though big: `js/stencils.min.js` (all 204 stencil sets, loaded at editor start;
+ * KEPT on purpose, though big: `js/stencils.min.js` (every stencil set, loaded at editor start;
  * the viewer pages load it too, which is why `stencils/` can go), `math4/` (the editor loads MathJax
  * at start), `templates/` (Insert › Template works offline), `img/` (library icons a diagram names
  * by path), `js/extensions.min.js` (loaded at start; Mermaid, ELK and libavoid live in it), and

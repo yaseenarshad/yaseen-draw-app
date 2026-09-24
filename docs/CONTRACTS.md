@@ -77,7 +77,7 @@ Two kinds of BOARD, one extension each (🔒 YAZ-1802 D1 / D2).
   storage, the Import / Export Drawing dialogs) keeps asking it. The GENERIC surfaces (tree row
   kind, the file head's dates, Info, search, hover preview, the files a launch is handed, link
   routing, `Editor`) ask `isBoard` / `fileKind`, and so do Version history and the menu bar's
-  Export Image… (🔒 YAZ-1802 D9 / D10); Share and Share Link are YAZ-1802 3C's (see Share links).
+  Export Image… (🔒 YAZ-1802 D9 / D10); Share and Share Link ask `isBoard` too (🔒 YAZ-1802 D11).
 - A rename never converts between the two kinds, in the sidebar (`renamedPath` re-appends the old
   suffix) and in main (`fs:rename` → `UNSUPPORTED_EXTENSION`). A copy keeps its extension as
   spelled: `Flow copy.drawio`, `UP copy.DRAWIO`.
@@ -86,7 +86,7 @@ Two kinds of BOARD, one extension each (🔒 YAZ-1802 D1 / D2).
 - `.excalidraw` and `.drawio` hide their extension wherever a name is shown — tree rows, tab
   labels, the window title, the rename field (⚡ YAZ-1775 D8 amended, 🔒 YAZ-1802 D13). Every other
   file shows its full name.
-- 🔒 YAZ-1802 D15: so a draw.io diagram wears a type mark — a muted linked-boxes glyph (`DiagramMark`,
+- 🔒 YAZ-1802 D15: so a draw.io diagram wears a type mark — a muted linked-boxes glyph (`DiagramBadge`,
   aria-label "draw.io diagram"), never draw.io's logo — in its tree row's chevron slot (every other
   file row keeps that 14 px slot empty, so names line up with folders and lose no width) and before
   its tab label. An Excalidraw board is unmarked: the usual kind.
@@ -498,7 +498,7 @@ chrome classes (`--presenting`, `--presentation-tools`) go on that element, and 
 (0.32 of the width, always on) is a fraction of the pane. The keyboard and double-click handlers
 are still document-wide — the canvas has the keyboard while presenting, and it is not inside the
 overlay — so both stand down unless the overlay is in the visible tab layer, the same test
-`drawingCommand.ts` makes for the menu's canvas items.
+`boardCommand.ts` makes for the menu's canvas items.
 
 **Keys:** → / PageDown / Space (Space only while the tools are hidden) next, ← / PageUp previous,
 Home / End the ends, **Esc zooms out to the whole deck and never leaves** (restarting a deck by
@@ -713,7 +713,7 @@ filter ignores ↑/↓/⏎/Esc meanwhile. Every right-click swallows Electron's 
 | File | Search Vault | ⌘K |
 | File | Export Image… (a board tab) | ⌘⇧E |
 | File | Export Excalidraw Drawing… (a drawing tab only) | ⌘⇧S |
-| File | Share Link (a drawing tab only) | ⌘⇧L |
+| File | Share Link (a board tab) | ⌘⇧L |
 | File | Close Tab | ⌘W |
 | File | Close Window | ⌘⇧W |
 | Edit | Undo / Redo / Cut / Copy / Paste / Select All | stock roles |
@@ -732,7 +732,7 @@ of the engine's main menu by 🔒 YAZ-1775 D10 (there is no `<MainMenu>` in a dr
 trigger is hidden). Main enables them only while the window a menu action would target has a
 board of their kind in front, rebuilding the menu when any window's active file changes and when focus
 moves between windows. Each is pushed to that window's renderer, which dispatches it as a DOM
-event on the VISIBLE drawing layer (`client/src/drawings/drawingCommand.ts`) — several tabs are
+event on the VISIBLE drawing layer (`client/src/drawings/boardCommand.ts`) — several tabs are
 mounted at once, each with its own engine, so a prop or a `window` listener would reach the wrong
 canvas. The drawing then calls the engine's own door: `openDialog: { name: 'imageExport' }` (the
 engine's PNG / SVG export dialog), or `viewBackgroundColor`, which the engine writes into the
@@ -925,10 +925,12 @@ canvas). That last gate is why ⌘C with a selection is still the engine's COPY 
 
 **Inside a draw.io diagram** (🔒 YAZ-1802 D17) the keyboard belongs to the iframe, and no key
 pressed there reaches the renderer's document. The menu's accelerators (⌘K, ⌘W, ⌘O, ⌘⇧O, ⌘, , the
-zoom trio, the tab keys) still fire, because the menu takes them whatever frame has focus; draw.io's
-own bindings on ⌘K / ⌘, / ⌘⇧O / ⌘0 / ⌘+ / ⌘− are cleared in the configure reply (`MENU_CHORDS`), since
-off macOS the page would see the key first. Menu items greyed on a diagram tab (Export Excalidraw
-Drawing…, Export Image…, Share Link) hand their keys to draw.io. ⌘S is draw.io's own `save` event,
+zoom trio, ⌘⇧E, ⌘⇧L, the tab keys) still fire, because the menu takes them whatever frame has focus;
+draw.io's own bindings on ⌘K / ⌘, / ⌘0 / ⌘+ / ⌘− and ⌘⇧O / ⌘⇧E / ⌘⇧L / ⌘⇧[ / ⌘⇧] / ⌘⇧S are cleared in
+the configure reply (`MENU_CHORDS`), since off macOS the page would see the key first — ⌘⇧S too,
+though Export Excalidraw Drawing… is greyed there, because draw.io's own is Save As, which the app
+has not got. Export Image… and Share Link work on a diagram tab; only Export Excalidraw Drawing… and
+Canvas Background are greyed there. ⌘S is draw.io's own `save` event,
 which the host flushes at once. Of the renderer-owned chords only ⌘B means something here: with
 nothing selected our `PostConfig.js` sends it up as draw.io's `shortcut` event and the host toggles
 the sidebar; with a selection it stays draw.io's bold. ⌘X / ⌘C / ⌘V and Escape stay draw.io's.
@@ -1023,8 +1025,8 @@ link's download flag is its OWN object, `perm/<id>` (`"0"` | `"1"`, missing = al
   `/assets/drawio/config.js`, which points every path it would take from viewer.diagrams.net at
   `/assets/drawio/`, then the viewer, then `/assets/diagram.js`. It opens fitted (never past 100%);
   the viewer's hover toolbar zooms and turns pages, and dragging or scrolling pans. It offers
-  Download .drawio only — no PNG: draw.io draws labels as HTML inside the SVG, which a canvas cannot
-  read back out. Same CSP, still no inline script.
+  Download .drawio only — no PNG: draw.io draws labels as HTML inside the SVG, and Safari and
+  Firefox block reading such a canvas back. Same CSP, still no inline script.
 - The Worker's `/assets/drawio/` holds our `config.js` and a `fonts.css` for the editor's five font
   families pointing at the Excalidraw fonts already under `/assets/fonts/` (both built into
   `share/dist/assets`), and draw.io's own files, `DRAWIO_SHARE_FILES` in `drawio/assets.ts`, which
@@ -1032,9 +1034,12 @@ link's download flag is its OWN object, `perm/<id>` (`"0"` | `"1"`, missing = al
   YAZ-1973) and publishes at their pack paths: `js/viewer-static.min.js` (4.2 MB),
   `js/stencils.min.js` (7.7 MB, all 204 stencil sets — `diagram.js` loads it only for a diagram
   that names a `mxgraph.…` library shape, compressed pages looked inside), `LICENSE-drawio.txt`,
-  and the whole `img/` folder (`DRAWIO_SHARE_DIRS`, 11 MB, ~2,100 files) — the pictures draw.io's
-  image shapes point at (Azure, network, clipart…), which would otherwise draw blank on a link.
-  The static assets are ~46 MB (~2,500 files); every file far under Cloudflare's 25 MiB per asset
+  and two whole folders (`DRAWIO_SHARE_DIRS`): `img/` (11 MB, ~2,100 files) — the pictures
+  draw.io's image shapes point at (Azure, network, clipart…), which would otherwise draw blank on a
+  link — and `math4/` (3.3 MB, 78 files), the MathJax the viewer loads on every page, without
+  which a math label shows raw TeX. `config.js` also points the paths nothing is published under
+  (styles, shapes, mxgraph) at `/assets/drawio/`, because unset they default to viewer.diagrams.net.
+  The static assets are ~50 MB (~2,600 files); every file far under Cloudflare's 25 MiB per asset
   and the whole set under its 20,000-files-per-version cap.
 - **An outdated Worker.** The Worker echoes the stored kind on every PUT (`x-board-kind`). A Worker
   deployed before kinds answers a diagram's upload without it, and would serve the XML to the

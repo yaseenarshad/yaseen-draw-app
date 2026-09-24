@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import type { FileKind, TreeNode } from '@shared/types'
-import { SEARCH_CAP, buildDrawingCatalog, searchTitles } from './searchCandidates'
+import { SEARCH_CAP, buildBoardCatalog, searchTitles } from './searchCandidates'
 
 const file = (path: string, kind: FileKind | null = 'drawing'): TreeNode => ({
   type: 'file',
@@ -24,32 +24,32 @@ const dir = (path: string, children: TreeNode[] = []): TreeNode => ({
   children,
 })
 
-describe('buildDrawingCatalog — the file rows', () => {
+describe('buildBoardCatalog — the file rows', () => {
   it('one row per drawing: matched on the name, opening its own path, folder as the label', () => {
-    expect(buildDrawingCatalog('/vault', [dir('/vault/sub', [file('/vault/sub/Alpha.excalidraw')])])).toEqual([
+    expect(buildBoardCatalog('/vault', [dir('/vault/sub', [file('/vault/sub/Alpha.excalidraw')])])).toEqual([
       { kind: 'dir', name: 'sub', lower: 'sub', label: 'sub', path: '/vault/sub', folder: '' },
       { kind: 'file', name: 'Alpha', lower: 'alpha', label: 'Alpha', path: '/vault/sub/Alpha.excalidraw', folder: 'sub' },
     ])
   })
 
   it('a root-level drawing carries an empty folder', () => {
-    expect(buildDrawingCatalog('/vault', [file('/vault/Alpha.excalidraw')])[0].folder).toBe('')
+    expect(buildBoardCatalog('/vault', [file('/vault/Alpha.excalidraw')])[0].folder).toBe('')
   })
 
   it('a nested drawing is labelled by its ROOT-RELATIVE parent, and a trailing slash on the root is tolerated', () => {
     const deep = [dir('/vault/A', [dir('/vault/A/B', [file('/vault/A/B/Deep.excalidraw')])])]
-    expect(buildDrawingCatalog('/vault', deep).find((r) => r.kind === 'file')?.folder).toBe('A/B')
-    expect(buildDrawingCatalog('/vault/', deep).find((r) => r.kind === 'file')?.folder).toBe('A/B')
+    expect(buildBoardCatalog('/vault', deep).find((r) => r.kind === 'file')?.folder).toBe('A/B')
+    expect(buildBoardCatalog('/vault/', deep).find((r) => r.kind === 'file')?.folder).toBe('A/B')
   })
 
   it('a drawing matches and reads WITHOUT its extension — the name the tree shows', () => {
-    const rows = buildDrawingCatalog('/vault', [file('/vault/Customer Acquisition Cost.excalidraw')])
+    const rows = buildBoardCatalog('/vault', [file('/vault/Customer Acquisition Cost.excalidraw')])
     expect(rows.map((c) => [c.name, c.label, c.lower])).toEqual([['Customer Acquisition Cost', 'Customer Acquisition Cost', 'customer acquisition cost']])
     expect(rows[0].path).toBe('/vault/Customer Acquisition Cost.excalidraw')
   })
 
   it('🔒 YAZ-1802 D2: a draw.io diagram is a board too — a row, its .drawio hidden; a picture of one is not', () => {
-    const rows = buildDrawingCatalog('/vault', [file('/vault/Flow.drawio', 'diagram'), file('/vault/UP.DRAWIO', 'diagram'), file('/vault/image.drawio.svg', null)])
+    const rows = buildBoardCatalog('/vault', [file('/vault/Flow.drawio', 'diagram'), file('/vault/UP.DRAWIO', 'diagram'), file('/vault/image.drawio.svg', null)])
     expect(rows.map((c) => [c.name, c.path])).toEqual([
       ['Flow', '/vault/Flow.drawio'],
       ['UP', '/vault/UP.DRAWIO'],
@@ -57,39 +57,39 @@ describe('buildDrawingCatalog — the file rows', () => {
   })
 
   it('duplicate names BOTH appear under the bare name, told apart by the folder', () => {
-    const rows = buildDrawingCatalog('/vault', [file('/vault/Note.excalidraw'), dir('/vault/deep', [file('/vault/deep/Note.excalidraw')])]).filter((r) => r.kind === 'file')
+    const rows = buildBoardCatalog('/vault', [file('/vault/Note.excalidraw'), dir('/vault/deep', [file('/vault/deep/Note.excalidraw')])]).filter((r) => r.kind === 'file')
     expect(rows.map((c) => c.name)).toEqual(['Note', 'Note'])
     expect(rows.map((c) => c.folder)).toEqual(['', 'deep'])
     expect(rows.map((c) => c.path)).toEqual(['/vault/Note.excalidraw', '/vault/deep/Note.excalidraw'])
   })
 
   it('a NON-drawing file is never a row — it lists in the tree and opens in the OS app, but it is not a document', () => {
-    expect(buildDrawingCatalog('/vault', [file('/vault/photo.png', null), file('/vault/notes.md', null), file('/vault/Board.excalidraw')]).map((r) => r.path)).toEqual([
+    expect(buildBoardCatalog('/vault', [file('/vault/photo.png', null), file('/vault/notes.md', null), file('/vault/Board.excalidraw')]).map((r) => r.path)).toEqual([
       '/vault/Board.excalidraw',
     ])
   })
 
   it('the image store never appears: `fs:tree` already drops the top-level `assets/`, and the catalog is that tree', () => {
     // What `fs:tree` hands over for a vault WITH an image store: the store is simply not in it.
-    expect(buildDrawingCatalog('/vault', [file('/vault/Board.excalidraw')]).some((r) => r.name === 'assets')).toBe(false)
+    expect(buildBoardCatalog('/vault', [file('/vault/Board.excalidraw')]).some((r) => r.name === 'assets')).toBe(false)
     // A folder the user called `assets` INSIDE a subfolder is theirs — the tree shows it, so search finds it.
-    expect(buildDrawingCatalog('/vault', [dir('/vault/sub', [dir('/vault/sub/assets')])]).map((r) => r.path)).toEqual(['/vault/sub', '/vault/sub/assets'])
+    expect(buildBoardCatalog('/vault', [dir('/vault/sub', [dir('/vault/sub/assets')])]).map((r) => r.path)).toEqual(['/vault/sub', '/vault/sub/assets'])
   })
 
   it('an empty tree is an empty catalog', () => {
-    expect(buildDrawingCatalog('/vault', [])).toEqual([])
+    expect(buildBoardCatalog('/vault', [])).toEqual([])
   })
 })
 
-describe('buildDrawingCatalog — the folder rows (🔒 D1, YAZ-1491)', () => {
+describe('buildBoardCatalog — the folder rows (🔒 D1, YAZ-1491)', () => {
   it('one `dir` row per folder: matched by its own name, revealing its own path', () => {
-    expect(buildDrawingCatalog('/vault', [dir('/vault/Archive')])).toEqual([
+    expect(buildBoardCatalog('/vault', [dir('/vault/Archive')])).toEqual([
       { kind: 'dir', name: 'Archive', lower: 'archive', label: 'Archive', path: '/vault/Archive', folder: '' },
     ])
   })
 
   it('a nested folder is labelled by its ROOT-RELATIVE parent, the way a drawing row is', () => {
-    const rows = buildDrawingCatalog('/vault', [dir('/vault/A', [dir('/vault/A/B', [dir('/vault/A/B/C')])])])
+    const rows = buildBoardCatalog('/vault', [dir('/vault/A', [dir('/vault/A/B', [dir('/vault/A/B/C')])])])
     expect(rows.map((c) => [c.name, c.folder])).toEqual([
       ['A', ''],
       ['B', 'A'],
@@ -98,13 +98,13 @@ describe('buildDrawingCatalog — the folder rows (🔒 D1, YAZ-1491)', () => {
   })
 
   it('folders lead the catalog, outer before inner, whatever order their drawings sit in', () => {
-    const rows = buildDrawingCatalog('/vault', [file('/vault/Root.excalidraw'), dir('/vault/A', [file('/vault/A/Inner.excalidraw'), dir('/vault/A/B')])])
+    const rows = buildBoardCatalog('/vault', [file('/vault/Root.excalidraw'), dir('/vault/A', [file('/vault/A/Inner.excalidraw'), dir('/vault/A/B')])])
     expect(rows.map((c) => c.path)).toEqual(['/vault/A', '/vault/A/B', '/vault/Root.excalidraw', '/vault/A/Inner.excalidraw'])
   })
 })
 
 describe('searchTitles', () => {
-  const catalog = buildDrawingCatalog('/vault', [file('/vault/Big CAC story.excalidraw'), file('/vault/CAC Model.excalidraw'), file('/vault/CAC.excalidraw')])
+  const catalog = buildBoardCatalog('/vault', [file('/vault/Big CAC story.excalidraw'), file('/vault/CAC Model.excalidraw'), file('/vault/CAC.excalidraw')])
 
   it('ranks exact → prefix → substring, input order within each bucket', () => {
     expect(searchTitles(catalog, 'cac').map((c) => c.label)).toEqual(['CAC', 'CAC Model', 'Big CAC story'])
@@ -115,12 +115,12 @@ describe('searchTitles', () => {
   })
 
   it('a drawing never matches on its folder (🔒 D3, YAZ-739); the folder itself is ONE row (🔒 D2, YAZ-1491)', () => {
-    const rows = buildDrawingCatalog('/vault', [dir('/vault/Archive', [file('/vault/Archive/Note.excalidraw')])])
+    const rows = buildBoardCatalog('/vault', [dir('/vault/Archive', [file('/vault/Archive/Note.excalidraw')])])
     expect(searchTitles(rows, 'archive').map((c) => [c.kind, c.label])).toEqual([['dir', 'Archive']])
   })
 
   it('a folder and a drawing of the same name both match exactly — the folder first (🔒 YAZ-1491 D1)', () => {
-    const rows = buildDrawingCatalog('/vault', [dir('/vault/CAC'), file('/vault/CAC.excalidraw')])
+    const rows = buildBoardCatalog('/vault', [dir('/vault/CAC'), file('/vault/CAC.excalidraw')])
     expect(searchTitles(rows, 'cac').map((c) => [c.kind, c.path])).toEqual([
       ['dir', '/vault/CAC'],
       ['file', '/vault/CAC.excalidraw'],
@@ -128,7 +128,7 @@ describe('searchTitles', () => {
   })
 
   it('"Board 4" lists Board 04 and Board 40–49, prefix-first (the issue`s acceptance criterion)', () => {
-    const rows = buildDrawingCatalog('/vault', [
+    const rows = buildBoardCatalog('/vault', [
       file('/vault/Board 04.excalidraw'),
       ...Array.from({ length: 10 }, (_, i) => file(`/vault/Board 4${i}.excalidraw`)),
       file('/vault/Old Board 4 sketch.excalidraw'),
@@ -141,12 +141,12 @@ describe('searchTitles', () => {
   })
 
   it('an empty query returns the first SEARCH_CAP rows in catalog order', () => {
-    const many = buildDrawingCatalog('/vault', Array.from({ length: SEARCH_CAP + 10 }, (_, i) => file(`/vault/Note ${i}.excalidraw`)))
+    const many = buildBoardCatalog('/vault', Array.from({ length: SEARCH_CAP + 10 }, (_, i) => file(`/vault/Note ${i}.excalidraw`)))
     expect(searchTitles(many, '')).toEqual(many.slice(0, SEARCH_CAP))
   })
 
   it('caps at SEARCH_CAP AFTER ranking — a late exact match still tops a board of substrings', () => {
-    const many = buildDrawingCatalog('/vault', [
+    const many = buildBoardCatalog('/vault', [
       ...Array.from({ length: SEARCH_CAP + 10 }, (_, i) => file(`/vault/note cac ${i}.excalidraw`)),
       file('/vault/CAC.excalidraw'),
     ])
@@ -171,14 +171,14 @@ describe('perf tripwire — a 5,000-drawing vault', () => {
 
   it('builds the catalog once, well under a frame', () => {
     const started = performance.now()
-    const catalog = buildDrawingCatalog('/vault', tree)
+    const catalog = buildBoardCatalog('/vault', tree)
     const elapsed = performance.now() - started
     expect(catalog).toHaveLength(5050)
     expect(elapsed).toBeLessThan(200)
   })
 
   it('ranks a whole typed word — one scan per keystroke — well inside a keypress', () => {
-    const catalog = buildDrawingCatalog('/vault', tree)
+    const catalog = buildBoardCatalog('/vault', tree)
     const queries = ['b', 'bo', 'boa', 'boar', 'board', 'board ', 'board 4', 'board 40', 'board 40-', 'board 40-9']
     const started = performance.now()
     for (const q of queries) searchTitles(catalog, q)

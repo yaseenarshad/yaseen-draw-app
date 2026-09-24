@@ -69,20 +69,26 @@ costs $0 on Cloudflare's free tier (Cloudflare asks for a card on file before it
 same page lists the vault's shared boards, attaches your own domain, and turns sharing off. The
 contract is in `docs/CONTRACTS.md` › Share links.
 
+A shared draw.io diagram opens in draw.io's own read-only viewer (zoom, pan, pages) and downloads
+as its `.drawio` file; there is no PNG download for a diagram. If you set up sharing before
+diagrams could be shared, run **Settings › Sharing › Set up sharing** once more: it updates your
+Worker, and every existing link keeps working.
+
 ## Sync
 
 Turn on **Settings › Sync** to push a vault to GitHub. It uses the computer's own git, found at a fixed set of locations rather than on `PATH` (`desktop/src/main/git/exec.ts`): on a Mac the Command Line Tools or Homebrew git, on Windows [Git for Windows](https://git-scm.com/download/win) (its installer bundles the Git Credential Manager, so a one-time GitHub sign-in sticks). Without one, the sync banner says so and offers a setup prompt to paste into an LLM. The switch lives per vault, in `<vault>/.yaseendraw/github.json`.
 
-Two computers can work on one vault. When both changed the same board, sync merges it shape by
-shape: everyone's shapes are kept, and if you both changed the same shape, the newest edit wins.
-Any other file changed on both keeps both copies (yours as `<name> (conflict, <date>)`). A small
+Two computers can work on one vault. When both changed the same Excalidraw drawing, sync merges it
+shape by shape: everyone's shapes are kept, and if you both changed the same shape, the newest edit
+wins. A draw.io diagram, and any other file, changed on both keeps both copies (yours as
+`<name> (conflict, <date>)`). A small
 notice says what was merged, with **See changes**. Nothing needs a person to untangle it. The app
 also checks GitHub every minute while a vault is open, so the other computer's changes show up on
 their own.
 
-Right-click a board › **Version history** to see every version as a picture: the board now, with
-what changed since that version marked in green (added), amber (changed) and faded red (removed).
-**Restore** puts any version back.
+Right-click a board › **Version history** to see every version as a picture: for a drawing, the
+board now, with what changed since that version marked in green (added), amber (changed) and faded
+red (removed); for a diagram, the version as it was. **Restore** puts any version back.
 
 ## Excalidraw drawings
 
@@ -117,7 +123,7 @@ it. Settings › Hotkeys has the full table.
 
 A diagram is marked with a small linked-boxes glyph in the sidebar and on its tab (an Excalidraw
 board is unmarked). Hover it for a preview, right-click › **Version history** to see and restore
-older versions, and **File › Export Image…** (`⌘⇧E`) saves what is on screen as a PNG or an SVG.
+older versions, and **File › Export Image…** (`⌘⇧E`) saves its first page, unsaved edits included, as a PNG or an SVG.
 In dark mode draw.io re-colours diagrams so they stay readable; **Settings › Appearance › draw.io
 diagrams in dark mode** can keep their original colours instead, and a diagram that asks to keep
 its own colours (`adaptiveColors="none"`) always does. Present is Excalidraw-only for now.

@@ -2,29 +2,13 @@
 /**
  * USAGE: node tools/packDrawio.mjs [--war <path>] [--force]
  *
- * Unpacks the pinned draw.io webapp into a gitignored cache (🔒 YAZ-1802 D5), where main's `app://`
- * protocol serves it on the `drawio` host in dev and `electron.vite.config.ts` copies it into
- * `desktop/out/drawio` at build time. The bytes are never committed.
- *
  *   --war    use an already-downloaded `draw.war` instead of fetching it (still size- and
  *            sha256-checked, so a wrong file cannot sneak in)
  *   --force  unpack again even when the cache already holds this release
  *
- * What it does: downloads jgraph/drawio's release asset `draw.war` for the pinned tag (once — the
- * archive is kept beside the unpacked tree), refuses it unless its size and sha256 are exactly the
- * pinned ones, unzips it (a `.war` is a zip) into `desktop/.cache/drawio/<tag>/`, prunes what the
- * editor, the picture page and the share viewer never load (~155 MB → ~47 MB,
- * `tools/lib/drawioPack.mjs`), then lays OUR files over it: `desktop/drawio-overlay/` (the
- * `PreConfig.js` / `PostConfig.js` config hooks draw.io's `bootstrap.js` loads off its own
- * domains, the hover-preview page `yaseen-render.html`, and `LICENSE-drawio.txt` — draw.io's
- * Apache-2.0 licence, which the war itself does not carry) and the five font families the editor
- * offers first, copied from the Excalidraw package.
- *
- * IDEMPOTENT: the unpack is skipped when `<tag>/.yaseen-pack.json` says this exact archive is
- * already there under the current prune rules; the overlay and fonts are re-laid on EVERY run, so
- * an edit to an overlay file lands with the next `npm run dev`. The unpack goes to a temp folder
- * that is renamed into place, so an interrupted run never leaves half a webapp behind
- * (`tools/lib/drawioPack.mjs`).
+ * Verifies, unpacks and prunes the pinned draw.io webapp into the gitignored
+ * `desktop/.cache/drawio/<tag>/`, then lays our overlay and fonts over it (🔒 YAZ-1802 D5 / D12a —
+ * the rules and why: `tools/lib/drawioPack.mjs`). Idempotent; the overlay is re-laid on every run.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'

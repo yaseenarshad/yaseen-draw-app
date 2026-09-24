@@ -35,14 +35,8 @@ export async function readBoardHead(file: string): Promise<BoardHead | null> {
     const buffer = Buffer.allocUnsafe(Math.min(st.size, BOARD_META_HEAD_BYTES))
     const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0)
     const head = buffer.subarray(0, bytesRead).toString('utf8')
-    return { block: isDiagram(file) ? diagramBlock(head) : parseBoardMetaBlock(head), mtime: st.mtimeMs, size: st.size }
+    return { block: isDiagram(file) ? parseDiagramMetaAttrs(head) : parseBoardMetaBlock(head), mtime: st.mtimeMs, size: st.size }
   } finally {
     await handle.close()
   }
-}
-
-/** A diagram's two attributes in the block's shape (a diagram has no extras to carry, 🔒 YAZ-1834 D5). */
-function diagramBlock(head: string): BoardMetaBlock | null {
-  const meta = parseDiagramMetaAttrs(head)
-  return meta === null ? null : { ...meta }
 }

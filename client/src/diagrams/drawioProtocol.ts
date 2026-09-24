@@ -20,10 +20,8 @@
  * From the iframe at any time: `{ event: 'shortcut', command: 'toggleSidebar' }` — an APP shortcut
  * pressed inside draw.io, where the host page never sees the key (see `DrawioMessage`).
  */
+import { DRAWIO_ORIGIN } from '@shared/drawio'
 import type { DiagramDarkColors } from '@shared/types'
-
-/** The iframe's origin — main's `app://` scheme, `drawio` host (🔒 YAZ-1802 D4). */
-export const DRAWIO_ORIGIN = 'app://drawio'
 
 /**
  * 🔒 YAZ-1802 D16: the app's "draw.io diagrams in dark mode" setting as draw.io's own
@@ -105,19 +103,19 @@ const TOOL_KEYS = [
 ]
 
 /**
- * draw.io's own bindings on chords the app's MENU owns (`desktop/src/main/menu.ts`): ⌘K Search,
- * ⌘, Settings, ⌘⇧O Open Folder, ⌘0 / ⌘+ / ⌘− zoom (every key code draw.io reads as plus or
- * minus). On macOS a menu accelerator fires before the page sees the key anyway; off macOS the page
- * handles it first and draw.io's binding would swallow it. Cleared, the menu gets it everywhere.
+ * draw.io's own bindings on chords the app's MENU owns (`desktop/src/main/menu.ts`), cleared so the
+ * menu gets them everywhere: off macOS the page sees a key before the menu does. ⌘K ⌘, ⌘0 and every
+ * code draw.io reads as plus or minus; ⌘⇧O ⌘⇧E ⌘⇧L; ⌘⇧[ / ⌘⇧] (tabs, draw.io's font size); ⌘⇧S
+ * (draw.io's Save As — the app has none, and Export Excalidraw Drawing… is greyed on a diagram).
  */
 const MENU_CHORDS = [
   ...[75, 188, 48, 61, 107, 187, 222, 109, 173, 189].map((keyCode) => ({ keyCode, control: true, action: null })),
-  { keyCode: 79, control: true, shift: true, action: null },
+  ...[79, 69, 76, 219, 221, 83].map((keyCode) => ({ keyCode, control: true, shift: true, action: null })),
 ]
 
 /**
  * The `configure` reply (🔒 YAZ-1802 D3 / D12a / D12b). Every key is one draw.io v31.5.2 reads in
- * `Editor.configure` (verified in `js/diagramly/Editor.js`), and every action name one it defines
+ * `Editor.configure` (in the pinned `js/app.min.js`), and every action name one it defines
  * (`tools/drawioOverlay.test.mjs` checks the pinned bundle). Fonts are NOT here: their
  * `@font-face` sheet lives on the drawio origin and our PostConfig.js hands it to
  * `Editor.configureFontCss` itself, so the host never needs to know the files.

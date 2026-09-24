@@ -5,7 +5,7 @@
  * user's own Worker, with the upload password.
  */
 import { stat } from 'node:fs/promises'
-import { isDiagram } from '@shared/fileKind'
+import { boardBaseName, isDiagram } from '@shared/fileKind'
 import { MAX_SHARE_BYTES, type ShareEntry, type ShareListEntry, type ShareSync } from '@shared/types'
 import { BridgeFailure, requireAbsPath } from '../fs/fsUtils'
 import { uploadTimeoutMs } from './cloudflare'
@@ -14,7 +14,7 @@ import { absFromKey, readShares, relKey, updateShares, type ShareRecord } from '
 
 const LIVE_CHECK_MS = 5_000
 const mb = (bytes: number): string => `${(bytes / 1_000_000).toFixed(1)} MB`
-const stripName = (p: string): string => p.split('/').pop()!.replace(/\.(excalidraw|drawio)$/i, '')
+const stripName = (p: string): string => boardBaseName(p.split('/').pop()!)
 /** 🔒 YAZ-1802 D11: a share Worker deployed before diagrams could be shared (it answers a diagram's upload without `x-board-kind`). */
 export const WORKER_OUTDATED = "Your share Worker is from before diagrams could be shared, so it can't show this one. Open Settings › Sharing and run Set up sharing again: it updates the Worker, and every link keeps working."
 /** `abs` is `base` or inside it. */

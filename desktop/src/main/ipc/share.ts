@@ -46,9 +46,11 @@ export function viewerAssetsDir({ isPackaged, resourcesPath, appPath }: { isPack
  * `out/drawio` inside the packaged app's asar — instead of a second copy of those bytes in `share-viewer`.
  */
 export async function readViewerAssets(dir: string, drawioDir: string): Promise<AssetFile[]> {
-  const notBuilt = () => {
-    throw new BridgeFailure('NOT_FOUND', 'The viewer page is not built on this computer (run: npm run build), so sharing cannot be set up yet.')
+  const missing = (what: string, run: string) => () => {
+    throw new BridgeFailure('NOT_FOUND', `${what} is not built on this computer (run: ${run}), so sharing cannot be set up yet.`)
   }
+  const notBuilt = missing('The viewer page', 'npm run build')
+  await readdir(drawioDir).catch(missing('draw.io', 'npm run drawio:pack'))
   /** Every file under `root`, published at `prefix` + its path relative to `base`. */
   const filesUnder = async (root: string, base: string, prefix: string) =>
     (await readdir(root, { recursive: true, withFileTypes: true }).catch(notBuilt))

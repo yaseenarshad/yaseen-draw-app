@@ -30,7 +30,7 @@ export interface EditorProps {
   canvasPanel?: CanvasPanelState
   onCanvasPanelChange?: (next: CanvasPanelState) => void
   /** 🔒 YAZ-1802 D16: `SettingsState.diagramDarkColors` — how a diagram looks in dark mode, live. */
-  diagramDarkColors?: DiagramDarkColors
+  diagramDarkColors: DiagramDarkColors
   /** The window's ONE passive notice: how an export says where it landed, or why it did not. */
   onNotice?: (text: string, icon?: NoticeKind) => void
   /** App's ⌘B, for a diagram: the key never leaves draw.io's iframe, so the diagram passes it up. */

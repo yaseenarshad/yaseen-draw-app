@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { BOARD_TYPE_NAME, isDiagram } from '@shared/fileKind'
+import { isDiagram } from '@shared/fileKind'
 import { api, BridgeRequestError } from '../api'
 import { ContextMenuSurface } from '../components/ContextMenuSurface'
 import { dropIndex, insertionSlot } from '../lib/dragSlot'
 import { basename, stripExt } from '../lib/paths'
-import { DiagramMark, SidebarPanelIcon } from '../components/icons'
+import { DiagramBadge, SidebarPanelIcon } from '../components/icons'
 import './tabs.css'
 
 export interface TabBarProps {
@@ -171,11 +171,7 @@ export function TabBar({ tabs, active, onActivate, onClose, onMove, canBack, can
                   if (e.button === 1) onClose(path)
                 }}
               >
-                {isDiagram(path) && (
-                  <span className="tabbar__kind" role="img" aria-label={BOARD_TYPE_NAME.diagram} title={BOARD_TYPE_NAME.diagram}>
-                    <DiagramMark />
-                  </span>
-                )}
+                {isDiagram(path) && <DiagramBadge className="tabbar__kind" />}
                 <span className="tabbar__label">{label}</span>
               </button>
               <button type="button" className="tabbar__close" aria-label={`Close ${label}`} title={`Close ${label}`} onClick={() => onClose(path)}>

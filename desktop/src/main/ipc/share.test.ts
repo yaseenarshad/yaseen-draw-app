@@ -31,12 +31,12 @@ describe('readViewerAssets (🔒 YAZ-1802 D5 / D11)', () => {
     await writeFile(file, text)
   }
 
-  it("publishes the viewer build as /assets/…, and draw.io's viewer, stencils, licence and image folder from the app's own webapp", async () => {
+  it("publishes the viewer build as /assets/…, and draw.io's viewer, stencils, licence, image and MathJax folders from the app's own webapp", async () => {
     const viewer = path.join(root, 'share-viewer')
     const drawio = path.join(root, 'drawio')
     await put(path.join(viewer, 'viewer.js'), 'viewer')
     await put(path.join(viewer, 'drawio', 'config.js'), 'config')
-    for (const file of ['js/viewer-static.min.js', 'js/stencils.min.js', 'LICENSE-drawio.txt', 'js/app.min.js', 'img/lib/azure/VM.svg']) await put(path.join(drawio, file), file)
+    for (const file of ['js/viewer-static.min.js', 'js/stencils.min.js', 'LICENSE-drawio.txt', 'js/app.min.js', 'img/lib/azure/VM.svg', 'math4/es5/startup.js']) await put(path.join(drawio, file), file)
     const assets = await readViewerAssets(viewer, drawio)
     expect(Object.fromEntries(assets.map((a) => [a.path, new TextDecoder().decode(a.bytes)]))).toEqual({
       '/assets/viewer.js': 'viewer',
@@ -45,13 +45,14 @@ describe('readViewerAssets (🔒 YAZ-1802 D5 / D11)', () => {
       '/assets/drawio/js/stencils.min.js': 'js/stencils.min.js',
       '/assets/drawio/LICENSE-drawio.txt': 'LICENSE-drawio.txt',
       '/assets/drawio/img/lib/azure/VM.svg': 'img/lib/azure/VM.svg',
+      '/assets/drawio/math4/es5/startup.js': 'math4/es5/startup.js',
     })
   })
 
   it('refuses to set up with no viewer build or no draw.io webapp, rather than upload a page that cannot draw', async () => {
     await put(path.join(root, 'share-viewer', 'viewer.js'), 'viewer')
-    await expect(readViewerAssets(path.join(root, 'nothing'), root)).rejects.toMatchObject({ code: 'NOT_FOUND' })
-    await expect(readViewerAssets(path.join(root, 'share-viewer'), path.join(root, 'no-drawio'))).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    await expect(readViewerAssets(path.join(root, 'nothing'), root)).rejects.toMatchObject({ code: 'NOT_FOUND', message: expect.stringContaining('npm run build') })
+    await expect(readViewerAssets(path.join(root, 'share-viewer'), path.join(root, 'no-drawio'))).rejects.toMatchObject({ code: 'NOT_FOUND', message: expect.stringContaining('npm run drawio:pack') })
   })
 })
 

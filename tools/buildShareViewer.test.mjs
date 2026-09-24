@@ -5,7 +5,7 @@ import { deflateRawSync } from 'node:zlib'
 import { build } from 'esbuild'
 import { JSDOM, VirtualConsole } from 'jsdom'
 import { describe, expect, it } from 'vitest'
-import { DRAWIO_SHARE_FILES } from '../desktop/src/main/drawio/assets.ts'
+import { DRAWIO_SHARE_DIRS, DRAWIO_SHARE_FILES } from '../desktop/src/main/drawio/assets.ts'
 import { viewerPage } from '../share/viewer/page.js'
 import { DRAWIO_TAG } from './packDrawio.mjs'
 import { diagramFontCss } from './buildShareViewer.mjs'
@@ -14,8 +14,8 @@ import { diagramFontCss } from './buildShareViewer.mjs'
  * A SHARED DIAGRAM'S PAGE, DRAWN OFFLINE (🔒 YAZ-1802 D11): the Worker's real page with its scripts
  * run in page order in jsdom — our config, the pinned draw.io viewer, our `diagram.js`, and any
  * script it adds — against a stand-in origin that answers `/scene/<id>` and every `/assets/…`
- * path from exactly the files share setup publishes there: our config, and `DRAWIO_SHARE_FILES`
- * from the pruned pack (🔒 YAZ-1802 D5). Nothing leaves the process. jsdom has no layout, so this
+ * path from exactly the files share setup publishes there: our config, and `DRAWIO_SHARE_FILES` /
+ * `DRAWIO_SHARE_DIRS` from the pruned pack (🔒 YAZ-1802 D5). Nothing leaves the process. jsdom has no layout, so this
  * pins what is drawn and fetched, not how it looks; that is a look at a live link.
  */
 const REPO = fileURLToPath(new URL('..', import.meta.url))
@@ -34,7 +34,8 @@ const XML = page(`${LABEL}
 /** The bytes share setup publishes at `/assets/<rel>`; null when it publishes nothing there. */
 function published(rel) {
   const drawio = rel.startsWith('drawio/') ? rel.slice('drawio/'.length) : null
-  const file = drawio === 'config.js' ? path.join(REPO, 'share', 'viewer', 'drawioConfig.js') : DRAWIO_SHARE_FILES.includes(drawio) ? path.join(PACK, drawio) : null
+  const fromPack = DRAWIO_SHARE_FILES.includes(drawio) || DRAWIO_SHARE_DIRS.some((dir) => drawio?.startsWith(`${dir}/`))
+  const file = drawio === 'config.js' ? path.join(REPO, 'share', 'viewer', 'drawioConfig.js') : fromPack ? path.join(PACK, drawio) : null
   return file !== null && existsSync(file) ? readFileSync(file) : null
 }
 
@@ -99,6 +100,9 @@ describe.skipIf(!existsSync(VIEWER))("a shared diagram's page, drawn offline by 
       expect(requested.filter((url) => !url.startsWith(`${ORIGIN}/`))).toEqual([])
       expect(window.document.getElementById('note')).toBeNull()
       expect(typeof window.document.getElementById('dl-drawio').onclick).toBe('function')
+      // The viewer loads MathJax on every page: unpublished, a math label would show raw TeX.
+      const mathJax = new URL(window.document.querySelector('script[src$="/startup.js"]').src)
+      expect(published(mathJax.pathname.slice('/assets/'.length)), mathJax.href).not.toBeNull()
     } finally {
       window.close()
     }

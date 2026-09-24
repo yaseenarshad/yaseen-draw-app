@@ -62,8 +62,19 @@ describe('packDrawio (🔒 YAZ-1802 D5)', () => {
     expect(WAR_URL).toBe('https://github.com/jgraph/drawio/releases/download/v31.5.2/draw.war')
     expect(WAR_BYTES).toBe(53_946_815)
     expect(WAR_SHA256).toMatch(/^[0-9a-f]{64}$/)
-    const assets = readFileSync(new URL('../desktop/src/main/drawio/assets.ts', import.meta.url), 'utf8')
-    expect(assets).toContain(`export const DRAWIO_TAG = '${DRAWIO_TAG}'`)
+    const shared = readFileSync(new URL('../shared/drawio.ts', import.meta.url), 'utf8')
+    expect(shared).toContain(`export const DRAWIO_TAG = '${DRAWIO_TAG}'`)
+  })
+
+  it('dev and build pack draw.io before the share viewer, which copies files out of the pack; CI packs before it tests', () => {
+    const { scripts } = JSON.parse(readFileSync(new URL('../desktop/package.json', import.meta.url), 'utf8'))
+    for (const script of [scripts.dev, scripts.build]) {
+      expect(script.indexOf('packDrawio.mjs')).toBeGreaterThan(-1)
+      expect(script.indexOf('packDrawio.mjs')).toBeLessThan(script.indexOf('buildShareViewer.mjs'))
+    }
+    const ci = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8')
+    expect(ci.indexOf('run: npm run drawio:pack')).toBeGreaterThan(-1)
+    expect(ci.indexOf('run: npm run drawio:pack')).toBeLessThan(ci.indexOf('run: npm test'))
   })
 })
 
@@ -148,7 +159,7 @@ describe('unpackWebapp + isUnpacked (🔒 YAZ-1802 D5)', () => {
   })
 })
 
-describe('layOverlay (🔒 YAZ-1802 D17)', () => {
+describe('layOverlay (🔒 YAZ-1802 D12a)', () => {
   function fixture() {
     const root = temp()
     const dir = join(root, 'webapp')

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { DRAWIO_ORIGIN, drawioAdaptiveColors, drawioConfig, drawioFrameUrl, readDrawioMessage } from './drawioProtocol'
+import { DRAWIO_ORIGIN } from '@shared/drawio'
+import { drawioAdaptiveColors, drawioConfig, drawioFrameUrl, readDrawioMessage } from './drawioProtocol'
 
 describe('drawioFrameUrl (🔒 YAZ-1802 D4)', () => {
   it('is the drawio origin in embed + JSON + configure mode, with every door to the network shut', () => {
@@ -59,10 +60,12 @@ describe('drawioConfig (🔒 YAZ-1802 D3 / D12a / D12b / D16)', () => {
     expect(config.keyboardShortcuts).toContainEqual({ keyCode: 220, control: true, action: 'removeFormat' })
   })
 
-  it('clears draw.io’s own ⌘K, ⌘, ⌘⇧O and zoom keys, so the app menu gets them on every platform', () => {
+  it('clears draw.io’s own bindings on every menu chord, so the app menu gets them on every platform', () => {
     const cleared = config.keyboardShortcuts.filter((s) => s.action === null && s.control === true)
     expect(cleared.filter((s) => s.shift !== true).map((s) => s.keyCode)).toEqual(expect.arrayContaining([75, 188, 48, 187, 189]))
-    expect(cleared).toContainEqual({ keyCode: 79, control: true, shift: true, action: null })
+    // ⌘⇧O Open Folder, ⌘⇧E Export Image, ⌘⇧L Share Link, ⌘⇧[ / ⌘⇧] tabs, ⌘⇧S (draw.io's Save As).
+    const shifted = cleared.filter((s) => s.shift === true).map((s) => s.keyCode)
+    expect(shifted).toEqual(expect.arrayContaining([79, 69, 76, 219, 221, 83]))
   })
 })
 

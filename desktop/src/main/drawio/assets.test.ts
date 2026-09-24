@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { DRAWIO_CSP, DRAWIO_ORIGIN, drawioFilePath, resolveDrawioDir, serveDrawio } from './assets'
+import { DRAWIO_ORIGIN } from '@shared/drawio'
+import { DRAWIO_CSP, drawioFilePath, resolveDrawioDir, serveDrawio } from './assets'
 
 describe('drawioFilePath — the traversal guard (🔒 YAZ-1802 D4)', () => {
   const dir = '/app/out/drawio'

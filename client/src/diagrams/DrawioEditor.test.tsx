@@ -8,6 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { DRAWIO_ORIGIN } from '@shared/drawio'
 import type { DiagramDarkColors, WatchEvent } from '@shared/types'
 
 vi.mock('../api', async (importOriginal) => ({
@@ -18,11 +19,10 @@ vi.mock('../share/liveShare', () => ({ noteBoardSaved: vi.fn() }))
 vi.mock('./renderDiagram', () => ({ renderDiagramImage: vi.fn() }))
 
 import { api, BridgeRequestError } from '../api'
-import { DRAWING_COMMAND_EVENT } from '../drawings/drawingCommand'
+import { BOARD_COMMAND_EVENT } from '../drawings/boardCommand'
 import { _resetRenameContinuity, flushRenamedPath, retirePath } from '../lib/renameContinuity'
 import { noteBoardSaved } from '../share/liveShare'
 import { BROKEN_DIAGRAM_DOCUMENT, DrawioEditor } from './DrawioEditor'
-import { DRAWIO_ORIGIN } from './drawioProtocol'
 import { renderDiagramImage } from './renderDiagram'
 
 const load = vi.mocked(api.diagram.load)
@@ -267,7 +267,7 @@ describe('the dark-mode colour setting (🔒 YAZ-1802 D16)', () => {
 
 describe('File › Export Image… (🔒 YAZ-1802 D9)', () => {
   const exportImage = async (): Promise<void> => {
-    container.querySelector('.editor--diagram')!.dispatchEvent(new CustomEvent(DRAWING_COMMAND_EVENT, { detail: { kind: 'export-image' } }))
+    container.querySelector('.editor--diagram')!.dispatchEvent(new CustomEvent(BOARD_COMMAND_EVENT, { detail: { kind: 'export-image' } }))
     await settle()
     await settle()
   }

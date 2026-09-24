@@ -41,7 +41,7 @@ export function requireAbsPath(p: unknown, param: string): string {
   return path.resolve(p)
 }
 
-/** Throws unless `p` has the only editable/creatable extension kind. */
+/** Throws unless `p` is an Excalidraw drawing — the kind the Import / Export Drawing dialogs take (🔒 YAZ-1802 D2). */
 export function requireDrawingFile(p: string): void {
   if (!isDrawing(p)) throw new BridgeFailure('UNSUPPORTED_EXTENSION', 'only .excalidraw files are editable', { path: p })
 }

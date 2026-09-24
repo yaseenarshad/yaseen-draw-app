@@ -88,6 +88,13 @@ describe('stampDiagramMeta (🔒 YAZ-1802 D7)', () => {
     expect(twice.match(new RegExp(DIAGRAM_CREATED_ATTR, 'g'))).toHaveLength(1)
   })
 
+  it('reads and replaces single-quoted dates too, so a reformatted file never gets a duplicate attribute', () => {
+    const quoted = file(` ${DIAGRAM_CREATED_ATTR}='7' host="x" ${DIAGRAM_UPDATED_ATTR} = '8'`)
+    expect(parseDiagramMetaAttrs(quoted)).toEqual({ createdAt: 7, updatedAt: 8 })
+    const out = stampDiagramMeta(quoted, at)
+    expect(out).toBe(`<mxfile ${DIAGRAM_CREATED_ATTR}="7" ${DIAGRAM_UPDATED_ATTR}="6000" host="x">${PAGE}</mxfile>\n`)
+  })
+
   it('stamps a self-closing <mxfile/> and leaves a bare <mxGraphModel> untouched', () => {
     expect(stampDiagramMeta('<mxfile/>', at)).toBe(`<mxfile ${DIAGRAM_CREATED_ATTR}="5000" ${DIAGRAM_UPDATED_ATTR}="6000"/>`)
     const bare = '<mxGraphModel><root/></mxGraphModel>'

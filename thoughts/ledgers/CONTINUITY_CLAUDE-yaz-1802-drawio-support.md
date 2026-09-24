@@ -19,15 +19,19 @@
   - [x] 2A classify (YAZ-1950) · [x] 2B bundle (YAZ-1951) · [x] 2C doors (YAZ-1952) · [x] 2F sync (YAZ-1955) — commit 7075e93, 2,429 tests
   - [x] 2D host (YAZ-1953) · [x] 2E feel (YAZ-1954) · [x] 2G naming (YAZ-1956) — commit 831466f; review fix: guides a per-diagram toggle
   - [x] Yasin hand pass of phase 2: "all good" (logged on 4A)
-  - [x] 3A–3E (YAZ-1958–1962) — commit 902ac87, 2,511 tests
-- Now: [→] 2B1 trim bundled draw.io (YAZ-1973) — app ~475 MB + share viewer +47 MB stencils (double copy)
-- Remaining:
-  - [ ] 4A core E2E (YAZ-1964) · [ ] 4B everywhere-else E2E (YAZ-1965)
-  - [ ] 5A audit (YAZ-1967) · [ ] 5B apply (YAZ-1968)
-  - [ ] merge to main · [ ] release (smallest bump) + install · [ ] release notes backfill
+  - [x] 3A–3E (YAZ-1958–1962) — commit 8addfd9
+  - [x] 2B1 trim bundled draw.io (YAZ-1973) — commit 1b3693b, 2,519 tests
+  - [x] 5A audit (YAZ-1967) — 10 MUST + 24 SHOULD, comment on YAZ-1967
+  - [x] 4A core loop (YAZ-1964) · 4B everywhere else (YAZ-1965) — Yasin: "all good" on both builds
+  - [x] 5B apply the audit (YAZ-1968) — 33/34 done, 1 half-declined; review fix: the build config imported `@shared` (no alias in Node) → `DRAWIO_TAG` moved to `shared/drawio.ts`; CI now runs `npm run build` as LAUNCH always said
+- Now: [→] merge to main · release 0.1.9 + install · closeout (handoff comments, cleanup, statuses)
+- Notes for a future agent:
+  - Yasin must re-run Settings › Sharing › Set up sharing once after 0.1.9 (new Worker code + draw.io assets); old links keep working.
+  - Future issues: YAZ-1969 Present for diagrams · YAZ-1970 cell merge + history marks · YAZ-1971 .drawio.svg/.png · YAZ-1972 diagram images in assets/.
+  - draw.io bump: change `DRAWIO_TAG` in `shared/drawio.ts` + `tools/packDrawio.mjs` (+ `WAR_BYTES`/`WAR_SHA256`), run `npm run drawio:pack --force`, run tests (the overlay guard test fails if a patched draw.io internal vanished), watch the dev log for `app://drawio` 404s.
 
 ## Open Questions
-- none yet
+- none
 
 ## Working Set
 - Worktree `../yaseen-draw-app-yaz-1802-demo`, branch `yaz-1802-drawio-support`

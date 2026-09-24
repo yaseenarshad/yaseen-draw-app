@@ -103,7 +103,7 @@ export interface ShareBoardRequest {
 }
 
 export interface SharePublishRequest extends ShareBoardRequest {
-  /** The standalone `.excalidraw` text (images embedded). */
+  /** The standalone `.excalidraw` text (images embedded), or a diagram's `.drawio` XML (🔒 YAZ-1802 D11). */
   content: string
   /**
    * A re-upload's link: main finds the record by it even if a rename moved the board since the

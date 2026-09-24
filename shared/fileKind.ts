@@ -48,6 +48,16 @@ export function isBoard(name: string): boolean {
   return fileKind(name) !== null
 }
 
+/** A board's name or path without its extension (`Flow.DRAWIO` → `Flow`, `.excalidraw` → ``); any other name is returned whole. */
+export function boardBaseName(name: string): string {
+  const dot = name.lastIndexOf('.')
+  const isBoardExt = dot !== -1 && ([...DRAWING_VIEW_EXTENSIONS, ...DIAGRAM_EXTENSIONS] as string[]).includes(name.slice(dot).toLowerCase())
+  return isBoardExt ? name.slice(0, dot) : name
+}
+
+/** The extension each kind of board is born with (🔒 YAZ-1802 D13). */
+export const BOARD_EXTENSION: Record<FileKind, string> = { drawing: DRAWING_VIEW_EXTENSIONS[0], diagram: DIAGRAM_EXTENSIONS[0] }
+
 /**
  * Renames never transcode bytes: a file may move between the extensions of its own kind, and a
  * file with no supported kind keeps its exact extension, since nothing else vouches for what its

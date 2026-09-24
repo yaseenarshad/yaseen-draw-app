@@ -353,4 +353,33 @@ describe.skipIf(!existsSync(APP_MIN_JS))(`every draw.io action we name exists in
     const named = [...new Set(shortcuts.map((s) => s.action).filter((a) => a !== null)), 'grid', 'darkMode', 'lightMode']
     for (const action of named) expect(app, action).toMatch(new RegExp(`(addAction|put)\\("${action}"`))
   })
+
+  it('every draw.io internal PostConfig.js wraps, replaces or leans on — a rename would drop a feature without an error', () => {
+    const app = readFileSync(APP_MIN_JS, 'utf8')
+    const internals = {
+      'Graph.isZoomWheelEvent': /Graph\.prototype\.isZoomWheelEvent\s*=\s*function/,
+      'mxSettings.getSidebarWidth': /getSidebarWidth\s*:\s*function/,
+      'EditorUi.createUi': /EditorUi\.prototype\.createUi\s*=\s*function/,
+      'EditorUi.hsplitPosition': /\.hsplitPosition\s*=/,
+      'Menus.createPopupMenu': /Menus\.prototype\.createPopupMenu\s*=\s*function/,
+      'Menus.addMenuItems': /Menus\.prototype\.addMenuItems\s*=\s*function/,
+      'EditorUi.installKeyboardShortcuts': /EditorUi\.prototype\.installKeyboardShortcuts\s*=\s*function/,
+      'keyHandler': /this\.keyHandler\s*=/,
+      'mxKeyHandler.getFunction': /mxKeyHandler\.prototype\.getFunction\s*=\s*function/,
+      'mxKeyHandler.isControlDown': /isControlDown\s*=\s*function/,
+      'mxKeyHandler.bindControlKey': /bindControlKey\s*=\s*function/,
+      'mxKeyHandler.bindControlShiftKey': /bindControlShiftKey\s*=\s*function/,
+      'controlKeys[66] is bold': /\.controlKeys\[/,
+      '⌘B bound to bold': /bindAction\(66,\s*!0,\s*"bold"\)/,
+      'CELLS_RESIZED carries "previous"': /CELLS_RESIZED,\s*"cells",\s*\w+,\s*"bounds",\s*\w+,\s*"previous"/,
+      'Graph.defaultAdaptiveColors': /Graph\.defaultAdaptiveColors\s*=/,
+      'EditorUi.setAdaptiveColors': /EditorUi\.prototype\.setAdaptiveColors\s*=\s*function/,
+      'graph.adaptiveColors': /\.adaptiveColors\s*=/,
+      'Editor.configureFontCss': /Editor\.configureFontCss\s*=\s*function/,
+      'Graph.toggleCellStyleFlags': /toggleCellStyleFlags\s*=\s*function/,
+      'Graph.getEditableCells': /getEditableCells\s*=\s*function/,
+      'Graph.updateCellSize': /updateCellSize\s*=\s*function/,
+    }
+    for (const [name, pattern] of Object.entries(internals)) expect(app, name).toMatch(pattern)
+  })
 })
