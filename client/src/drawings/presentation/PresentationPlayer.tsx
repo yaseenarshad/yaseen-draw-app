@@ -21,7 +21,7 @@
  * THE ONE PLACE THAT IS STILL DOCUMENT-WIDE is the key and double-click capture: the canvas has
  * the keyboard while presenting, and it is not inside this overlay. Both handlers therefore stand
  * down unless this overlay is in the VISIBLE tab layer, which is the same test
- * `drawingCommand.ts` makes for the menu's canvas items.
+ * `boardCommand.ts` makes for the menu's canvas items.
  *
  * PRESENTING IS FREE-FORM. The camera is never locked: the presenter can pan and zoom at any
  * time, and ← → / Esc / a double-click re-fit. The hand tool is active while the chrome is
@@ -34,7 +34,7 @@ import type { ExcalidrawImperativeApi, ExcalidrawModule } from '../engine'
 import { getPresentationViewportOffsets } from './camera'
 import { arrowRightIcon, closeIcon, toolsIcon } from './presentationIcons'
 import { findSlideIndexAtPoint, getOrderedPresentationFrames, type OrderedPresentationFrame } from './slides'
-import { isFrontmost } from '../drawingCommand'
+import { isFrontmost } from '../boardCommand'
 import './presentation.css'
 
 /** The web app's own transition length; the status line and the token both key off it. */
@@ -115,7 +115,7 @@ export function PresentationPlayer({ engine, excalidrawAPI, initialFrameId = nul
   /** The surface's own element: what the chrome classes go on, and what the reserve is measured from. */
   const host = useCallback(() => overlayRef.current?.closest<HTMLElement>('.drawing-surface') ?? null, [])
 
-  /** This overlay is in the tab that is IN FRONT — `drawingCommand.ts`'s one test. */
+  /** This overlay is in the tab that is IN FRONT — `boardCommand.ts`'s one test. */
   const inFront = useCallback(() => isFrontmost(overlayRef.current), [])
 
   const clearTransition = useCallback(() => {

@@ -2,7 +2,7 @@
  * Settings › Storage (YAZ-1801 D1): its own page (standalone, before Hotkeys), present only with a
  * vault open. One bar that always ends at 10 GB (D7), with "Your files" and "Old versions" on two
  * muted lines under it; "Needs attention" only when a file is ≥ 50 MiB (red at the sync guard's
- * 95 MiB, amber below); "Make boards smaller" only while pictures are inside boards, its result
+ * 95 MiB, amber below); "Make Excalidraw drawings smaller" only while pictures are inside drawings, its result
  * line outliving the numbers.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -76,7 +76,7 @@ const row = (el: HTMLElement, id: string) => el.querySelector<HTMLElement>(`[dat
 describe('Settings › Storage (YAZ-1801)', () => {
   it('is a standalone page under the divider, before Hotkeys — and absent with no vault', () => {
     const { el } = mount(STATS)
-    expect(navTitles(el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images', 'Sync', 'Storage', 'Hotkeys'])
+    expect(navTitles(el)).toEqual(['Appearance', 'Excalidraw canvas', 'Files', 'Images', 'Sync', 'Storage', 'Hotkeys'])
     // Under the divider with Hotkeys, not on the scrolling page.
     expect(el.querySelector('.settings-nav__divider + .settings-nav__item')?.textContent).toBe('Storage')
     expect(row(el, 'storageGithub')).toBeNull()
@@ -137,7 +137,7 @@ describe('Settings › Storage (YAZ-1801)', () => {
   it('needs attention: any large file, red at the sync guard ("Stays on this Mac"), amber below ("Close to the limit")', () => {
     const { el } = mount(STATS)
     openStorage(el)
-    expect(groupTitles(el)).toEqual(['Needs attention', 'Make boards smaller'])
+    expect(groupTitles(el)).toEqual(['Needs attention', 'Make Excalidraw drawings smaller'])
     const files = [...el.querySelectorAll<HTMLElement>('.storage__file')]
     expect(files.map((f) => f.dataset.path)).toEqual(['Big video.mov', 'Too big.excalidraw', 'Folder/Sixty.excalidraw'])
     expect(files.map((f) => f.classList.contains('storage__file--danger'))).toEqual([true, true, false])
@@ -155,16 +155,16 @@ describe('Settings › Storage (YAZ-1801)', () => {
   it('make boards smaller: the sentence carries the numbers, the button just acts, the result line stays after the numbers drop to zero', async () => {
     const { el, storage } = mount(STATS)
     openStorage(el)
-    expect(el.textContent).toContain('9 boards still carry 232.0 MB of pictures inside.')
+    expect(el.textContent).toContain('9 drawings still carry 232.0 MB of pictures inside.')
     const button = el.querySelector<HTMLButtonElement>('[data-testid="storage-shrink"]')!
     expect(button.textContent).toBe('Move pictures out')
     await act(async () => button.click())
     expect(storage?.shrink).toHaveBeenCalledOnce()
     // App's hook refreshes: the pictures are out, and it holds the result.
     render({ ...storage!, stats: { ...STATS, embedded: { bytes: 0, boards: 0 } }, lastShrink: { shrunk: 9, skipped: 1, bytesMoved: 230 * MB } })
-    expect(groupTitles(el)).toContain('Make boards smaller')
+    expect(groupTitles(el)).toContain('Make Excalidraw drawings smaller')
     expect(el.querySelector('[data-testid="storage-shrink"]')).toBeNull()
-    expect(el.textContent).toContain('9 boards 230.0 MB lighter · 1 skipped')
+    expect(el.textContent).toContain('9 drawings 230.0 MB lighter · 1 skipped')
   })
 
   it("measures nothing while Settings is closed, and once when the page opens — not also on Settings' open (🔒 D13)", async () => {

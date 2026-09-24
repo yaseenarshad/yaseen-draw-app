@@ -9,7 +9,7 @@
  */
 import { useMemo, useRef } from 'react'
 import type { TreeNode } from '@shared/types'
-import { EMPTY_CATALOG, buildDrawingCatalog, searchTitles, type SearchCandidate } from './searchCandidates'
+import { EMPTY_CATALOG, buildBoardCatalog, searchTitles, type SearchCandidate } from './searchCandidates'
 
 export function useSearchResults(root: string, query: string, tree: readonly TreeNode[] | null): SearchCandidate[] {
   const typed = query.trim() !== ''
@@ -20,7 +20,7 @@ export function useSearchResults(root: string, query: string, tree: readonly Tre
   const live = latched.current || typed
   latched.current = live
 
-  const catalog = useMemo(() => (live && tree !== null ? buildDrawingCatalog(root, tree) : EMPTY_CATALOG), [live, root, tree])
+  const catalog = useMemo(() => (live && tree !== null ? buildBoardCatalog(root, tree) : EMPTY_CATALOG), [live, root, tree])
   // An empty query matches EVERYTHING through the shared matcher (`indexOf('')` is 0), so the
   // no-query case is answered here rather than by the ranker.
   return useMemo(() => (typed ? searchTitles(catalog, query) : []), [catalog, query, typed])

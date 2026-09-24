@@ -1,7 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { existsSync } from 'node:fs'
 import { readFile, stat, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { BOARD_META_KEY } from '@shared/drawingAssets'
+import { EMPTY_DIAGRAM_XML, parseDiagramMetaAttrs } from '@shared/diagramFile'
 import { createDir, createFile } from './create'
 import { failure, makeFixture } from './testFixture'
 
@@ -11,6 +14,8 @@ beforeAll(async () => ({ root, cleanup } = await makeFixture()))
 afterAll(() => cleanup())
 
 const code = async (p: Promise<unknown>) => (await failure(p)).code
+/** The fixture's volume folds case (APFS's default — the Mac this app ships on). */
+const foldsCase = existsSync(tmpdir().toUpperCase())
 
 describe('createDir', () => {
   it('creates a directory and returns its path', async () => {
@@ -37,6 +42,33 @@ describe('createFile', () => {
     for (const name of ['note.md', 'note.txt', 'data.json', 'script.py', 'report.pdf', 'Plan.base']) {
       expect(await code(createFile({ path: path.join(root, name), content: '{"type":"excalidraw","elements":[]}' })), name).toBe('UNSUPPORTED_EXTENSION')
     }
+  })
+
+  it('🔒 YAZ-1802 D13: a .drawio is born whole — an <mxfile> stamped with both dates under wx — never empty or foreign', async () => {
+    const file = path.join(root, 'Untitled.drawio')
+    const before = Date.now()
+    const res = await createFile({ path: file, content: EMPTY_DIAGRAM_XML })
+    const written = await readFile(file, 'utf8')
+    const meta = parseDiagramMetaAttrs(written)
+    expect(meta?.createdAt).toBeGreaterThanOrEqual(before)
+    expect(meta?.updatedAt).toBe(meta?.createdAt)
+    expect(written).toContain('page="0"')
+    expect(res).toEqual({ path: file, mtime: (await stat(file)).mtimeMs, size: Buffer.byteLength(written) })
+    expect(await code(createFile({ path: file, content: EMPTY_DIAGRAM_XML }))).toBe('ALREADY_EXISTS')
+    for (const content of ['', '{"type":"excalidraw","elements":[]}', '<mxGraphModel><root/></mxGraphModel>', '<mxfile>']) {
+      expect(await code(createFile({ path: path.join(root, 'Bad.drawio'), content })), content).toBe('BAD_REQUEST')
+    }
+    // A diagram's name with scene content, and a scene's name with diagram content, are both refused.
+    expect(await code(createFile({ path: path.join(root, 'Scene.excalidraw'), content: EMPTY_DIAGRAM_XML }))).toBe('BAD_REQUEST')
+    expect(await code(createFile({ path: path.join(root, 'image.drawio.svg'), content: EMPTY_DIAGRAM_XML }))).toBe('UNSUPPORTED_EXTENSION')
+  })
+
+  it.runIf(foldsCase)('🔒 YAZ-1802 D13: on a case-folding volume `UNTITLED 2.DRAWIO` is refused beside `untitled 2.drawio`, which keeps its bytes', async () => {
+    const lower = path.join(root, 'untitled 2.drawio')
+    await createFile({ path: lower, content: EMPTY_DIAGRAM_XML })
+    const before = await readFile(lower, 'utf8')
+    expect(await code(createFile({ path: path.join(root, 'UNTITLED 2.DRAWIO'), content: EMPTY_DIAGRAM_XML }))).toBe('ALREADY_EXISTS')
+    expect(await readFile(lower, 'utf8')).toBe(before)
   })
 
   it.each(['existing.json', 'existing.py', 'existing.pdf'])('refuses existing %s before mutation and preserves its bytes', async (name) => {

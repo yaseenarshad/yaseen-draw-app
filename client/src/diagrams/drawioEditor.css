@@ -1,0 +1,35 @@
+/*
+ * The diagram document (YAZ-1802) — classes applied by DrawioEditor.tsx.
+ *
+ * The host is `.drawing-editor`'s shape: a flex column inside `section.editor`, the conflict bar
+ * when there is one, then the frame taking every remaining pixel (`min-height: 0` is what stops
+ * the iframe measuring its own content). Unlike a drawing there IS a chips row: draw.io's toolbar
+ * owns the top of its frame, and this app cannot place anything inside another origin — so the
+ * save and sync chips sit in a slim strip of their own above it.
+ */
+
+.drawio-editor {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawio-editor__chips {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-height: 26px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.drawio-editor__frame {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  display: block;
+  background: var(--bg);
+}

@@ -35,6 +35,10 @@ describe('openableFileArgs', () => {
     expect(openableFileArgs(['app.exe', '/v/Board.EXCALIDRAW'])).toEqual(['/v/Board.EXCALIDRAW'])
   })
 
+  it('🔒 YAZ-1802 D14: takes a draw.io diagram in any case, never a picture that holds one', () => {
+    expect(openableFileArgs(['app.exe', '/v/Flow.drawio', '/v/UP.DRAWIO', '/v/image.drawio.svg', '/v/image.drawio.png'])).toEqual(['/v/Flow.drawio', '/v/UP.DRAWIO'])
+  })
+
   it('an empty argv, or one with nothing but the launcher, asks for nothing', () => {
     expect(openableFileArgs([])).toEqual([])
     expect(openableFileArgs(['app.exe'])).toEqual([])

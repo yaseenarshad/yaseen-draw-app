@@ -10,8 +10,8 @@
  *     ● Too big for GitHub - 110 MB   110 MB   Stays on this Mac
  *     ● Big but OK - 60 MB             60 MB   Close to the limit
  *
- *   Make boards smaller                    (only when pictures are still inside boards)
- *     9 boards still carry 232 MB of pictures inside.   [ Move pictures out ]
+ *   Make Excalidraw drawings smaller       (only when pictures are still inside drawings)
+ *     9 drawings still carry 232 MB of pictures inside.   [ Move pictures out ]
  *
  * THE BAR is the git history — what GitHub has to store — on a FIXED scale that always ends at
  * GitHub's 10 GB maximum (D7), with GitHub's 1 GB and 5 GB lines marked: green to 1 GB, amber to
@@ -130,7 +130,7 @@ function MakeSmaller({ storage }: SettingsCtx) {
       {bytes > 0 && (
         <>
           <p className="storage__sentence">
-            {boards} {boards === 1 ? 'board still carries' : 'boards still carry'} {formatBytes(bytes)} of pictures inside.
+            {boards} {boards === 1 ? 'drawing still carries' : 'drawings still carry'} {formatBytes(bytes)} of pictures inside.
           </p>
           <button type="button" className="settings__option" disabled={busy} onClick={() => void run()} data-testid="storage-shrink">
             {busy ? 'Moving pictures…' : 'Move pictures out'}
@@ -140,7 +140,7 @@ function MakeSmaller({ storage }: SettingsCtx) {
       {failed && <p className="storage__muted storage__muted--danger">The pictures could not be moved.</p>}
       {result !== null && !failed && (
         <p className="storage__muted" role="status">
-          {result.shrunk === 0 ? 'No board changed' : `${result.shrunk} ${result.shrunk === 1 ? 'board' : 'boards'} ${formatBytes(result.bytesMoved)} lighter`}
+          {result.shrunk === 0 ? 'No drawing changed' : `${result.shrunk} ${result.shrunk === 1 ? 'drawing' : 'drawings'} ${formatBytes(result.bytesMoved)} lighter`}
           {result.skipped > 0 && ` · ${result.skipped} skipped (unsaved edits, or unreadable)`}
         </p>
       )}
@@ -172,7 +172,8 @@ export const STORAGE_SECTION: SettingsSection = {
       items: [{ id: 'storageLarge', label: 'Large files', keywords: ['large', 'big', 'too big', '100 MB', '50 MB', 'limit'], bare: true, render: (ctx) => <NeedsAttention {...ctx} /> }],
     },
     {
-      title: 'Make boards smaller',
+      // Excalidraw's alone: a draw.io diagram keeps its pictures in its XML (🔒 YAZ-1802 D1).
+      title: 'Make Excalidraw drawings smaller',
       available: (ctx) => (ctx.storage?.stats?.embedded.bytes ?? 0) > 0 || ctx.storage?.lastShrink != null,
       items: [{ id: 'storageShrink', label: 'Move pictures out', keywords: ['embedded', 'legacy', 'shrink', 'pictures', 'images', 'assets', 'smaller'], bare: true, render: (ctx) => <MakeSmaller {...ctx} /> }],
     },

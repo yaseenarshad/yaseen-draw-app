@@ -6,8 +6,8 @@
   "description": "Yaseen Draw — Electron shell (main + preload); the renderer is ../client",
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "node ../tools/buildShareViewer.mjs && electron-vite dev",
-    "build": "electron-vite build && node ../tools/buildShareViewer.mjs"
+    "dev": "node ../tools/packDrawio.mjs && node ../tools/buildShareViewer.mjs && electron-vite dev",
+    "build": "node ../tools/packDrawio.mjs && electron-vite build && node ../tools/buildShareViewer.mjs"
   },
   "dependencies": {
     "chokidar": "^4.0.3"
@@ -87,6 +87,14 @@
           "excalidraw"
         ],
         "name": "Excalidraw Drawing",
+        "role": "Editor",
+        "rank": "Owner"
+      },
+      {
+        "ext": [
+          "drawio"
+        ],
+        "name": "draw.io Diagram",
         "role": "Editor",
         "rank": "Owner"
       }

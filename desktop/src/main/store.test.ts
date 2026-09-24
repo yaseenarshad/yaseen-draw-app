@@ -118,6 +118,18 @@ describe('createStore: loading', () => {
     expect(isSettings({ ...DEFAULT_SETTINGS, hoverPreview: false })).toBe(true)
   })
 
+  it('diagramDarkColors: an old file without it reads adapt, junk falls back to adapt, keep survives; the IPC guard wants a known value (🔒 YAZ-1802 D16)', async () => {
+    const { diagramDarkColors: _omitted, ...preSettings } = DEFAULT_SETTINGS
+    await seed(valid({ settings: preSettings }))
+    expect(createStore(file).get().settings.diagramDarkColors).toBe('adapt')
+    await seed(valid({ settings: { diagramDarkColors: 'none' } }))
+    expect(createStore(file).get().settings.diagramDarkColors).toBe('adapt')
+    await seed(valid({ settings: { diagramDarkColors: 'keep' } }))
+    expect(createStore(file).get().settings.diagramDarkColors).toBe('keep')
+    expect(isSettings({ ...DEFAULT_SETTINGS, diagramDarkColors: 'auto' })).toBe(false)
+    expect(isSettings({ ...DEFAULT_SETTINGS, diagramDarkColors: 'keep' })).toBe(true)
+  })
+
   it('theme: an old settings object without the key sanitizes to system; junk falls back too (GRO-2218)', async () => {
     // A pre-K yaseendraw.json: every field but `theme` — the missing field must default, not corrupt the file.
     const { theme: _omitted, ...preThemeSettings } = DEFAULT_SETTINGS

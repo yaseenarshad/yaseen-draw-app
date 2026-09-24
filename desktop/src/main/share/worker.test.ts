@@ -125,6 +125,58 @@ describe('share Worker: the download file name', () => {
   })
 })
 
+describe('share Worker: two kinds of board (🔒 YAZ-1802 D11)', () => {
+  const XML = '<mxfile><diagram id="p" name="Page-1"><mxGraphModel><root><mxCell id="0"/></root></mxGraphModel></diagram></mxfile>'
+  const putDiagram = () => call('PUT', `/api/boards/${ID}`, { body: XML, headers: { 'x-board-kind': 'diagram', 'x-board-name': 'Flow' } })
+  const page = async () => (await call('GET', `/b/${ID}`, { auth: null })).text()
+  const scripts = (html: string) => [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)].map((m) => m[1])
+
+  it('a diagram is stored as XML under the SAME key, tagged with its kind, and the PUT echoes the kind', async () => {
+    const res = await putDiagram()
+    expect(res.headers.get('x-board-kind')).toBe('diagram')
+    expect(text(board)).toBe(XML)
+    expect(bucket.objects.get(board)?.customMetadata).toMatchObject({ name: 'Flow', kind: 'diagram' })
+  })
+
+  it('a PUT with no kind (or one the Worker does not know) is a drawing, and says so', async () => {
+    expect((await put('{"v":1}')).headers.get('x-board-kind')).toBe('drawing')
+    expect((await call('PUT', `/api/boards/${ID}`, { body: '{}', headers: { 'x-board-kind': 'mermaid' } })).headers.get('x-board-kind')).toBe('drawing')
+    expect(bucket.objects.get(board)?.customMetadata).toMatchObject({ kind: 'drawing' })
+  })
+
+  it('/scene and /raw answer a diagram as XML with its kind; the download is <name>.drawio', async () => {
+    await putDiagram()
+    for (const route of [`/scene/${ID}`, `/raw/${ID}`]) {
+      const res = await call('GET', route, { auth: null })
+      expect([res.headers.get('content-type'), res.headers.get('x-board-kind'), await res.text()]).toEqual(['application/xml; charset=utf-8', 'diagram', XML])
+    }
+    const header = (await call('GET', `/raw/${ID}?download=1`, { auth: null })).headers.get('content-disposition')
+    expect(header).toBe("attachment; filename*=UTF-8''Flow.drawio")
+  })
+
+  it('a board stored before kinds (no kind in its metadata) is a drawing: old links keep working', async () => {
+    bucket.objects.set(board, { bytes: new TextEncoder().encode('{"v":0}'), customMetadata: { name: 'Old', updatedAt: '1' } })
+    const raw = await call('GET', `/raw/${ID}?download=1`, { auth: null })
+    expect(raw.headers.get('x-board-kind')).toBe('drawing')
+    expect(raw.headers.get('content-disposition')).toContain('Old.excalidraw')
+    expect(scripts(await page())).toEqual(['/assets/viewer.js'])
+  })
+
+  it("/b picks the viewer by kind: a diagram runs draw.io's viewer after its config, with Download .drawio and no PNG", async () => {
+    await putDiagram()
+    const html = await page()
+    expect(scripts(html)).toEqual(['/assets/drawio/config.js', '/assets/drawio/js/viewer-static.min.js', '/assets/diagram.js'])
+    expect(html.match(/<script\b/g)).toHaveLength(4) // those three and the JSON block: still no inline script
+    expect(html).toContain('<link rel="stylesheet" href="/assets/drawio/fonts.css">')
+    expect(html).toContain('<title>Flow — shared diagram</title>')
+    expect(html).toContain('id="dl-drawio"')
+    expect(html).not.toContain('id="dl-excalidraw"')
+    expect(html).not.toContain('id="dl-png"')
+    await call('PATCH', `/api/boards/${ID}`, { body: JSON.stringify({ allowDownload: false }) })
+    expect(await page()).not.toContain('id="dl-drawio"')
+  })
+})
+
 describe('share Worker: the download flag is its own object, perm/<id> (D15)', () => {
   it('a PUT with x-allow-download writes the flag; a PUT without it leaves the flag alone', async () => {
     await put('{"v":1}', '0')

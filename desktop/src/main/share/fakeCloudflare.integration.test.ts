@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { CLOUDFLARE_TOKEN_SECRET, SHARE_UPLOAD_PASSWORD_SECRET, type ShareSetupProgress } from '@shared/types'
 import { createSecrets } from '../secrets'
+import { WORKER_OUTDATED } from './boards'
 import { createSharing, type Sharing } from './sharing'
 
 const REPO = fileURLToPath(new URL('../../../../', import.meta.url))
@@ -27,6 +28,13 @@ let server: ChildProcess | null
 let sharing: Sharing
 /** Every request `sharing.ts` sent to the share Worker (not Cloudflare's API). */
 let workerRequests: string[]
+/** The headers of every board upload (`PUT /api/boards/<id>`). */
+let uploads: Headers[]
+/**
+ * Answer like a share Worker deployed before 🔒 YAZ-1802 D11: its upload answer is the same, minus
+ * the `x-board-kind` echo — the one thing the app can tell it by.
+ */
+let preKindWorker: boolean
 
 /**
  * Starts the fake on a port it picks itself (`--port 0`), or (scenario 8's reconnect) back on `port`
@@ -67,10 +75,16 @@ const makeSharing = async () =>
     demoOrigin: origin,
     modules: { 'worker.js': await readFile(path.join(REPO, 'share', 'worker.js'), 'utf8') },
     readAssets: async () => [{ path: '/assets/viewer.js', bytes: new TextEncoder().encode('// viewer') }],
-    fetchImpl: (input, init) => {
+    fetchImpl: async (input, init) => {
       const url = String(input)
       if (!url.includes('/client/v4/')) workerRequests.push(`${init?.method ?? 'GET'} ${new URL(url).pathname}`)
-      return fetch(input, init)
+      const upload = init?.method === 'PUT' && url.includes('/api/boards/')
+      if (upload) uploads.push(new Headers(init.headers))
+      const res = await fetch(input, init)
+      if (!upload || !preKindWorker) return res
+      const headers = new Headers(res.headers)
+      headers.delete('x-board-kind')
+      return new Response(res.body, { status: res.status, headers })
     },
     sleep: async () => {},
   })
@@ -82,6 +96,8 @@ beforeEach(async () => {
   await mkdir(path.join(vault, 'Clients', 'Acme Corp', '2026', 'Q3 workshop'), { recursive: true })
   for (const b of boards()) await writeFile(b, scene(path.basename(b)))
   workerRequests = []
+  uploads = []
+  preKindWorker = false
   await startFake()
   sharing = await makeSharing()
 })
@@ -209,6 +225,59 @@ describe('a shared link against the fake Cloudflare (scenarios 4–6, 9, 10)', (
     expect(workerRequests).toEqual([])
     expect(await sharing.get(vault, deep())).toBeNull()
   }, 60_000)
+})
+
+describe('a shared draw.io diagram (🔒 YAZ-1802 D11)', () => {
+  const XML = '<mxfile host="yaz-1802"><diagram id="p1" name="Page-1"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" value="Lambda" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" vertex="1" parent="1"><mxGeometry x="10" y="10" width="60" height="60" as="geometry"/></mxCell></root></mxGraphModel></diagram></mxfile>\n'
+  const flow = () => path.join(vault, 'Clients', 'Flow.drawio')
+  const meta = async (id: string) => JSON.parse(await readFile(path.join(dir, 'fake', 'bucket', `${encodeURIComponent(`boards/${id}.excalidraw`)}.meta.json`), 'utf8'))
+
+  it('uploads its XML tagged as a diagram; the link opens the draw.io viewer, and downloads <name>.drawio byte for byte', async () => {
+    await writeFile(flow(), XML)
+    await setUp()
+    const s = await publish(flow())
+    const sent = uploads.at(-1)!
+    expect([sent.get('content-type'), sent.get('x-board-kind'), sent.get('x-board-name')]).toEqual(['application/xml', 'diagram', 'Flow'])
+    expect(await meta(s.id)).toMatchObject({ httpMetadata: { contentType: 'application/xml; charset=utf-8' }, customMetadata: { name: 'Flow', kind: 'diagram' } })
+    const page = await (await get(`/b/${s.id}`)).text()
+    expect(page).toContain('<script src="/assets/drawio/js/viewer-static.min.js"></script>')
+    expect(page).toContain('id="dl-drawio"')
+    const raw = await get(`/raw/${s.id}?download=1`)
+    expect(raw.headers.get('content-disposition')).toBe("attachment; filename*=UTF-8''Flow.drawio")
+    expect(raw.headers.get('x-board-kind')).toBe('diagram')
+    expect(await raw.text()).toBe(XML)
+    // An in-app save re-uploads to the same link, still a diagram (what liveShare sends).
+    await writeFile(flow(), XML.replace('Lambda', 'Edited'))
+    await publish(flow(), s.id)
+    expect(await (await get(`/scene/${s.id}`)).text()).toContain('Edited')
+    expect((await meta(s.id)).customMetadata.kind).toBe('diagram')
+  })
+
+  it('a drawing sends no kind, and is served exactly as before', async () => {
+    await setUp()
+    const s = await publish(simple())
+    expect([uploads.at(-1)!.get('content-type'), uploads.at(-1)!.has('x-board-kind')]).toEqual(['application/json', false])
+    expect((await get(`/raw/${s.id}`)).headers.get('x-board-kind')).toBe('drawing')
+    expect(await (await get(`/b/${s.id}`)).text()).toContain('<script type="module" src="/assets/viewer.js"></script>')
+  })
+
+  it('a Worker deployed before diagrams is caught: a first share is refused and taken back down, a shared one keeps its record — both ask for Set up sharing again', async () => {
+    await writeFile(flow(), XML)
+    await setUp()
+    const shared = await publish(flow())
+    preKindWorker = true
+    await expect(publish(flow(), shared.id)).rejects.toMatchObject({ code: 'PROVIDER_FAILED', message: WORKER_OUTDATED })
+    expect((await sharing.get(vault, flow()))?.sync).toMatchObject({ state: 'failed', message: expect.stringMatching(/Set up sharing again/) })
+    await sharing.stop(vault, flow())
+    workerRequests = []
+    await expect(publish(flow())).rejects.toMatchObject({ message: WORKER_OUTDATED })
+    const [put, del] = workerRequests
+    expect([put.split(' ')[0], del]).toEqual(['PUT', put.replace('PUT', 'DELETE')])
+    expect((await get(put.replace('PUT /api/boards/', '/b/'))).status).toBe(404)
+    expect(await sharing.get(vault, flow())).toBeNull()
+    // Drawings are unaffected: an old Worker shares them as it always did.
+    expect((await publish(simple())).id).toMatch(/^[\w-]{24}$/)
+  })
 })
 
 describe('keeping links right (scenarios 8, 11, 12)', () => {

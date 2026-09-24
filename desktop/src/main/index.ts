@@ -1,10 +1,12 @@
 import { app, BrowserWindow, Menu, nativeTheme, net, powerMonitor, protocol, screen, shell } from 'electron'
-import { statSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { isDrawing } from '@shared/fileKind'
+import { DRAWIO_HOST } from '@shared/drawio'
+import { fileKind } from '@shared/fileKind'
 import { fileLink, parseFileLink } from '@shared/links'
 import type { WindowEntry } from '@shared/types'
+import { resolveDrawioDir, serveDrawio } from './drawio/assets'
 import type { GitSyncManager } from './git/manager'
 import { registerIpc } from './ipc'
 import { viewerAssetsDir } from './ipc/share'
@@ -28,7 +30,7 @@ const isPrimaryInstance = app.requestSingleInstanceLock()
 if (!isPrimaryInstance) app.quit()
 app.on('second-instance', (_event, argv) => {
   // Windows/Linux deliver a clicked yaseendraw:// link as an argv entry of the second launch —
-  // and a double-clicked `.excalidraw` as a bare PATH in the same place (YAZ-1815): off macOS there is
+  // and a double-clicked `.excalidraw` or `.drawio` as a bare PATH in the same place (YAZ-1815): off macOS there is
   // no `open-file` event, so argv is the only door the file association has.
   const urls = [...argv.filter((arg) => arg.startsWith('yaseendraw://')), ...openableFileArgs(argv, argsSkip()).map(fileLink)]
   if (urls.length > 0) {
@@ -64,8 +66,9 @@ app.on('open-url', (event, url) => {
 // macOS hands a double-clicked (or `open`ed, or "Open With"-ed) file to `open-file` as a plain
 // absolute path — also before `ready` on a cold start. Encoding it as a yaseendraw:// link reuses
 // the whole E1 pipeline (queue, parse, routing, kind/exists guards); fileLink ↔ parseFileLink is
-// lossless (links.test.ts round trips). The bundle claims `.excalidraw` as an Owner association
-// in `desktop/package.json`, which is what makes the event fire at all (🔒 YAZ-1775 D1, YAZ-1775).
+// lossless (links.test.ts round trips). The bundle claims `.excalidraw` and `.drawio` as Owner
+// associations in `desktop/package.json`, which is what makes the event fire at all (🔒 YAZ-1775 D1,
+// 🔒 YAZ-1802 D14).
 app.on('open-file', (event, path) => {
   event.preventDefault()
   links.push(fileLink(path))
@@ -79,6 +82,9 @@ const argsSkip = (): number => (app.isPackaged ? 1 : 2)
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }])
 
 const RENDERER_DIR = join(__dirname, '../renderer')
+
+/** The draw.io webapp (🔒 YAZ-1802 D4/D5): the pack cache in dev, `out/drawio` in a build. */
+const DRAWIO_DIR = resolveDrawioDir({ mainDir: __dirname, appPath: app.getAppPath(), isPackaged: app.isPackaged, exists: existsSync })
 
 /** One user-global state file (D9, GRO-2159): `~/Library/Application Support/Yaseen Draw/yaseendraw.json`. */
 const store = createStore(join(app.getPath('userData'), 'yaseendraw.json'))
@@ -163,7 +169,15 @@ app.whenReady().then(() => {
     nativeTheme.themeSource = theme
   })
   protocol.handle('app', (req) => {
-    const { pathname } = new URL(req.url)
+    const { host, pathname } = new URL(req.url)
+    // 🔒 YAZ-1802 D4: routed by HOST — `app://drawio` is the diagram editor's own origin.
+    if (host === DRAWIO_HOST) {
+      return serveDrawio(DRAWIO_DIR, pathname, {
+        fetchFile: (url) => net.fetch(url),
+        noStore: !app.isPackaged,
+        onNotFound: app.isPackaged ? undefined : (missing) => console.warn(`[drawio] 404 app://drawio${missing} — not in the pruned pack (tools/lib/drawioPack.mjs)`),
+      })
+    }
     const file = join(RENDERER_DIR, pathname === '/' ? 'index.html' : pathname)
     return net.fetch(pathToFileURL(file).toString())
   })
@@ -180,17 +194,17 @@ app.whenReady().then(() => {
     },
     openExternal: (url) => void shell.openExternal(url),
   })
-  // 🔒 YAZ-1775 D10: the two canvas items are enabled only while the window a menu action would target has
-  // a DRAWING in front. Read at build time from the same entry `focusedEntry` uses, so the answer
-  // and the send target can never disagree.
-  const activeFileIsDrawing = (): boolean => {
+  // 🔒 YAZ-1775 D10: the board items are enabled only while the window a menu action would target has
+  // a board of the right kind in front. Read at build time from the same entry `focusedEntry` uses,
+  // so the answer and the send target can never disagree.
+  const activeFileKind = () => {
     const wc = menuTarget()
     const id = wc === undefined ? undefined : manager.idFor(wc)
     const file = id === undefined ? null : (store.get().windows.find((w) => w.id === id)?.file ?? null)
-    return file !== null && isDrawing(file)
+    return file === null ? null : fileKind(file)
   }
   const applyMenu = (): void =>
-    Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenuTemplate({ recents: store.get().recents, isDev: !app.isPackaged, activeIsDrawing: activeFileIsDrawing() }, handlers)))
+    Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenuTemplate({ recents: store.get().recents, isDev: !app.isPackaged, activeKind: activeFileKind() }, handlers)))
   applyMenu()
   subscribeMenuRebuild(store, applyMenu)
   // A tab switch changes which file is in front (🔒 YAZ-1775 D10); focus changes which window is asked.
@@ -198,6 +212,7 @@ app.whenReady().then(() => {
   rebuildMenuOnFocus = applyMenu
   gitSync = registerIpc(store, manager, app.getPath('userData'), {
     viewerAssetsDir: viewerAssetsDir({ isPackaged: app.isPackaged, resourcesPath: process.resourcesPath, appPath: app.getAppPath() }),
+    drawioDir: DRAWIO_DIR,
     isPackaged: app.isPackaged,
   })
   // 🔒 YAZ-1775 D5: the one library folder every vault shares. Made at startup, detached — a launch must

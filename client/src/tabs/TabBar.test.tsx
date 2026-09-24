@@ -53,6 +53,17 @@ describe('TabBar', () => {
     expect(tabsEls.map((t) => t.title)).toEqual(['/v/Note.excalidraw', '/v/sub/Plan.excalidraw'])
   })
 
+  it('marks a draw.io diagram’s tab with its type glyph before the label, and leaves an Excalidraw tab unmarked (🔒 YAZ-1802 D15)', () => {
+    const el = mount({ tabs: ['/v/Note.excalidraw', '/v/Flow.drawio', '/v/Flow.drawio.svg'], active: '/v/Flow.drawio', ...noop, ...noNav })
+    const [drawing, diagram, picture] = [...el.querySelectorAll<HTMLButtonElement>('[role="tab"]')]
+    expect(drawing.querySelector('.tabbar__kind')).toBeNull()
+    expect(picture.querySelector('.tabbar__kind')).toBeNull()
+    const mark = diagram.querySelector('.tabbar__kind')
+    expect(mark?.getAttribute('aria-label')).toBe('draw.io diagram')
+    expect(mark?.nextElementSibling?.className).toBe('tabbar__label')
+    expect(diagram.textContent).toBe('Flow')
+  })
+
   it('marks only the active tab: aria-selected + the underline modifier', () => {
     const el = mount({ tabs: ['/v/a.excalidraw', '/v/b.excalidraw'], active: '/v/b.excalidraw', ...noop, ...noNav })
     expect([...el.querySelectorAll('[role="tab"]')].map((t) => t.getAttribute('aria-selected'))).toEqual(['false', 'true'])

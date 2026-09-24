@@ -21,7 +21,7 @@ import { CANVAS_SECTION } from './canvasSection'
 import { Segmented } from './controls'
 import { HOTKEY_GROUPS, type HotkeyEntry } from './hotkeys'
 import { LibraryFolderControl, LibraryFolderHint } from './LibraryFolderControl'
-import { ON_OFF_OPTIONS, repoHint, THEME_OPTIONS } from './options'
+import { DIAGRAM_DARK_COLORS_OPTIONS, ON_OFF_OPTIONS, repoHint, THEME_OPTIONS } from './options'
 import { PixabayKeyControl } from './PixabayKeyControl'
 import { STORAGE_SECTION } from './storageSection'
 import { SHARING_SECTION } from '../share/SharingPage'
@@ -105,6 +105,16 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
             keywords: ['dark', 'light', 'system'],
             render: ({ settings, onChange }) => <Segmented options={THEME_OPTIONS} value={settings.theme} onChange={(theme) => onChange({ ...settings, theme })} ariaLabel="Theme" />,
           },
+          {
+            // 🔒 YAZ-1802 D16: the default for every diagram; a file that sets its own `adaptiveColors` keeps it.
+            id: 'diagramDarkColors',
+            label: 'draw.io diagrams in dark mode',
+            hint: 'Adapt re-colours diagrams so they stay readable in dark mode. A diagram that asks to keep its own colours always does.',
+            keywords: ['drawio', 'draw.io', 'diagram', 'dark', 'colors', 'colours', 'adaptive'],
+            render: ({ settings, onChange }) => (
+              <Segmented options={DIAGRAM_DARK_COLORS_OPTIONS} value={settings.diagramDarkColors} onChange={(diagramDarkColors) => onChange({ ...settings, diagramDarkColors })} ariaLabel="draw.io diagrams in dark mode" />
+            ),
+          },
         ],
       },
     ],
@@ -124,7 +134,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
             // actually means rather than being a bare switch.
             id: 'confirmDelete',
             label: 'Confirm before deleting',
-            hint: 'Deleted drawings and folders move to the Trash either way.',
+            hint: 'Deleted files and folders move to the Trash either way.',
             render: ({ settings, onChange }) => (
               <Segmented options={ON_OFF_OPTIONS} value={settings.confirmDelete} onChange={(confirmDelete) => onChange({ ...settings, confirmDelete })} ariaLabel="Confirm before deleting" />
             ),
@@ -133,7 +143,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
             // YAZ-1800: the sidebar's hover preview; the picture button in the sidebar header toggles the same flag.
             id: 'hoverPreview',
             label: 'Preview on hover',
-            hint: 'Rest the mouse on a board in the sidebar to see the whole drawing.',
+            hint: 'Rest the mouse on a board in the sidebar to see the whole board.',
             render: ({ settings, onChange }) => (
               <Segmented options={ON_OFF_OPTIONS} value={settings.hoverPreview} onChange={(hoverPreview) => onChange({ ...settings, hoverPreview })} ariaLabel="Preview on hover" />
             ),
@@ -212,14 +222,14 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     id: 'hotkeys',
     title: 'Hotkeys',
     standalone: true,
-    // One group per table, so "Window" is a heading search knows. The id is the table's title
-    // lower-cased (`hotkeys-window`); every key and label of the table is a keyword, so "close
-    // tab" or "⌘W" finds it, and "keyboard shortcuts" reaches every table.
-    groups: HOTKEY_GROUPS.map(({ title, entries }) => ({
+    // One group per table, so "Window" is a heading search knows. The id is the table's own
+    // (`hotkeys-window`); every key and label of the table is a keyword, so "close tab" or "⌘W"
+    // finds it, and "keyboard shortcuts" reaches every table.
+    groups: HOTKEY_GROUPS.map(({ id, title, entries }) => ({
       title,
       items: [
         {
-          id: `hotkeys-${title.toLowerCase()}`,
+          id: `hotkeys-${id}`,
           label: `${title} shortcuts`,
           keywords: ['keyboard shortcuts', ...entries.flatMap((entry) => [entry.keys, entry.label])],
           wide: true,

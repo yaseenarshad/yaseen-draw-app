@@ -5,7 +5,7 @@
  * exist. `main/index.ts` turns each one into a `yaseendraw://` link, so a double-click travels the
  * routing path every deep link takes.
  */
-import { isSupportedFile } from '@shared/fileKind'
+import { isBoard } from '@shared/fileKind'
 
 /**
  * The openable file paths in `argv`, in order. `skip` is how many leading entries belong to the
@@ -13,5 +13,5 @@ import { isSupportedFile } from '@shared/fileKind'
  * `main/index.ts` passes `app.isPackaged ? 1 : 2` because in dev `argv[1]` is the app directory.
  */
 export function openableFileArgs(argv: readonly string[], skip = 1): string[] {
-  return argv.slice(skip).filter((arg) => arg !== '' && !arg.startsWith('-') && !arg.includes('://') && isSupportedFile(arg))
+  return argv.slice(skip).filter((arg) => arg !== '' && !arg.startsWith('-') && !arg.includes('://') && isBoard(arg))
 }

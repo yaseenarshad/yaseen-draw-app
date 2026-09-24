@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { StrictMode, act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { DEFAULT_SETTINGS, defaultAppState, type AppState, type FileClipRequest, type FileClipState, type PasteResponse, type TreeNode, type WatchEvent, type WindowIdentity } from '@shared/types'
+import { EMPTY_DIAGRAM_XML } from '@shared/diagramFile'
 import { EMPTY_SCENE_JSON } from '../drawings/drawingScene'
 // Focus Mode's persistence is the REAL storage module (no mock in this file): a spy on its read is
 // how a test hands the Sidebar a focus restored from an earlier session (YAZ-1605).
@@ -137,7 +138,7 @@ async function mount(over: Partial<SidebarProps> = {}, tweakBridge?: (bridge: Re
 }
 
 const fileRow = (el: HTMLElement) => el.querySelector<HTMLButtonElement>('.tree__row--file')
-const searchInput = (el: HTMLElement) => el.querySelector<HTMLInputElement>('input[aria-label="Search drawings"]')
+const searchInput = (el: HTMLElement) => el.querySelector<HTMLInputElement>('input[aria-label="Search boards"]')
 /**
  * Drive the CONTROLLED search input like a user: native value setter + input event (SettingsDialog
  * idiom). Async so the re-render it triggers has settled before the assertions read the body.
@@ -277,14 +278,14 @@ describe('Sidebar file-row open gestures (D2 GRO-2168, I3 GRO-2235)', () => {
   })
 
   /**
-   * "New drawing" (🔒 R1 on YAZ-1775, YAZ-1815): the app's ONE file-creation door, and it never asks for
-   * a name — the board is born `Untitled`, opens in the current tab, and offers the inline rename.
+   * "New Excalidraw drawing" (🔒 R1 on YAZ-1775, YAZ-1815): the app's ONE file-creation door, and it never
+   * asks for a name — the board is born `Untitled`, opens in the current tab, and offers the inline rename.
    */
-  describe('"New drawing" (YAZ-1815)', () => {
+  describe('"New Excalidraw drawing" (YAZ-1815)', () => {
     /** Right-click blank space and take the item; the whole birth settles inside one act. */
     const newDrawing = async (el: HTMLElement) => {
       act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
-      await act(async () => itemByLabel(el, 'New drawing')?.click())
+      await act(async () => itemByLabel(el, 'New Excalidraw drawing')?.click())
       await act(async () => undefined)
     }
     /** `createFile` that also grows the tree the next refresh reads — what the watcher does in production. */
@@ -327,19 +328,29 @@ describe('Sidebar file-row open gestures (D2 GRO-2168, I3 GRO-2235)', () => {
       expect(bridge.createFile.mock.calls.map((c) => (c[0] as { path: string }).path)).toEqual(['/v/Untitled.excalidraw', '/v/Untitled 2.excalidraw'])
     })
 
-    it('reports a refusal through the passive notice and opens nothing', async () => {
+    it('reports a refusal through the passive notice, naming the engine (🔒 YAZ-1802 D13), and opens nothing', async () => {
       const { el, props, bridge } = await mount()
       bridge.createFile.mockRejectedValue(new BridgeRequestError('FORBIDDEN', 'read-only vault'))
       await newDrawing(el)
-      expect(props.onNotice).toHaveBeenCalledWith(expect.stringContaining('read-only vault'), 'error')
+      expect(props.onNotice).toHaveBeenCalledWith("Can't create Excalidraw drawing: read-only vault", 'error')
       expect(props.onOpenFile).not.toHaveBeenCalled()
     })
 
     it('creates inside the right-clicked FOLDER, not the vault root', async () => {
       const { el, bridge } = await mount()
       act(() => void el.querySelector('.tree__row--dir')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
-      await act(async () => itemByLabel(el, 'New drawing')?.click())
+      await act(async () => itemByLabel(el, 'New Excalidraw drawing')?.click())
       expect(bridge.createFile).toHaveBeenCalledExactlyOnceWith({ path: '/v/sub/Untitled.excalidraw', content: EMPTY_SCENE_JSON })
+    })
+
+    it('🔒 YAZ-1802 D13: "New draw.io diagram" is the same birth — `Untitled.drawio`, an EMPTY DIAGRAM, counted on .drawio names only', async () => {
+      const taken: TreeNode[] = [...TREE, { type: 'file', name: 'Untitled.excalidraw', path: '/v/Untitled.excalidraw', size: 1, mtime: 1, kind: 'drawing' }, { type: 'file', name: 'untitled.DRAWIO', path: '/v/untitled.DRAWIO', size: 1, mtime: 1, kind: 'diagram' }]
+      const { el, props, bridge } = await mount({}, (b) => b.tree.mockResolvedValue({ root: '/v', tree: taken, generatedAt: 1 }))
+      act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
+      await act(async () => itemByLabel(el, 'New draw.io diagram')?.click())
+      await act(async () => undefined)
+      expect(bridge.createFile).toHaveBeenCalledExactlyOnceWith({ path: '/v/Untitled 2.drawio', content: EMPTY_DIAGRAM_XML })
+      expect(props.onOpenFile).toHaveBeenCalledExactlyOnceWith('/v/Untitled 2.drawio')
     })
   })
 
@@ -351,7 +362,7 @@ describe('Sidebar file-row open gestures (D2 GRO-2168, I3 GRO-2235)', () => {
     act(() => void el.querySelector('.ctx-overlay')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })))
     act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
     expect(subItemByLabel(el, 'New window')).toBeUndefined()
-    expect(itemByLabel(el, 'New drawing')).toBeDefined()
+    expect(itemByLabel(el, 'New Excalidraw drawing')).toBeDefined()
   })
 })
 
@@ -616,7 +627,7 @@ describe('context menu target matrix (GRO-2296)', () => {
     expect(itemByLabel(el, 'Rename')).toBeUndefined()
     expect(subItemByLabel(el, 'New window')).toBeUndefined()
     // The create actions are always available on blank space: they target the root.
-    expect(itemByLabel(el, 'New drawing')).toBeDefined()
+    expect(itemByLabel(el, 'New Excalidraw drawing')).toBeDefined()
     expect(itemByLabel(el, 'New folder')).toBeDefined()
   })
 
@@ -851,7 +862,7 @@ describe('persistent search bar (YAZ-801)', () => {
 
   it('renders in an empty vault', async () => {
     const { el } = await mount({}, (b) => b.tree.mockImplementation(async (r: string) => ({ root: r, tree: [], generatedAt: 1 })))
-    expect(el.textContent).toContain('No drawings here.')
+    expect(el.textContent).toContain('No boards here.')
     expect(searchInput(el)).not.toBeNull()
   })
 
@@ -1279,7 +1290,7 @@ describe('lens tabs (🔒 D4/D5, YAZ-847)', () => {
     const { el } = await mount({ lens: 'favorites' })
     act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
     expect(el.querySelector('.ctx-menu')).not.toBeNull()
-    expect(menuItems(el).map((b) => b.textContent)).toEqual(['Paste', 'Copy path', 'New drawing', 'New folder', 'New dated folder', 'Open in'])
+    expect(menuItems(el).map((b) => b.textContent)).toEqual(['Paste', 'Copy path', 'New Excalidraw drawing', 'New draw.io diagram', 'New folder', 'New dated folder', 'Open in'])
   })
 
   it('a typed query still offers nothing on either lens — a result list has no root to target (YAZ-803)', async () => {
@@ -1436,7 +1447,7 @@ describe('focus mode (YAZ-1605)', () => {
     closeMenu(el)
     rightClick(el.querySelector('.sidebar__body'))
     expect(itemByLabel(el, 'Focus on folder')).toBeUndefined()
-    expect(itemByLabel(el, 'New drawing')).toBeDefined() // the menu is there; only Focus is missing
+    expect(itemByLabel(el, 'New Excalidraw drawing')).toBeDefined() // the menu is there; only Focus is missing
   })
 
   it('focusing a folder makes it the only top row, opens it, and stores the one path', async () => {
@@ -1684,11 +1695,11 @@ describe('favorites (YAZ-1766)', () => {
 
   it('New drawing from a ROOT favorited FILE hops to Files — its parent dir is not on the tab; from a favorited FOLDER it stays put (3B1)', async () => {
     const { el, v, props, bridge } = await mountVault({ lens: 'favorites' }, { favorites: ['/Notes/n.excalidraw', '/Projects'] })
-    await pick(el, `${v}/Notes/n.excalidraw`, 'New drawing')
+    await pick(el, `${v}/Notes/n.excalidraw`, 'New Excalidraw drawing')
     expect(props.onLensChange).toHaveBeenCalledExactlyOnceWith('files')
     expect(bridge.createFile).toHaveBeenCalledWith({ path: `${v}/Notes/Untitled.excalidraw`, content: EMPTY_SCENE_JSON })
     vi.mocked(props.onLensChange).mockClear()
-    await pick(el, `${v}/Projects`, 'New drawing')
+    await pick(el, `${v}/Projects`, 'New Excalidraw drawing')
     expect(props.onLensChange).not.toHaveBeenCalled()
     expect(bridge.createFile).toHaveBeenLastCalledWith({ path: `${v}/Projects/Untitled.excalidraw`, content: EMPTY_SCENE_JSON })
   })
@@ -1700,7 +1711,7 @@ describe('favorites (YAZ-1766)', () => {
     closeMenu(el)
     rightClick(el.querySelector('.sidebar__body'))
     expect(itemByLabel(el, 'Add to favorites')).toBeUndefined()
-    expect(itemByLabel(el, 'New drawing')).toBeDefined()
+    expect(itemByLabel(el, 'New Excalidraw drawing')).toBeDefined()
     closeMenu(el)
     await pick(el, `${v}/Projects`, 'Add to favorites')
     expect(props.onNotice).toHaveBeenCalledWith('Added to favorites', 'favorite')
@@ -1721,11 +1732,11 @@ describe('favorites (YAZ-1766)', () => {
   it('every favorites row carries the full row menu — Focus, Copy path, Rename, Open in, Delete', async () => {
     const { el, v } = await mountVault({ lens: 'favorites' }, { favorites: ['/Projects', '/top.excalidraw'] })
     rightClick(rowByPath(el, `${v}/Projects`))
-    for (const label of ['Focus on folder', 'Cut', 'Copy', 'Copy path', 'New drawing', 'Rename', 'Remove from favorites', 'Open in', 'Delete']) expect(itemByLabel(el, label), label).toBeDefined()
+    for (const label of ['Focus on folder', 'Cut', 'Copy', 'Copy path', 'New Excalidraw drawing', 'Rename', 'Remove from favorites', 'Open in', 'Delete']) expect(itemByLabel(el, label), label).toBeDefined()
     closeMenu(el)
     rightClick(rowByPath(el, `${v}/top.excalidraw`))
     // A FILE row keeps the rest of the menu and loses only the folder-shaped items.
-    for (const label of ['Cut', 'Copy', 'Copy path', 'New drawing', 'Rename', 'Remove from favorites', 'Open in', 'Delete']) expect(itemByLabel(el, label), label).toBeDefined()
+    for (const label of ['Cut', 'Copy', 'Copy path', 'New Excalidraw drawing', 'Rename', 'Remove from favorites', 'Open in', 'Delete']) expect(itemByLabel(el, label), label).toBeDefined()
     expect(itemByLabel(el, 'Focus on folder')).toBeUndefined()
   })
 
@@ -1917,7 +1928,8 @@ describe('context menu order (GRO-2272 C1a)', () => {
       'Copy path',
       // The create group: the one document birth first, then the two folder births — every one
       // of them targets a DIRECTORY (the row's parent), never the row itself.
-      'New drawing',
+      'New Excalidraw drawing',
+      'New draw.io diagram',
       'New folder',
       'New dated folder',
       // The act-on-this-row group, above the destructive pair, which stays last.
@@ -2208,7 +2220,7 @@ describe('Sidebar multi-select context menu (YAZ-1337)', () => {
     shiftClickRow(rowByPath(el, '/v/b.excalidraw'))
     rightClick(el.querySelector('.sidebar__body'))
     expect(itemByLabel(el, 'Copy 2 paths')).toBeUndefined()
-    expect(itemByLabel(el, 'New drawing')).toBeDefined()
+    expect(itemByLabel(el, 'New Excalidraw drawing')).toBeDefined()
     expect(selectedCount(el)).toBe(2)
   })
 
@@ -2853,7 +2865,7 @@ describe('hover preview (YAZ-1800)', () => {
     await dwell(1)
     expect(panel()?.getAttribute('aria-label')).toBe('Preview of a')
     expect(panel()?.querySelector('img')?.getAttribute('src')).toBe('data:image/png;base64,AA')
-    expect(previewLoad).toHaveBeenCalledWith(['/v', '/v/a.excalidraw', 1, 'light'].join('\n'))
+    expect(previewLoad).toHaveBeenCalledWith(['/v', '/v/a.excalidraw', 1, 'light', 'adapt'].join('\n'))
     await leave(row)
     expect(panel()).toBeNull()
   })
@@ -2923,7 +2935,7 @@ describe('hover preview (YAZ-1800)', () => {
     bridge.tree.mockResolvedValue({ root: '/v', tree: TREE.map((n) => (n.path === '/v/a.excalidraw' ? { ...n, mtime: 9 } : n)), generatedAt: 2 })
     await act(async () => w.emit?.({ type: 'change', path: '/v/a.excalidraw', mtime: 9 }))
     expect(panel()).not.toBeNull()
-    expect(previewLoad).toHaveBeenLastCalledWith(['/v', '/v/a.excalidraw', 9, 'light'].join('\n'))
+    expect(previewLoad).toHaveBeenLastCalledWith(['/v', '/v/a.excalidraw', 9, 'light', 'adapt'].join('\n'))
   })
 
   it('the hovered board disappearing from the tree (deleted, renamed, moved) closes the panel', async () => {

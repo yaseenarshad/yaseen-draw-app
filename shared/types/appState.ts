@@ -72,7 +72,17 @@ export interface SettingsState {
   canvas: CanvasPrefs
   /** What the in-canvas docked panel remembers: its last-used tab and its dock preference (🔒 YAZ-1775 D10). */
   canvasPanel: CanvasPanelState
+  /**
+   * How draw.io diagrams look in dark mode (🔒 YAZ-1802 D16): `adapt` lets draw.io re-colour them so
+   * an ordinary diagram stays readable, `keep` shows every diagram in its own colours. It is the
+   * DEFAULT only — a file whose `<mxGraphModel>` says `adaptiveColors="none"` keeps its colours
+   * either way. The editor, the hover preview and the history pictures all follow it, live.
+   */
+  diagramDarkColors: DiagramDarkColors
 }
+
+export type DiagramDarkColors = 'adapt' | 'keep'
+export const DIAGRAM_DARK_COLORS: readonly DiagramDarkColors[] = ['adapt', 'keep']
 
 /** Obsidian's Appearance vocabulary and order — also exactly Electron's `nativeTheme.themeSource`. */
 export type Theme = 'system' | 'light' | 'dark'
@@ -85,6 +95,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   hoverPreview: true,
   canvas: DEFAULT_CANVAS_PREFS,
   canvasPanel: DEFAULT_CANVAS_PANEL,
+  diagramDarkColors: 'adapt',
 }
 
 export interface WindowBounds {

@@ -1,5 +1,8 @@
 import path from 'node:path'
-import { MAX_DRAWING_BYTES, type BoardVersion, type BoardVersionScene } from '@shared/types'
+import { MAX_DIAGRAM_BYTES, MAX_DRAWING_BYTES, type BoardVersion, type BoardVersionScene } from '@shared/types'
+import { diagramDocumentError } from '@shared/diagramFile'
+import { isDiagram } from '@shared/fileKind'
+import { resolveDiagram, saveDiagram } from '../fs/diagram'
 import { resolveDocument, sceneElements, sceneFiles } from '../fs/drawing'
 import { atomicWrite, BridgeFailure, requireAbsPath } from '../fs/fsUtils'
 import { git, resolveGit } from './exec'
@@ -11,6 +14,10 @@ import { BEFORE_MERGE_REF } from './resolve'
  *
  * A version's `ref` is `<commit>:<path at that commit>` — opaque to the renderer, and exactly what
  * `git show` takes, so a board that was renamed still shows (and restores) its older versions.
+ *
+ * 🔒 YAZ-1802 D10: a draw.io diagram has a history too. Its version is `{ kind: 'diagram', xml }` —
+ * the renderer draws it with the D9 renderer, no change marks in v1 — and a restore goes through
+ * `diagram:save`'s own write, so the XML is checked and our D7 dates are stamped like any save.
  */
 
 /** Deep enough for any real board; a history longer than this is not a list anyone scrolls. */
@@ -27,10 +34,13 @@ interface Board {
   file: string
 }
 
-/** The request's board, validated like `drawing:load` does; null when the vault has no git to ask. */
+/**
+ * The request's board, validated like its own load door does (`diagram:load` for a `.drawio`,
+ * `drawing:load` for anything else); null when the vault has no git to ask.
+ */
 async function board(root: unknown, rawPath: unknown): Promise<Board | null> {
   const dir = requireAbsPath(root, 'root')
-  const file = resolveDocument(dir, rawPath)
+  const file = typeof rawPath === 'string' && isDiagram(rawPath) ? resolveDiagram(dir, rawPath) : resolveDocument(dir, rawPath)
   const bin = await resolveGit()
   if (bin === null) return null
   return { bin, root: dir, rel: path.relative(dir, file).split(path.sep).join('/'), file }
@@ -67,21 +77,34 @@ async function beforeMerge(b: Board, known: readonly BoardVersion[]): Promise<Bo
 
 async function readVersion(b: Board, ref: unknown): Promise<string> {
   if (typeof ref !== 'string' || !REF.test(ref)) throw new BridgeFailure('BAD_REQUEST', "'ref' is not a version of this board")
-  const shown = await git(b.bin, b.root, ['show', ref], { maxBuffer: MAX_DRAWING_BYTES })
+  const shown = await git(b.bin, b.root, ['show', ref], { maxBuffer: isDiagram(b.file) ? MAX_DIAGRAM_BYTES : MAX_DRAWING_BYTES })
   if (shown.code !== 0) throw new BridgeFailure('NOT_FOUND', 'that version is not in this vault', { path: b.file })
   return shown.stdout
+}
+
+/** A diagram version's XML; one that is no draw.io document is `IO_ERROR`, as `diagram:load` says of a file. */
+async function readDiagramVersion(b: Board, ref: unknown): Promise<string> {
+  const xml = await readVersion(b, ref)
+  const problem = diagramDocumentError(xml)
+  if (problem !== null) throw new BridgeFailure('IO_ERROR', problem, { path: b.file })
+  return xml
 }
 
 export async function boardVersion(root: unknown, rawPath: unknown, ref: unknown): Promise<BoardVersionScene> {
   const b = await board(root, rawPath)
   if (b === null) throw new BridgeFailure('NOT_FOUND', 'this vault has no git history', { path: String(rawPath) })
+  if (isDiagram(b.file)) return { kind: 'diagram', xml: await readDiagramVersion(b, ref) }
   const json = await readVersion(b, ref)
-  return { json, files: (await sceneFiles(b.root, json, sceneElements(json, b.file, 'IO_ERROR'))).files }
+  return { kind: 'drawing', json, files: (await sceneFiles(b.root, json, sceneElements(json, b.file, 'IO_ERROR'))).files }
 }
 
 export async function restoreBoardVersion(root: unknown, rawPath: unknown, ref: unknown): Promise<void> {
   const b = await board(root, rawPath)
   if (b === null) throw new BridgeFailure('NOT_FOUND', 'this vault has no git history', { path: String(rawPath) })
+  if (isDiagram(b.file)) {
+    await saveDiagram({ root: b.root, path: b.file, xml: await readDiagramVersion(b, ref) })
+    return
+  }
   const json = await readVersion(b, ref)
   sceneElements(json, b.file, 'IO_ERROR') // never write something that is not a scene over a board
   await atomicWrite(b.file, json)

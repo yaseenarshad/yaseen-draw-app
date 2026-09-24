@@ -1,7 +1,8 @@
 import { mkdir, stat, writeFile } from 'node:fs/promises'
 import type { CreateDirResponse, CreateFileRequest, CreateFileResponse } from '@shared/types'
-import { isDrawing } from '@shared/fileKind'
+import { isDiagram, isDrawing } from '@shared/fileKind'
 import { stampBoardMeta } from '@shared/drawingAssets'
+import { diagramDocumentError, diagramRoot, stampDiagramMeta } from '@shared/diagramFile'
 import { BridgeFailure, fsCall, requireAbsPath } from './fsUtils'
 
 /**
@@ -22,6 +23,10 @@ export async function createDir(path: string): Promise<CreateDirResponse> {
  * `yaseendraw` block — `createdAt` and `updatedAt`, both "now" — goes first, so no board main
  * creates ever exists without its dates. Content that is not a JSON object is refused
  * `BAD_REQUEST` before the disk is touched.
+ *
+ * "New draw.io diagram" (🔒 YAZ-1802 D13) is the same birth for a `.drawio`: its own content
+ * check (an `<mxfile>` document, whole — never a zero-byte file) and its own stamp, the two
+ * `yaseendraw-*` attributes on the root (D7). Every other extension is still refused.
  */
 export async function createFile(req: CreateFileRequest): Promise<CreateFileResponse> {
   // Crosses IPC from a sandboxed renderer: shape-checked like a request body.
@@ -29,14 +34,19 @@ export async function createFile(req: CreateFileRequest): Promise<CreateFileResp
   if (typeof raw !== 'object' || raw === null) throw new BridgeFailure('BAD_REQUEST', 'request must be an object')
   const { path, content } = raw as Record<string, unknown>
   const p = requireAbsPath(path, 'path')
-  if (!isDrawing(p)) throw new BridgeFailure('UNSUPPORTED_EXTENSION', 'only .excalidraw files can be created', { path: p })
+  if (!isDrawing(p) && !isDiagram(p)) throw new BridgeFailure('UNSUPPORTED_EXTENSION', 'only .excalidraw and .drawio files can be created', { path: p })
   if (typeof content !== 'string') throw new BridgeFailure('BAD_REQUEST', "'content' must be a string", { path: p })
   const now = Date.now()
   let body: string
-  try {
-    body = stampBoardMeta(content, { createdAt: now, updatedAt: now })
-  } catch {
-    throw new BridgeFailure('BAD_REQUEST', "'content' must be an Excalidraw scene", { path: p })
+  if (isDiagram(p)) {
+    if (diagramRoot(content) !== 'mxfile' || diagramDocumentError(content) !== null) throw new BridgeFailure('BAD_REQUEST', "'content' must be a draw.io <mxfile> diagram", { path: p })
+    body = stampDiagramMeta(content, { createdAt: now, updatedAt: now })
+  } else {
+    try {
+      body = stampBoardMeta(content, { createdAt: now, updatedAt: now })
+    } catch {
+      throw new BridgeFailure('BAD_REQUEST', "'content' must be an Excalidraw scene", { path: p })
+    }
   }
   return fsCall(p, async () => {
     await writeFile(p, body, { flag: 'wx' })

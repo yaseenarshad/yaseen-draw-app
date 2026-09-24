@@ -32,7 +32,7 @@
  * rule to ⌘F / ⌘C, and it is why the parity checklist drops `handleKeyboardGlobally`.
  *
  * THE APPLICATION MENU'S TWO CANVAS ITEMS (🔒 YAZ-1775 D10) arrive the same way: `App` dispatches a
- * `DRAWING_COMMAND_EVENT` on the VISIBLE `.editor--drawing` section (`drawingCommand.ts`), and
+ * `BOARD_COMMAND_EVENT` on the VISIBLE `.editor--drawing` section (`boardCommand.ts`), and
  * this host claims it on its own element. Same reason as the keys — several engines are mounted,
  * and exactly one of them is in front.
  *
@@ -62,22 +62,23 @@ import { basename } from '../lib/paths'
 import { Autosave, SaveConflict, type SaveStatus } from '../lib/autosave'
 import { registerRenameContinuity } from '../lib/renameContinuity'
 import { useAppliedTheme } from '../lib/theme'
-import { DRAWING_COMMAND_EVENT, type DrawingCommand } from './drawingCommand'
+import { BOARD_COMMAND_EVENT, type BoardCommand } from './boardCommand'
 import { exportFileName } from './exportDrawing'
 import { noteBoardSaved } from '../share/liveShare'
 import { parseSceneText, type DrawingScene } from './drawingScene'
 import { mayTakeFocus } from './focusHandoff'
 import { ExcalidrawSurface, type DrawingSnapshot, type DrawingSurfaceApi } from './ExcalidrawSurface'
+import { ConflictBar } from './ConflictBar'
 import { SaveIndicator } from './SaveIndicator'
 import { SyncIndicator } from './SyncIndicator'
 import './drawingEditor.css'
 import './statusChips.css'
 
 /** What a document that will not open says — one message for its three causes (missing, corrupt, empty). */
-export const BROKEN_DRAWING_DOCUMENT = "This drawing can't be opened: its file is missing or is not a scene."
+export const BROKEN_DRAWING_DOCUMENT = "This Excalidraw drawing can't be opened: its file is missing or is not a scene."
 
 /** What File › Export Drawing… says when the save sheet or the write refused (🔒 YAZ-1775 D3, YAZ-1821). */
-const EXPORT_FAILED = "The drawing couldn't be exported."
+const EXPORT_FAILED = "The Excalidraw drawing couldn't be exported."
 
 export interface DrawingEditorProps {
   root: string
@@ -319,23 +320,23 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasPrefs, 
   )
 
   // The application menu's two canvas items (🔒 YAZ-1775 D10), claimed on THIS host's element so only the
-  // drawing in front answers. `drawingCommand.ts` already picked the visible layer; a host whose
+  // drawing in front answers. `boardCommand.ts` already picked the visible layer; a host whose
   // engine has not handed its API over yet simply has nothing to do.
   useEffect(() => {
-    // The event lands on the SECTION `drawingCommand.ts` selects (`.editor--drawing`), and it does
+    // The event lands on the SECTION `boardCommand.ts` selects (`.editor--drawing`), and it does
     // not bubble — on purpose, so no ancestor can become a second claimant.
     const section = hostRef.current?.closest('.editor--drawing') ?? null
     if (section === null) return
     const onCommand = (event: Event): void => {
-      const command = (event as CustomEvent<DrawingCommand>).detail
+      const command = (event as CustomEvent<BoardCommand>).detail
       const s = surface.current
       if (s === null) return
       if (command.kind === 'export-image') s.openImageExport()
       else if (command.kind === 'export-drawing') void exportDrawingRef.current()
       else s.setCanvasBackground(command.color)
     }
-    section.addEventListener(DRAWING_COMMAND_EVENT, onCommand)
-    return () => section.removeEventListener(DRAWING_COMMAND_EVENT, onCommand)
+    section.addEventListener(BOARD_COMMAND_EVENT, onCommand)
+    return () => section.removeEventListener(BOARD_COMMAND_EVENT, onCommand)
   }, [])
 
   // A tab coming back from `visibility: hidden` may have been laid out at the wrong size — and it
@@ -406,17 +407,7 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasPrefs, 
 
   return (
     <div className="drawing-editor" ref={hostRef} onKeyDownCapture={onKeyDownCapture}>
-      {conflictMtime !== null && (
-        <div className="conflict-bar" role="alert">
-          <span>File changed on disk.</span>
-          <button type="button" onClick={() => void reload()}>
-            Reload
-          </button>
-          <button type="button" onClick={keepMine}>
-            Keep mine
-          </button>
-        </div>
-      )}
+      {conflictMtime !== null && <ConflictBar onReload={() => void reload()} onKeepMine={keepMine} />}
       <div className="drawing-editor__canvas">
         <ExcalidrawSurface
           scene={loaded.scene}

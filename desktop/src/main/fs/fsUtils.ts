@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { readdir, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { BoardMeta, BridgeError, TreeNode } from '@shared/types'
-import { fileKind, isDrawing } from '@shared/fileKind'
+import { fileKind, isBoard, isDrawing } from '@shared/fileKind'
 import { byName } from '@shared/treeSort'
 import { ASSETS_DIR } from '@shared/drawingAssets'
 import { readBoardHead } from './boardHead'
@@ -41,7 +41,7 @@ export function requireAbsPath(p: unknown, param: string): string {
   return path.resolve(p)
 }
 
-/** Throws unless `p` has the only editable/creatable extension kind. */
+/** Throws unless `p` is an Excalidraw drawing — the kind the Import / Export Drawing dialogs take (🔒 YAZ-1802 D2). */
 export function requireDrawingFile(p: string): void {
   if (!isDrawing(p)) throw new BridgeFailure('UNSUPPORTED_EXTENSION', 'only .excalidraw files are editable', { path: p })
 }
@@ -113,12 +113,13 @@ export async function requireDir(dir: string): Promise<void> {
 }
 
 /**
- * A drawing's dates and stat in one open, or just the stat of any other file. A board that
+ * A board's dates and stat in one open — a drawing's JSON block or a diagram's `<mxfile>`
+ * attributes (🔒 YAZ-1802 D7) — or just the stat of any other file. A board that
  * cannot be OPENED (EACCES, say) is still a board: it falls back to the stat, so it is listed
  * without dates rather than dropped (🔒 YAZ-1834 D7 — no metadata is never no board).
  */
 async function fileHead(full: string): Promise<{ meta: BoardMeta | null; mtime: number; size: number }> {
-  const head = isDrawing(full) ? await readBoardHead(full).catch(() => null) : null
+  const head = isBoard(full) ? await readBoardHead(full).catch(() => null) : null
   if (head === null) {
     const st = await stat(full)
     return { meta: null, mtime: st.mtimeMs, size: st.size }

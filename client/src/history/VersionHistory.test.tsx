@@ -15,6 +15,7 @@ vi.mock('../api', async (importOriginal) => ({
     drawing: { load: vi.fn() },
   },
 }))
+vi.mock('../diagrams/renderDiagram', () => ({ renderDiagramPreview: vi.fn(async () => 'data:image/svg+xml;base64,PHN2Zy8+') }))
 vi.mock('../drawings/engine', () => ({
   loadExcalidraw: vi.fn(async () => ({
     restoreElements: (els: unknown[]) => els,
@@ -28,6 +29,7 @@ vi.mock('../lib/scenePreview', async (importOriginal) => ({
 vi.mock('../share/liveShare', () => ({ noteBoardSaved: vi.fn() }))
 
 import { api } from '../api'
+import { renderDiagramPreview } from '../diagrams/renderDiagram'
 import { createScenePreviewPng } from '../lib/scenePreview'
 import { noteBoardSaved } from '../share/liveShare'
 import { VersionHistory } from './VersionHistory'
@@ -47,10 +49,11 @@ let host: HTMLElement
 
 beforeEach(() => {
   github.history.mockReset().mockResolvedValue(VERSIONS)
-  github.version.mockReset().mockImplementation(async (_r, _p, ref) => ({ json: SCENES[ref] ?? scene([]), files: {} }))
+  github.version.mockReset().mockImplementation(async (_r, _p, ref) => ({ kind: 'drawing', json: SCENES[ref] ?? scene([]), files: {} }))
   github.restore.mockReset().mockResolvedValue(undefined)
   vi.mocked(api.drawing.load).mockReset().mockResolvedValue({ path: P, json: scene(['x', 'y']), mtime: 1, size: 1, files: {}, stored: [] })
   vi.mocked(createScenePreviewPng).mockClear()
+  vi.mocked(renderDiagramPreview).mockClear()
   vi.mocked(noteBoardSaved).mockClear()
 })
 afterEach(() => {
@@ -64,13 +67,13 @@ const flush = () =>
     for (let i = 0; i < 20; i++) await Promise.resolve()
   })
 
-async function mount(fromMerge = false) {
+async function mount(fromMerge = false, path = P) {
   const onClose = vi.fn()
   const onNotice = vi.fn()
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
-  act(() => root?.render(<VersionHistory root={ROOT} path={P} fromMerge={fromMerge} onClose={onClose} onNotice={onNotice} />))
+  act(() => root?.render(<VersionHistory root={ROOT} path={path} fromMerge={fromMerge} darkColors="adapt" onClose={onClose} onNotice={onNotice} />))
   await flush()
   const $ = <T extends Element = HTMLElement>(sel: string) => document.querySelector<T & HTMLElement>(sel)
   const rows = () => [...document.querySelectorAll<HTMLElement>('.history-list__row')]
@@ -167,5 +170,45 @@ describe('VersionHistory', () => {
     expect(outside).not.toHaveBeenCalled()
     await d.key(behind, 'Escape')
     expect(d.onClose).toHaveBeenCalled()
+  })
+
+  describe('a draw.io diagram (🔒 YAZ-1802 D10)', () => {
+    const FLOW = '/v/Flow.drawio'
+    const FLOW_VERSIONS = [v('d'.repeat(40) + ':Flow.drawio'), v('e'.repeat(40) + ':Flow.drawio', { at: NOW - 86_400_000 })]
+    const xml = (label: string) => `<mxfile><diagram id="p"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0" value="${label}"/></root></mxGraphModel></diagram></mxfile>`
+
+    beforeEach(() => {
+      github.history.mockResolvedValue(FLOW_VERSIONS)
+      github.version.mockImplementation(async (_r, _p, ref) => ({ kind: 'diagram', xml: xml(ref.slice(0, 1)) }))
+    })
+
+    it('draws each version with the D9 renderer in the app`s theme and colour setting — no Changes view, no legend, no drawing door', async () => {
+      const d = await mount(false, FLOW)
+      expect(d.$('.history-view__picture img')?.getAttribute('src')).toBe('data:image/svg+xml;base64,PHN2Zy8+')
+      expect(renderDiagramPreview).toHaveBeenLastCalledWith(xml('d'), 'light', 'adapt', expect.objectContaining({ maxWidth: 1100 }))
+      expect(d.$('.history-view__tabs')).toBeNull()
+      expect(d.$('[data-testid="history-legend"]')).toBeNull()
+      expect(api.drawing.load).not.toHaveBeenCalled()
+      await d.key(d.$('.history-list') as HTMLElement, 'ArrowDown')
+      await flush()
+      expect(renderDiagramPreview).toHaveBeenLastCalledWith(xml('e'), 'light', 'adapt', expect.anything())
+    })
+
+    it('a version the renderer cannot draw says so instead of spinning', async () => {
+      vi.mocked(renderDiagramPreview).mockRejectedValueOnce(new Error('not a draw.io diagram'))
+      const d = await mount(false, FLOW)
+      expect(d.text('[data-testid="history-picture"]')).toBe("This version can't be drawn.")
+    })
+
+    it('restores through the bridge after a confirm, like a drawing', async () => {
+      const d = await mount(false, FLOW)
+      await d.key(d.$('.history-list') as HTMLElement, 'ArrowDown')
+      act(() => d.$('[data-testid="history-restore"]')?.click())
+      act(() => d.$('[data-testid="history-restore-confirm"]')?.click())
+      await flush()
+      expect(github.restore).toHaveBeenCalledWith(ROOT, FLOW, FLOW_VERSIONS[1].ref)
+      expect(noteBoardSaved).toHaveBeenCalledWith(ROOT, FLOW)
+      expect(d.onClose).toHaveBeenCalled()
+    })
   })
 })

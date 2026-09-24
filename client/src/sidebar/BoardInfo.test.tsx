@@ -22,14 +22,19 @@ afterEach(() => {
 })
 
 describe('BoardInfo (🔒 YAZ-1835 D6/D7)', () => {
-  it('shows the six rows off the tree node: name, vault-relative folder, size, the two block dates and the disk time', () => {
+  it('shows the seven rows off the tree node: name, type, vault-relative folder, size, the two block dates and the disk time', () => {
     const r = rows(render(board({ meta: { createdAt: NOW - 2 * 86_400_000, updatedAt: NOW - 3_600_000 } })))
     expect(r.Name).toBe('Plan.excalidraw')
+    expect(r.Type).toBe('Excalidraw drawing')
     expect(r.Folder).toBe('Projects')
     expect(r.Size).toBe('1.5 KB')
     expect(r.Created).toMatch(/2026, .*· 2 days ago$/)
     expect(r.Updated).toMatch(/· 1 hour ago$/)
     expect(r['On disk']).toMatch(/· 1 hour ago$/)
+  })
+
+  it('names the engine in Type (🔒 YAZ-1802 D13) — the tree hides the extension that would', () => {
+    expect(rows(render(board({ name: 'Flow.drawio', path: '/v/Flow.drawio', kind: 'diagram' }))).Type).toBe('draw.io diagram')
   })
 
   it('a board without a block says so for the two dates and still shows the disk time; a root-level board reads "/"', () => {

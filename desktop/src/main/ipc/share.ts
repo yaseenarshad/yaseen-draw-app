@@ -5,6 +5,7 @@ import { isRecord } from '@shared/guards'
 import { CH } from '../../channels'
 import { BridgeFailure } from '../fs/fsUtils'
 import type { Secrets } from '../secrets'
+import { DRAWIO_SHARE_DIRS, DRAWIO_SHARE_FILES } from '../drawio/assets'
 import { CLOUDFLARE_API, CLOUDFLARE_TOKEN_PAGE, type AssetFile } from '../share/cloudflare'
 import { shareFsHooks } from '../share/fsHooks'
 import { createSharing } from '../share/sharing'
@@ -38,18 +39,28 @@ export function viewerAssetsDir({ isPackaged, resourcesPath, appPath }: { isPack
   return isPackaged ? join(resourcesPath, 'share-viewer') : join(appPath, '..', 'share', 'dist', 'assets')
 }
 
-/** The viewer's built assets, served as `/assets/…`. */
-async function readViewerAssets(dir: string): Promise<AssetFile[]> {
-  const entries = await readdir(dir, { recursive: true, withFileTypes: true }).catch(() => {
-    throw new BridgeFailure('NOT_FOUND', 'The viewer page is not built on this computer (run: npm run build), so sharing cannot be set up yet.')
-  })
-  const files = entries.filter((e) => e.isFile())
-  return Promise.all(
-    files.map(async (e) => {
-      const abs = join(e.parentPath, e.name)
-      return { path: `/assets/${relative(dir, abs).split(sep).join('/')}`, bytes: new Uint8Array(await readFile(abs)) }
-    }),
-  )
+/**
+ * The Worker's static assets: the viewer build's own files as `/assets/…`, and the draw.io files and
+ * folders a shared diagram runs (`DRAWIO_SHARE_FILES` / `DRAWIO_SHARE_DIRS`) as `/assets/drawio/…`,
+ * read from the app's own draw.io webapp (🔒 YAZ-1802 D5 / D11, YAZ-1973) — the pack cache in dev,
+ * `out/drawio` inside the packaged app's asar — instead of a second copy of those bytes in `share-viewer`.
+ */
+export async function readViewerAssets(dir: string, drawioDir: string): Promise<AssetFile[]> {
+  const missing = (what: string, run: string) => () => {
+    throw new BridgeFailure('NOT_FOUND', `${what} is not built on this computer (run: ${run}), so sharing cannot be set up yet.`)
+  }
+  const notBuilt = missing('The viewer page', 'npm run build')
+  await readdir(drawioDir).catch(missing('draw.io', 'npm run drawio:pack'))
+  /** Every file under `root`, published at `prefix` + its path relative to `base`. */
+  const filesUnder = async (root: string, base: string, prefix: string) =>
+    (await readdir(root, { recursive: true, withFileTypes: true }).catch(notBuilt))
+      .filter((e) => e.isFile())
+      .map((e) => join(e.parentPath, e.name))
+      .map((abs) => ({ path: `${prefix}${relative(base, abs).split(sep).join('/')}`, abs }))
+  const own = await filesUnder(dir, dir, '/assets/')
+  const drawioFiles = DRAWIO_SHARE_FILES.map((file) => ({ path: `/assets/drawio/${file}`, abs: join(drawioDir, ...file.split('/')) }))
+  const drawioDirs = (await Promise.all(DRAWIO_SHARE_DIRS.map((sub) => filesUnder(join(drawioDir, sub), drawioDir, '/assets/drawio/')))).flat()
+  return Promise.all([...own, ...drawioFiles, ...drawioDirs].map(async ({ path, abs }) => ({ path, bytes: new Uint8Array(await readFile(abs).catch(notBuilt)) })))
 }
 
 /**
@@ -66,7 +77,7 @@ export function shareEndpoints(isPackaged: boolean, env: Record<string, string |
   return { apiBase, demoOrigin, tokenPage }
 }
 
-export function registerShareIpc(userData: string, secrets: Secrets, where: { viewerAssetsDir: string; isPackaged: boolean }): void {
+export function registerShareIpc(userData: string, secrets: Secrets, where: { viewerAssetsDir: string; drawioDir: string; isPackaged: boolean }): void {
   const { apiBase, demoOrigin, tokenPage } = shareEndpoints(where.isPackaged, process.env)
   const sharing = createSharing({
     secrets,
@@ -75,7 +86,7 @@ export function registerShareIpc(userData: string, secrets: Secrets, where: { vi
     demoOrigin,
     // Uploaded verbatim: the same two files `tools/fakeCloudflare.mjs` imports and runs.
     modules: { 'worker.js': workerSource, 'viewer/page.js': viewerSource },
-    readAssets: () => readViewerAssets(where.viewerAssetsDir),
+    readAssets: () => readViewerAssets(where.viewerAssetsDir, where.drawioDir),
     onChanged: () => broadcastAll(CH.shareChanged),
   })
   // Shares follow in-app renames, moves and deletes (the fs IPC calls these beside its favorites repair).

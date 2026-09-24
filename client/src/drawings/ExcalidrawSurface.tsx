@@ -47,7 +47,7 @@
  *
  * THE CHROME INSIDE THE ENGINE (🔒 YAZ-1775 D10). No `<MainMenu>` at all: the engine's own trigger is
  * hidden (`drawingEditor.css`, the web app's own rule) and its items moved out — File › Export
- * Image… ⌘⇧E and View › Canvas Background to the application menu (`drawingCommand.ts` routes
+ * Image… ⌘⇧E and View › Canvas Background to the application menu (`boardCommand.ts` routes
  * them to the visible drawing), Preferences to Settings › Canvas (🔒 YAZ-1775 D9). `renderTopLeftUI` is the
  * rail (`LauncherRail.tsx`: the panel hamburger plus the Writing / Frames toggles);
  * `renderTopRightUI` is the host's status chips, the slot the web app's CloudStatus sat in, so
@@ -190,7 +190,7 @@ export interface DrawingSurfaceProps {
 }
 
 /** The one failure this seam can raise on its own (the file's own failures are the host's). */
-export const ENGINE_LOAD_FAILED = "Can't open the drawing editor."
+export const ENGINE_LOAD_FAILED = "Can't open the Excalidraw editor."
 
 /** How long the engine's own toggles settle before the shell hears about them (🔒 YAZ-1775 D9). */
 const PREFS_DEBOUNCE_MS = 300

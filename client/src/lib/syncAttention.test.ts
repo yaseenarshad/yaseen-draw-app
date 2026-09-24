@@ -112,7 +112,7 @@ describe('buildSetupPrompt', () => {
   })
 
   it('opens by explaining the situation, so the prompt stands alone in a fresh chat', () => {
-    expect(buildSetupPrompt('/vault', 'auth')).toMatch(/^I'm using a Mac desktop app that syncs a folder of drawings to GitHub using my computer's own git\./)
+    expect(buildSetupPrompt('/vault', 'auth')).toMatch(/^I'm using a Mac desktop app that syncs a folder of boards \(Excalidraw \.excalidraw and draw\.io \.drawio files\) to GitHub using my computer's own git\./)
   })
 
   it('names Windows and Git for Windows on a Windows platform, so the assistant never sends a PC to Homebrew', () => {

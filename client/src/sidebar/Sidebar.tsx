@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import { DRAWING_VIEW_EXTENSIONS, SIDEBAR_LENSES, SORT_ORDERS, type FileClipState, type SettingsState, type SidebarLens, type SortOrder, type TreeNode, type TreeResponse } from '@shared/types'
+import { SIDEBAR_LENSES, SORT_ORDERS, type FileClipState, type FileKind, type SettingsState, type SidebarLens, type SortOrder, type TreeNode, type TreeResponse } from '@shared/types'
+import { EMPTY_DIAGRAM_XML } from '@shared/diagramFile'
+import { BOARD_TYPE_NAME } from '@shared/fileKind'
 import { api, BridgeRequestError } from '../api'
 import { EMPTY_SCENE_JSON } from '../drawings/drawingScene'
 import { ContextMenuSurface } from '../components/ContextMenuSurface'
@@ -20,7 +22,7 @@ import type { SearchCandidate } from '../search/searchCandidates'
 import { useSearchResults } from '../search/useSearchResults'
 import { ConfirmDelete, type DeleteTarget } from './ConfirmDelete'
 import { ContextMenu } from './ContextMenu'
-import { datedFolderSeed, entryPath, renamedPath, targetDirFor, untitledDrawingName, type EntryKind, type MenuRow } from './createEntry'
+import { datedFolderSeed, entryPath, renamedPath, targetDirFor, untitledBoardName, type EntryKind, type MenuRow } from './createEntry'
 import { SettingsButton } from '../settings/SettingsButton'
 import { buildMenuSections, countItems } from './menuSections'
 import type { NoticeKind } from '../lib/notice'
@@ -204,7 +206,10 @@ export interface MenuTargets {
   favoritePaths: string[] | null
   /** True only when EVERY `favoritePaths` entry is already a favorite — a mixed selection reads as Add. */
   favoriteIsOn: boolean
-  /** "Info" (🔒 YAZ-1835 D6): the ONE board row under the pointer; null on blank space, a folder, or a 2+ selection. Its OWN field. */
+  /**
+   * "Info" (🔒 YAZ-1835 D6): the ONE board row under the pointer; null on blank space, a folder, or a 2+
+   * selection. "Share" (🔒 YAZ-1802 D11) and "Version history" (🔒 YAZ-1802 D10) take it too. Its OWN field.
+   */
   infoPath: string | null
 }
 
@@ -259,10 +264,10 @@ function findDir(nodes: readonly TreeNode[], dir: string): readonly TreeNode[] |
 
 /** The lens tabs' copy; the ORDER is `SIDEBAR_LENSES`', so the default lens leads (YAZ-847). */
 const LENS_LABEL: Record<SidebarLens, string> = { files: 'Files', favorites: 'Favorites' }
-/** A drawing row, by the live tree's word (🔒 YAZ-1835 D6): Info describes boards, not `notes.txt`. */
-function isBoard(tree: readonly TreeNode[], path: string): boolean {
+/** A board row — a drawing or a diagram (🔒 YAZ-1802 D2) — by the live tree's word (🔒 YAZ-1835 D6): Info describes boards, not `notes.txt`. */
+function isBoardRow(tree: readonly TreeNode[], path: string): boolean {
   const node = findNode(tree, path)
-  return node !== null && node.type === 'file' && node.kind === 'drawing'
+  return node !== null && node.type === 'file' && node.kind !== null
 }
 /** The sort control's labels (🔒 YAZ-1835 D5), in `SORT_ORDERS` order. */
 const SORT_LABEL: Record<SortOrder, string> = { name: 'Name', updated: 'Last updated', created: 'Created' }
@@ -772,7 +777,7 @@ export function Sidebar({
         favoriteIsOn: node !== null && (plural ?? [node.path]).every((p) => favorites.includes(p)),
         // Info (🔒 YAZ-1835 D6): one BOARD, on its own — the live tree says whether the row is a drawing;
         // a plural gesture has no single thing to describe.
-        infoPath: plural === null && filePath !== null && isBoard(tree?.tree ?? [], filePath) ? filePath : null,
+        infoPath: plural === null && filePath !== null && isBoardRow(tree?.tree ?? [], filePath) ? filePath : null,
       })
     },
     [root, tree, selectedPaths, orderedSelectedPaths, favorites],
@@ -971,17 +976,20 @@ export function Sidebar({
   )
 
   /**
-   * "New drawing" (🔒 R1 on YAZ-1775, YAZ-1815): the ONE file-creation door in the app, and it does NOT
-   * ask for a name. The board is born as `Untitled` (`Untitled 2`, `Untitled 3`… beside its
-   * siblings), with the EMPTY SCENE in the same `wx` write (content-at-create, 🔒 YAZ-1810 — a
-   * zero-byte `.excalidraw` is the corrupt case, not a new board), opens in the CURRENT tab, and
-   * lands with the tree's inline rename field focused so the first thing the user types is its
-   * name. Nothing is ever overwritten: `fs:create-file` refuses an existing path, and a name lost
-   * to a race (another window, a sync) is simply retried with the next number.
+   * "New Excalidraw drawing" / "New draw.io diagram" (🔒 R1 on YAZ-1775, YAZ-1815; 🔒 YAZ-1802 D13):
+   * the ONE file-creation door in the app, and it does NOT ask for a name. The board is born as
+   * `Untitled` (`Untitled 2`, `Untitled 3`… beside its siblings of the same extension), with its
+   * empty content in the same `wx` write (content-at-create, 🔒 YAZ-1810 — a zero-byte file is the
+   * corrupt case, not a new board): the EMPTY SCENE for a drawing, the EMPTY DIAGRAM (one page, page
+   * view off) for a diagram. It opens in the CURRENT tab and lands with the tree's inline rename
+   * field focused so the first thing the user types is its name. Nothing is ever overwritten:
+   * `fs:create-file` refuses an existing path, and a name lost to a race (another window, a sync)
+   * is simply retried with the next number.
    */
-  const createDrawing = useCallback(async () => {
+  const createBoard = useCallback(async (board: FileKind) => {
     if (menu === null) return
     const parentDir = menu.targetDir
+    const content = board === 'diagram' ? EMPTY_DIAGRAM_XML : EMPTY_SCENE_JSON
     setMenu(null)
     // The row has to be visible for the rename field to mount, exactly as the inline create needs.
     if (parentDir !== root) dispatch({ type: 'expandTo', root, file: `${parentDir}/x` })
@@ -991,10 +999,9 @@ export function Sidebar({
     const siblings = level.map((n) => n.name)
     const taken = [...siblings]
     for (let attempt = 0; attempt < 5; attempt++) {
-      const name = untitledDrawingName(taken)
-      const path = entryPath(parentDir, name, 'file')
+      const path = entryPath(parentDir, untitledBoardName(taken, board), 'file', board)
       try {
-        await api.createFile({ path, content: EMPTY_SCENE_JSON })
+        await api.createFile({ path, content })
         refresh()
         onOpenFile(path)
         setRenamingEntry({ path, kind: 'file' })
@@ -1002,14 +1009,14 @@ export function Sidebar({
       } catch (err: unknown) {
         // Someone else got there between the tree we read and the write: take the next number.
         if (err instanceof BridgeRequestError && err.code === 'ALREADY_EXISTS') {
-          taken.push(`${name}${DRAWING_VIEW_EXTENSIONS[0]}`)
+          taken.push(path.slice(path.lastIndexOf('/') + 1))
           continue
         }
-        onNotice(`Can't create drawing: ${err instanceof Error ? err.message : String(err)}`, 'error')
+        onNotice(`Can't create ${BOARD_TYPE_NAME[board]}: ${err instanceof Error ? err.message : String(err)}`, 'error')
         return
       }
     }
-    onNotice("Can't create drawing: too many untitled drawings here", 'error')
+    onNotice(`Can't create ${BOARD_TYPE_NAME[board]}: too many untitled ones here`, 'error')
   }, [menu, root, lens, favoriteNodes, onLensChange, tree, refresh, onOpenFile, onNotice])
 
   const cancelCreate = useCallback(() => setCreating(null), [])
@@ -1311,7 +1318,7 @@ export function Sidebar({
           type="text"
           placeholder="Search"
           title="Search (⌘K)"
-          aria-label="Search drawings"
+          aria-label="Search boards"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value)
@@ -1425,7 +1432,7 @@ export function Sidebar({
             {error !== null && <p className="sidebar__msg sidebar__msg--error">{error}</p>}
             {tree === null && error === null && <p className="sidebar__msg">Loading…</p>}
             {tree !== null && tree.tree.length === 0 && pending === null && (
-              <p className="sidebar__msg">No drawings here.</p>
+              <p className="sidebar__msg">No boards here.</p>
             )}
             {tree !== null && (
               <Tree
@@ -1474,7 +1481,8 @@ export function Sidebar({
               // Paste goes exactly where "New folder" goes (🔒 D5, YAZ-1674).
               onPaste: canNewFolder ? () => void pasteInto(menu.targetDir) : null,
               onNotice,
-              onNewDrawing: () => void createDrawing(),
+              onNewDrawing: () => void createBoard('drawing'),
+              onNewDiagram: () => void createBoard('diagram'),
               onNewFolder: canNewFolder ? () => startCreate('dir') : null,
               onNewDatedFolder: canNewFolder ? () => startCreate('dir', datedFolderSeed()) : null,
               onToggleFavorite: toggleFavorite,
@@ -1502,7 +1510,7 @@ export function Sidebar({
         </ContextMenuSurface>
       )}
       {hover?.shown === true && hoverNode !== null && previewsOn && (
-        <BoardPreview key={hoverNode.path} root={root} node={hoverNode} cacheKey={boardPreviewKey(root, hoverNode, theme)} anchor={asideRef} />
+        <BoardPreview key={hoverNode.path} root={root} node={hoverNode} cacheKey={boardPreviewKey(root, hoverNode, theme, settings.diagramDarkColors)} anchor={asideRef} />
       )}
       {confirmingDelete !== null && <ConfirmDelete target={confirmingDelete} onConfirm={confirmDelete} onCancel={() => setConfirmingDelete(null)} />}
     </aside>

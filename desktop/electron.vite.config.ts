@@ -2,9 +2,11 @@ import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import type { Plugin } from 'vite'
 import { createReadStream, existsSync } from 'node:fs'
-import { cp } from 'node:fs/promises'
+import { cp, rm } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
+// Relative, not `@shared`: this file runs in Node before any alias exists.
+import { DRAWIO_TAG } from '../shared/drawio'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 const shared = resolve(here, '../shared')
@@ -54,6 +56,32 @@ function excalidrawAssets(): Plugin {
   }
 }
 
+/**
+ * The draw.io webapp beside the renderer bundle (🔒 YAZ-1802 D5), `excalidrawAssets()`'s twin:
+ * `tools/packDrawio.mjs` has unpacked the pinned release into the gitignored cache, and this copies
+ * it into `out/drawio` when the bundle is written, where main serves it as `app://drawio/…` and
+ * electron-builder's `out/**` carries it into the app. Dev needs no copy — main serves the cache
+ * directly (`resolveDrawioDir`). The bytes are never committed.
+ *
+ * `out/drawio` sits outside the renderer's `outDir`, so nothing else empties it: it is replaced
+ * whole, or a bumped release would keep the old one's files. It is pruned to what the editor, the
+ * picture page and the share viewer load (🔒 YAZ-1802 D5, `tools/lib/drawioPack.mjs`);
+ * share setup uploads the share viewer's draw.io files from this same copy (`readViewerAssets`).
+ */
+function drawioAssets(): Plugin {
+  const cache = resolve(here, '.cache/drawio', DRAWIO_TAG)
+  const target = resolve(here, 'out/drawio')
+  return {
+    name: 'yaseen-drawio-assets',
+    apply: 'build',
+    async writeBundle() {
+      if (!existsSync(resolve(cache, 'index.html'))) throw new Error(`draw.io ${DRAWIO_TAG} is not unpacked at ${cache} — run \`npm run drawio:pack\``)
+      await rm(target, { recursive: true, force: true })
+      await cp(cache, target, { recursive: true })
+    },
+  }
+}
+
 export default defineConfig({
   main: {
     // No externalizeDepsPlugin: chokidar 4 is pure JS and gets bundled, so the packaged app
@@ -67,7 +95,7 @@ export default defineConfig({
   },
   renderer: {
     root: client,
-    plugins: [react(), excalidrawAssets()],
+    plugins: [react(), excalidrawAssets(), drawioAssets()],
     resolve: {
       alias: { '@shared': shared },
       /**

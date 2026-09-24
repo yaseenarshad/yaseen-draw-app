@@ -87,11 +87,12 @@ const width = (key: WidthKey, label: string, hint: string): SettingDef => ({
 
 export const CANVAS_SECTION: SettingsSection = {
   id: 'canvas',
-  title: 'Canvas',
+  // 🔒 YAZ-1802 D12 / D13: these preferences are Excalidraw's alone; a draw.io diagram has fixed defaults.
+  title: 'Excalidraw canvas',
   groups: [
     {
       title: 'Drawing aids',
-      hint: 'Applies to every board, in every window.',
+      hint: 'Applies to every Excalidraw drawing, in every window.',
       items: [
         toggle('gridModeEnabled', 'Grid', undefined, ['grid mode']),
         toggle('objectsSnapModeEnabled', 'Snap to objects', undefined, ['snapping']),

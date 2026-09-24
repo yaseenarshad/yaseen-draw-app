@@ -38,6 +38,14 @@ describe('renameFile (Links E1, GRO-2194)', () => {
     expect(await readFile(newPath, 'utf8')).toBe('case')
   })
 
+  it('🔒 YAZ-1802 D13: a diagram renames within its own kind, the extension case included', async () => {
+    const oldPath = path.join(root, 'Flow.drawio')
+    await writeFile(oldPath, '<mxfile/>')
+    const newPath = path.join(root, 'Pipeline.DRAWIO')
+    expect(await renameFile({ oldPath, newPath })).toEqual({ oldPath, newPath, kind: 'file' })
+    expect(await readFile(newPath, 'utf8')).toBe('<mxfile/>')
+  })
+
   it('BAD_REQUEST when old and new path are the same', async () => {
     expect(await code(renameFile({ oldPath: path.join(root, 'b.excalidraw'), newPath: path.join(root, 'b.excalidraw') }))).toBe('BAD_REQUEST')
   })
@@ -56,6 +64,9 @@ describe('renameFile (Links E1, GRO-2194)', () => {
     ['text to drawing', 'source.py', 'target.excalidraw'],
     ['drawing to no extension', 'bare.excalidraw', 'bare'],
     ['unknown to unknown', 'source.json', 'target.bin'],
+    ['diagram to drawing (🔒 YAZ-1802 D13)', 'flow.drawio', 'flow.excalidraw'],
+    ['drawing to diagram (🔒 YAZ-1802 D13)', 'scene.excalidraw', 'scene.drawio'],
+    ['diagram to a picture of one (🔒 YAZ-1802 D3)', 'pic.drawio', 'pic.drawio.svg'],
   ])('refuses cross-kind rename (%s) before mutation', async (_label, oldName, newName) => {
     const oldPath = path.join(root, oldName)
     const newPath = path.join(root, newName)

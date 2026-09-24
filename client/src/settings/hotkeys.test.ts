@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CANVAS_HOTKEYS, HOTKEY_GROUPS, MOUSE_TIPS, WINDOW_HOTKEYS } from './hotkeys'
+import { CANVAS_HOTKEYS, DRAWIO_HOTKEYS, HOTKEY_GROUPS, MOUSE_TIPS, WINDOW_HOTKEYS } from './hotkeys'
 
 describe('HOTKEYS source of truth', () => {
   it('covers the window & tab shortcuts from the application menu (B3 + Tabs + View › Zoom) plus the open-beside tip', () => {
@@ -23,8 +23,8 @@ describe('HOTKEYS source of truth', () => {
     const byKeys = (keys: string) => MOUSE_TIPS.find((t) => t.keys === keys)
     expect(byKeys('⌘-click file')?.label).toMatch(/background tab/i)
     expect(byKeys('Right-click file')?.label).toMatch(/new window/i)
-    // The context menu's create group leads on the one document birth (⚡ YAZ-1775 D8 amended).
-    expect(byKeys('Right-click file')?.label).toMatch(/new drawing/i)
+    // The context menu's create group leads on the two board births (🔒 YAZ-1802 D13).
+    expect(byKeys('Right-click file')?.label).toMatch(/New Excalidraw drawing \/ New draw\.io diagram/)
     // The vault menu (YAZ-1941): the one in-place open lives there, so the tip names it.
     expect(byKeys('Right-click vault')?.label).toMatch(/Open in this window/)
     // Multi-select (YAZ-1336 🔒 YAZ-1775 D2 → YAZ-1337): ⇧-click toggles rows, and the tip has to say what
@@ -37,11 +37,12 @@ describe('HOTKEYS source of truth', () => {
   /**
    * The old document layer is gone (YAZ-1808), and so is everything it bound: the outliner's
    * fold / zoom / mark chords, the folder-page view surface, wiki links, the right panel and the
-   * ⌘⇧C copy-path chord. The reference may not advertise a key the app no longer answers.
+   * ⌘⇧C copy-path chord. The reference may not advertise a key the app no longer answers. (⌘⇧X
+   * came back as draw.io's strikethrough, 🔒 YAZ-1802 D12b, so it is no longer on the list.)
    */
   it('advertises NO binding of a deleted feature', () => {
     const all = HOTKEY_GROUPS.flatMap((group) => group.entries)
-    for (const gone of ['⌘⇧U', '⌘⇧I', '⌘.', '⌘⇧.', '⌘⏎', '⌘U', '⌘⇧H', '⌘⇧X', 'Tab / ⇧Tab', '⌘⇧C', '⌘⏎ / ⌥⏎', 'Click glyph', 'Click link', 'Click card']) {
+    for (const gone of ['⌘⇧U', '⌘⇧I', '⌘.', '⌘⇧.', '⌘⏎', '⌘U', '⌘⇧H', 'Tab / ⇧Tab', '⌘⇧C', '⌘⏎ / ⌥⏎', 'Click glyph', 'Click link', 'Click card']) {
       expect(all.map((h) => h.keys)).not.toContain(gone)
     }
     for (const word of [/bullet/i, /heading/i, /wiki/i, /right panel/i, /board card/i, /topic/i]) {
@@ -49,16 +50,24 @@ describe('HOTKEYS source of truth', () => {
     }
   })
 
-  it('is THREE groups — Window, Canvas and Mouse — in the order the page shows them', () => {
-    expect(HOTKEY_GROUPS.map((g) => g.title)).toEqual(['Window', 'Canvas', 'Mouse'])
-    expect(HOTKEY_GROUPS.map((g) => g.entries)).toEqual([WINDOW_HOTKEYS, CANVAS_HOTKEYS, MOUSE_TIPS])
+  it('is FOUR groups — Window, Excalidraw canvas, draw.io diagram and Mouse — in the order the page shows them', () => {
+    expect(HOTKEY_GROUPS.map((g) => g.title)).toEqual(['Window', 'Excalidraw canvas', 'draw.io diagram', 'Mouse'])
+    expect(HOTKEY_GROUPS.map((g) => g.id)).toEqual(['window', 'canvas', 'drawio', 'mouse'])
+    expect(HOTKEY_GROUPS.map((g) => g.entries)).toEqual([WINDOW_HOTKEYS, CANVAS_HOTKEYS, DRAWIO_HOTKEYS, MOUSE_TIPS])
+  })
+
+  it('the draw.io table is the D12b keymap: tools with nothing selected, colour and size with a selection, and ⌘B’s split (🔒 YAZ-1802)', () => {
+    expect(DRAWIO_HOTKEYS.map((h) => h.keys)).toEqual(['R / O / T', 'A / D / L', 'W / P / X', 'T B W D R P A V U C E G Y O N', '⇧ + colour letter', '1 … 9, 0', '⌘\\', '⌘⇧X', '⌘B / ⌘U', '⌘S', '⌘-scroll / pinch', 'Right-click empty canvas'])
+    expect(DRAWIO_HOTKEYS.find((h) => h.keys === 'R / O / T')?.label).toMatch(/nothing selected/)
+    expect(DRAWIO_HOTKEYS.find((h) => h.keys === '⇧ + colour letter')?.label).toMatch(/text's background/)
+    expect(DRAWIO_HOTKEYS.find((h) => h.keys === '⌘B / ⌘U')?.label).toMatch(/nothing selected toggles the sidebar/)
   })
 
   it("the Canvas table carries every key that needs a drawing in front (YAZ-1812), and says what gates ⌘C", () => {
     // The menu's two drawing-only items (menu.ts) plus the three bound on the canvas host itself.
     expect(CANVAS_HOTKEYS.map((h) => h.keys)).toEqual(['⌘⇧E', '⌘⇧S', '⌘S', '⌘F', '⌘C'])
     expect(CANVAS_HOTKEYS.find((h) => h.keys === '⌘⇧E')?.label).toMatch(/export image/i)
-    expect(CANVAS_HOTKEYS.find((h) => h.keys === '⌘⇧S')?.label).toMatch(/export drawing/i)
+    expect(CANVAS_HOTKEYS.find((h) => h.keys === '⌘⇧S')?.label).toMatch(/export excalidraw drawing/i)
     expect(CANVAS_HOTKEYS.find((h) => h.keys === '⌘S')?.label).toMatch(/autosaves/i)
     expect(CANVAS_HOTKEYS.find((h) => h.keys === '⌘C')?.label).toMatch(/nothing is selected/i)
   })
