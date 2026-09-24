@@ -14,9 +14,10 @@
  * The frame is laid out off-screen rather than `display: none`: draw.io measures its labels in
  * its own document, and a document with no layout would measure every label as zero.
  */
+import { DRAWIO_ORIGIN } from '@shared/drawio'
 import type { DiagramDarkColors } from '@shared/types'
 import type { PreviewBounds } from '../lib/scenePreview'
-import { DRAWIO_ORIGIN, drawioAdaptiveColors } from './drawioProtocol'
+import { drawioAdaptiveColors } from './drawioProtocol'
 
 const RENDER_URL = `${DRAWIO_ORIGIN}/yaseen-render.html`
 /** A picture that has not come back by then is a failure ("Preview unavailable"), not a hang. */

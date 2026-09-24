@@ -44,8 +44,8 @@
 
 	/**
 	 * The `@font-face` rules of `fontCss` — one per line, as packDrawio writes `yaseen-fonts/fonts.css` —
-	 * whose family `svgXml` names: a picture carries the faces it draws with, not all twelve (≈0.8 MB
-	 * as data URIs, in every cached preview).
+	 * whose family `svgXml` names: a picture carries the faces it draws with, not every face as a
+	 * data URI in every cached preview.
 	 */
 	function usedFontCss(fontCss, svgXml)
 	{

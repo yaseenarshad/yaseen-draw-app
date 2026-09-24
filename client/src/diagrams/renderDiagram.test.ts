@@ -5,7 +5,7 @@
  * the requests the renderer posts into it. Each test gets a fresh module: the frame is module state.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { DRAWIO_ORIGIN } from './drawioProtocol'
+import { DRAWIO_ORIGIN } from '@shared/drawio'
 
 type Renderer = typeof import('./renderDiagram')
 

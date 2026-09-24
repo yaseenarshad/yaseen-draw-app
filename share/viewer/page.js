@@ -21,7 +21,7 @@ const scriptJson = (value) => JSON.stringify(value).replace(/</g, '\\u003c')
  * 🔒 YAZ-1802 D11: what the page loads for each kind of board. A diagram runs draw.io's own
  * read-only viewer, after `drawio/config.js` has pointed it at this Worker's assets (classic scripts,
  * in order), and our `diagram.js` module after both. It has no Download PNG: draw.io draws labels as
- * HTML inside the SVG, and a canvas holding that cannot be read back out as a PNG.
+ * HTML inside the SVG, and Safari and Firefox block reading such a canvas back.
  */
 const KIND_PAGES = {
   drawing: {

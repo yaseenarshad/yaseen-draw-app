@@ -29,7 +29,7 @@ import { matchCandidates } from './matchCandidates'
 export interface SearchCandidate {
   /** What activating the row does (🔒 D3, YAZ-1491): a `dir` row REVEALS itself in Files; a `file` row OPENS. */
   kind: 'file' | 'dir'
-  /** The text the query matches: the drawing's name without its extension, or the folder's name. */
+  /** The text the query matches: the board's name without its extension, or the folder's name. */
   name: string
   /** `name.toLowerCase()`, precomputed so the ranking scan (GRO-2197) allocates nothing per keystroke. */
   lower: string
@@ -56,25 +56,25 @@ function row(kind: SearchCandidate['kind'], prefix: string, path: string, name: 
 
 /**
  * The whole catalog in ONE walk of the tree: every folder (outer before inner, tree order) ahead of
- * every drawing (tree order). Folders lead so that a folder sits above a drawing it ties with in a
+ * every board (tree order). Folders lead so that a folder sits above a board it ties with in a
  * rank bucket — the reveal is the cheaper mistake (🔒 D1, YAZ-1491).
  */
-export function buildDrawingCatalog(root: string, tree: readonly TreeNode[]): SearchCandidate[] {
+export function buildBoardCatalog(root: string, tree: readonly TreeNode[]): SearchCandidate[] {
   const prefix = `${root.replace(/\/+$/, '')}/`
   const folders: SearchCandidate[] = []
-  const drawings: SearchCandidate[] = []
+  const boards: SearchCandidate[] = []
   const walk = (nodes: readonly TreeNode[]): void => {
     for (const node of nodes) {
       if (node.type === 'dir') {
         folders.push(row('dir', prefix, node.path, node.name))
         walk(node.children)
       } else if (isBoard(node.name)) {
-        drawings.push(row('file', prefix, node.path, stripExt(node.name)))
+        boards.push(row('file', prefix, node.path, stripExt(node.name)))
       }
     }
   }
   walk(tree)
-  return [...folders, ...drawings]
+  return [...folders, ...boards]
 }
 
 /** Rows matching `query`, ranked exact → prefix → substring by the shared matcher, capped at SEARCH_CAP. */

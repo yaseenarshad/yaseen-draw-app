@@ -1,3 +1,5 @@
+import { BOARD_TYPE_NAME } from '@shared/fileKind'
+
 /** The shell's stroked 14px glyphs, in the sidebar's style. */
 const svg = {
   width: 14,
@@ -82,14 +84,16 @@ export const HeartIcon = () => (
 
 /**
  * 🔒 YAZ-1802 D15: a draw.io diagram's type mark — linked boxes, a generic glyph, never draw.io's
- * logo — on its sidebar row and before its tab label. Excalidraw boards carry none.
+ * logo — on its sidebar row and before its tab label, named for screen readers. Excalidraw boards carry none.
  */
-export const DiagramMark = () => (
-  <svg {...svg} width={12} height={12} viewBox="0 0 24 24" strokeWidth={2}>
-    <rect x="3" y="3" width="7" height="6" rx="1" />
-    <rect x="14" y="15" width="7" height="6" rx="1" />
-    <path d="M6.5 9v4a2 2 0 0 0 2 2H14" />
-  </svg>
+export const DiagramBadge = ({ className }: { className: string }) => (
+  <span className={className} role="img" aria-label={BOARD_TYPE_NAME.diagram} title={BOARD_TYPE_NAME.diagram}>
+    <svg {...svg} width={12} height={12} viewBox="0 0 24 24" strokeWidth={2}>
+      <rect x="3" y="3" width="7" height="6" rx="1" />
+      <rect x="14" y="15" width="7" height="6" rx="1" />
+      <path d="M6.5 9v4a2 2 0 0 0 2 2H14" />
+    </svg>
+  </span>
 )
 
 /** Share link (YAZ-1799): the chain — the Share dialog's Copy link button and a shared board's sidebar mark. */

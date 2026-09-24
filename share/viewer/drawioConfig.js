@@ -1,12 +1,10 @@
 /**
- * Loaded BEFORE draw.io's viewer on a shared diagram's page (🔒 YAZ-1802 D11) — the share page's
- * twin of the app's `yaseen-render-config.js`, published as `/assets/drawio/config.js`. Every path
- * the viewer would otherwise take from viewer.diagrams.net points at this Worker's own
- * `/assets/drawio/` instead: nothing is fetched from a third party at view time (the CSP refuses a
- * foreign script or fetch anyway, but not an image). Of these, only the stencils ship, as the one
- * file `js/stencils.min.js` that `diagram.js` loads for a diagram with library shapes — it looks each
- * set up by its path under `STENCIL_PATH` (🔒 YAZ-1802 D5); the rest is bundled into the viewer or
- * never used read-only.
+ * Loaded BEFORE draw.io's viewer on a shared diagram's page (🔒 YAZ-1802 D11), published as
+ * `/assets/drawio/config.js` — the twin of the app's `yaseen-render-config.js`. Every path the viewer
+ * would otherwise take from viewer.diagrams.net points at this Worker's `/assets/drawio/`, even the
+ * ones nothing is published under (styles, shapes, mxgraph): unset, they default to that third party.
+ * Published there: the stencils (`js/stencils.min.js`, looked up under `STENCIL_PATH`), `img/` and
+ * the MathJax in `math4/` (`DRAWIO_SHARE_FILES` / `DRAWIO_SHARE_DIRS`).
  */
 window.DRAWIO_BASE_URL = `${window.location.origin}/assets/drawio`
 window.PROXY_URL = null

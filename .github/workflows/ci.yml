@@ -15,5 +15,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # The pinned draw.io pack (YAZ-1802 D5), so the suites that read the real bundle run here too.
+      - id: drawio
+        run: node -e "import('./tools/packDrawio.mjs').then((m) => console.log('tag=' + m.DRAWIO_TAG))" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: desktop/.cache/drawio
+          key: drawio-${{ steps.drawio.outputs.tag }}
+      - run: npm run drawio:pack
       - run: npm run typecheck
       - run: npm test
+      - run: npm run build

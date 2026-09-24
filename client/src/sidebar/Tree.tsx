@@ -1,7 +1,6 @@
 import type { FileKind, TreeNode } from '@shared/types'
-import { BOARD_TYPE_NAME } from '@shared/fileKind'
 import type { FileNode } from '@shared/treeSort'
-import { DiagramMark, LinkIcon } from '../components/icons'
+import { DiagramBadge, LinkIcon } from '../components/icons'
 import { stripExt } from '../lib/paths'
 import { TOO_LARGE_LABEL } from '../lib/syncAttention'
 import { CreateInline } from './CreateInline'
@@ -137,12 +136,7 @@ function CloudOffIcon() {
  * all names line up.
  */
 function KindIcon({ kind }: { kind: FileKind | null }) {
-  if (kind !== 'diagram') return <span className="tree__kind" aria-hidden="true" />
-  return (
-    <span className="tree__kind" role="img" aria-label={BOARD_TYPE_NAME.diagram} title={BOARD_TYPE_NAME.diagram}>
-      <DiagramMark />
-    </span>
-  )
+  return kind === 'diagram' ? <DiagramBadge className="tree__kind" /> : <span className="tree__kind" aria-hidden="true" />
 }
 
 export interface ShareBadge {

@@ -11,9 +11,9 @@
  * three commands, main enables only Export Image… on a diagram tab.
  */
 
-export const DRAWING_COMMAND_EVENT = 'yaseendraw:drawing-command'
+export const BOARD_COMMAND_EVENT = 'yaseendraw:board-command'
 
-export type DrawingCommand = { kind: 'export-image' } | { kind: 'export-drawing' } | { kind: 'canvas-background'; color: string }
+export type BoardCommand = { kind: 'export-image' } | { kind: 'export-drawing' } | { kind: 'canvas-background'; color: string }
 
 /** THE test: `el` is in the tab layer that is in front (an element outside any layer counts as in front). */
 export function isFrontmost(el: Element | null): boolean {
@@ -29,9 +29,9 @@ export function activeBoardSection(root: ParentNode = document): Element | null 
  * Dispatches `command` to the visible board; true when one was there to take it. Main already
  * greys each menu item out off a board it does not work for — this is the belt to that pair of braces.
  */
-export function requestDrawingCommand(command: DrawingCommand, root: ParentNode = document): boolean {
+export function requestBoardCommand(command: BoardCommand, root: ParentNode = document): boolean {
   const section = activeBoardSection(root)
   if (section === null) return false
-  section.dispatchEvent(new CustomEvent<DrawingCommand>(DRAWING_COMMAND_EVENT, { detail: command, bubbles: false }))
+  section.dispatchEvent(new CustomEvent<BoardCommand>(BOARD_COMMAND_EVENT, { detail: command, bubbles: false }))
   return true
 }

@@ -15,7 +15,7 @@ import { DEFAULT_CANVAS_PREFS, type DrawingLoadResponse, type GithubSyncStatus }
 import type { WatchEvent } from '@shared/types'
 import type { DrawingFileData } from '@shared/drawingAssets'
 import type { DrawingSnapshot, DrawingSurfaceApi, DrawingSurfaceProps } from './ExcalidrawSurface'
-import { DRAWING_COMMAND_EVENT, requestDrawingCommand, type DrawingCommand } from './drawingCommand'
+import { BOARD_COMMAND_EVENT, requestBoardCommand, type BoardCommand } from './boardCommand'
 
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),
@@ -34,7 +34,7 @@ const surface = {
   /** How many times the tab-reveal handoff (🔒 YAZ-1812) put the keyboard in this canvas. */
   focuses: 0,
   /** What the application menu's three canvas items (🔒 YAZ-1775 D10 / 🔒 YAZ-1775 D3) reached this canvas as. */
-  commands: [] as DrawingCommand[],
+  commands: [] as BoardCommand[],
   /** What `exportScene()` answers — the standalone bytes the save sheet is offered (🔒 YAZ-1775 D3). */
   exportedScene: '{"type":"excalidraw","elements":[],"files":{}}\n',
 }
@@ -592,14 +592,14 @@ describe('chips and the canvas frame', () => {
   })
 
   it('claims the application menu`s three canvas commands on its own section (🔒 YAZ-1775 D10, 🔒 YAZ-1775 D3)', async () => {
-    // The container IS this tab's workspace layer, which is what `requestDrawingCommand` selects.
+    // The container IS this tab's workspace layer, which is what `requestBoardCommand` selects.
     container.className = 'tabstack__layer'
     render()
     await flush()
 
-    expect(requestDrawingCommand({ kind: 'export-image' }, document.body)).toBe(true)
-    expect(requestDrawingCommand({ kind: 'canvas-background', color: '#fffce8' }, document.body)).toBe(true)
-    expect(requestDrawingCommand({ kind: 'export-drawing' }, document.body)).toBe(true)
+    expect(requestBoardCommand({ kind: 'export-image' }, document.body)).toBe(true)
+    expect(requestBoardCommand({ kind: 'canvas-background', color: '#fffce8' }, document.body)).toBe(true)
+    expect(requestBoardCommand({ kind: 'export-drawing' }, document.body)).toBe(true)
     await flush()
     expect(surface.commands).toEqual([{ kind: 'export-image' }, { kind: 'canvas-background', color: '#fffce8' }, { kind: 'export-drawing' }])
   })
@@ -609,7 +609,7 @@ describe('chips and the canvas frame', () => {
     await flush()
     const section = container.querySelector('.editor--drawing') as Element
     act(() => root?.render(null))
-    section.dispatchEvent(new CustomEvent(DRAWING_COMMAND_EVENT, { detail: { kind: 'export-image' } }))
+    section.dispatchEvent(new CustomEvent(BOARD_COMMAND_EVENT, { detail: { kind: 'export-image' } }))
     expect(surface.commands).toEqual([])
   })
 
@@ -620,7 +620,7 @@ describe('chips and the canvas frame', () => {
     await flush()
     saveDrawing.mockResolvedValue({ path: '/Users/x/Desktop/Board.excalidraw' })
 
-    requestDrawingCommand({ kind: 'export-drawing' }, document.body)
+    requestBoardCommand({ kind: 'export-drawing' }, document.body)
     await flush()
     expect(saveDrawing).toHaveBeenCalledExactlyOnceWith({ defaultName: 'Board.excalidraw', content: surface.exportedScene })
     expect(onNotice).toHaveBeenCalledWith('Exported to Board.excalidraw')
@@ -636,7 +636,7 @@ describe('chips and the canvas frame', () => {
     await flush()
     saveDrawing.mockResolvedValue({ cancelled: true })
 
-    requestDrawingCommand({ kind: 'export-drawing' }, document.body)
+    requestBoardCommand({ kind: 'export-drawing' }, document.body)
     await flush()
     expect(onNotice).not.toHaveBeenCalled()
   })
@@ -648,7 +648,7 @@ describe('chips and the canvas frame', () => {
     await flush()
     saveDrawing.mockRejectedValue(new BridgeRequestError('IO_ERROR', 'disk is full'))
 
-    requestDrawingCommand({ kind: 'export-drawing' }, document.body)
+    requestBoardCommand({ kind: 'export-drawing' }, document.body)
     await flush()
     expect(onNotice).toHaveBeenCalledWith('disk is full', 'error')
     expect(chips()).not.toContain(BROKEN_DRAWING_DOCUMENT)

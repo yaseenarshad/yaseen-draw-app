@@ -10,7 +10,7 @@ import { board, loadBoard, note, wireDownload } from './board.js'
 
 /**
  * 🔒 YAZ-1802 D5 (YAZ-1973): draw.io's stencil sets ship as ONE file, the editor's own
- * `js/stencils.min.js` (~7.7 MB, every set) — the app carries no per-set files to upload. It is
+ * `js/stencils.min.js` (every set) — the app carries no per-set files to upload. It is
  * loaded only for a diagram that names a library shape (`shape=mxgraph.…`, looked for inside
  * compressed pages too), so a plain diagram's link never pays for it.
  */

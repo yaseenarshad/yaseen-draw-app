@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { SIDEBAR_MAX_W, SIDEBAR_MIN_W, type CanvasPanelState, type CanvasPrefs, type SettingsState, type SidebarLens } from '@shared/types'
 import { prefsEqual } from '@shared/canvasPrefs'
 import { api, BridgeRequestError } from './api'
-import { requestDrawingCommand } from './drawings/drawingCommand'
+import { requestBoardCommand } from './drawings/boardCommand'
 import { Editor } from './Editor'
 import { useGithubSync } from './hooks/useGithubSync'
 import { useVaultStorage } from './hooks/useVaultStorage'
@@ -326,11 +326,11 @@ export function App() {
   // File › Open Folder… / Open Recent (GRO-2161) reuse the same flows as the in-app buttons;
   // File › Close Tab and Window › Next/Previous Tab (GRO-2232) drive the tab model.
   // 🔒 YAZ-1775 D10: File › Export Image… and View › Canvas Background act on the VISIBLE board layer,
-  // which `requestDrawingCommand` finds by DOM — several tabs are mounted at once and only one is
+  // which `requestBoardCommand` finds by DOM — several tabs are mounted at once and only one is
   // in front. Main greys each item out off a board it does not work for, so a miss here is already impossible.
-  const exportImage = useCallback(() => void requestDrawingCommand({ kind: 'export-image' }), [])
-  const setCanvasBackground = useCallback((color: string) => void requestDrawingCommand({ kind: 'canvas-background', color }), [])
-  const exportDrawing = useCallback(() => void requestDrawingCommand({ kind: 'export-drawing' }), [])
+  const exportImage = useCallback(() => void requestBoardCommand({ kind: 'export-image' }), [])
+  const setCanvasBackground = useCallback((color: string) => void requestBoardCommand({ kind: 'canvas-background', color }), [])
+  const exportDrawing = useCallback(() => void requestBoardCommand({ kind: 'export-drawing' }), [])
   useMenuEvents({
     onOpenFolder: pick,
     onOpenRoot: openRoot,
@@ -628,7 +628,7 @@ export function App() {
             onNotice={notify}
           />
           <div className="tabstack">
-            {mounted.length === 0 && <Editor path={null} root={root} watch={watch} />}
+            {mounted.length === 0 && <Editor path={null} root={root} watch={watch} diagramDarkColors={settings.diagramDarkColors} />}
             {mounted.map((path) => (
               // Every VISITED tab keeps its document mounted so its view state survives a switch
               // (rule 6); inactive layers hide via visibility — see tabs.css for why

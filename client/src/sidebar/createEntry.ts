@@ -4,8 +4,8 @@
  * lives in Sidebar/Tree; the main process enforces the same rules again (absolute path, vault
  * extension, no overwrite).
  */
-import { fileKind } from '@shared/fileKind'
-import { DIAGRAM_EXTENSIONS, DRAWING_VIEW_EXTENSIONS, type FileKind } from '@shared/types'
+import { BOARD_EXTENSION, fileKind } from '@shared/fileKind'
+import type { FileKind } from '@shared/types'
 
 /** What the inline input creates: a drawing or a folder. */
 export type EntryKind = 'file' | 'dir'
@@ -18,9 +18,6 @@ export function validateEntryName(name: string): string | null {
   if (trimmed.startsWith('.')) return 'Names starting with "." are hidden'
   return null
 }
-
-/** The extension each kind of board is born with (🔒 YAZ-1802 D13). */
-const BOARD_EXTENSION: Record<FileKind, string> = { drawing: DRAWING_VIEW_EXTENSIONS[0], diagram: DIAGRAM_EXTENSIONS[0] }
 
 /**
  * Absolute path for the new entry; a `board` file (a drawing unless told otherwise) gains its

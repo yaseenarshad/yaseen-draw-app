@@ -1,35 +1,14 @@
 /**
- * WHERE THE DRAW.IO WEBAPP LIVES, AND HOW IT IS SERVED (🔒 YAZ-1802 D4 / D5).
- *
- * The diagram editor is jgraph's own webapp, unmodified but for two config hooks, served from the
- * `drawio` HOST of the app's existing privileged `app` scheme — `app://drawio/index.html` — so it
- * is a SEPARATE ORIGIN from the renderer (`app://yaseen`, or the dev server): the iframe cannot
- * reach `window.yaseenDraw`, and the renderer talks to it by postMessage only.
- *
- * The bytes: `tools/packDrawio.mjs` unpacks the pinned release into `desktop/.cache/drawio/<tag>/`
- * (gitignored), and `electron.vite.config.ts` copies that into `desktop/out/drawio` at build time,
- * which electron-builder's `out/**` carries into the packaged app. Dev serves the cache directly,
- * so an overlay edit lands with the next `npm run dev` without a build.
- *
- * Every drawio-host answer carries `DRAWIO_CSP`: the webapp may load what is on its own origin and
- * nothing else — no fetch, no remote image, no CDN font — whatever a diagram or a menu asks for.
- *
- * draw.io has a desktop-app mode of its own (`bootstrap.js` loads drawio-desktop's `ElectronApp.js`
- * when the user agent carries both ` electron/` AND ` draw.io/`). Electron puts OUR app name in the
- * user agent, so the webapp always runs as the plain embed; `assets.test.ts` keeps the name clear.
- *
- * Pure (node path, an injected `exists` and `fetchFile`), so `assets.test.ts` pins every rule
- * without Electron.
+ * Where the draw.io webapp lives and how `app://drawio/…` serves it (🔒 YAZ-1802 D4 / D5): its own
+ * origin, apart from the renderer, so the iframe cannot reach `window.yaseenDraw`; every answer
+ * carries `DRAWIO_CSP`, so nothing leaves that origin. Dev serves the pack cache, a build its copy in
+ * `out/drawio`. Our app name in the user agent keeps draw.io out of its drawio-desktop mode
+ * (`assets.test.ts` pins it). Pure, so every rule tests without Electron. Long form:
+ * docs/CONTRACTS.md › draw.io diagrams.
  */
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-
-/** 🔒 YAZ-1802 D5: the pinned release. Keep in step with `DRAWIO_TAG` in `tools/packDrawio.mjs` (`packDrawio.test.mjs` pins the pair). */
-export const DRAWIO_TAG = 'v31.5.2'
-
-/** The `app://` host the webapp is served on (🔒 YAZ-1802 D4). */
-export const DRAWIO_HOST = 'drawio'
-export const DRAWIO_ORIGIN = `app://${DRAWIO_HOST}`
+import { DRAWIO_ORIGIN, DRAWIO_TAG } from '@shared/drawio'
 
 /**
  * 🔒 YAZ-1802 D4: the strict policy on every drawio-host response. Network is closed: `connect-src`,
@@ -66,9 +45,10 @@ export const DRAWIO_SHARE_FILES = ['js/viewer-static.min.js', 'js/stencils.min.j
 /**
  * …and the pack FOLDERS a shared diagram can reach, published whole: `img/` holds the pictures
  * draw.io's own image shapes point at (`GRAPH_IMAGE_PATH`, e.g. the Azure / network / clipart
- * libraries) — without it such a shape draws blank on a share link.
+ * libraries), and `math4/` is the MathJax the viewer loads on every page (`DRAW_MATH_URL`) —
+ * without them such a shape draws blank and a math label shows raw TeX on a share link.
  */
-export const DRAWIO_SHARE_DIRS = ['img'] as const
+export const DRAWIO_SHARE_DIRS = ['img', 'math4'] as const
 
 /**
  * The webapp folder. Dev (not packaged) prefers the pack cache — `<desktop>/.cache/drawio/<tag>`,

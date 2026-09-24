@@ -1,23 +1,8 @@
 /**
- * THE DIAGRAM DOCUMENT'S TWO DOORS (🔒 YAZ-1802 D6) — `drawing.ts`'s twin for a `.drawio`.
- *
- * `diagram:load` and `diagram:save` are the ONLY way a `.drawio` opened AS A DOCUMENT reads and
- * writes. Simpler than a drawing's pair on purpose: a diagram's pictures live inside its own XML
- * (a data URI in a cell's style), so there is no `assets/` store to land first — a load is the
- * text and its mtime, a save is the text back.
- *
- * THE DOCUMENT IS VALIDATED HERE, not only in the iframe: an empty, corrupt, truncated or
- * not-draw.io `.drawio` comes back as one `IO_ERROR` naming the path and the reason
- * (`diagramDocumentError`), which the editor shows as a readable error pane — and because it
- * never mounts draw.io on it, it can never autosave over a file it failed to load. The check is
- * the OUTLINE only (a draw.io root, closed at the end); draw.io decides what the cells mean.
- *
- * THE SAVE is `drawing:save`'s rules exactly: the request is shape-checked like a body, the
- * `expectedMtime` guard refuses with `CONFLICT` and writes NOTHING, a file that is gone is not a
- * conflict, and the write is atomic (tmp + rename). The dates ride the same write (🔒 YAZ-1802 D7):
- * `createdAt` from the CURRENT file's head (or its pre-save mtime, the first time), `updatedAt`
- * now, stamped onto the root `<mxfile>` by `stampDiagramMeta` — draw.io drops attributes it does
- * not know, so the renderer never sends them back. A refused save stamps nothing.
+ * `diagram:load` / `diagram:save` (🔒 YAZ-1802 D6) — `drawing.ts`'s twin for a `.drawio`: the only
+ * way a diagram opened as a document is read and written. Both doors refuse a file that fails the
+ * outline check, so the editor never mounts on it and never autosaves over it. The save follows
+ * `drawing:save`'s rules and stamps the D7 dates. Long form: docs/CONTRACTS.md › draw.io diagrams.
  */
 import path from 'node:path'
 import type { DiagramLoadRequest, DiagramLoadResponse, DiagramSaveRequest, DiagramSaveResponse } from '@shared/types'
@@ -69,8 +54,8 @@ export async function saveDiagram(req: DiagramSaveRequest): Promise<DiagramSaveR
   // The file as it is now: its dates and mtime in one open, serving both the guard and the stamp.
   const prior = await fsCall(file, () => readBoardHead(file))
   const now = Date.now()
-  const priorMeta = prior?.block ? { createdAt: prior.block.createdAt, updatedAt: prior.block.updatedAt } : null
-  const stamped = stampDiagramMeta(xml, { createdAt: prior?.mtime ?? now, updatedAt: now }, priorMeta)
+  const bornAt = prior?.mtime ?? now
+  const stamped = stampDiagramMeta(xml, { createdAt: bornAt, updatedAt: now }, prior?.block ?? null)
   if (Buffer.byteLength(stamped, 'utf8') > MAX_DIAGRAM_BYTES) throw new BridgeFailure('TOO_LARGE', TOO_LARGE, { path: file })
   if (expectedMtime !== undefined && prior !== null && prior.mtime !== expectedMtime) {
     // A file that is GONE is not a conflict (the `drawing:save` rule): the tab's copy is the only one left.

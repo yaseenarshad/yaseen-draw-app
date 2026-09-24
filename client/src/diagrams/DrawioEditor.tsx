@@ -1,54 +1,17 @@
 /**
- * THE DIAGRAM DOCUMENT (YAZ-1802): a `.drawio` opened full-pane in a tab. `Editor` dispatches
- * `kind === 'diagram'` here; it is `DrawingEditor`'s twin — save chip, sync chip, conflict bar,
- * debounced autosave, the quit handshake, rename continuity — with draw.io where the canvas is.
+ * A `.drawio` open in a tab (YAZ-1802): `DrawingEditor`'s twin — save and sync chips, conflict bar,
+ * debounced autosave, quit flush, rename continuity — with draw.io where the canvas is.
  *
- * 🔒 YAZ-1802 D4 — AN IFRAME ON ITS OWN ORIGIN, TALKED TO BY POSTMESSAGE ONLY. draw.io is
- * jgraph's own webapp, served by main at `app://drawio` under a no-network CSP. Being another
- * origin is the sandbox: the iframe cannot reach `window.yaseenDraw`, the renderer cannot reach
- * into draw.io, and the two exchange only the JSON strings `drawioProtocol.ts` names. A message
- * counts only from THIS iframe's window AND the drawio origin.
- *
- * LOAD FIRST, THEN MOUNT. The XML is read through `diagram:load` BEFORE draw.io exists; a file
- * main refuses (empty, corrupt, not draw.io, cut short) is the error pane, and draw.io is never
- * mounted on it — so an editor that failed to load can never autosave over the file.
- *
- * AUTOSAVE ON A COUNTER, like the drawing's version. draw.io posts the whole XML on every change
- * (`autosave: 1`); the latest XML sits in a ref and `Autosave<number>` sees only a counter, so the
- * 500 ms debounce, the dirty rule, the mtime guard and the conflict block are `lib/autosave.ts`'s,
- * unchanged. The baseline is draw.io's own `load` answer: opening a diagram and not touching it
- * writes nothing (a compressed file stays compressed until the first edit, D3).
- *
- * EXTERNAL CHANGES are `DrawingEditor`'s rule exactly: once any in-flight save has settled, a
- * watcher `change` whose mtime is our own save's is the echo; otherwise a CLEAN tab reloads (the
- * `load` action again — undo history starts over, as it does for a drawing) and a DIRTY one gets
- * the Reload / Keep mine bar. A `CONFLICT` from the save door raises the same bar.
- *
- * KEYS pressed inside the iframe never reach this document, which is why there is no capture
- * handler here (🔒 YAZ-1802 D17). ⌘S is draw.io's own: its `save` event carries the XML and the
- * host flushes at once. The app's MENU chords (⌘W, ⌘K, ⌘O, ⌘, …) are accelerators and fire
- * whatever frame has focus (`MENU_CHORDS` keeps draw.io's own bindings off them). The one
- * renderer-owned chord that means something here, ⌘B, comes up from our PostConfig.js as a
- * `shortcut` event when nothing is selected, and toggles the sidebar.
- *
- * 🔒 YAZ-1802 D12 — THE THEME FOLLOWS THE APP, LIVE: the first theme rides the URL (`dark=`), and
- * a flip afterwards is draw.io's own `darkMode` / `lightMode` action, invoked by message — no
- * reload, no lost undo. A flip before draw.io listens (its `init`) is sent at `init`.
- *
- * 🔒 YAZ-1802 D16 — SO DOES THE DARK-MODE COLOUR SETTING: the configure reply carries it as draw.io's
- * `defaultAdaptiveColors`, and a change afterwards is our `yaseenAdaptiveColors` message, answered
- * by our PostConfig.js (draw.io has no embed action for it). It re-draws, it never edits: nothing
- * autosaves, and undo and unsaved work stay exactly as they were.
- *
- * FILE › EXPORT IMAGE… (🔒 YAZ-1802 D9) lands on this tab's section as the menu's DOM command
- * (`drawingCommand.ts`): the XML draw.io last posted — unsaved edits included — goes through the
- * D9 renderer as a PNG and an SVG, and main's save sheet writes the one the user picks.
- *
- * SHARE LINKS stay live the drawing's way: every successful save tells `liveShare`, which
- * re-uploads a shared board once its saves settle.
+ * 🔒 D4: draw.io runs in an iframe on its own origin and is talked to by postMessage only
+ * (`drawioProtocol.ts`). The XML is loaded BEFORE the iframe mounts, so a file main refuses is the
+ * error pane and draw.io can never autosave over it. Autosave counts draw.io's changes and leaves
+ * the rules to `lib/autosave.ts`; outside changes follow `DrawingEditor`'s rule. Theme (D12) and
+ * the dark-mode colour setting (D16) apply live by message. Keys, export and share: docs/CONTRACTS.md
+ * › draw.io diagrams.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { DEFAULT_SETTINGS, type DiagramDarkColors, type GithubSyncStatus } from '@shared/types'
+import { DRAWIO_ORIGIN } from '@shared/drawio'
+import type { DiagramDarkColors, GithubSyncStatus } from '@shared/types'
 import { api, BridgeRequestError } from '../api'
 import type { WatchSource } from '../hooks/useWatch'
 import { Autosave, SaveConflict, type SaveStatus } from '../lib/autosave'
@@ -58,11 +21,11 @@ import { registerRenameContinuity } from '../lib/renameContinuity'
 import { useAppliedTheme } from '../lib/theme'
 import { noteBoardSaved } from '../share/liveShare'
 import { ConflictBar } from '../drawings/ConflictBar'
-import { DRAWING_COMMAND_EVENT, type DrawingCommand } from '../drawings/drawingCommand'
+import { BOARD_COMMAND_EVENT, type BoardCommand } from '../drawings/boardCommand'
 import { mayTakeFocus } from '../drawings/focusHandoff'
 import { SaveIndicator } from '../drawings/SaveIndicator'
 import { SyncIndicator } from '../drawings/SyncIndicator'
-import { DRAWIO_ORIGIN, drawioAdaptiveColors, drawioConfig, drawioFrameUrl, readDrawioMessage } from './drawioProtocol'
+import { drawioAdaptiveColors, drawioConfig, drawioFrameUrl, readDrawioMessage } from './drawioProtocol'
 import { renderDiagramImage } from './renderDiagram'
 import '../drawings/statusChips.css'
 import './drawioEditor.css'
@@ -88,10 +51,10 @@ export interface DrawioEditorProps {
   sync?: GithubSyncStatus | null
   onSyncNow?: () => void
   /** 🔒 YAZ-1802 D16: the app's dark-mode colour setting, applied live (see the module doc). */
-  darkColors?: DiagramDarkColors
+  darkColors: DiagramDarkColors
   /** The window's ONE passive notice: where an exported image landed, or why it did not. */
   onNotice?: (text: string, icon?: NoticeKind) => void
-  /** App's sidebar toggle: ⌘B pressed inside draw.io with nothing selected (see the module doc). */
+  /** App's sidebar toggle: ⌘B pressed inside draw.io with nothing selected, sent up by our PostConfig.js as a `shortcut` event. */
   onToggleSidebar?: () => void
 }
 
@@ -145,7 +108,7 @@ interface DiagramHostProps extends DrawioEditorProps {
 }
 
 /** Mounts exactly one draw.io iframe for `loaded` and owns everything that writes. */
-function DiagramHost({ root, path, loaded, watch, sync, onSyncNow, darkColors = DEFAULT_SETTINGS.diagramDarkColors, onNotice, onToggleSidebar }: DiagramHostProps) {
+function DiagramHost({ root, path, loaded, watch, sync, onSyncNow, darkColors, onNotice, onToggleSidebar }: DiagramHostProps) {
   const theme = useAppliedTheme()
   const hostRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLIFrameElement>(null)
@@ -291,7 +254,7 @@ function DiagramHost({ root, path, loaded, watch, sync, onSyncNow, darkColors = 
     }
   }, [root, path, sendLoad])
 
-  // The watcher rule (see the module doc): settle the in-flight save, then echo / reload / conflict.
+  // `DrawingEditor`'s watcher rule: settle the in-flight save, then echo / reload / conflict.
   useEffect(
     () =>
       watch.subscribe((ev) => {
@@ -326,7 +289,7 @@ function DiagramHost({ root, path, loaded, watch, sync, onSyncNow, darkColors = 
     syncColors()
   }, [darkColors, syncColors])
 
-  /** File › Export Image…: see the module doc. The picture is drawn before the sheet opens, because the sheet's pick decides the format. */
+  /** File › Export Image… (🔒 D9): the XML draw.io last posted, unsaved edits included, drawn before the sheet opens because the pick decides the format. */
   const exportImage = useCallback(async () => {
     try {
       const xml = latestXml.current
@@ -346,15 +309,15 @@ function DiagramHost({ root, path, loaded, watch, sync, onSyncNow, darkColors = 
   exportImageRef.current = exportImage
 
   // The menu's command, claimed on THIS tab's section so only the diagram in front answers
-  // (`drawingCommand.ts`); main enables nothing but Export Image… on a diagram tab.
+  // (`boardCommand.ts`). Export Image… is the one board command a diagram answers.
   useEffect(() => {
     const section = hostRef.current?.closest('.editor--diagram') ?? null
     if (section === null) return
     const onCommand = (event: Event): void => {
-      if ((event as CustomEvent<DrawingCommand>).detail.kind === 'export-image') void exportImageRef.current()
+      if ((event as CustomEvent<BoardCommand>).detail.kind === 'export-image') void exportImageRef.current()
     }
-    section.addEventListener(DRAWING_COMMAND_EVENT, onCommand)
-    return () => section.removeEventListener(DRAWING_COMMAND_EVENT, onCommand)
+    section.addEventListener(BOARD_COMMAND_EVENT, onCommand)
+    return () => section.removeEventListener(BOARD_COMMAND_EVENT, onCommand)
   }, [])
 
   // The close/quit handshake and the unmount flush — `DrawingEditor`'s, unchanged. A retired host

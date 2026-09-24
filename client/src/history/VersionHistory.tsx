@@ -58,10 +58,13 @@ interface Board {
 }
 
 /**
- * What a version is drawn against: a drawing's board as it is now plus the engine (for "Changes
- * since this version"), or nothing for a diagram — no change marks in v1 (🔒 YAZ-1802 D10).
+ * What a drawing's version is drawn against: the board as it is now plus the engine (for "Changes
+ * since this version"). A diagram has none — no change marks in v1 (🔒 YAZ-1802 D10).
  */
-type Against = { kind: 'drawing'; board: Board; engine: ExcalidrawModule } | { kind: 'diagram' }
+interface DrawingBase {
+  board: Board
+  engine: ExcalidrawModule
+}
 
 interface Picture {
   key: string
@@ -100,7 +103,7 @@ export function VersionHistory({ root, path, fromMerge = false, darkColors, onCl
   const theme = useAppliedTheme()
   const dialogRef = useRef<HTMLDivElement>(null)
   const [versions, setVersions] = useState<BoardVersion[] | null>(null)
-  const [against, setAgainst] = useState<Against | null>(null)
+  const [drawingBase, setDrawingBase] = useState<DrawingBase | null>(null)
   const [selected, setSelected] = useState(0)
   const [view, setView] = useState<View>(diagram ? 'version' : 'changes')
   const [picture, setPicture] = useState<Picture | null>(null)
@@ -117,23 +120,23 @@ export function VersionHistory({ root, path, fromMerge = false, darkColors, onCl
 
   useEffect(() => {
     let live = true
-    const loadAgainst: Promise<Against> = isDiagram(path)
-      ? Promise.resolve({ kind: 'diagram' })
-      : Promise.all([api.drawing.load({ root, path }), loadExcalidraw()]).then(([board, engine]) => ({ kind: 'drawing', board: { scene: parseSceneText(board.json), files: board.files }, engine }))
-    Promise.all([api.github.history(root, path), loadAgainst]).then(
-      ([list, loaded]) => {
+    const loadBase: Promise<DrawingBase | null> = diagram
+      ? Promise.resolve(null)
+      : Promise.all([api.drawing.load({ root, path }), loadExcalidraw()]).then(([board, engine]) => ({ board: { scene: parseSceneText(board.json), files: board.files }, engine }))
+    Promise.all([api.github.history(root, path), loadBase]).then(
+      ([list, base]) => {
         if (!live) return
         const before = fromMerge ? list.findIndex((v) => v.localOnly) : -1
         setVersions(list)
         setSelected(Math.max(0, before))
-        setAgainst(loaded)
+        setDrawingBase(base)
       },
       (err: unknown) => live && setProblem(problemText(err)),
     )
     return () => {
       live = false
     }
-  }, [root, path, fromMerge])
+  }, [root, path, diagram, fromMerge])
 
   const listRef = useRef<HTMLUListElement>(null)
   // Once the list is there, it takes focus, so ↑ / ↓ work straight away.
@@ -146,7 +149,8 @@ export function VersionHistory({ root, path, fromMerge = false, darkColors, onCl
 
   // Draw the chosen version — the fetch is cached per ref, the drawing is redone per view, theme and colour setting.
   useEffect(() => {
-    if (version === undefined || against === null || key === null) return
+    // `version` exists only once the list AND the drawing base have landed (one update, above).
+    if (version === undefined || key === null) return
     let live = true
     let scene = scenes.current.get(version.ref)
     if (scene === undefined) {
@@ -159,8 +163,10 @@ export function VersionHistory({ root, path, fromMerge = false, darkColors, onCl
         if (then.kind === 'diagram') {
           const src = await renderDiagramPreview(then.xml, theme, darkColors, PICTURE_BOUNDS)
           if (live) setPicture({ key, src, changes: null })
-        } else if (against.kind === 'drawing') {
-          const { board: current, engine } = against
+        } else {
+          // A drawing version with nothing to compare against is "could not be drawn", never "Drawing…" forever.
+          if (drawingBase === null) throw new Error('no drawing base')
+          const { board: current, engine } = drawingBase
           const thenScene = parseSceneText(then.json)
           const changes = compareBoards(thenScene.elements, current.scene.elements)
           const elements = view === 'changes' ? changesScene(engine, current.scene.elements, changes) : thenScene.elements
@@ -176,7 +182,7 @@ export function VersionHistory({ root, path, fromMerge = false, darkColors, onCl
     return () => {
       live = false
     }
-  }, [version, against, key, view, theme, darkColors, root, path])
+  }, [version, drawingBase, key, view, theme, darkColors, root, path])
 
   const shown = picture !== null && picture.key === key ? picture : null
   const unchanged = shown?.changes !== null && shown?.changes !== undefined && !hasChanges(shown.changes)

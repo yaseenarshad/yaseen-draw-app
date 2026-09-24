@@ -5,7 +5,8 @@ import { createReadStream, existsSync } from 'node:fs'
 import { cp, rm } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
-import { DRAWIO_TAG } from './src/main/drawio/assets'
+// Relative, not `@shared`: this file runs in Node before any alias exists.
+import { DRAWIO_TAG } from '../shared/drawio'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 const shared = resolve(here, '../shared')
@@ -63,8 +64,8 @@ function excalidrawAssets(): Plugin {
  * directly (`resolveDrawioDir`). The bytes are never committed.
  *
  * `out/drawio` sits outside the renderer's `outDir`, so nothing else empties it: it is replaced
- * whole, or a bumped release would keep the old one's files. v31.5.2 is ~47 MB, 2 660 files, pruned
- * to what the editor, the picture page and the share viewer load (🔒 YAZ-1802 D5, `tools/lib/drawioPack.mjs`);
+ * whole, or a bumped release would keep the old one's files. It is pruned to what the editor, the
+ * picture page and the share viewer load (🔒 YAZ-1802 D5, `tools/lib/drawioPack.mjs`);
  * share setup uploads the share viewer's draw.io files from this same copy (`readViewerAssets`).
  */
 function drawioAssets(): Plugin {
