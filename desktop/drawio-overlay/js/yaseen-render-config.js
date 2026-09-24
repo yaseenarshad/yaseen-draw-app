@@ -1,7 +1,8 @@
 /**
  * Loaded BEFORE draw.io's viewer on `yaseen-render.html` (🔒 YAZ-1802 D9): every path the viewer
  * would otherwise take from viewer.diagrams.net points at this origin instead. The CSP would block
- * the network anyway; this makes the stencils and styles actually resolve.
+ * the network anyway; this makes the styles and images actually resolve. The stencils come from
+ * `js/stencils.min.js`, which looks each set up by its path under `STENCIL_PATH` (🔒 YAZ-1802 D5).
  */
 (function()
 {

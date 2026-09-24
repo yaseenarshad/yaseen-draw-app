@@ -30,6 +30,7 @@ import path from 'node:path'
 import { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 import { handle as workerHandle } from '../share/worker.js'
+import { DRAWIO_TAG } from './packDrawio.mjs'
 
 const USAGE = 'usage: node tools/fakeCloudflare.mjs --data <dir> [--port 8787] (0 = any free port)'
 const args = process.argv.slice(2)
@@ -47,6 +48,8 @@ const BUCKET_DIR = path.join(DATA, 'bucket')
 const ASSET_DIR = path.join(DATA, 'assets')
 /** The repo's built viewer — what an account that already had the Worker (board 10's) serves before any setup ran here. */
 const REPO_ASSETS = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'share', 'dist', 'assets')
+/** The app's draw.io webapp: share setup publishes its viewer files under `/assets/drawio/` (🔒 YAZ-1802 D5). */
+const REPO_DRAWIO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'desktop', '.cache', 'drawio', DRAWIO_TAG)
 const STATE_FILE = path.join(DATA, 'state.json')
 fs.mkdirSync(BUCKET_DIR, { recursive: true })
 fs.mkdirSync(ASSET_DIR, { recursive: true })
@@ -136,7 +139,8 @@ const diskBucket = {
 const MIME = { '.js': 'application/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.png': 'image/png', '.svg': 'image/svg+xml', '.xml': 'application/xml', '.txt': 'text/plain' }
 /**
  * The `ASSETS` binding (Workers Static Assets): the uploaded manifest's files, by path. Before any
- * setup uploaded them (board 10's pre-existing link), the repo's `share/dist/assets` stands in.
+ * setup uploaded them (board 10's pre-existing link), the repo's `share/dist/assets` stands in, and
+ * the pack cache for the draw.io files setup would have added under `/assets/drawio/`.
  */
 const assetsBinding = (manifest) => ({
   async fetch(request) {
@@ -148,6 +152,8 @@ const assetsBinding = (manifest) => ({
     } else if (pathname.startsWith('/assets/')) {
       const candidate = path.resolve(REPO_ASSETS, `.${pathname.slice('/assets'.length)}`)
       if (candidate.startsWith(`${REPO_ASSETS}/`)) file = candidate
+      const drawio = path.resolve(REPO_DRAWIO, `.${pathname.slice('/assets/drawio'.length)}`)
+      if (pathname.startsWith('/assets/drawio/') && !fs.existsSync(candidate) && drawio.startsWith(`${REPO_DRAWIO}/`)) file = drawio
     }
     if (file === null || !fs.existsSync(file)) return new Response('not found', { status: 404 })
     const type = MIME[path.extname(pathname)] ?? 'application/octet-stream'

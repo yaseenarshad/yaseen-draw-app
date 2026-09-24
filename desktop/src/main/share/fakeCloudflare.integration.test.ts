@@ -240,7 +240,7 @@ describe('a shared draw.io diagram (🔒 YAZ-1802 D11)', () => {
     expect([sent.get('content-type'), sent.get('x-board-kind'), sent.get('x-board-name')]).toEqual(['application/xml', 'diagram', 'Flow'])
     expect(await meta(s.id)).toMatchObject({ httpMetadata: { contentType: 'application/xml; charset=utf-8' }, customMetadata: { name: 'Flow', kind: 'diagram' } })
     const page = await (await get(`/b/${s.id}`)).text()
-    expect(page).toContain('<script src="/assets/drawio/viewer-static.min.js"></script>')
+    expect(page).toContain('<script src="/assets/drawio/js/viewer-static.min.js"></script>')
     expect(page).toContain('id="dl-drawio"')
     const raw = await get(`/raw/${s.id}?download=1`)
     expect(raw.headers.get('content-disposition')).toBe("attachment; filename*=UTF-8''Flow.drawio")

@@ -34,7 +34,7 @@ const KIND_PAGES = {
     noun: 'diagram',
     stylesheet: '/assets/drawio/fonts.css',
     downloads: '<button id="dl-drawio" type="button">Download .drawio</button>',
-    scripts: '<script src="/assets/drawio/config.js"></script>\n<script src="/assets/drawio/viewer-static.min.js"></script>\n<script type="module" src="/assets/diagram.js"></script>',
+    scripts: '<script src="/assets/drawio/config.js"></script>\n<script src="/assets/drawio/js/viewer-static.min.js"></script>\n<script type="module" src="/assets/diagram.js"></script>',
   },
 }
 

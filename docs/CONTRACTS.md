@@ -1025,12 +1025,17 @@ link's download flag is its OWN object, `perm/<id>` (`"0"` | `"1"`, missing = al
   the viewer's hover toolbar zooms and turns pages, and dragging or scrolling pans. It offers
   Download .drawio only — no PNG: draw.io draws labels as HTML inside the SVG, which a canvas cannot
   read back out. Same CSP, still no inline script.
-- The viewer build ships, under `/assets/drawio/` (`tools/buildShareViewer.mjs` `DRAWIO_FILES`):
-  `viewer-static.min.js` (4.2 MB), EVERY stencil set — 206 files, 43.3 MB, the largest 6.6 MB, all
-  far under Cloudflare's 25 MiB per static asset — because a library shape (AWS, Cisco, …) loads its
-  set on first use and draws as nothing without it, draw.io's `LICENSE-drawio.txt`, and a
-  `fonts.css` for the editor's five font families pointing at the Excalidraw fonts already under
-  `/assets/fonts/`. The static assets grow from ~23 MB to ~71 MB (638 files).
+- The Worker's `/assets/drawio/` holds our `config.js` and a `fonts.css` for the editor's five font
+  families pointing at the Excalidraw fonts already under `/assets/fonts/` (both built into
+  `share/dist/assets`), and draw.io's own files, `DRAWIO_SHARE_FILES` in `drawio/assets.ts`, which
+  share setup reads from the app's ONE draw.io webapp (`readViewerAssets`, 🔒 YAZ-1802 D5,
+  YAZ-1973) and publishes at their pack paths: `js/viewer-static.min.js` (4.2 MB),
+  `js/stencils.min.js` (7.7 MB, all 204 stencil sets — `diagram.js` loads it only for a diagram
+  that names a `mxgraph.…` library shape, compressed pages looked inside), `LICENSE-drawio.txt`,
+  and the whole `img/` folder (`DRAWIO_SHARE_DIRS`, 11 MB, ~2,100 files) — the pictures draw.io's
+  image shapes point at (Azure, network, clipart…), which would otherwise draw blank on a link.
+  The static assets are ~46 MB (~2,500 files); every file far under Cloudflare's 25 MiB per asset
+  and the whole set under its 20,000-files-per-version cap.
 - **An outdated Worker.** The Worker echoes the stored kind on every PUT (`x-board-kind`). A Worker
   deployed before kinds answers a diagram's upload without it, and would serve the XML to the
   Excalidraw viewer: main refuses the upload with `WORKER_OUTDATED` ("… run Set up sharing again").
@@ -1168,7 +1173,8 @@ but for two config hooks, inside an iframe on its OWN origin.
   The renderer and the iframe talk by postMessage ONLY, in draw.io's `proto=json` dialect, and a
   message counts only from that iframe's window and `app://drawio` (`drawioProtocol.ts` documents
   the conversation). The iframe URL shuts every network door
-  (`offline`, `stealth`, `lockdown`, no plugins / PWA / cloud storage).
+  (`offline`, `stealth`, `lockdown`, no plugins / PWA / cloud storage) and pins `lang=en`, the one
+  language the pruned pack carries (D5).
 - **🔒 D3 — plain XML.** The configure reply sets `compressXml: false`; a compressed file opens and
   is written plain on its first edit. Opening and not editing writes nothing.
 - **🔒 D6 — two doors.** `diagram:load` validates the outline first (a draw.io root, closed at the
@@ -1251,12 +1257,20 @@ but for two config hooks, inside an iframe on its OWN origin.
   packaged and from the repo checkout in dev.
 - The renderer serves from the custom `app://yaseen/` protocol; Excalidraw's fonts are copied
   beside the bundle at build time so a scene with text never reaches a CDN (🔒 the offline rule).
-  The draw.io webapp (~150 MB unpacked, 3 400 files) is copied from the pack cache into
-  `out/drawio` the same way (`drawioAssets()` in `electron.vite.config.ts`, replaced whole on every
-  build) and served as `app://drawio/` (🔒 YAZ-1802 D5). It ships unmodified under Apache-2.0: the
-  war carries no licence file of its own, so the overlay adds `LICENSE-drawio.txt` (jgraph/drawio's
-  `LICENSE` at the pinned tag) at its root, and the war's own `stencils/`, `templates/`, `shapes/`,
-  `img/` and `js/libavoid-js/` `LICENSE` files are never pruned.
+  The draw.io webapp (~47 MB, 2 660 files) is copied from the pack cache into `out/drawio` the same
+  way (`drawioAssets()` in `electron.vite.config.ts`, replaced whole on every build) and served as
+  `app://drawio/` (🔒 YAZ-1802 D5). It is PRUNED to what the editor, the picture page and the share
+  viewer load (YAZ-1973: a deny list with reasons in `tools/lib/drawioPack.mjs`, the request set
+  pinned in `packDrawio.test.mjs`; the stamp re-unpacks when a rule changes) — no other languages
+  (the frame URL pins `lang=en`), no cloud/integration code, no dev sources, and no `stencils/` or
+  `shapes/` files, which `js/stencils.min.js` / `js/shapes-14-6-5.min.js` carry. Dev logs every
+  `app://drawio` 404 (`serveDrawio` `onNotFound`) — the check after a bump. The share viewer's
+  draw.io files are read from this copy at share setup, so the app carries them once. It ships
+  unmodified under Apache-2.0: the war carries no licence file of its own, so the overlay adds
+  `LICENSE-drawio.txt` (jgraph/drawio's `LICENSE` at the pinned tag) at its root, and no `LICENSE`
+  anywhere in the war is ever pruned (`stencils/`, `shapes/`, `templates/`, `img/`,
+  `js/libavoid-js/`).
+- Size (v0.1.8, YAZ-1973): the `.app` is ~375 MB and the dmg ~175 MB (from ~528 MB / ~208 MB).
 - `.github/workflows/release.yml` builds both on a `v*` tag (node 22, `CSC_IDENTITY_AUTO_DISCOVERY:
   false`, `fail_on_unmatched_files: true`) and attaches them to that tag's release.
 - 🔒 **Releases are Yasin's call.** No tag, no GitHub release and no `npm version` without him

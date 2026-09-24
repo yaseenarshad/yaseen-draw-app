@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { deflateRawSync } from 'node:zlib'
 import { afterEach, describe, expect, it } from 'vitest'
 import { DRAWIO_TAG, WAR_BYTES, WAR_SHA256, WAR_URL } from './packDrawio.mjs'
-import { fontFaceCss, fontWeightOf, isPrunedEntry, isSafeEntryName, isUnpacked, layOverlay, readZipEntries, unpackWebapp, verifyArchive } from './lib/drawioPack.mjs'
+import { fontFaceCss, fontWeightOf, isPrunedEntry, isSafeEntryName, isUnpacked, layOverlay, PRUNE_ID, readZipEntries, unpackWebapp, verifyArchive } from './lib/drawioPack.mjs'
 
 /** A minimal zip writer (local headers + central directory + end record) — enough to feed the reader. */
 function zip(entries) {
@@ -105,24 +105,30 @@ describe('unpackWebapp + isUnpacked (🔒 YAZ-1802 D5)', () => {
     file('index.html', '<html></html>', 0),
     file('js/PreConfig.js', '/* draw.io stub */'),
     file('js/viewer-static.min.js', 'viewer'),
+    file('js/stencils.min.js', 'every stencil set'),
     file('stencils/LICENSE', 'stencil terms'),
+    file('stencils/aws4.xml', '<shapes/>'),
     file('WEB-INF/web.xml', '<web-app/>'),
     file('service-worker.js', 'sw'),
   ])
 
-  it('writes the webapp pruned, licences kept, stamped with the pin', () => {
+  it('writes the webapp pruned, licences kept, stamped with the pin and the prune', () => {
     const dir = join(temp(), 'v1')
-    expect(unpackWebapp(war, dir, pinOf(war))).toBe(4)
-    expect(filesIn(dir)).toEqual(['.yaseen-pack.json', 'index.html', 'js/PreConfig.js', 'js/viewer-static.min.js', 'stencils/LICENSE'])
+    expect(unpackWebapp(war, dir, pinOf(war))).toBe(5)
+    expect(filesIn(dir)).toEqual(['.yaseen-pack.json', 'index.html', 'js/PreConfig.js', 'js/stencils.min.js', 'js/viewer-static.min.js', 'stencils/LICENSE'])
+    expect(JSON.parse(readFileSync(join(dir, '.yaseen-pack.json'), 'utf8')).prune).toBe(PRUNE_ID)
     expect(isUnpacked(dir, pinOf(war))).toBe(true)
   })
 
-  it('is idempotent by the stamp: another tag or hash, or no folder at all, means unpack', () => {
+  it('is idempotent by the stamp: another tag, hash or prune, or no folder at all, means unpack', () => {
     const dir = join(temp(), 'v1')
     expect(isUnpacked(dir, pinOf(war))).toBe(false)
     unpackWebapp(war, dir, pinOf(war))
     expect(isUnpacked(dir, pinOf(war, 'v2'))).toBe(false)
     expect(isUnpacked(dir, { ...pinOf(war), sha256: '0'.repeat(64) })).toBe(false)
+    // A cache unpacked before the prune changed (YAZ-1973's first run found the old stamp) is unpacked again.
+    writeFileSync(join(dir, '.yaseen-pack.json'), JSON.stringify({ tag: 'v1', sha256: pinOf(war).sha256 }))
+    expect(isUnpacked(dir, pinOf(war))).toBe(false)
   })
 
   it('replaces a previous unpack whole — nothing of the old release lingers', () => {
@@ -196,15 +202,49 @@ describe('isSafeEntryName', () => {
   })
 })
 
-describe('isPrunedEntry', () => {
-  it('drops the servlet folders, source maps, the service worker and the cloud pages', () => {
-    for (const name of ['WEB-INF/web.xml', 'META-INF/MANIFEST.MF', 'js/app.min.js.map', 'service-worker.js', 'workbox-05b6c01b.js', 'github.html', 'connect/x.js', 'js/dropbox/a.js'])
+/**
+ * 🔒 YAZ-1802 D5 (YAZ-1973): every file the app's three draw.io pages were seen loading — a logged
+ * static server over the unpruned v31.5.2, the editor opened with `drawioFrameUrl`'s parameters
+ * over the seeded vault, the bake-off diagrams, a diagram with one shape from each of the 204
+ * stencil sets and 57 shape libraries, a math page, Mermaid, PlantUML, Insert › Template and More
+ * Shapes; then `yaseen-render.html` drawing each as SVG and PNG. Plus what those pages load on
+ * demand that the pass did not reach (Gliffy import, org-chart layout, math printing, the open
+ * dialog). The 204 `stencils/*.xml` the viewer fetched are all inside `js/stencils.min.js`.
+ */
+const LOADED = [
+  'index.html', 'favicon.ico', 'js/bootstrap.js', 'js/main.js', 'js/PreConfig.js', 'js/app.min.js', 'js/PostConfig.js',
+  'js/shapes-14-6-5.min.js', 'js/stencils.min.js', 'js/extensions.min.js', 'js/plantuml/drawio-plantuml.min.js',
+  'styles/grapheditor.css', 'styles/high-contrast.css', 'styles/fonts/ArchitectsDaughter-Regular.ttf', 'mxgraph/css/common.css',
+  'resources/dia.txt', 'images/spin.gif', 'images/github-logo.svg', 'images/osa_drive-harddisk.png',
+  'math4/es5/startup.js', 'math4/es5/core.js', 'math4/es5/input/tex.js', 'math4/es5/input/asciimath.js', 'math4/es5/input/tex/extensions/html.js', 'math4/es5/output/svg.js', 'math4/es5/fonts/mathjax-tex-font/svg.js', 'math4/es5/ui/safe.js',
+  'templates/index.xml', 'templates/basic/flowchart.png', 'img/lib/azure2/compute/Virtual_Machine.svg', 'img/lib/mscae/Cloud_Service.svg', 'img/clipart/Gear_128x128.png', 'img/people/Worker_Man_128x128.png',
+  'yaseen-render.html', 'js/yaseen-render-config.js', 'js/viewer-static.min.js', 'js/yaseen-render.js', 'yaseen-fonts/fonts.css',
+]
+const ON_DEMAND = ['js/gliffy/drawio-gliffy.min.js', 'js/orgchart.min.js', 'js/math-print.js', 'open.html', 'js/open.js', 'mxgraph/images/warning.png']
+const LICENCES = ['LICENSE-drawio.txt', 'stencils/LICENSE', 'shapes/LICENSE', 'templates/LICENSE', 'img/LICENSE', 'js/libavoid-js/LICENSE']
+
+describe('isPrunedEntry (🔒 YAZ-1802 D5)', () => {
+  it('keeps every file the editor, the picture page and the share viewer load, and every licence', () => {
+    for (const name of [...LOADED, ...ON_DEMAND, ...LICENCES]) expect(isPrunedEntry(name), name).toBe(false)
+  })
+
+  it('drops the servlet folders, source maps, the service worker, plugins and the cloud pages and SDKs', () => {
+    for (const name of ['WEB-INF/web.xml', 'META-INF/MANIFEST.MF', 'js/app.min.js.map', 'service-worker.js', 'workbox-05b6c01b.js', 'github.html', 'connect/x.js', 'js/dropbox/a.js', 'js/onedrive/OneDrive.js', 'plugins/sql.js', 'js/jquery/jquery-3.6.0.min.js', 'js/simplepeer/simplepeer9.10.0.min.js'])
       expect(isPrunedEntry(name), name).toBe(true)
   })
 
-  it('keeps what the offline editor and the viewer load, and every licence', () => {
-    for (const name of ['index.html', 'js/bootstrap.js', 'js/app.min.js', 'js/viewer-static.min.js', 'js/PreConfig.js', 'js/PostConfig.js', 'stencils/basic.xml', 'resources/dia.txt', 'styles/grapheditor.css', 'math4/es5/startup.js', 'stencils/LICENSE', 'templates/LICENSE', 'js/libavoid-js/LICENSE'])
-      expect(isPrunedEntry(name), name).toBe(false)
+  it('drops what no page loads: integrations, dev sources, the lightbox, other languages, the stencil and shape files the bundles carry', () => {
+    for (const name of ['js/integrate.min.js', 'js/diagramly/App.js', 'js/grapheditor/Graph.js', 'js/mermaid/drawio-mermaid.min.js', 'js/elk/drawio-elk.min.js', 'js/orgchart/bridge.min.js', 'mxgraph/src/mxClient.js', 'mxgraph/mxClient.js', 'js/viewer.min.js', 'export3.html', 'js/export.js', 'clear.html', 'resources/dia_de.txt', 'resources/dia_zh-tw.txt', 'images/sidebar-aws4.png', 'stencils/aws4.xml', 'stencils/cisco/routers.xml', 'shapes/mxBasic.js', 'shapes/mockup/mxMockupButtons.js'])
+      expect(isPrunedEntry(name), name).toBe(true)
+  })
+})
+
+describe.skipIf(!existsSync(new URL(`../desktop/.cache/drawio/${DRAWIO_TAG}/index.html`, import.meta.url)))('the real pack (🔒 YAZ-1802 D5)', () => {
+  it('holds every file the three pages load and every licence, and none of the separate stencil or shape files', () => {
+    const pack = new URL(`../desktop/.cache/drawio/${DRAWIO_TAG}/`, import.meta.url)
+    for (const name of [...LOADED, ...ON_DEMAND, ...LICENCES]) expect(existsSync(new URL(name, pack)), name).toBe(true)
+    expect(readdirSync(new URL('stencils/', pack))).toEqual(['LICENSE'])
+    expect(readdirSync(new URL('shapes/', pack))).toEqual(['LICENSE'])
   })
 })
 

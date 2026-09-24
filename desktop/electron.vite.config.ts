@@ -63,7 +63,9 @@ function excalidrawAssets(): Plugin {
  * directly (`resolveDrawioDir`). The bytes are never committed.
  *
  * `out/drawio` sits outside the renderer's `outDir`, so nothing else empties it: it is replaced
- * whole, or a bumped release would keep the old one's files. v31.5.2 is ~150 MB, 3 400 files.
+ * whole, or a bumped release would keep the old one's files. v31.5.2 is ~47 MB, 2 660 files, pruned
+ * to what the editor, the picture page and the share viewer load (🔒 YAZ-1802 D5, `tools/lib/drawioPack.mjs`);
+ * share setup uploads the share viewer's draw.io files from this same copy (`readViewerAssets`).
  */
 function drawioAssets(): Plugin {
   const cache = resolve(here, '.cache/drawio', DRAWIO_TAG)
