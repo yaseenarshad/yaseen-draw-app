@@ -18,7 +18,7 @@ const OPEN_FILE_OPTIONS: Electron.OpenDialogOptions = {
 
 /** The export sheet (🔒 YAZ-1775 D3, YAZ-1821): one file, the extension it is getting, and no directory picking. */
 const SAVE_FILE_OPTIONS: Omit<Electron.SaveDialogOptions, 'defaultPath'> = {
-  title: 'Export Drawing',
+  title: 'Export Excalidraw Drawing',
   filters: [{ name: 'Excalidraw', extensions: ['excalidraw'] }],
   properties: ['createDirectory', 'showOverwriteConfirmation'],
 }

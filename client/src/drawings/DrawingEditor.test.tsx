@@ -205,8 +205,8 @@ describe('opening', () => {
   it('shows the engine`s own failure when the package will not load', async () => {
     render()
     await flush()
-    act(() => surface.fail?.("Can't open the drawing editor."))
-    expect(chips()).toContain("Can't open the drawing editor.")
+    act(() => surface.fail?.("Can't open the Excalidraw editor."))
+    expect(chips()).toContain("Can't open the Excalidraw editor.")
   })
 })
 

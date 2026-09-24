@@ -69,7 +69,7 @@ function engineFiles(...maps: Record<string, DrawingFileEntry>[]): Record<string
 /** A failure in this dialog's own words: the bridge's message, or "not a board" for a file that will not parse. */
 function problemText(err: unknown): string {
   if (err instanceof BridgeRequestError) return err.message
-  return err instanceof SyntaxError ? "This board's file isn't valid JSON, so its history can't be compared." : err instanceof Error ? err.message : String(err)
+  return err instanceof SyntaxError ? "This Excalidraw drawing's file isn't valid JSON, so its history can't be compared." : err instanceof Error ? err.message : String(err)
 }
 
 export function versionLabel(v: BoardVersion): string {

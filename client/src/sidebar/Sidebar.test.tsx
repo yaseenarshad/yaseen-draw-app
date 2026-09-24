@@ -138,7 +138,7 @@ async function mount(over: Partial<SidebarProps> = {}, tweakBridge?: (bridge: Re
 }
 
 const fileRow = (el: HTMLElement) => el.querySelector<HTMLButtonElement>('.tree__row--file')
-const searchInput = (el: HTMLElement) => el.querySelector<HTMLInputElement>('input[aria-label="Search drawings"]')
+const searchInput = (el: HTMLElement) => el.querySelector<HTMLInputElement>('input[aria-label="Search boards"]')
 /**
  * Drive the CONTROLLED search input like a user: native value setter + input event (SettingsDialog
  * idiom). Async so the re-render it triggers has settled before the assertions read the body.
@@ -278,10 +278,10 @@ describe('Sidebar file-row open gestures (D2 GRO-2168, I3 GRO-2235)', () => {
   })
 
   /**
-   * "New drawing" (🔒 R1 on YAZ-1775, YAZ-1815): the app's ONE file-creation door, and it never asks for
-   * a name — the board is born `Untitled`, opens in the current tab, and offers the inline rename.
+   * "New Excalidraw drawing" (🔒 R1 on YAZ-1775, YAZ-1815): the app's ONE file-creation door, and it never
+   * asks for a name — the board is born `Untitled`, opens in the current tab, and offers the inline rename.
    */
-  describe('"New drawing" (YAZ-1815)', () => {
+  describe('"New Excalidraw drawing" (YAZ-1815)', () => {
     /** Right-click blank space and take the item; the whole birth settles inside one act. */
     const newDrawing = async (el: HTMLElement) => {
       act(() => void el.querySelector('.sidebar__body')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
@@ -328,11 +328,11 @@ describe('Sidebar file-row open gestures (D2 GRO-2168, I3 GRO-2235)', () => {
       expect(bridge.createFile.mock.calls.map((c) => (c[0] as { path: string }).path)).toEqual(['/v/Untitled.excalidraw', '/v/Untitled 2.excalidraw'])
     })
 
-    it('reports a refusal through the passive notice and opens nothing', async () => {
+    it('reports a refusal through the passive notice, naming the engine (🔒 YAZ-1802 D13), and opens nothing', async () => {
       const { el, props, bridge } = await mount()
       bridge.createFile.mockRejectedValue(new BridgeRequestError('FORBIDDEN', 'read-only vault'))
       await newDrawing(el)
-      expect(props.onNotice).toHaveBeenCalledWith(expect.stringContaining('read-only vault'), 'error')
+      expect(props.onNotice).toHaveBeenCalledWith("Can't create Excalidraw drawing: read-only vault", 'error')
       expect(props.onOpenFile).not.toHaveBeenCalled()
     })
 
@@ -862,7 +862,7 @@ describe('persistent search bar (YAZ-801)', () => {
 
   it('renders in an empty vault', async () => {
     const { el } = await mount({}, (b) => b.tree.mockImplementation(async (r: string) => ({ root: r, tree: [], generatedAt: 1 })))
-    expect(el.textContent).toContain('No drawings here.')
+    expect(el.textContent).toContain('No boards here.')
     expect(searchInput(el)).not.toBeNull()
   })
 

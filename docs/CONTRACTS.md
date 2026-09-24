@@ -99,7 +99,7 @@ Two kinds of BOARD, one extension each (🔒 YAZ-1802 D1 / D2).
   creates a file. A diagram is born the same way — `Untitled.drawio`, counted on `.drawio` names
   (`untitledBoardName`), written as `EMPTY_DIAGRAM_XML` (one page; page view, grid and alignment
   guides off — 🔒 YAZ-1802 D12a) under `wx`, stamped with both dates (D7).
-  - "New drawing" does not ask for a name. The board is born `Untitled.excalidraw` — then
+  - "New Excalidraw drawing" does not ask for a name. The board is born `Untitled.excalidraw` — then
     `Untitled 2`, `Untitled 3`… beside its siblings, filling a gap rather than running past it,
     compared case-insensitively because the filesystem is — in the right-clicked FOLDER (a file
     row means its parent, blank space means the vault root).
@@ -110,7 +110,7 @@ Two kinds of BOARD, one extension each (🔒 YAZ-1802 D1 / D2).
 - A `.excalidraw` has ONE door per direction (🔒 YAZ-1810): `drawing:load` and `drawing:save`, and
   no other channel reads or writes a scene — a second writer with different rules about the
   scene's images is a race with no upside. `fs:create-file` is the one exception and only for
-  BIRTH: "New drawing" writes the empty scene with the file, under `wx`.
+  BIRTH: "New Excalidraw drawing" writes the empty scene with the file, under `wx`.
 - Every board main writes starts with its own dates — `{ "yaseendraw": { "createdAt", "updatedAt" } }`
   as the FIRST key (🔒 YAZ-1834, "Board metadata" below). Set by main in those two doors, read by
   `fs:tree` off the file head, never touched by the renderer.
@@ -154,7 +154,7 @@ calls that go through it; `state`, `window`, `menu`, `link` and `watch` are call
 | `window.identity` / `setIdentity` | `window:*` | THIS window's `WindowEntry`, by the `?win=<id>` in its URL |
 | `window.open` / `openRecent` / `closeSelf` | `window:*` | window lifecycle |
 | `window.onFlush` | `app:flush` / `app:flushed` | the close/quit handshake (main waits, 5s cap) |
-| `menu.on*` | `menu:*` | Open Folder…, Open Recent, Search Vault, Switch Vault…, Settings…, Toggle Sidebar, Close Tab, Next/Previous Tab, Export Image…, Export Drawing…, Canvas Background, Share Link (`menu.onShareLink`) |
+| `menu.on*` | `menu:*` | Open Folder…, Open Recent, Search Vault, Switch Vault…, Settings…, Toggle Sidebar, Close Tab, Next/Previous Tab, Export Image…, Export Excalidraw Drawing…, Canvas Background, Share Link (`menu.onShareLink`) |
 | `link.onOpenFile` / `onNotice` | `link:*` | a routed `yaseendraw://` link |
 | `favorites.get` / `set` / `onChanged` | `favorites:*` | `<vault>/.yaseendraw/favorites.json` |
 | `media.favorites(req)` | `media:favorites` | `{ op: 'list' }` · `{ op: 'add', item }` · `{ op: 'remove', itemKey }` over `<library>/media.json` (🔒 YAZ-1775 D5); every verb answers the resulting list |
@@ -704,7 +704,7 @@ filter ignores ↑/↓/⏎/Esc meanwhile. Every right-click swallows Electron's 
 | File | Open Recent ▸ | — (from a vault window it opens beside; Welcome fills in place) |
 | File | Search Vault | ⌘K |
 | File | Export Image… (a drawing tab only) | ⌘⇧E |
-| File | Export Drawing… (a drawing tab only) | ⌘⇧S |
+| File | Export Excalidraw Drawing… (a drawing tab only) | ⌘⇧S |
 | File | Share Link (a drawing tab only) | ⌘⇧L |
 | File | Close Tab | ⌘W |
 | File | Close Window | ⌘⇧W |
@@ -719,7 +719,7 @@ filter ignores ↑/↓/⏎/Esc meanwhile. Every right-click swallows Electron's 
 Zoom is deliberately NOT the stock roles: a registered accelerator never reaches the page on
 macOS, so main applies the step to the focused window's `webContents` itself.
 
-Export Image…, Export Drawing… and Canvas Background are the canvas's own three items, moved out
+Export Image…, Export Excalidraw Drawing… and Canvas Background are the canvas's own three items, moved out
 of the engine's main menu by 🔒 YAZ-1775 D10 (there is no `<MainMenu>` in a drawing and the engine's stock
 trigger is hidden). Main enables them only while the window a menu action would target has a
 `.excalidraw` in front, rebuilding the menu when any window's active file changes and when focus
@@ -764,8 +764,8 @@ and so does the board vanishing.
 
 **🔒 D7 — Info reads the live tree, nothing else.** The popover keeps the board's PATH and resolves
 the node off the current tree on every render, so a save in any window moves its dates and a
-deletion closes it. Rows: Name · Folder (vault-relative, `/` at the root) · Size · Created ·
-Updated · On disk (mtime); dates as "Sep 22, 2026, 3:14 PM · 2 hours ago" (`formatDateTime`,
+deletion closes it. Rows: Name · Type ("Excalidraw drawing" / "draw.io diagram", `BOARD_TYPE_NAME`,
+🔒 YAZ-1802 D13) · Folder (vault-relative, `/` at the root) · Size · Created · Updated · On disk (mtime); dates as "Sep 22, 2026, 3:14 PM · 2 hours ago" (`formatDateTime`,
 `relativeTime`); a board with no trustworthy block reads "Not stamped yet · written on the next
 save" for the two dates (🔒 YAZ-1834 D7). No new IPC. The demo vault behind these rules is
 `tools/seedSortDemoVault.mjs`, proved by `sortVault.integration.test.ts`.
@@ -911,6 +911,16 @@ editable target, a live selection, a gesture in flight, a dialog, or anything se
 canvas). That last gate is why ⌘C with a selection is still the engine's COPY and nothing else
 (YAZ-1819): the Components tab is what ⌘C means only when there is nothing to copy. Settings › Hotkeys lists every one of them and is the single place that copy lives.
 
+**Inside a draw.io diagram** (🔒 YAZ-1802 D17) the keyboard belongs to the iframe, and no key
+pressed there reaches the renderer's document. The menu's accelerators (⌘K, ⌘W, ⌘O, ⌘⇧O, ⌘, , the
+zoom trio, the tab keys) still fire, because the menu takes them whatever frame has focus; draw.io's
+own bindings on ⌘K / ⌘, / ⌘⇧O / ⌘0 / ⌘+ / ⌘− are cleared in the configure reply (`MENU_CHORDS`), since
+off macOS the page would see the key first. Menu items greyed on a diagram tab (Export Excalidraw
+Drawing…, Export Image…, Share Link) hand their keys to draw.io. ⌘S is draw.io's own `save` event,
+which the host flushes at once. Of the renderer-owned chords only ⌘B means something here: with
+nothing selected our `PostConfig.js` sends it up as draw.io's `shortcut` event and the host toggles
+the sidebar; with a selection it stays draw.io's bold. ⌘X / ⌘C / ⌘V and Escape stay draw.io's.
+
 The right-click menu inside the renderer is Electron's (`buildContextMenuTemplate`): spelling
 suggestions, Add to Dictionary, and cut/copy/paste. Electron ships no default one, which is why
 this exists at all.
@@ -925,21 +935,21 @@ two that do not — the Pixabay key and the GitHub switch — are marked below.
 
 | Section | Rows |
 |---|---|
-| Appearance | Theme (the only one — 🔒 YAZ-1775 D9 put everything else about the canvas in Canvas) |
-| Canvas | the fourteen `CanvasPrefs` (🔒 YAZ-1775 D9) in three groups: Drawing aids, Modes, New elements |
+| Appearance | Theme (the only one — 🔒 YAZ-1775 D9 put everything else about the canvas in Excalidraw canvas) |
+| Excalidraw canvas | the fourteen `CanvasPrefs` (🔒 YAZ-1775 D9) in three groups: Drawing aids, Modes, New elements — Excalidraw's alone; a draw.io diagram has fixed defaults (🔒 YAZ-1802 D12) |
 | Files | Confirm before deleting · Library folder (🔒 YAZ-1775 D5: resolved path, Choose…, Reset to default) |
 | Images | Pixabay API key (🔒 YAZ-1775 D4: a password field, Save / Clear, "Key set" / "No key" from `secrets:has`, never echoed) — NOT in `SettingsState`, it lives in main's owner-only `secrets.json` (YAZ-1842 D1) |
 | Sync | the per-vault GitHub switch — the other setting NOT in `SettingsState` (it lives in `.yaseendraw/github.json`) |
 | Sharing | its own page (YAZ-1799 🔒 D7): Status · Set up sharing (Open Cloudflare, the pasted key, the account picker, the step list) · Your shared boards (permission, Copy link, Stop sharing, the one status line; live-checked) · Custom domain · How sharing works · Turn off sharing (Forget key / Delete all shared links, each behind an in-page confirm). Nothing here is in `SettingsState` — see Share links |
-| Storage | its own page, like Hotkeys (YAZ-1801), present only while a vault is open — a report, not settings: **GitHub** (a bar of the git history on a fixed scale ending at 10 GB, marked at 1 GB and 5 GB; green to 1 GB, amber to 5 GB, red past it, "10 GB — over GitHub's max" past 10 GB; "Not synced with git" for a plain folder) with two muted lines, "Your files N" and "Old versions N" · **Needs attention** (only when non-empty: every file ≥ 50 MiB, red "Stays on this Mac" at the sync guard's 95 MiB, amber "Close to the limit" below) · **Make boards smaller** (only while pictures are inside boards, or a result from this session is showing: one sentence, "Move pictures out", the result line). Measured only while Settings is open (🔒 D13): on the page's open, a sync pass finishing, and after a shrink — one measure at a time, a trigger mid-measure queuing one re-run; a failed first measure reads "Couldn't measure this vault" |
-| Hotkeys | its own page: the Window, Canvas and Mouse tables, from `hotkeys.ts` |
+| Storage | its own page, like Hotkeys (YAZ-1801), present only while a vault is open — a report, not settings: **GitHub** (a bar of the git history on a fixed scale ending at 10 GB, marked at 1 GB and 5 GB; green to 1 GB, amber to 5 GB, red past it, "10 GB — over GitHub's max" past 10 GB; "Not synced with git" for a plain folder) with two muted lines, "Your files N" and "Old versions N" · **Needs attention** (only when non-empty: every file ≥ 50 MiB, red "Stays on this Mac" at the sync guard's 95 MiB, amber "Close to the limit" below) · **Make Excalidraw drawings smaller** (only while pictures are inside drawings, or a result from this session is showing: one sentence, "Move pictures out", the result line). Measured only while Settings is open (🔒 D13): on the page's open, a sync pass finishing, and after a shrink — one measure at a time, a trigger mid-measure queuing one re-run; a failed first measure reads "Couldn't measure this vault" |
+| Hotkeys | its own page: the Window, Excalidraw canvas, draw.io diagram and Mouse tables, from `hotkeys.ts` |
 
 A group may declare `available(ctx)` (Storage's two conditional groups), and a row may be `bare`
 — its control is the whole row, its label and hint feed search only.
 
 `hotkeys.ts` is the single source of truth for every binding the app advertises — Settings ›
-Hotkeys renders it and nothing else — and `hotkeys.test.ts` pins the expected set, the Canvas
-table included, so a keymap change anywhere fails loudly here.
+Hotkeys renders it and nothing else — and `hotkeys.test.ts` pins the expected set, the Excalidraw
+canvas and draw.io tables included, so a keymap change anywhere fails loudly here.
 
 ## Share links (YAZ-1799)
 
@@ -1126,7 +1136,14 @@ but for two config hooks, inside an iframe on its OWN origin.
   on it — it cannot autosave over what it failed to read — and `diagram:save` refuses anything that
   is not a whole diagram (`BAD_REQUEST`) before touching the disk. The
   host reuses `lib/autosave.ts` (500 ms), the watcher rule (echo / reload when clean / Reload–Keep
-  mine when dirty), the quit flush and rename continuity exactly as `DrawingEditor` does.
+  mine when dirty), the quit flush, the tab-close flush, rename continuity and `noteBoardSaved`
+  exactly as `DrawingEditor` does.
+- **🔒 D17 — the handshake.** Our `PostConfig.js` posts `{ event: 'yaseenReady' }` once its patches
+  and fonts are in; the host answers draw.io's `configure` only after that (a 3 s fallback, so a
+  missing overlay costs the keymap, never the document), then `init` → `load` with `autosave: 1`,
+  and draw.io's `load` answer is the clean baseline. The Saved / Synced chips sit in a slim strip
+  above the iframe. A theme flip is draw.io's `darkMode` / `lightMode` action, sent once draw.io
+  listens (a flip before its `init` goes at `init`); the iframe is never reloaded for it.
 - **🔒 D7 — dates.** `yaseendraw-created` / `yaseendraw-updated` on the root `<mxfile>` ("Board
   metadata" above); `fs:tree` reads them off the head, so sort and Info work.
 - **🔒 D8 — sync keeps both.** `.git/info/attributes` carries the case-proof `.drawio` `-merge` rule
@@ -1134,10 +1151,25 @@ but for two config hooks, inside an iframe on its OWN origin.
   `<name> (conflict, <date>).drawio`, the extension as the file spelled it.
 - **🔒 D9 — the hover picture** is draw.io's own viewer on our page `app://drawio/yaseen-render.html`
   in one hidden iframe: page 1 as an SVG data URL, same bounds, theme and cache as a drawing's.
-- **🔒 D12 — feel.** Page view off on open (`pv=0`), grid and guides off for new diagrams, plain wheel
-  pans, ⌘/ctrl-wheel and pinch zoom, fonts from `yaseen-fonts/` on the drawio origin, the theme
-  follows the app live (draw.io's `darkMode` / `lightMode` actions), and a keymap section in
-  `PostConfig.js`.
+- **🔒 D12a — feel**, in the configure reply (`drawioConfig`) and `PostConfig.js`: page view off
+  on open (`pv=0`), grid and alignment guides off for new diagrams (both stay per-diagram
+  toggles: the right-click Grid item, View › Guides), 2 px lines with 8 px corners in Assistant, the fonts (Assistant, Inter,
+  Roboto, IBM Plex Mono, Liberation Serif) from `yaseen-fonts/` on the drawio origin, Excalidraw's
+  picks and open-colour palette in the colour dialog; plain wheel pans, ⌘/ctrl-wheel and pinch
+  zoom; the shapes panel starts collapsed; Grid on the empty-canvas right-click menu; a corner drag
+  on text scales its font. "Text" means LOOKS like text: draw.io's text style, or a childless,
+  labelled vertex with no fill and no border (how AI-written titles are spelled).
+- **🔒 D12b — keys.** With nothing selected, draw.io's own bindings from the configure reply: `R`
+  rectangle, `O` ellipse, `T` text, `A` / `D` / `L` arrow, `W` / `P` / `X` freehand, `S` and `F`
+  cleared, ⌘\ clear formatting. With a selection, `PostConfig.js`: the Excalidraw fork's colour
+  letters (`t b w d r p a v u c e g y o n`) — a shape's fill in the light shade (open-colour index
+  1, a no-fill shape included), a text's font colour, a line's or freehand stroke's stroke and an
+  image's border in the dark shade (index 4); ⇧ + letter strokes a shape and gives text its
+  background (light shade); `1`…`0` set a text's font size (12…128) or anything else's long side
+  (48…1024, aspect and centre kept); ⌘⇧X strikethrough. Locked cells are left alone. A colour
+  letter no longer starts typing into a selected label (Enter / F2 do). Settings › Hotkeys'
+  "draw.io diagram" table lists them; `tools/drawioOverlay.test.mjs` runs `PostConfig.js` against a
+  stand-in draw.io and checks every action name against the pinned bundle.
 - **Not yet:** share links and version history (YAZ-1802 3B / 3C) — Share and Version history are
   offered for Excalidraw boards only (`MenuTargets.sharePath`); Present and merging diagrams are
   Future (🔒 D1).

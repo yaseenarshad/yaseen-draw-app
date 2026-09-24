@@ -74,7 +74,7 @@ export async function saveDiagram(req: DiagramSaveRequest): Promise<DiagramSaveR
   if (Buffer.byteLength(stamped, 'utf8') > MAX_DIAGRAM_BYTES) throw new BridgeFailure('TOO_LARGE', TOO_LARGE, { path: file })
   if (expectedMtime !== undefined && prior !== null && prior.mtime !== expectedMtime) {
     // A file that is GONE is not a conflict (the `drawing:save` rule): the tab's copy is the only one left.
-    throw new BridgeFailure('CONFLICT', 'diagram changed on disk since last read', { path: file, mtime: prior.mtime })
+    throw new BridgeFailure('CONFLICT', 'draw.io diagram changed on disk since last read', { path: file, mtime: prior.mtime })
   }
   const { mtime, size } = await fsCall(file, () => atomicWrite(file, stamped))
   return { path: file, mtime, size }

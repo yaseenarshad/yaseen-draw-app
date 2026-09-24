@@ -130,7 +130,7 @@ export function buildMenuTemplate({ recents, isDev, activeIsDrawing }: MenuInput
         // someone with no vault and no `assets/` folder. ⌘⇧S is free in this menu — the engine's
         // own "Save as" is off (`saveToActiveFile: false`) and a registered accelerator never
         // reaches the page on macOS anyway — and it is the key the gesture means.
-        { id: 'menu.file.export-drawing', label: 'Export Drawing…', accelerator: 'CmdOrCtrl+Shift+S', enabled: activeIsDrawing, click: () => handlers.exportDrawing() },
+        { id: 'menu.file.export-drawing', label: 'Export Excalidraw Drawing…', accelerator: 'CmdOrCtrl+Shift+S', enabled: activeIsDrawing, click: () => handlers.exportDrawing() },
         // YAZ-1799 D6: the Share dialog for the same drawing — its standalone file, kept live on the user's own Cloudflare.
         { id: 'menu.file.share-link', label: 'Share Link', accelerator: 'CmdOrCtrl+Shift+L', enabled: activeIsDrawing, click: () => handlers.shareLink() },
         { type: 'separator' },

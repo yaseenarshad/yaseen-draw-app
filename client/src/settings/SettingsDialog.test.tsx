@@ -151,15 +151,15 @@ describe('SettingsDialog shell (D1)', () => {
 describe('SettingsDialog: one page of every settings section (the post-demo redesign)', () => {
   it('the nav: the settings-page anchors (Sync only with the engine), a divider, then the standalone Hotkeys page', () => {
     const { el } = mount()
-    expect(navShape(el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images', '—', 'Hotkeys'])
+    expect(navShape(el)).toEqual(['Appearance', 'Excalidraw canvas', 'Files', 'Images', '—', 'Hotkeys'])
     unmount()
     const withSync = mount({ ...DEFAULT_SETTINGS }, status())
-    expect(navShape(withSync.el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images', 'Sync', '—', 'Hotkeys'])
+    expect(navShape(withSync.el)).toEqual(['Appearance', 'Excalidraw canvas', 'Files', 'Images', 'Sync', '—', 'Hotkeys'])
   })
 
   it('renders every settings section on the one page, in order, each anchored by id and every row addressed by data-setting — Hotkeys is not on it', () => {
     const { el } = mount({ ...DEFAULT_SETTINGS }, status())
-    expect(headings(el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images', 'Sync'])
+    expect(headings(el)).toEqual(['Appearance', 'Excalidraw canvas', 'Files', 'Images', 'Sync'])
     expect(sections(el).map((s) => s.id)).toEqual(['settings-appearance', 'settings-canvas', 'settings-files', 'settings-images', 'settings-sync'])
     expect(rowIds(el)).toEqual([
       'theme',
@@ -211,8 +211,8 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
     expect(currentNav(el)).toBe('Hotkeys')
     expect(currentKind(el)).toBe('page') // a page, where an anchor says `location`
     expect(headings(el)).toEqual(['Hotkeys'])
-    expect(groupTitles(el)).toEqual(['Window', 'Canvas', 'Mouse'])
-    expect(rowIds(el)).toEqual(['hotkeys-window', 'hotkeys-canvas', 'hotkeys-mouse'])
+    expect(groupTitles(el)).toEqual(['Window', 'Excalidraw canvas', 'draw.io diagram', 'Mouse'])
+    expect(rowIds(el)).toEqual(['hotkeys-window', 'hotkeys-canvas', 'hotkeys-drawio', 'hotkeys-mouse'])
     expect([...el.querySelectorAll('[data-setting="hotkeys-window"] .hotkeys__keys')].map((k) => k.textContent)).toContain('⌘,')
     expect(scrollIntoView).not.toHaveBeenCalled()
   })
@@ -222,7 +222,7 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
     clickNav(el, 'Hotkeys')
     clickNav(el, 'Files')
     expect(currentNav(el)).toBe('Files')
-    expect(headings(el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images'])
+    expect(headings(el)).toEqual(['Appearance', 'Excalidraw canvas', 'Files', 'Images'])
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
     expect(scrollIntoView.mock.instances[0]).toBe(el.querySelector('#settings-files'))
   })
@@ -249,10 +249,10 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
     layOut(el) // five sections at 0 / 300 / 600 / 900 / 1200, pane 400 of 1500
     scrollTo(el, 0)
     expect(currentNav(el)).toBe('Appearance')
-    scrollTo(el, 270) // the read line (scrollTop + 24 = 294) is still above Canvas' top (300)
+    scrollTo(el, 270) // the read line (scrollTop + 24 = 294) is still above Excalidraw canvas' top (300)
     expect(currentNav(el)).toBe('Appearance')
-    scrollTo(el, 280) // 304: Canvas' top is now at or above it
-    expect(currentNav(el)).toBe('Canvas')
+    scrollTo(el, 280) // 304: Excalidraw canvas' top is now at or above it
+    expect(currentNav(el)).toBe('Excalidraw canvas')
     // The bottom: 1500 - 400 = 1100, and Sync's top (1200) never reaches the read line.
     scrollTo(el, 1100)
     expect(currentNav(el)).toBe('Sync')
@@ -265,7 +265,7 @@ describe('SettingsDialog: one page of every settings section (the post-demo rede
     unmount()
     const again = mount()
     expect(currentNav(again.el)).toBe('Appearance')
-    expect(headings(again.el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images'])
+    expect(headings(again.el)).toEqual(['Appearance', 'Excalidraw canvas', 'Files', 'Images'])
   })
 })
 
@@ -282,7 +282,7 @@ describe('SettingsDialog rows write through the popover contracts', () => {
 
   it('Confirm before deleting: On · Off with the guard ON by default, its hint in the row, and Off writing the whole object', () => {
     const { el, onChange } = mount()
-    expect(row(el, 'confirmDelete')?.querySelector('.setting__hint')?.textContent).toBe('Deleted drawings and folders move to the Trash either way.')
+    expect(row(el, 'confirmDelete')?.querySelector('.setting__hint')?.textContent).toBe('Deleted files and folders move to the Trash either way.')
     const buttons = rowButtons(el, 'confirmDelete')
     expect(buttons.map((b) => b.textContent)).toEqual(['On', 'Off'])
     expect(buttons.map((b) => b.classList.contains('settings__option--active'))).toEqual([true, false])
@@ -336,8 +336,8 @@ describe('SettingsDialog search (D6)', () => {
     expect(headings(el)).toEqual(['Files', 'Hotkeys › Window'])
     expect(rowIds(el)).toEqual(['confirmDelete', 'hoverPreview', 'libraryFolder', 'hotkeys-window'])
     type(searchInput(el), 'keyboard shortcuts')
-    expect(headings(el)).toEqual(['Hotkeys › Window', 'Hotkeys › Canvas', 'Hotkeys › Mouse'])
-    expect(rowIds(el)).toEqual(['hotkeys-window', 'hotkeys-canvas', 'hotkeys-mouse'])
+    expect(headings(el)).toEqual(['Hotkeys › Window', 'Hotkeys › Excalidraw canvas', 'Hotkeys › draw.io diagram', 'Hotkeys › Mouse'])
+    expect(rowIds(el)).toEqual(['hotkeys-window', 'hotkeys-canvas', 'hotkeys-drawio', 'hotkeys-mouse'])
     type(searchInput(el), 'close tab')
     expect(headings(el)).toEqual(['Hotkeys › Window'])
     expect(rowIds(el)).toEqual(['hotkeys-window'])
@@ -367,12 +367,12 @@ describe('SettingsDialog search (D6)', () => {
     pressEscape(searchInput(el))
     expect(onClose).not.toHaveBeenCalled()
     expect(searchInput(el).value).toBe('')
-    expect(headings(el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images'])
+    expect(headings(el)).toEqual(['Appearance', 'Excalidraw canvas', 'Files', 'Images'])
 
     type(searchInput(el), 'dark')
     act(() => el.querySelector<HTMLButtonElement>('[aria-label="Clear search settings"]')?.click())
     expect(searchInput(el).value).toBe('')
-    expect(headings(el)).toEqual(['Appearance', 'Canvas', 'Files', 'Images'])
+    expect(headings(el)).toEqual(['Appearance', 'Excalidraw canvas', 'Files', 'Images'])
   })
 
   it('a nav click during a search clears the query and then scrolls to that section on the restored page', () => {

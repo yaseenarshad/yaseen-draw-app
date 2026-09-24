@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { validateEntryName, type EntryKind } from './createEntry'
 
 /** Placeholder per entry kind; the extension is implied (added by `entryPath`). */
-const PLACEHOLDER: Record<EntryKind, string> = { file: 'New drawing', dir: 'New folder' }
+const PLACEHOLDER: Record<EntryKind, string> = { file: 'New Excalidraw drawing', dir: 'New folder' }
 
 interface CreateInlineProps {
   kind: EntryKind

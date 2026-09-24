@@ -14,14 +14,17 @@ vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),
   api: { diagram: { load: vi.fn(), save: vi.fn() } },
 }))
+vi.mock('../share/liveShare', () => ({ noteBoardSaved: vi.fn() }))
 
 import { api, BridgeRequestError } from '../api'
-import { _resetRenameContinuity, retirePath } from '../lib/renameContinuity'
+import { _resetRenameContinuity, flushRenamedPath, retirePath } from '../lib/renameContinuity'
+import { noteBoardSaved } from '../share/liveShare'
 import { BROKEN_DIAGRAM_DOCUMENT, DrawioEditor } from './DrawioEditor'
 import { DRAWIO_ORIGIN } from './drawioProtocol'
 
 const load = vi.mocked(api.diagram.load)
 const save = vi.mocked(api.diagram.save)
+const toggleSidebar = vi.fn()
 
 const ROOT = '/vault'
 const PATH = '/vault/Flow.drawio'
@@ -46,7 +49,7 @@ let posted: Array<Record<string, unknown>> = []
 let flushListener: (() => Promise<void> | void) | null = null
 
 function render(): void {
-  act(() => root?.render(<DrawioEditor root={ROOT} path={PATH} watch={watch} />))
+  act(() => root?.render(<DrawioEditor root={ROOT} path={PATH} watch={watch} onToggleSidebar={toggleSidebar} />))
 }
 
 async function settle(): Promise<void> {
@@ -85,6 +88,12 @@ async function opened(): Promise<void> {
 
 const text = (): string => container.textContent ?? ''
 
+/** App flips `<html data-theme>`; the host reads it back through a MutationObserver. */
+async function appTheme(theme: 'light' | 'dark'): Promise<void> {
+  document.documentElement.dataset.theme = theme
+  await settle()
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true })
   listeners.clear()
@@ -115,6 +124,7 @@ afterEach(() => {
   act(() => root?.unmount())
   root = null
   container.remove()
+  delete document.documentElement.dataset.theme
   _resetRenameContinuity()
   vi.useRealTimers()
   vi.clearAllMocks()
@@ -174,6 +184,40 @@ describe('the handshake (drawioProtocol.ts)', () => {
     drawio({ event: 'yaseenReady' })
     expect(posted).toEqual([])
   })
+
+  it('⌘B pressed inside draw.io with nothing selected arrives as its `shortcut` event and toggles the app sidebar — from THAT frame only', async () => {
+    await opened()
+    drawio({ event: 'shortcut', command: 'toggleSidebar' }, { source: window })
+    drawio({ event: 'shortcut', command: 'closeTab' })
+    expect(toggleSidebar).not.toHaveBeenCalled()
+    drawio({ event: 'shortcut', command: 'toggleSidebar' })
+    expect(toggleSidebar).toHaveBeenCalledOnce()
+  })
+})
+
+describe('the theme (🔒 YAZ-1802 D12)', () => {
+  it('a flip is draw.io’s own darkMode / lightMode action — the frame is never reloaded', async () => {
+    await opened()
+    const src = frame()!.src
+    await appTheme('dark')
+    expect(posted.at(-1)).toEqual({ action: 'invokeAction', actionName: 'darkMode', _origin: DRAWIO_ORIGIN })
+    await appTheme('light')
+    expect(posted.at(-1)).toMatchObject({ action: 'invokeAction', actionName: 'lightMode' })
+    expect(frame()!.src).toBe(src)
+  })
+
+  it('a flip before draw.io listens is sent the moment it does, ahead of the document', async () => {
+    render()
+    await settle()
+    tapFrame()
+    drawio({ event: 'yaseenReady' })
+    drawio({ event: 'configure' })
+    await appTheme('dark')
+    expect(posted.map((m) => m.action)).toEqual(['configure'])
+    drawio({ event: 'init' })
+    expect(posted.map((m) => m.action)).toEqual(['configure', 'invokeAction', 'load'])
+    expect(posted[1]).toMatchObject({ actionName: 'darkMode' })
+  })
 })
 
 describe('saving', () => {
@@ -193,11 +237,48 @@ describe('saving', () => {
     expect(text()).toContain('Saved')
   })
 
-  it('⌘S (draw.io`s own save event) writes at once', async () => {
+  it('⌘S (draw.io’s own save event) writes at once', async () => {
     await opened()
     drawio({ event: 'save', xml: EDITED })
     await settle()
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ xml: EDITED }))
+  })
+
+  it('every write tells the live share link; a refused one does not', async () => {
+    save.mockRejectedValueOnce(new BridgeRequestError('CONFLICT', 'changed', 500))
+    await opened()
+    drawio({ event: 'save', xml: EDITED })
+    await settle()
+    expect(noteBoardSaved).not.toHaveBeenCalled()
+    save.mockClear()
+    drawio({ event: 'save', xml: EDITED })
+    await settle()
+    expect(save).not.toHaveBeenCalled() // blocked until Reload / Keep mine answers the conflict
+    await act(async () => [...container.querySelectorAll('button')].find((b) => b.textContent === 'Keep mine')!.click())
+    await settle()
+    expect(save).toHaveBeenCalledOnce()
+    expect(noteBoardSaved).toHaveBeenCalledExactlyOnceWith(ROOT, PATH)
+  })
+
+  it('closing the tab writes a pending edit once', async () => {
+    await opened()
+    drawio({ event: 'autosave', xml: EDITED })
+    act(() => root?.unmount())
+    root = null
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+    })
+    await settle()
+    expect(save).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ xml: EDITED }))
+  })
+
+  it('answers the pre-rename flush, so the bytes travel with the file', async () => {
+    await opened()
+    drawio({ event: 'autosave', xml: EDITED })
+    await act(async () => {
+      await flushRenamedPath(PATH)
+    })
+    expect(save).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ xml: EDITED }))
   })
 
   it('the quit handshake flushes a pending edit', async () => {

@@ -31,9 +31,11 @@ export interface EditorProps {
   onCanvasPanelChange?: (next: CanvasPanelState) => void
   /** The window's ONE passive notice: how an export says where it landed, or why it did not. */
   onNotice?: (text: string, icon?: NoticeKind) => void
+  /** App's ⌘B, for a diagram: the key never leaves draw.io's iframe, so the diagram passes it up. */
+  onToggleSidebar?: () => void
 }
 
-export function Editor({ path, root, watch, sync, onSyncNow, canvasPrefs, onCanvasPrefsChange, canvasPanel, onCanvasPanelChange, onNotice }: EditorProps) {
+export function Editor({ path, root, watch, sync, onSyncNow, canvasPrefs, onCanvasPrefsChange, canvasPanel, onCanvasPanelChange, onNotice, onToggleSidebar }: EditorProps) {
   if (path === null || root === null) {
     return (
       <section className="editor">
@@ -42,7 +44,7 @@ export function Editor({ path, root, watch, sync, onSyncNow, canvasPrefs, onCanv
     )
   }
   const kind = fileKind(path)
-  if (kind === 'diagram') return <DrawioEditor root={root} path={path} watch={watch} sync={sync} onSyncNow={onSyncNow} />
+  if (kind === 'diagram') return <DrawioEditor root={root} path={path} watch={watch} sync={sync} onSyncNow={onSyncNow} onToggleSidebar={onToggleSidebar} />
   if (kind !== 'drawing') {
     return (
       <section className="editor">
