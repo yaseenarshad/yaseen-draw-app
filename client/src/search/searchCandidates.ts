@@ -8,8 +8,9 @@
  * a tree somebody else is already refreshing, never a second read of the vault).
  *
  * What is in it (🔒 YAZ-1814):
- * - one row per `.excalidraw` FILE, named the way the tree and the tab strip spell it — without
- *   the extension — carrying its absolute path and its root-relative folder as the row's label;
+ * - one row per BOARD file — `.excalidraw` or `.drawio` (🔒 YAZ-1802 D2) — named the way the tree
+ *   and the tab strip spell it — without the extension — carrying its absolute path and its
+ *   root-relative folder as the row's label;
  * - one row per FOLDER, matched by its own name (🔒 D2, YAZ-1491), labelled by ITS parent.
  * A file never matches on its folder (🔒 D3, YAZ-739): the folder is its own row instead.
  *
@@ -20,7 +21,7 @@
  * theirs, shows in the tree, and is searchable, exactly as the tree rule says.
  */
 import type { TreeNode } from '@shared/types'
-import { isDrawing } from '@shared/fileKind'
+import { isBoard } from '@shared/fileKind'
 import { stripExt } from '../lib/paths'
 import { matchCandidates } from './matchCandidates'
 
@@ -67,7 +68,7 @@ export function buildDrawingCatalog(root: string, tree: readonly TreeNode[]): Se
       if (node.type === 'dir') {
         folders.push(row('dir', prefix, node.path, node.name))
         walk(node.children)
-      } else if (isDrawing(node.name)) {
+      } else if (isBoard(node.name)) {
         drawings.push(row('file', prefix, node.path, stripExt(node.name)))
       }
     }

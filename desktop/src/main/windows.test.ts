@@ -579,6 +579,13 @@ describe('createWindowManager: routeToFile (E1)', () => {
     expect(w1.webContents.send).toHaveBeenCalledWith(CH.linkOpenFile, '/v/A.EXCALIDRAW')
   })
 
+  it('🔒 YAZ-1802 D14: a draw.io diagram routes like a drawing, in any case', () => {
+    const { manager, w1 } = seedRouting()
+    manager.routeToFile('/v/Flow.drawio')
+    manager.routeToFile('/v/UP.DRAWIO')
+    expect(sentOn(w1, CH.linkOpenFile)).toEqual([[CH.linkOpenFile, '/v/Flow.drawio'], [CH.linkOpenFile, '/v/UP.DRAWIO']])
+  })
+
   it('no containing window: a new window on the most recent recents folder containing the file, persisted', () => {
     const { manager, created } = seedRouting()
     store.pushRecent('/w', 1)
@@ -623,6 +630,13 @@ describe('createWindowManager: routeToFile (E1)', () => {
     expect(w1.focusCount).toBe(1)
     const notices = sentOn(w1, CH.linkNotice)
     expect(notices).toEqual([[CH.linkNotice, "Can't open /v/archive.zip: unsupported file type"]])
+    expect(sentOn(w1, CH.linkOpenFile)).toHaveLength(0)
+  })
+
+  it('🔒 YAZ-1802 D3: a picture that holds a diagram is not one — it gets the same notice', () => {
+    const { manager, w1 } = seedRouting()
+    manager.routeToFile('/v/image.drawio.svg')
+    expect(sentOn(w1, CH.linkNotice)).toEqual([[CH.linkNotice, "Can't open /v/image.drawio.svg: unsupported file type"]])
     expect(sentOn(w1, CH.linkOpenFile)).toHaveLength(0)
   })
 

@@ -5,7 +5,7 @@
  * extension, no overwrite).
  */
 import { fileKind } from '@shared/fileKind'
-import { DRAWING_VIEW_EXTENSIONS } from '@shared/types'
+import { DIAGRAM_EXTENSIONS, DRAWING_VIEW_EXTENSIONS, type FileKind } from '@shared/types'
 
 /** What the inline input creates: a drawing or a folder. */
 export type EntryKind = 'file' | 'dir'
@@ -19,31 +19,40 @@ export function validateEntryName(name: string): string | null {
   return null
 }
 
-/** Absolute path for the new entry; a drawing gains `.excalidraw` unless the typed name already carries it. */
-export function entryPath(parentDir: string, name: string, kind: EntryKind): string {
+/** The extension each kind of board is born with (🔒 YAZ-1802 D13). */
+const BOARD_EXTENSION: Record<FileKind, string> = { drawing: DRAWING_VIEW_EXTENSIONS[0], diagram: DIAGRAM_EXTENSIONS[0] }
+
+/**
+ * Absolute path for the new entry; a `board` file (a drawing unless told otherwise) gains its
+ * kind's extension unless the typed name already carries it.
+ */
+export function entryPath(parentDir: string, name: string, kind: EntryKind, board: FileKind = 'drawing'): string {
   let final = name.trim()
-  if (kind === 'file' && fileKind(final) !== 'drawing') final += DRAWING_VIEW_EXTENSIONS[0]
+  if (kind === 'file' && fileKind(final) !== board) final += BOARD_EXTENSION[board]
   return `${parentDir}/${final}`
 }
 
-/** The name a new drawing is born with (🔒 YAZ-1775 R1), before the user renames it. */
-export const UNTITLED_DRAWING = 'Untitled'
+/** The name a new board is born with (🔒 YAZ-1775 R1), before the user renames it. */
+export const UNTITLED_BOARD = 'Untitled'
 
 /**
- * The next free "New drawing" name in a folder (🔒 R1 on YAZ-1775, YAZ-1815): `Untitled`, then
- * `Untitled 2`, `Untitled 3`… — never a name the folder already holds, because the birth must not
- * overwrite anything (`fs:create-file` writes `wx` and would refuse anyway; this is so the user
- * sees a new board rather than an error). `taken` is the folder's existing entry names WITH their
+ * The next free "New drawing" / "New diagram" name in a folder (🔒 R1 on YAZ-1775, YAZ-1815):
+ * `Untitled`, then `Untitled 2`, `Untitled 3`… — never a name the folder already holds, because
+ * the birth must not overwrite anything (`fs:create-file` writes `wx` and would refuse anyway;
+ * this is so the user sees a new board rather than an error). `taken` is the folder's existing entry names WITH their
  * extensions, compared case-insensitively: the Mac's own filesystem is, so `untitled.excalidraw`
  * and `Untitled.excalidraw` are the same file and the second one must not be offered.
+ *
+ * Only names of the same `board` kind count (🔒 YAZ-1802 D13): `Untitled.excalidraw` and
+ * `Untitled.drawio` can sit side by side — they are different files.
  */
-export function untitledDrawingName(taken: readonly string[]): string {
+export function untitledBoardName(taken: readonly string[], board: FileKind = 'drawing'): string {
   const used = new Set(taken.map((n) => n.toLowerCase()))
-  const free = (name: string): boolean => !used.has(`${name}${DRAWING_VIEW_EXTENSIONS[0]}`.toLowerCase())
-  if (free(UNTITLED_DRAWING)) return UNTITLED_DRAWING
+  const free = (name: string): boolean => !used.has(`${name}${BOARD_EXTENSION[board]}`.toLowerCase())
+  if (free(UNTITLED_BOARD)) return UNTITLED_BOARD
   // Terminates: `used` is finite, so one of the first `used.size + 1` numbered candidates is free.
   for (let n = 2; ; n++) {
-    const candidate = `${UNTITLED_DRAWING} ${n}`
+    const candidate = `${UNTITLED_BOARD} ${n}`
     if (free(candidate)) return candidate
   }
 }
@@ -71,10 +80,10 @@ export function targetDirFor(node: MenuRow | null, root: string): string {
   return node.path.slice(0, node.path.lastIndexOf('/'))
 }
 
-/** Rename-field prefill: a drawing hides its suffix; every other file shows its full filename. */
+/** Rename-field prefill: a board (drawing or diagram) hides its suffix; every other file shows its full filename. */
 export function renameInputName(fileName: string): string {
   const name = fileName.slice(fileName.lastIndexOf('/') + 1)
-  if (fileKind(name) !== 'drawing') return name
+  if (fileKind(name) === null) return name
   return name.slice(0, name.lastIndexOf('.'))
 }
 
@@ -86,7 +95,8 @@ function extensionOf(fileName: string): string {
 
 /**
  * Absolute path for the sidebar's inline rename (Links E1, GRO-2194; folders E1b, GRO-2241):
- * same parent directory. A drawing keeps only an explicit `.excalidraw` suffix; any other visible
+ * same parent directory. A board keeps only an explicit suffix of its OWN kind (`.excalidraw` for a
+ * drawing, `.drawio` for a diagram — 🔒 YAZ-1802 D13, a rename never converts); any other visible
  * name inherits the old one. An unsupported file keeps its exact suffix, since nothing else
  * vouches for what its bytes are — and an extensionless one (`README`, `LICENSE`) has none to
  * inherit. Directories have no extension logic.
@@ -99,6 +109,6 @@ export function renamedPath(oldPath: string, newName: string, kind: 'file' | 'di
   if (final === renameInputName(oldName)) return oldPath
   const oldKind = fileKind(oldName)
   const newKind = fileKind(final)
-  if (oldKind === 'drawing' ? newKind !== 'drawing' : newKind === null) final += extensionOf(oldName)
+  if (oldKind !== null ? newKind !== oldKind : newKind === null) final += extensionOf(oldName)
   return `${dir}/${final}`
 }

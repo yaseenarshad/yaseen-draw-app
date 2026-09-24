@@ -78,8 +78,10 @@ export interface MenuHandlers {
    * `PageContextMenu` reports it — a copy that quietly did nothing is the worst kind of no-op.
    */
   onNotice: (message: string) => void
-  /** "New drawing" (⚡ YAZ-1674 D8 amended): the one document birth, and the first row of the create group. */
+  /** "New Excalidraw drawing" (⚡ YAZ-1674 D8 amended): the one document birth, and the first row of the create group. */
   onNewDrawing: () => void
+  /** "New draw.io diagram" (🔒 YAZ-1802 D13): the same birth for a `.drawio`, directly below it. */
+  onNewDiagram: () => void
   /** Create a DISK folder — null hides the item (YAZ-948). */
   onNewFolder: (() => void) | null
   /** "New dated folder" (YAZ-1604): a disk folder born with today's `MM_DD- ` seed. Same gate as `onNewFolder`. */
@@ -203,7 +205,10 @@ const copyPath: Leaf = (t, h) => {
 
 // ---- (3) Create: births BESIDE the right-clicked row — the group targets a DIRECTORY, never the row ----
 
-const newDrawing: Leaf = (_t, h) => ({ id: 'new-drawing', label: 'New drawing', onSelect: h.onNewDrawing })
+const newDrawing: Leaf = (_t, h) => ({ id: 'new-drawing', label: 'New Excalidraw drawing', onSelect: h.onNewDrawing })
+
+/** 🔒 YAZ-1802 D13: the create group names both kinds of board, Excalidraw first. */
+const newDiagram: Leaf = (_t, h) => ({ id: 'new-diagram', label: 'New draw.io diagram', onSelect: h.onNewDiagram })
 
 const newFolder: Leaf = (_t, h) => (h.onNewFolder === null ? null : { id: 'new-folder', label: 'New folder', onSelect: h.onNewFolder })
 
@@ -310,19 +315,22 @@ const info: Leaf = (t, h) => {
 
 const OPEN_GROUP: readonly Item[] = [openInNewTabs, focus]
 const CLIPBOARD_GROUP: readonly Item[] = [cut, copy, paste, copyPaths, copyPath]
-const CREATE_GROUP: readonly Item[] = [newDrawing, newFolder, newDatedFolder]
+const CREATE_GROUP: readonly Item[] = [newDrawing, newDiagram, newFolder, newDatedFolder]
 const ROW_GROUP: readonly Item[] = [rename]
 const OPEN_IN_GROUP: readonly Item[] = [toggleFavorite, openIn]
-/** "Share" (YAZ-1799 D6): exactly Info's gate — one BOARD row — and just above Info, so Info stays directly above Delete (🔒 YAZ-1835 D6). */
+/**
+ * "Share" (YAZ-1799 D6): one EXCALIDRAW board row — Info's gate minus diagrams, which have no share
+ * link yet (YAZ-1802) — and just above Info, so Info stays directly above Delete (🔒 YAZ-1835 D6).
+ */
 const share: Leaf = (t, h) => {
-  const path = t.infoPath
+  const path = t.sharePath
   if (path === null) return null
   return { id: 'share', label: 'Share', onSelect: () => h.onShare(path) }
 }
 
-/** "Version history" (YAZ-1897 D4): the same one-board gate, between Share and Info. */
+/** "Version history" (YAZ-1897 D4): Share's gate (Excalidraw boards only, YAZ-1802), between Share and Info. */
 const history: Leaf = (t, h) => {
-  const path = t.infoPath
+  const path = t.sharePath
   if (path === null) return null
   return { id: 'history', label: 'Version history', onSelect: () => h.onHistory(path) }
 }

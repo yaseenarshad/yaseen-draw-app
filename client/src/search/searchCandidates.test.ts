@@ -48,6 +48,14 @@ describe('buildDrawingCatalog — the file rows', () => {
     expect(rows[0].path).toBe('/vault/Customer Acquisition Cost.excalidraw')
   })
 
+  it('🔒 YAZ-1802 D2: a draw.io diagram is a board too — a row, its .drawio hidden; a picture of one is not', () => {
+    const rows = buildDrawingCatalog('/vault', [file('/vault/Flow.drawio', 'diagram'), file('/vault/UP.DRAWIO', 'diagram'), file('/vault/image.drawio.svg', null)])
+    expect(rows.map((c) => [c.name, c.path])).toEqual([
+      ['Flow', '/vault/Flow.drawio'],
+      ['UP', '/vault/UP.DRAWIO'],
+    ])
+  })
+
   it('duplicate names BOTH appear under the bare name, told apart by the folder', () => {
     const rows = buildDrawingCatalog('/vault', [file('/vault/Note.excalidraw'), dir('/vault/deep', [file('/vault/deep/Note.excalidraw')])]).filter((r) => r.kind === 'file')
     expect(rows.map((c) => c.name)).toEqual(['Note', 'Note'])

@@ -68,6 +68,7 @@ import { noteBoardSaved } from '../share/liveShare'
 import { parseSceneText, type DrawingScene } from './drawingScene'
 import { mayTakeFocus } from './focusHandoff'
 import { ExcalidrawSurface, type DrawingSnapshot, type DrawingSurfaceApi } from './ExcalidrawSurface'
+import { ConflictBar } from './ConflictBar'
 import { SaveIndicator } from './SaveIndicator'
 import { SyncIndicator } from './SyncIndicator'
 import './drawingEditor.css'
@@ -406,17 +407,7 @@ function DrawingHost({ root, path, loaded, watch, sync, onSyncNow, canvasPrefs, 
 
   return (
     <div className="drawing-editor" ref={hostRef} onKeyDownCapture={onKeyDownCapture}>
-      {conflictMtime !== null && (
-        <div className="conflict-bar" role="alert">
-          <span>File changed on disk.</span>
-          <button type="button" onClick={() => void reload()}>
-            Reload
-          </button>
-          <button type="button" onClick={keepMine}>
-            Keep mine
-          </button>
-        </div>
-      )}
+      {conflictMtime !== null && <ConflictBar onReload={() => void reload()} onKeepMine={keepMine} />}
       <div className="drawing-editor__canvas">
         <ExcalidrawSurface
           scene={loaded.scene}

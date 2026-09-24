@@ -38,6 +38,11 @@ const api: YaseenDrawApi = {
     save: (req) => call(CH.drawingSave, req),
     libraryFolder: () => call(CH.drawingLibraryFolder),
   },
+  // The draw.io DIAGRAM document's two doors (🔒 YAZ-1802 D6): the only way a `.drawio` tab reads and writes.
+  diagram: {
+    load: (req) => call(CH.diagramLoad, req),
+    save: (req) => call(CH.diagramSave, req),
+  },
   pickFolder: () => call(CH.dialogPickFolder),
   // The import picker (YAZ-1833): a native open-file dialog that answers the picked file's bytes.
   dialog: { openDrawing: () => call(CH.dialogOpenFile), saveDrawing: (req) => call(CH.dialogSaveFile, req) },

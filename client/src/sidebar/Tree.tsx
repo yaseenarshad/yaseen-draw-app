@@ -1,4 +1,4 @@
-import type { TreeNode } from '@shared/types'
+import type { FileKind, TreeNode } from '@shared/types'
 import type { FileNode } from '@shared/treeSort'
 import { LinkIcon } from '../components/icons'
 import { stripExt } from '../lib/paths'
@@ -129,6 +129,25 @@ function CloudOffIcon() {
   )
 }
 
+/**
+ * 🔒 YAZ-1802 D15: a draw.io diagram's mark, since its name no longer says (the extension is
+ * hidden) — linked boxes, a generic glyph, never draw.io's logo. An unmarked board is an
+ * Excalidraw drawing, the usual kind. The mark sits in the slot a folder's chevron takes, so it
+ * costs the name no width; every other row keeps the slot empty so all names line up.
+ */
+function KindIcon({ kind }: { kind: FileKind | null }) {
+  if (kind !== 'diagram') return <span className="tree__kind" aria-hidden="true" />
+  return (
+    <span className="tree__kind" role="img" aria-label="draw.io diagram" title="draw.io diagram">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="3" y="3" width="7" height="6" rx="1" />
+        <rect x="14" y="15" width="7" height="6" rx="1" />
+        <path d="M6.5 9v4a2 2 0 0 0 2 2H14" />
+      </svg>
+    </span>
+  )
+}
+
 export interface ShareBadge {
   tone: 'ok' | 'error'
   title: string
@@ -171,7 +190,8 @@ export function Tree({
   // path tooltip, which would sit on top of the panel that already names the board; any other file
   // (no in-app viewer, no picture) keeps its tooltip.
   const hoverProps = (node: FileNode) =>
-    onHoverFile === undefined || node.kind !== 'drawing'
+    // 🔒 YAZ-1802 D9: a diagram previews too — any board kind.
+    onHoverFile === undefined || node.kind === null
       ? { title: node.path }
       : { onMouseEnter: () => onHoverFile(node), onMouseLeave: () => onHoverFile(null), onFocus: () => onHoverFile(node), onBlur: () => onHoverFile(null) }
   const dropEdge = (path: string) => (rowReorder?.over?.path === path ? ` tree__row--drop-${rowReorder.over.edge}` : '')
@@ -259,7 +279,7 @@ export function Tree({
             <button
               type="button"
               className={`tree__row tree__row--file${node.kind === null ? ' tree__row--external' : ''}${node.path === activeFile ? ' tree__row--active' : ''}${selection.paths.has(node.path) ? ' tree__row--selected' : ''}${dropEdge(node.path)}`}
-              style={{ paddingLeft: 8 + depth * 14 + 14 }}
+              style={{ paddingLeft: 8 + depth * 14 }}
               onClick={(e) => {
                 // Shift is the SELECTION gesture and nothing else (YAZ-1336, 🔒 D2): it never
                 // opens, never previews — so it is asked first, before any of the open rules.
@@ -302,6 +322,7 @@ export function Tree({
                 rowReorder.drop()
               }}
             >
+              <KindIcon kind={node.kind} />
               <span className="tree__label">{stripExt(node.name)}</span>
               {tooLarge?.has(node.path) === true && <CloudOffIcon />}
               <ShareMark badge={shareBadges?.get(node.path)} />

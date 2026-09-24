@@ -18,11 +18,20 @@ export type BridgeErrorCode =
   | 'NOT_SET_UP' // YAZ-1799: sharing is not set up yet (Settings › Sharing)
   | 'OFFLINE' // 🔒 YAZ-1775 D4: the provider could not be reached at all — a passive state in the UI, never an error banner
 
-/** The one document extension the app opens, edits and creates (🔒 YAZ-1775 D1). */
+/** The Excalidraw document extension the app opens, edits and creates (🔒 YAZ-1775 D1). */
 export const DRAWING_VIEW_EXTENSIONS = ['.excalidraw'] as const
 
-/** The file kinds the app can open in-app. A file of no kind still lists (YAZ-1577). */
-export type FileKind = 'drawing'
+/**
+ * The draw.io document extension (🔒 YAZ-1802 D2/D3): plain `.drawio` only. `x.drawio.svg` /
+ * `x.drawio.png` are pictures with a diagram inside and stay files of no kind.
+ */
+export const DIAGRAM_EXTENSIONS = ['.drawio'] as const
+
+/**
+ * The file kinds the app can open in-app (🔒 YAZ-1802 D2): an Excalidraw `drawing` or a draw.io
+ * `diagram` — together, the BOARDS. A file of no kind still lists (YAZ-1577).
+ */
+export type FileKind = 'drawing' | 'diagram'
 /**
  * The ceiling on ONE drawing document read through `drawing:load` (🔒 YAZ-1810). A LEGACY
  * `.excalidraw` (an upstream export, or one this app wrote before 🔒 YAZ-1775 D3) embeds its images as
@@ -30,3 +39,9 @@ export type FileKind = 'drawing'
  * which a scene has stopped being a document; the store (🔒 YAZ-1775 D3) keeps every saved file far below it.
  */
 export const MAX_DRAWING_BYTES = 200 * 1024 * 1024
+
+/**
+ * The same ceiling for ONE draw.io diagram through `diagram:load` / `diagram:save` (🔒 YAZ-1802 D6).
+ * A diagram with embedded pictures is base64 inside XML — the legacy-scene case again.
+ */
+export const MAX_DIAGRAM_BYTES = MAX_DRAWING_BYTES

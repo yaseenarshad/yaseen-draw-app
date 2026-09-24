@@ -9,7 +9,9 @@
  * `null`.
  */
 import type { FileNode } from '@shared/treeSort'
+import { isDiagram } from '@shared/fileKind'
 import { api } from '../api'
+import { renderDiagramPreview } from '../diagrams/renderDiagramPreview'
 import { createScenePreviewPng, visibleElements, type PreviewBounds } from '../lib/scenePreview'
 import { parseSceneText } from '../drawings/drawingScene'
 import { loadExcalidraw } from '../drawings/engine'
@@ -34,9 +36,14 @@ function parseKey(key: string): { root: string; path: string; theme: 'light' | '
   return { root: parts[0], path: parts.slice(1, -2).join('\n'), theme: parts[parts.length - 1] === 'dark' ? 'dark' : 'light' }
 }
 
-/** Read the board, restore it the way the canvas would, and draw it; `''` when nothing is visible. */
+/**
+ * Read the board, restore it the way the canvas would, and draw it; `''` when nothing is visible.
+ * A DIAGRAM goes through its own door and draw.io's own viewer instead (🔒 YAZ-1802 D9): its first
+ * page, same bounds, same theme, same `''` for an empty page.
+ */
 async function drawBoardPreview(key: string): Promise<string> {
   const { root, path, theme } = parseKey(key)
+  if (isDiagram(path)) return renderDiagramPreview((await api.diagram.load({ root, path })).xml, theme, BOARD_PREVIEW_BOUNDS)
   const [res, engine] = await Promise.all([api.drawing.load({ root, path }), loadExcalidraw()])
   const parsed = parseSceneText(res.json)
   const elements = visibleElements(engine.restoreElements(parsed.elements as never, null))

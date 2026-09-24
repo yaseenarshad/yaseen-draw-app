@@ -12,6 +12,9 @@ export const CH = {
   drawingSave: 'drawing:save',
   // The resolved library folder (🔒 YAZ-1775 D5): only main knows where userData is.
   drawingLibraryFolder: 'drawing:library-folder',
+  // The draw.io DIAGRAM document's two doors (🔒 YAZ-1802 D6): text in, text out, same mtime guard.
+  diagramLoad: 'diagram:load',
+  diagramSave: 'diagram:save',
   fsRename: 'fs:rename',
   fsDelete: 'fs:delete',
   fsClip: 'fs:clip',

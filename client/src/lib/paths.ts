@@ -4,8 +4,8 @@ export function basename(p: string): string {
   return trimmed.slice(trimmed.lastIndexOf('/') + 1) || p
 }
 
-/** File name without its vault extension (`.excalidraw`); every other name is returned whole. */
-export const stripExt = (name: string) => name.replace(/\.excalidraw$/i, '')
+/** File name without its board extension (`.excalidraw`, or `.drawio` — 🔒 YAZ-1802 D13); every other name is returned whole. */
+export const stripExt = (name: string) => name.replace(/\.(excalidraw|drawio)$/i, '')
 
 /** The folder a board sits in, relative to the vault — `/` at the root (Info 🔒 YAZ-1835 D7, the hover preview 🔒 YAZ-1800 D4). */
 export function boardFolder(root: string, path: string): string {

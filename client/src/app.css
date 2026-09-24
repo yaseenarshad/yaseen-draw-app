@@ -1238,6 +1238,17 @@ button {
   cursor: default;
 }
 
+/* 🔒 YAZ-1802 D15: a draw.io diagram's muted mark in the chevron's 14px slot (empty on every other
+   row), so file names line up with folder names and lose no width. */
+.tree__kind {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  color: var(--fg-muted);
+}
+
 /* A shared board's mark (YAZ-1799): a small link glyph after the name; red when its last update failed or the link is stale. */
 .tree__share {
   display: inline-flex;

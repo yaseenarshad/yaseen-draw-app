@@ -1,6 +1,7 @@
 /** `window.yaseenDraw` itself: every namespace of the one door the renderer has. */
 
 import type { AppState, FolderState, SIDEBAR_MAX_W, SIDEBAR_MIN_W, SettingsState, SidebarLens, WindowEntry } from './appState'
+import type { DiagramApi } from './diagram'
 import type { DrawingApi } from './drawing'
 import type { BridgeErrorCode } from './errors'
 import type { CreateDirResponse, CreateFileRequest, CreateFileResponse, DialogApi, FileClipRequest, FileClipState, FileRenamedEvent, PasteRequest, PasteResponse, PickFolderResponse, RenameFileRequest, RenameFileResponse, TreeResponse, WatchEvent } from './files'
@@ -280,6 +281,8 @@ export interface YaseenDrawApi {
   createFile(req: CreateFileRequest): Promise<CreateFileResponse>
   /** The drawing DOCUMENT's two doors (🔒 YAZ-1810): the only way a `.excalidraw` tab reads and writes. */
   drawing: DrawingApi
+  /** The draw.io DIAGRAM document's two doors (🔒 YAZ-1802 D6): the only way a `.drawio` tab reads and writes. */
+  diagram: DiagramApi
   /** Native open-directory dialog parented to the calling window (GRO-2163). */
   pickFolder(): Promise<PickFolderResponse>
   /** Native file dialogs: pick a `.excalidraw` to import (YAZ-1833). */
