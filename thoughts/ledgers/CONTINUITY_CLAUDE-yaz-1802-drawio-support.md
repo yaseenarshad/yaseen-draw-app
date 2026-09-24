@@ -24,7 +24,10 @@
   - [x] 5A audit (YAZ-1967) — 10 MUST + 24 SHOULD, comment on YAZ-1967
   - [x] 4A core loop (YAZ-1964) · 4B everywhere else (YAZ-1965) — Yasin: "all good" on both builds
   - [x] 5B apply the audit (YAZ-1968) — 33/34 done, 1 half-declined; review fix: the build config imported `@shared` (no alias in Node) → `DRAWIO_TAG` moved to `shared/drawio.ts`; CI now runs `npm run build` as LAUNCH always said
-- Now: [→] merge to main · release 0.1.9 + install · closeout (handoff comments, cleanup, statuses)
+  - [x] merged to main — PR #14 (merge a1af517), CI green incl. the new build step
+  - [x] release v0.1.9 (9315e29, tag v0.1.9): dmg + Windows exe built by the release workflow; notes written; installed to /Applications (0.1.9, ad-hoc signed)
+  - [x] closeout: handoff on YAZ-1802 + every child, project update, worktree/branch removed, statuses Done
+- CLOSED 2026-09-24.
 - Notes for a future agent:
   - Yasin must re-run Settings › Sharing › Set up sharing once after 0.1.9 (new Worker code + draw.io assets); old links keep working.
   - Future issues: YAZ-1969 Present for diagrams · YAZ-1970 cell merge + history marks · YAZ-1971 .drawio.svg/.png · YAZ-1972 diagram images in assets/.
@@ -34,6 +37,6 @@
 - none
 
 ## Working Set
-- Worktree `../yaseen-draw-app-yaz-1802-demo`, branch `yaz-1802-drawio-support`
+- Worktree `../yaseen-draw-app-yaz-1802-demo`, branch `yaz-1802-drawio-support` — both removed after merge
 - `npx vitest run` · `npm run typecheck` · `npm run build` (PATH=/opt/homebrew/bin)
 - Seed: `node tools/seedDrawioDemoVault.mjs --vault <tmp> --profile <tmp>`
