@@ -14,7 +14,7 @@ import { DRAWIO_TAG } from './packDrawio.mjs'
  * inside — as SVG; how it looks, and the PNG, are a look in the app.
  */
 const WEBAPP = fileURLToPath(new URL(`../desktop/.cache/drawio/${DRAWIO_TAG}/`, import.meta.url))
-const OVERLAY_JS = fileURLToPath(new URL('../desktop/drawio-overlay/js/', import.meta.url))
+const OVERLAY = fileURLToPath(new URL('../desktop/drawio-overlay/', import.meta.url))
 const ORIGIN = 'app://drawio'
 
 /** draw.io reads the fonts with XMLHttpRequest as x-user-defined text; this one answers from the webapp folder. */
@@ -26,6 +26,7 @@ class WebappXhr {
   setRequestHeader() {}
   overrideMimeType() {}
   send() {
+    requested.push(this.url.href)
     // `app:` is no special scheme, so its URL has no origin to compare: the host says it is ours.
     const file = this.url.protocol === 'app:' && this.url.host === 'drawio' ? `${WEBAPP}${decodeURIComponent(this.url.pathname.slice(1))}` : null
     const bytes = file !== null && existsSync(file) ? readFileSync(file) : null
@@ -37,10 +38,13 @@ class WebappXhr {
 }
 
 let page = null
+/** Every URL the page asked for over XMLHttpRequest (draw.io loads stencil sets that way), in the current test. */
+let requested = []
 
 afterEach(() => {
   page?.close()
   page = null
+  requested = []
 })
 
 async function openRenderer() {
@@ -56,7 +60,11 @@ async function openRenderer() {
   window.fetch = async (url) => new Response(readFileSync(`${WEBAPP}${url}`, 'utf8'))
   // A top-level page is its own parent: what the page posts "up" is what the test reads.
   window.postMessage = (data) => answers.push(JSON.parse(data))
-  for (const script of [`${OVERLAY_JS}yaseen-render-config.js`, `${WEBAPP}js/viewer-static.min.js`, `${OVERLAY_JS}yaseen-render.js`]) window.eval(readFileSync(script, 'utf8'))
+  // The page's own scripts in its own order — ours from the overlay, draw.io's (the stencils bundle
+  // among them, 🔒 YAZ-1802 D5) from the pruned webapp.
+  const scripts = [...readFileSync(`${OVERLAY}yaseen-render.html`, 'utf8').matchAll(/<script src="([^"]+)"/g)].map((m) => m[1])
+  expect(scripts).toEqual(['js/yaseen-render-config.js', 'js/viewer-static.min.js', 'js/stencils.min.js', 'js/yaseen-render.js'])
+  for (const script of scripts) window.eval(readFileSync(existsSync(`${OVERLAY}${script}`) ? `${OVERLAY}${script}` : `${WEBAPP}${script}`, 'utf8'))
   await expect.poll(() => answers).toEqual([{ event: 'ready' }])
   let serial = 0
   /** One request, as the renderer's `renderDiagram.ts` sends it; resolves with the page's answer. */
@@ -123,6 +131,20 @@ describe.skipIf(!existsSync(`${WEBAPP}js/viewer-static.min.js`))(`yaseen-render.
     // draw.io rounds its crop up and widens it by the half pixel an odd stroke paints: a pixel at most.
     expect(width(svgOf(await render(wide, { maxWidth: 400, maxHeight: 300 })))).toBeLessThanOrEqual(401)
     expect(width(svgOf(await render(wide, { scale: 1, padding: 10 })))).toBeGreaterThan(1900)
+  })
+
+  it('draws library shapes from the one stencils bundle — the pack ships no per-set file, and none is asked for (🔒 YAZ-1802 D5)', async () => {
+    const { render } = await openRenderer()
+    const icons = [
+      cell('a', '', 10, 'shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;fillColor=#ED7100;'),
+      cell('b', '', 200, 'shape=mxgraph.cisco19.rect;prIcon=router;'),
+      cell('c', '', 400, 'shape=mxgraph.flowchart.decision;'),
+    ].join('')
+    const svg = svgOf(await render(mxfile(model(icons))))
+    expect(page.mxStencilRegistry.getStencil('mxgraph.aws4.lambda')).not.toBeNull()
+    expect(page.mxStencilRegistry.getStencil('mxgraph.flowchart.decision')).not.toBeNull()
+    expect((svg.match(/<path /g) ?? []).length).toBeGreaterThan(3)
+    expect(requested.filter((url) => url.includes('/stencils/'))).toEqual([])
   })
 
   it('an empty page is the empty string; a file that is no diagram is a readable failure', async () => {

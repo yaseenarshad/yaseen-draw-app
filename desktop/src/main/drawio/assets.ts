@@ -55,6 +55,22 @@ export const DRAWIO_CSP = [
 ].join('; ')
 
 /**
+ * 🔒 YAZ-1802 D5 / D11 (YAZ-1973): the pack files a shared diagram's page runs — draw.io's viewer,
+ * every stencil set in one file (loaded only for a diagram that names a library shape), and
+ * draw.io's licence. Share setup publishes each at `/assets/drawio/<the same path>` straight from
+ * the app's own webapp folder (`readViewerAssets` in `ipc/share.ts`), so the app carries these bytes
+ * ONCE — `share/dist/assets` holds only what the viewer build makes itself.
+ */
+export const DRAWIO_SHARE_FILES = ['js/viewer-static.min.js', 'js/stencils.min.js', 'LICENSE-drawio.txt'] as const
+
+/**
+ * …and the pack FOLDERS a shared diagram can reach, published whole: `img/` holds the pictures
+ * draw.io's own image shapes point at (`GRAPH_IMAGE_PATH`, e.g. the Azure / network / clipart
+ * libraries) — without it such a shape draws blank on a share link.
+ */
+export const DRAWIO_SHARE_DIRS = ['img'] as const
+
+/**
  * The webapp folder. Dev (not packaged) prefers the pack cache — `<desktop>/.cache/drawio/<tag>`,
  * `app.getAppPath()` being `desktop/` there — so the overlay is always the current one; a build
  * falls back to, and a packaged app only ever uses, `out/drawio` beside the main bundle.
@@ -89,9 +105,16 @@ export function drawioFilePath(dir: string, pathname: string): string | null {
  * headers. `noStore` is dev's (🔒 D17): the pack cache changes under a running app
  * (`npm run drawio:pack`), so Chromium must never hand an iframe yesterday's `PostConfig.js`; a
  * packaged app's copy is immutable and caches normally.
+ *
+ * `onNotFound` is dev's too (🔒 YAZ-1802 D5, YAZ-1973): every 404 is logged, because the pack is
+ * PRUNED to what draw.io loads (`tools/lib/drawioPack.mjs`) — after a draw.io bump, opening the
+ * seeded diagrams with the terminal in view is how a file the prune should have kept shows up.
  */
-export async function serveDrawio(dir: string, pathname: string, opts: { fetchFile: (url: string) => Promise<Response>; noStore: boolean }): Promise<Response> {
-  const notFound = () => new Response('Not found', { status: 404, headers: { 'Content-Security-Policy': DRAWIO_CSP } })
+export async function serveDrawio(dir: string, pathname: string, opts: { fetchFile: (url: string) => Promise<Response>; noStore: boolean; onNotFound?: (pathname: string) => void }): Promise<Response> {
+  const notFound = () => {
+    opts.onNotFound?.(pathname)
+    return new Response('Not found', { status: 404, headers: { 'Content-Security-Policy': DRAWIO_CSP } })
+  }
   const file = drawioFilePath(dir, pathname)
   if (file === null) return notFound()
   let res: Response
@@ -100,6 +123,7 @@ export async function serveDrawio(dir: string, pathname: string, opts: { fetchFi
   } catch {
     return notFound()
   }
+  if (res.status === 404) return notFound()
   const headers = new Headers(res.headers)
   headers.set('Content-Security-Policy', DRAWIO_CSP)
   if (opts.noStore) headers.set('Cache-Control', 'no-store')

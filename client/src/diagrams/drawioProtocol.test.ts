@@ -11,6 +11,10 @@ describe('drawioFrameUrl (🔒 YAZ-1802 D4)', () => {
     expect(p).toMatchObject({ pv: '0', dark: '0' })
   })
 
+  it('pins the English UI, the only language the bundled draw.io carries (🔒 YAZ-1802 D5)', () => {
+    expect(new URL(drawioFrameUrl('light')).searchParams.get('lang')).toBe('en')
+  })
+
   it('carries the app theme at mount', () => {
     expect(new URL(drawioFrameUrl('dark')).searchParams.get('dark')).toBe('1')
   })

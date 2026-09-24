@@ -17,10 +17,11 @@
 - Done:
   - [x] 1- Deep scope (YAZ-1948) — findings on every child; 4 small defaults decided
   - [x] 2A classify (YAZ-1950) · [x] 2B bundle (YAZ-1951) · [x] 2C doors (YAZ-1952) · [x] 2F sync (YAZ-1955) — commit 7075e93, 2,429 tests
-- Now: [→] 2D host (YAZ-1953) · 2E feel (YAZ-1954) · 2G naming (YAZ-1956)
+  - [x] 2D host (YAZ-1953) · [x] 2E feel (YAZ-1954) · [x] 2G naming (YAZ-1956) — commit 831466f; review fix: guides a per-diagram toggle
+  - [x] Yasin hand pass of phase 2: "all good" (logged on 4A)
+  - [x] 3A–3E (YAZ-1958–1962) — commit 902ac87, 2,511 tests
+- Now: [→] 2B1 trim bundled draw.io (YAZ-1973) — app ~475 MB + share viewer +47 MB stencils (double copy)
 - Remaining:
-  - [ ] 2B1 trim bundled draw.io (YAZ-1973) — packaged app ~475 MB
-  - [ ] 3A render/preview/export (YAZ-1958) · [ ] 3B history (YAZ-1959) · [ ] 3C share (YAZ-1960) · [ ] 3D type mark (YAZ-1961) · [ ] 3E dark setting (YAZ-1962)
   - [ ] 4A core E2E (YAZ-1964) · [ ] 4B everywhere-else E2E (YAZ-1965)
   - [ ] 5A audit (YAZ-1967) · [ ] 5B apply (YAZ-1968)
   - [ ] merge to main · [ ] release (smallest bump) + install · [ ] release notes backfill

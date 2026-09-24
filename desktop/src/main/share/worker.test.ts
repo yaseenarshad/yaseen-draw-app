@@ -165,7 +165,7 @@ describe('share Worker: two kinds of board (🔒 YAZ-1802 D11)', () => {
   it("/b picks the viewer by kind: a diagram runs draw.io's viewer after its config, with Download .drawio and no PNG", async () => {
     await putDiagram()
     const html = await page()
-    expect(scripts(html)).toEqual(['/assets/drawio/config.js', '/assets/drawio/viewer-static.min.js', '/assets/diagram.js'])
+    expect(scripts(html)).toEqual(['/assets/drawio/config.js', '/assets/drawio/js/viewer-static.min.js', '/assets/diagram.js'])
     expect(html.match(/<script\b/g)).toHaveLength(4) // those three and the JSON block: still no inline script
     expect(html).toContain('<link rel="stylesheet" href="/assets/drawio/fonts.css">')
     expect(html).toContain('<title>Flow — shared diagram</title>')

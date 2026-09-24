@@ -67,6 +67,15 @@ describe('serveDrawio — one app://drawio request (🔒 YAZ-1802 D4 / D17)', ()
     const missing = await serveDrawio(dir, '/nope.js', { fetchFile: async () => Promise.reject(new Error('ERR_FILE_NOT_FOUND')), noStore: true })
     for (const res of [escape, missing]) expect([res.status, res.headers.get('Content-Security-Policy')]).toEqual([404, DRAWIO_CSP])
   })
+
+  it('tells the dev log every 404 — how a file the prune should have kept shows up after a bump (🔒 YAZ-1802 D5)', async () => {
+    const onNotFound = vi.fn()
+    await serveDrawio(dir, '/stencils/aws4.xml', { fetchFile: async () => Promise.reject(new Error('ERR_FILE_NOT_FOUND')), noStore: true, onNotFound })
+    const gone = await serveDrawio(dir, '/js/gone.js', { fetchFile: async () => new Response('', { status: 404 }), noStore: true, onNotFound })
+    await serveDrawio(dir, '/js/app.min.js', { fetchFile: file(), noStore: true, onNotFound })
+    expect(onNotFound.mock.calls).toEqual([['/stencils/aws4.xml'], ['/js/gone.js']])
+    expect([gone.status, gone.headers.get('Content-Security-Policy')]).toEqual([404, DRAWIO_CSP])
+  })
 })
 
 describe('our user agent (🔒 YAZ-1802 D4)', () => {

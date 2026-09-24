@@ -9,7 +9,7 @@ import { cpSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, write
 import { dirname, join } from 'node:path'
 import { inflateRawSync } from 'node:zlib'
 
-/** Written into the unpacked webapp: which archive it came from, so an unchanged pin is not unpacked twice. */
+/** Written into the unpacked webapp: which archive it came from and under which prune, so an unchanged pack is not unpacked twice. */
 const STAMP = '.yaseen-pack.json'
 
 /**
@@ -25,11 +25,11 @@ export function verifyArchive(archive, pin) {
   if (digest !== pin.sha256) throw new Error(`draw.war sha256 ${digest} does not match the pinned ${pin.sha256} — refusing it`)
 }
 
-/** True when `dir` already holds this exact pinned archive, unpacked (its stamp says so). */
+/** True when `dir` already holds this exact pinned archive, unpacked under today's prune (its stamp says so). */
 export function isUnpacked(dir, pin) {
   try {
     const stamp = JSON.parse(readFileSync(join(dir, STAMP), 'utf8'))
-    return stamp.tag === pin.tag && stamp.sha256 === pin.sha256
+    return stamp.tag === pin.tag && stamp.sha256 === pin.sha256 && stamp.prune === PRUNE_ID
   } catch {
     return false
   }
@@ -55,7 +55,7 @@ export function unpackWebapp(archive, dir, pin) {
       writeFileSync(to, entry.data())
       written++
     }
-    writeFileSync(join(tmp, STAMP), `${JSON.stringify({ tag: pin.tag, sha256: pin.sha256 }, null, 2)}\n`)
+    writeFileSync(join(tmp, STAMP), `${JSON.stringify({ tag: pin.tag, sha256: pin.sha256, prune: PRUNE_ID }, null, 2)}\n`)
   } catch (err) {
     rmSync(tmp, { recursive: true, force: true })
     throw err
@@ -141,20 +141,47 @@ export function isSafeEntryName(name) {
 }
 
 /**
- * What the unpacked webapp does NOT need inside an offline, embed-only iframe (🔒 YAZ-1802 D5):
- * the servlet container's `WEB-INF` / `META-INF`, source maps, the PWA service worker (we pass
- * `pwa=0`), and the cloud-storage pages and SDKs (`db=0&od=0&gh=0&gl=0`). Everything else stays —
- * the sidebar's stencils and templates are loaded on demand from this same origin.
+ * 🔒 YAZ-1802 D5 (YAZ-1973): what the app's three draw.io pages never load, so neither the app nor
+ * the share viewer ships it — `[rule, why]`, a DENY list because almost everything else is loaded
+ * lazily by some diagram. The pages: the editor (`index.html` in embed mode with `offline=1`,
+ * `lang=en`, `plugins=0`, `pwa=0` — `drawioFrameUrl`), our picture page `yaseen-render.html`, and
+ * the share viewer (both `viewer-static.min.js`). Every rule was checked against v31.5.2's own
+ * loaders and a logged pass over the seeded vault, the bake-off diagrams, a diagram with one shape
+ * from every stencil set and library, math, Mermaid, PlantUML and the template dialog (the request
+ * set is pinned in `packDrawio.test.mjs`). A bump re-checks it with the dev 404 log (`serveDrawio`).
+ *
+ * KEPT on purpose, though big: `js/stencils.min.js` (all 204 stencil sets, loaded at editor start;
+ * the viewer pages load it too, which is why `stencils/` can go), `math4/` (the editor loads MathJax
+ * at start), `templates/` (Insert › Template works offline), `img/` (library icons a diagram names
+ * by path), `js/extensions.min.js` (loaded at start; Mermaid, ELK and libavoid live in it), and
+ * `js/libavoid-js/` (the LGPL-2.1 source of the router `extensions.min.js` bundles, with its licence).
  */
-const PRUNED_PREFIXES = ['WEB-INF/', 'META-INF/', 'connect/', 'js/dropbox/', 'js/onedrive/']
-const PRUNED_FILES = new Set(['service-worker.js', 'dropbox.html', 'github.html', 'gitlab.html', 'onedrive3.html', 'teams.html', 'monday-app-association.json'])
+const PRUNED = [
+  [/^(WEB-INF|META-INF)\//, 'the servlet container (the online features’ Java)'],
+  [/\.map$/, 'source maps'],
+  [/^(service-worker|workbox-[0-9a-f]+)\.js$/, 'the PWA service worker (pwa=0)'],
+  [/^(connect|plugins)\//, 'Atlassian Connect pages, and plugins (plugins=0)'],
+  [/^(dropbox|github|gitlab|onedrive3|teams)\.html$|^monday-app-association\.json$/, 'cloud-storage callback pages'],
+  [/^js\/(dropbox|onedrive|jquery|simplepeer)\//, 'cloud SDKs, Trello’s jQuery and realtime collaboration — network only'],
+  [/^js\/integrate\.min\.js$/, 'the Confluence / Jira integration bundle — no page loads it'],
+  [/^js\/(diagramly|grapheditor|orgchart|elk|mermaid|jszip|deflate|sanitizer|cryptojs|rough|freehand|spin)\//, 'unminified sources, loaded only with dev=1 — app.min.js, extensions.min.js and orgchart.min.js carry them built'],
+  [/^mxgraph\/(src\/|mxClient\.js$)/, 'mxGraph sources — app.min.js and viewer-static.min.js carry them built'],
+  [/^js\/(viewer\.min|embed\.dev|export|export-init|clear|vsdxImporter)\.js$|^(export3|clear|vsdxImporter)\.html$|^export-fonts\.css$/, 'the lightbox viewer, and the export-server, cache-clearing and Confluence importer pages'],
+  [/^resources\/dia_[^/]+\.txt$/, 'the UI in other languages (lang=en; dia.txt is English)'],
+  [/^images\/sidebar-[^/]+\.png$/, 'More Shapes’ big previews — offline it is the compact dialog, which has none'],
+  [/^stencils\//, 'the stencil sets as separate files — js/stencils.min.js carries every one'],
+  [/^shapes\//, 'the library shapes’ code as separate files — js/shapes-14-6-5.min.js and viewer-static.min.js carry it'],
+]
+
+/** A `LICENSE` is never pruned, whatever folder it sits in: the terms of what ships, bundled or not. */
+const LICENCE = /(^|\/)LICENSE$/
 
 export function isPrunedEntry(name) {
-  if (PRUNED_PREFIXES.some((prefix) => name.startsWith(prefix))) return true
-  if (name.endsWith('.map')) return true
-  if (PRUNED_FILES.has(name)) return true
-  return /^workbox-[0-9a-f]+\.js$/.test(name)
+  return !LICENCE.test(name) && PRUNED.some(([rule]) => rule.test(name))
 }
+
+/** Changes with any rule, so the stamp sends an already-unpacked release through a changed prune. */
+export const PRUNE_ID = createHash('sha256').update([LICENCE, ...PRUNED.map(([rule]) => rule)].map(String).join('\n')).digest('hex').slice(0, 12)
 
 /** Where the copied fonts sit inside the webapp, and the absolute URL the editor reaches them at. */
 const FONTS_DIR = 'yaseen-fonts'

@@ -169,7 +169,13 @@ app.whenReady().then(() => {
   protocol.handle('app', (req) => {
     const { host, pathname } = new URL(req.url)
     // 🔒 YAZ-1802 D4: routed by HOST — `app://drawio` is the diagram editor's own origin.
-    if (host === DRAWIO_HOST) return serveDrawio(DRAWIO_DIR, pathname, { fetchFile: (url) => net.fetch(url), noStore: !app.isPackaged })
+    if (host === DRAWIO_HOST) {
+      return serveDrawio(DRAWIO_DIR, pathname, {
+        fetchFile: (url) => net.fetch(url),
+        noStore: !app.isPackaged,
+        onNotFound: app.isPackaged ? undefined : (missing) => console.warn(`[drawio] 404 app://drawio${missing} — not in the pruned pack (tools/lib/drawioPack.mjs)`),
+      })
+    }
     const file = join(RENDERER_DIR, pathname === '/' ? 'index.html' : pathname)
     return net.fetch(pathToFileURL(file).toString())
   })
@@ -204,6 +210,7 @@ app.whenReady().then(() => {
   rebuildMenuOnFocus = applyMenu
   gitSync = registerIpc(store, manager, app.getPath('userData'), {
     viewerAssetsDir: viewerAssetsDir({ isPackaged: app.isPackaged, resourcesPath: process.resourcesPath, appPath: app.getAppPath() }),
+    drawioDir: DRAWIO_DIR,
     isPackaged: app.isPackaged,
   })
   // 🔒 YAZ-1775 D5: the one library folder every vault shares. Made at startup, detached — a launch must

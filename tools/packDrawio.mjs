@@ -12,17 +12,19 @@
  *
  * What it does: downloads jgraph/drawio's release asset `draw.war` for the pinned tag (once — the
  * archive is kept beside the unpacked tree), refuses it unless its size and sha256 are exactly the
- * pinned ones, unzips it (a `.war` is a zip) into `desktop/.cache/drawio/<tag>/`, prunes what an
- * offline embed-only iframe never loads (`tools/lib/drawioPack.mjs`), then lays OUR files over it:
- * `desktop/drawio-overlay/` (the `PreConfig.js` / `PostConfig.js` config hooks draw.io's
- * `bootstrap.js` loads off its own domains, the hover-preview page `yaseen-render.html`, and
- * `LICENSE-drawio.txt` — draw.io's Apache-2.0 licence, which the war itself does not carry) and
- * the five font families the editor offers first, copied from the Excalidraw package.
+ * pinned ones, unzips it (a `.war` is a zip) into `desktop/.cache/drawio/<tag>/`, prunes what the
+ * editor, the picture page and the share viewer never load (~155 MB → ~47 MB,
+ * `tools/lib/drawioPack.mjs`), then lays OUR files over it: `desktop/drawio-overlay/` (the
+ * `PreConfig.js` / `PostConfig.js` config hooks draw.io's `bootstrap.js` loads off its own
+ * domains, the hover-preview page `yaseen-render.html`, and `LICENSE-drawio.txt` — draw.io's
+ * Apache-2.0 licence, which the war itself does not carry) and the five font families the editor
+ * offers first, copied from the Excalidraw package.
  *
  * IDEMPOTENT: the unpack is skipped when `<tag>/.yaseen-pack.json` says this exact archive is
- * already there; the overlay and fonts are re-laid on EVERY run, so an edit to an overlay file
- * lands with the next `npm run dev`. The unpack goes to a temp folder that is renamed into place,
- * so an interrupted run never leaves half a webapp behind (`tools/lib/drawioPack.mjs`).
+ * already there under the current prune rules; the overlay and fonts are re-laid on EVERY run, so
+ * an edit to an overlay file lands with the next `npm run dev`. The unpack goes to a temp folder
+ * that is renamed into place, so an interrupted run never leaves half a webapp behind
+ * (`tools/lib/drawioPack.mjs`).
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'

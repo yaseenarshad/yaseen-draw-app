@@ -38,7 +38,9 @@ export function drawioAdaptiveColors(setting: DiagramDarkColors): 'auto' | 'none
  * The iframe URL (🔒 YAZ-1802 D4): embed mode over JSON, configured by us, no save or exit button
  * (autosave is the save), and every door to the network shut — `offline`, `stealth`, `lockdown`,
  * no plugins, no PWA, no Google / Dropbox / OneDrive / GitHub / GitLab / Trello. `pv=0` keeps the
- * page view off (D12); `dark` is the app's theme at mount, later changes go by message.
+ * page view off (D12); `dark` is the app's theme at mount, later changes go by message. `lang=en`:
+ * the bundled draw.io carries English only (🔒 YAZ-1802 D5) — without it draw.io would follow the
+ * system language and ask for a translation the app does not ship.
  */
 export function drawioFrameUrl(theme: 'light' | 'dark'): string {
   const params = new URLSearchParams({
@@ -63,6 +65,7 @@ export function drawioFrameUrl(theme: 'light' | 'dark'): string {
     pv: '0',
     dark: theme === 'dark' ? '1' : '0',
     ui: 'simple',
+    lang: 'en',
   })
   return `${DRAWIO_ORIGIN}/index.html?${params.toString()}`
 }
