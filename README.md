@@ -44,16 +44,16 @@ Maybe you know this. Excalidraw is the fastest way to sketch an idea. But you wr
 | | Excalidraw | Canva | Yaseen Draw |
 | -- | :--: | :--: | :--: |
 | **Desktop App (Mac and Windows)** | ❌<br><sub>Browser only</sub> | ✅ | ✅ |
-| **Sync Across Devices Included** | ❌<br><sub>Paid plan</sub> | ✅ | ✅<br><sub>Free, through GitHub</sub> |
+| **Sync Across Devices Included** | ❌<br><sub>Paid plan, $6 a month</sub> | ✅ | ✅<br><sub>Free, through GitHub</sub> |
 | **Format Text (Bold, Underline, Lists)** | ❌ | ✅ | ✅ |
 | **Icon Search Built In** | ❌ | ✅ | ✅ |
-| **Present Your Board as Slides** | ❌<br><sub>Paid plan</sub> | ✅ | ✅ |
+| **Present Your Board as Slides** | ❌<br><sub>Paid plan, $6 a month</sub> | ✅ | ✅ |
 | **Local Files (Agent Native)** | ❌<br><sub>Browser storage</sub> | ❌<br><sub>Cloud</sub> | ✅ |
 | **Own Your Data (No Account, No Server)** | ✅ | ❌ | ✅ |
 | **Open Source** | ✅ | ❌ | ✅ |
 | **draw.io Diagrams in the Same App** | ❌ | ❌ | ✅ |
 
-<sub>"Excalidraw" is the free editor on excalidraw.com. The paid plan is Excalidraw+.</sub>
+<sub>"Excalidraw" is the free editor on excalidraw.com. The paid plan is Excalidraw+, at $6 a month for each user.</sub>
 
 Excalidraw has the speed. Canva has the tools. Neither one gives you the file. You need one app.
 
