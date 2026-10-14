@@ -1,0 +1,43 @@
+<!doctype html>
+<!--
+  The README banner, 1600 × 340: the icon, the name, one line, and a small third line. Its own dark
+  background (rounded, transparent outside) reads on GitHub's light and dark pages alike. No picture
+  of the app here — capture.mjs renders this page as it is. Query: icon = the app icon's URL.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Yaseen Draw — banner</title>
+<style>
+  html, body { margin: 0; background: transparent; }
+  body { width: 1600px; height: 340px; font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  .card { position: relative; width: 1600px; height: 340px; border-radius: 34px; background: #131523; overflow: hidden; display: flex; align-items: center; }
+  img { width: 126px; height: 126px; margin-left: 150px; flex: none; }
+  .text { margin-left: 62px; }
+  h1 { margin: 0; font-size: 88px; line-height: 1; font-weight: 800; letter-spacing: -2.2px; color: #fff; }
+  .line { margin: 20px 0 0; font-size: 35px; font-weight: 500; letter-spacing: -.4px; color: #dfe1ea; }
+  .more { margin: 12px 0 0; font-size: 24px; font-weight: 700; letter-spacing: -.1px; color: #a5a1f7; }
+  /* A few whiteboard shapes, as quiet as the wallpaper of a room. */
+  svg { position: absolute; right: 60px; top: 46px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <img id="icon" alt="">
+  <div class="text">
+    <h1>Yaseen Draw</h1>
+    <p class="line">Your whiteboards, as plain files in a folder.</p>
+    <p class="more">Excalidraw and draw.io in one desktop app for Mac and Windows</p>
+  </div>
+  <svg width="330" height="250" viewBox="0 0 330 250" fill="none" stroke="#454a9c" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="12" y="14" width="126" height="78" rx="16"/>
+    <path d="M148 53 H206 M190 37 L206 53 L190 69"/>
+    <path d="M268 8 L320 53 L268 98 L216 53 Z"/>
+    <path d="M268 108 V150 M252 134 L268 150 L284 134"/>
+    <ellipse cx="268" cy="200" rx="56" ry="38"/>
+    <path d="M24 150 H128 M24 180 H104 M24 210 H120"/>
+  </svg>
+</div>
+<script>document.getElementById('icon').src = new URLSearchParams(location.search).get('icon')</script>
+</body>
+</html>

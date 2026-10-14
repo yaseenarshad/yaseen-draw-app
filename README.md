@@ -1,201 +1,184 @@
-# Yaseen Draw
+<p align="center">
+  <img src="docs/assets/banner.png" alt="Yaseen Draw. Your whiteboards, as plain files in a folder on your own computer." width="100%">
+</p>
 
-> Seeded from yaseen-docs-app @ 66c9806
+<p align="center">
+  <a href="https://github.com/yaseenarshad/yaseen-draw-app/releases/latest"><img src="https://img.shields.io/github/v/release/yaseenarshad/yaseen-draw-app?label=version&color=6965db" alt="Newest version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-6965db" alt="Licence: MIT"></a>
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-6965db" alt="Platform: macOS and Windows">
+</p>
 
-Yaseen Draw — a local whiteboard for a folder of boards (Excalidraw drawings and draw.io
-diagrams), as an Electron macOS desktop app: a React renderer around a vendored
-[Excalidraw](https://excalidraw.com) fork and a bundled, offline draw.io, and a main process
-that reads and writes the files on this machine (the renderer only ever talks to the
-`window.yaseenDraw` bridge — there is no server of any kind, except the optional share Worker on
-your own Cloudflare account). Pick a folder, browse its
-`.excalidraw` and `.drawio` files in the sidebar, draw, and changes are saved back to disk (debounced, atomic).
-Files changed outside the app (another editor, sync) are reloaded live; if you have unsaved edits
-you get a Reload / Keep mine choice. Lineage in one line: the shell follows Obsidian, the
-transport mechanism follows VS Code (sandboxed renderer + typed preload bridge + main-process fs),
-and the canvas is Yasin's own Excalidraw fork.
+<p align="center">
+  <b><a href="https://github.com/yaseenarshad/yaseen-draw-app/releases/latest">Download</a></b>
+  &nbsp;·&nbsp;
+  <a href="#how-it-works">How it works</a>
+  &nbsp;·&nbsp;
+  <a href="#questions">Questions</a>
+  &nbsp;·&nbsp;
+  <a href="docs/GUIDE.md">Feature guide</a>
+</p>
 
-## Requirements
+<h3 align="center">Find every whiteboard you ever made. Own every one of them.</h3>
 
-Node.js 22.2 or newer (`package.json` `engines`, and what CI runs), npm, macOS (the packaged app targets macOS arm64; the dev build runs wherever Electron does).
+<p align="center">
+  <img src="docs/assets/hero.gif" alt="Yaseen Draw: open a board from a folder in the sidebar, draw on it, and change to a different board" width="100%">
+</p>
 
-## Run
+<p align="center">
+  <b><a href="https://github.com/yaseenarshad/yaseen-draw-app/releases/latest">Download for Mac or Windows</a></b><br>
+  Free. No account. Works offline.
+</p>
 
-```sh
-npm install
-npm run dev      # launches the Electron app with HMR
-```
+## Where is the board you made last month?
 
-The first `npm run dev` or `npm run build` downloads the pinned draw.io webapp once (54 MB,
-sha256-checked) into `desktop/.cache/drawio/`; after that no network is needed.
+I draw a board for almost every idea and every client call. One day a client asked for a diagram from a month before. I knew that I drew it. I did not find it, so I drew it again. That day I started this app.
 
-See `LAUNCH.md` for the full launch recipe (state file, isolated profiles, packaged-app install)
-and `docs/CONTRACTS.md` for the bridge, app-state and packaging contracts.
+Maybe you know that moment. You need a board again, and:
 
-```sh
-npm test         # unit tests (vitest, three projects: client jsdom, desktop node, tools node)
-npm run typecheck
-npm run build    # electron-vite build into desktop/out + the share viewer into share/dist
-npm run e2e      # build, then the Playwright suite against the built app (sandboxed profile + vaults)
-```
+- It was in a browser tab. The tab is gone.
+- Or it is in a cloud app, behind a login and a monthly bill.
+- Or it is one of forty boards with the name "Untitled".
+- And your quick sketches are in one app, while your clean diagrams are in a different app.
 
-What the E2E suite cannot see is checked by hand from `docs/REGRESSION.md`.
+The board exists. But you cannot find it, and you do not own it.
 
-## Build the app
+## How it works
 
-```sh
-npm run desktop:build
-```
+Yaseen Draw keeps each board as one plain file, in a normal folder on your own computer.
 
-produces `desktop/dist-app/mac-arm64/Yaseen Draw.app` and `desktop/dist-app/Yaseen Draw-<version>-arm64.dmg` (arm64, ad-hoc signed). Drag the `.app` into `/Applications`, or send someone the dmg.
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <img src="docs/assets/step-1-folder.png" alt="Step 1: pick a folder" width="100%"><br>
+      <b>1. Pick a folder.</b><br>
+      Any folder on your computer. An empty folder is fine.
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/assets/step-2-draw.png" alt="Step 2: draw on a board" width="100%"><br>
+      <b>2. Draw.</b><br>
+      The app saves each change while you work.
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/assets/step-3-files.png" alt="Step 3: each board is a file in the folder" width="100%"><br>
+      <b>3. The board is a file.</b><br>
+      You name it, move it, and put it in folders, the same as any file.
+    </td>
+  </tr>
+</table>
 
-The app bundles jgraph's draw.io webapp ([jgraph/drawio](https://github.com/jgraph/drawio), Apache-2.0) unmodified, with its licence as `LICENSE-drawio.txt` in the app's `drawio/` folder. Yaseen Draw is not affiliated with draw.io; it opens `.drawio` files.
+If you know Obsidian, this is the same idea for whiteboards.
 
-## Installing on another Mac/PC
+## What you can do
 
-Every packaged version is downloadable from the repo's [Releases page](https://github.com/yaseenarshad/yaseen-draw-app/releases) — the `.dmg` for a Mac (Apple Silicon), the `-win-x64-setup.exe` for Windows — no build toolchain needed on the installing machine.
+### Find a board in seconds
 
-The Mac app is ad-hoc signed, not notarized, so on someone else's Mac (macOS 15) the first open is blocked with "Apple could not verify…". Once: open **System Settings › Privacy & Security**, scroll to the blocked-app notice, click **Open Anyway**, and confirm. After that it opens normally. The Windows installer is unsigned, so SmartScreen shows "Windows protected your PC" the first time: click **More info › Run anyway**, once.
+Your folders are in the sidebar. Click a board to open it, or `⌘`-click to open it in a new tab. Hold the pointer on a board to see a preview. Press `⌘K` and type a name to go to a board.
 
-The app is English only, and ships only Chromium's English strings (YAZ-2073 D3). On a Mac or PC set to another language, the Open/Save panels (and a Mac's system menu items) still follow that language, but the browser-drawn bits (a form's validation bubble, the colour and date pickers) are English, and the sidebar sorts names the English way (so `å`, `ä`, `ö` sort with `a` and `o` rather than after `z`).
+**So what:** the board from last month is two keys away.
 
-## Share links
+<img src="docs/assets/browse.gif" alt="Open boards from the sidebar into tabs, see a preview, and find a board by name with Command K" width="100%">
 
-Right-click a board › **Share**, or **File › Share Link** (`⌘⇧L`), and turn on *Anyone with the
-link*: the board gets one link anyone can open in a browser — no account, no app, no editing.
-Pick *View and download* (the default) or *View only*; the link stays the same either way. The
-link is **always live**: every save updates it about ten seconds after you stop drawing. A rename
-inside the app keeps the link; deleting the board stops it. Shared boards wear a small link mark
-in the sidebar, red when the last update failed.
+### Sketch and make clean diagrams in one app
 
-The link is served from **your own free Cloudflare account** — one storage bucket and one small
-Worker, which **Settings › Sharing** sets up from one pasted API key (Open Cloudflare opens the
-token page with every permission pre-filled). Nothing goes through anyone else's server, and it
-costs $0 on Cloudflare's free tier (Cloudflare asks for a card on file before it turns R2 on). The
-same page lists the vault's shared boards, attaches your own domain, and turns sharing off. The
-contract is in `docs/CONTRACTS.md` › Share links.
+Excalidraw is for a quick sketch while you think. draw.io is for the clean diagram that goes into a document. The two are in the same folder and the same window.
 
-A shared draw.io diagram opens in draw.io's own read-only viewer (zoom, pan, pages) and downloads
-as its `.drawio` file; there is no PNG download for a diagram. If you set up sharing before
-diagrams could be shared, run **Settings › Sharing › Set up sharing** once more: it updates your
-Worker, and every existing link keeps working.
+**So what:** you stop the search through two apps for one picture.
 
-## Sync
+<img src="docs/assets/two-tools.png" alt="A draw.io diagram open in Yaseen Draw, beside Excalidraw boards in the same sidebar" width="100%">
 
-Turn on **Settings › Sync** to push a vault to GitHub. It uses the computer's own git, found at a fixed set of locations rather than on `PATH` (`desktop/src/main/git/exec.ts`): on a Mac the Command Line Tools or Homebrew git, on Windows [Git for Windows](https://git-scm.com/download/win) (its installer bundles the Git Credential Manager, so a one-time GitHub sign-in sticks). Without one, the sync banner says so and offers a setup prompt to paste into an LLM. The switch lives per vault, in `<vault>/.yaseendraw/github.json`.
+### Share a board with one link
 
-Two computers can work on one vault. When both changed the same Excalidraw drawing, sync merges it
-shape by shape: everyone's shapes are kept, and if you both changed the same shape, the newest edit
-wins. A draw.io diagram, and any other file, changed on both keeps both copies (yours as
-`<name> (conflict, <date>)`). A small
-notice says what was merged, with **See changes**. Nothing needs a person to untangle it. The app
-also checks GitHub every minute while a vault is open, so the other computer's changes show up on
-their own.
+Turn on sharing for a board. You get one link. A person opens it in a browser, with no account and no app. The link shows your changes about ten seconds after you stop drawing.
 
-Right-click a board › **Version history** to see every version as a picture: for a drawing, the
-board now, with what changed since that version marked in green (added), amber (changed) and faded
-red (removed); for a diagram, the version as it was. **Restore** puts any version back.
+The link runs on your own free Cloudflare account. Your boards do not go through a server of a different company.
 
-## Excalidraw drawings
+**So what:** you send the link one time, and it is never out of date.
 
-A drawing is one `.excalidraw` file — Excalidraw's own scene JSON, readable by excalidraw.com and
-by any other tool that speaks the format. The app never invents a wrapper around it.
+<img src="docs/assets/share.png" alt="Sharing a board with a link" width="100%">
 
-A drawing opens zoomed out to show everything on it (never past 100%, down to 10% for a huge board),
-so you start from the overview and zoom into the part you want. An empty drawing opens at 100%.
+### See each old version as a picture
 
-Image bytes are kept OUT of the scene: a pasted or dropped image is written once to
-`<vault>/assets/<contentId>.<ext>` and the scene refers to it, so a board full of screenshots stays
-a small JSON file that git can actually diff and GitHub will actually accept. The same image used
-twice is stored once.
+Open the version history of a board. You see each version drawn out. Green shows what you added, amber shows what you changed, and red shows what you removed. One click puts an old version back.
 
-Saving is debounced and atomic (tmp file + rename), the mtime you read is the mtime a write must
-match, and a file that changed underneath an unsaved buffer raises the conflict bar instead of
-silently losing either side.
+**So what:** a wrong edit never costs you the board.
 
-## draw.io diagrams
+<img src="docs/assets/version-history.png" alt="Version history of a board, with added, changed and removed shapes marked in colour" width="100%">
 
-A diagram is one `.drawio` file — draw.io's own XML, always saved plain (uncompressed) so an AI
-agent, git and a person can all read it. It opens in the real draw.io, bundled with the app and
-fully offline, and saves, reloads and syncs exactly like a drawing. Excalidraw is the whiteboard;
-draw.io is for clean, screenshot-ready diagrams.
+### Present from the board
 
-draw.io is set up to feel like the Excalidraw canvas: an endless canvas (no page), the shapes panel
-closed, 2 px lines with 8 px corners in Assistant, plain scroll pans and `⌘`-scroll or a pinch
-zooms, and dragging a text box by its corner scales the text. Excalidraw's keys work too — with
-nothing selected `R` / `O` / `T` / `A` / `W` pick a tool; with a selection the colour letters
-(`R` red, `U` blue, `G` green…) colour it, `⇧` + a letter colours the outline, and `1`…`0` size
-it. Settings › Hotkeys has the full table.
+Each frame on a board is a slide. Click **Start presentation** and go through the frames with the arrow keys. There is no export and no second app.
 
-A diagram is marked with a small linked-boxes glyph in the sidebar and on its tab (an Excalidraw
-board is unmarked). Hover it for a preview, right-click › **Version history** to see and restore
-older versions, and **File › Export Image…** (`⌘⇧E`) saves its first page, unsaved edits included, as a PNG or an SVG.
-In dark mode draw.io re-colours diagrams so they stay readable; **Settings › Appearance › draw.io
-diagrams in dark mode** can keep their original colours instead, and a diagram that asks to keep
-its own colours (`adaptiveColors="none"`) always does. Present is Excalidraw-only for now.
+**So what:** the board you think on is the board you show.
 
-## Sidebar and windows
+<img src="docs/assets/present.gif" alt="Present mode goes through the frames of a board as slides" width="100%">
 
-- **Two lenses**: the sidebar shows your vault two ways, switched by the tabs at the top. **Files** is the ordinary folder tree on disk — every file, not just the drawings: a file the app cannot open is listed muted and a click hands it to the OS default app, as does right-click → Open in ▸ "Default app" on any row. The **♥** tab is your favorites (below). Same vault, two readings; both offer the same right-click menu. Switching the window to another vault opens it on Files; the same vault keeps its tab.
-- **Create**: right-click a folder, a file, or the blank space under the tree → "New Excalidraw drawing" / "New draw.io diagram" / "New folder" / "New dated folder" (a folder pre-named with today's `MM_DD- `, cursor ready for the title); name it inline (Enter confirms, Esc cancels). A drawing gets `.excalidraw` and a diagram `.drawio` automatically, and either opens at once; nothing is ever overwritten.
-- **Rename and delete**: both are in the same right-click menu, in both lenses. Renaming edits the name inline and commits on Enter; deleting moves the file to the system Trash — never a permanent delete — and closes its tabs.
-- **Cut, copy, paste**: right-click a row (or a selection) → **Cut** / **Copy**, then right-click a folder → **Paste** (`⌘X` / `⌘C` / `⌘V` do the same on the selected rows; `⌘V` pastes into the selected folder, beside the selected file, or into the vault root when nothing is selected). One clipboard for the whole app, so you can copy in one window and paste into another vault's window. A copy that lands on an existing name becomes "Board copy.excalidraw", then "Board copy 2.excalidraw" — pasting into the same folder is how you duplicate; a cut never overwrites, moves tabs along like drag-drop, and pastes once. Folders copy whole. The menu itself is five groups: open, clipboard, new, this row, favorites + **Open in ▸** (new window, VS Code, default app, Finder), delete.
-- **Search**: `⌘K` searches file and folder names across the vault from the sidebar; ↑/↓ pick, Enter opens, ⌘-Enter opens in a background tab. Right-click a result for the same menu its row has in the tree.
-- **Tabs and windows**: drawings open in tabs (`⌃Tab` / `⌃⇧Tab` or `⌘⇧]` / `⌘⇧[` to switch, `⌘W` closes the **tab** — on the last one it empties the window and then closes it). `⌘⇧N` duplicates the window (same folder, same file), `⌘O` opens the vault switcher in the sidebar header (type to filter, `⏎` brings that vault to the front or opens it in a new window, `⇧⏎` or ⇧-click opens it in this window; hover a vault's ⓘ to see its full path; right-click a vault — or the header's vault name — to open it in this window, give it a display name, copy its name or path, reveal it in Finder, open it in VS Code, or remove it from the recents), `⌘⇧O` opens a folder, `⌘⇧W` closes the window; File › Open Recent lists the last folders. Opening a folder never replaces the vault you are in (only "Open in this window" — the right-click item, or `⇧⏎` in the switcher — does, on purpose): it opens in its own window, or brings that vault's window to the front (only the empty Welcome screen fills itself). ⌘-click a sidebar file — or right-click → Open in ▸ "New window" — to open it in its own window. Open windows and their tabs are restored on relaunch.
-- **Links**: a `yaseendraw://` URL opens that exact drawing from anywhere (Slack, another app). Finder opens `.excalidraw` and `.drawio` files with Yaseen Draw, and Open With lists it for both.
-- **Folders start closed**: the tree opens fully collapsed on every launch, with your last tab restored. Folders you open are remembered for the session and shared by every window on the vault; quitting forgets them. Opening a drawing from search, a link or another tab still opens its folders. The double chevron beside the tabs expands or collapses everything on screen.
-- **Collapse**: the panel icon in the header hides the sidebar (a floating button on the left edge brings it back); the choice survives reload. Drag the sidebar's right edge to resize it (180–520 px, remembered); drag it well past the minimum to collapse.
-- **Paths**: the open file shows in the URL as `#/absolute/path.excalidraw`; right-click any row for "Copy path"; a click selects a row, shift-click adds files and folders to the selection, then right-click it for "Copy N paths".
-- **Focus**: right-click a folder → "Focus on folder" and the tree shows only that — shift-select several first for "Focus on N folders". An eye appears beside the collapse button while you are focused; click it to see everything again. Each lens keeps its own focus, and it survives a restart.
-- **Favorites**: right-click any file or folder → "Add to favorites" (shift-select several for "Add N to favorites"); a heart toast confirms. The **♥** tab lists them in the order you added them — drag a row up or down to reorder — and a favorited folder opens in place, so a drawing can show both on its own and inside its folder. Every row keeps the full right-click menu, including Focus, which narrows the ♥ tab on its own. Favorites live in the vault's own `.yaseendraw/favorites.json` and sync with it — turn on GitHub sync and the same list shows up on your other machine. Every window sees the same list, it survives a restart, follows renames and drops out when deleted.
+### And the small things
 
-## The canvas panel
+- **Two computers, no conflicts.** Sync backs up the folder to your own GitHub repo. If two computers change the same drawing, the app merges it shape by shape.
+- **Your AI agent can draw.** A board is a plain file. An agent or a script writes the file, and the app shows the change at once.
+- **Git can read it.** Pictures are kept out of the drawing file, so the file stays small and a diff is readable.
+- **Nothing is locked in.** A `.excalidraw` file opens on excalidraw.com. A `.drawio` file opens in draw.io.
+- **Icon and image search**, reusable components, favorites, a laser pointer, PNG and SVG export, and a dark look.
 
-The hamburger at the top-left of a drawing opens the canvas's own docked panel, three tabs wide.
+All of it is in the **[feature guide](docs/GUIDE.md)**.
 
-- **Images** (`⌘F`): search icons and graphics from Iconify and Pixabay, insert a shape from the
-  built-in catalog, or pick from Favorites and Recent. The app fetches them for you — the canvas
-  never reaches a provider itself — and an inserted picture becomes an ordinary `assets/` file.
-  Pixabay needs a free API key (Settings › Images); without one, Iconify and the shapes still work,
-  and so does everything else while you are offline.
-- **Components** (`⌘C`): save the current selection as a named, reusable component, then insert
-  independent copies of it into any board, in any vault. **Import JSON** turns a `.excalidraw` file
-  on disk into one. Components live in your Library folder, not in a vault, so they follow you.
-- **Present**: every top-level frame on the board is a slide. Reorder them by dragging or
-  `⌥↑` / `⌥↓`, rename them, and press Play for a full-pane player — `→` / `←`, `Space`,
-  `Home` / `End`, `Esc` for the whole deck, and a strip of the canvas kept clear on the right for a
-  camera. The order is stored in the board, so it travels with the file.
+## The numbers
 
-**File › Export Image…** (`⌘⇧E`) opens the engine's own PNG / SVG dialog, and **File › Export
-Excalidraw Drawing…** (`⌘⇧S`) writes a standalone `.excalidraw` anywhere on disk with its images embedded —
-the one file this app writes that is not lean, because it has no `assets/` folder to point at.
-**View › Canvas Background** sets the board's own colour.
+Each number is measured. None is an estimate.
 
-## Settings
+| | |
+|---|---|
+| Download size (version 0.1.13) | 116 MB for Mac, 132 MB for Windows |
+| From the start of the app to a board you can draw on | 0.49 seconds |
+| Time to open a draw.io diagram | 0.72 seconds |
+| Automatic tests that each version must pass | 2,891 unit tests and 129 full-app tests |
 
-The cog bottom-left, or `⌘,`. **Appearance › Theme** (System / Light / Dark — System follows the
-OS live) and **draw.io diagrams in dark mode** (Adapt colours / Keep original colours). **Excalidraw canvas** holds the fourteen drawing preferences the engine used to keep to
-itself — grid, snapping, binding, zen and writing modes, tool lock, frame visibility, the pen widths
-and what a new element looks like — and they apply to every Excalidraw drawing, every window and
-every relaunch (draw.io diagrams have fixed defaults).
-**Files › Confirm before deleting** (on by default: the sheet is the only guard, because the
-system Trash has no programmatic undo) and **Files › Library folder** (where components and image
-favorites live — point it inside a synced vault and they sync too). **Images › Pixabay API key**
-(kept in the app's own data folder, readable only by your user; never shown again). **Sync** for
-this vault's GitHub switch. **Storage** (its own page) shows this vault's git history on a bar that
-ends at GitHub's 10 GB maximum (marked at 1 GB and 5 GB), lists any file close to or over GitHub's
-100 MB limit, and offers **Move pictures out** for older boards that still carry their pictures
-inside; it measures only while Settings is open. A file near GitHub's 100 MB limit (sync draws
-the line a little under it, at 95 MB) is never committed: sync holds it back, says so in a banner
-that stays until it is fixed, turns the sync chip red ("1 file not synced") and marks the file with
-a red cloud in the sidebar — everything else keeps syncing.
-**Hotkeys** lists every shortcut. Settings are global — one file, every window follows a change
-live — and never written into a vault.
+The two times are medians of 7 runs on an M1 Max MacBook Pro, measured on version 0.1.12.
 
-## Out of scope
+What the app does not need:
 
-There is no browser mode: the app runs only inside Electron. The file layer has no path jail:
-anything under your user account can be read or written. The end-to-end suite (`npm run e2e`) is
-local, not part of CI; the rest of behaviour is verified by launching the app in an isolated profile
-(see `LAUNCH.md` and `docs/REGRESSION.md`).
-Distribution is deliberately minimal (locked decisions): no Developer-ID signing or notarization,
-no auto-update, no Intel or universal builds.
+- **No account.** There is nothing to sign up for.
+- **No server.** The app reads and writes files on your disk.
+- **No payment.** There is no paid plan.
+- **No tracking.** The app has no analytics. It goes online only for the things you turn on: share links, sync, and image search.
+
+## Questions
+
+**Does it cost money?**
+No. Share links and sync use your own free Cloudflare and GitHub accounts. Cloudflare asks for a card before it turns storage on, but the free tier costs $0.
+
+**Why does my computer warn me at the first start?**
+The app is not signed with a paid developer certificate. So macOS and Windows ask you to confirm one time. The steps are below.
+
+**How do I get my boards out?**
+They were never in. Each board is a file in your folder, in the format of Excalidraw or draw.io.
+
+**Does it need the internet?**
+No. You draw, find, and present offline. Only share links, sync, and image search go online.
+
+## Download
+
+**[Download the newest version](https://github.com/yaseenarshad/yaseen-draw-app/releases/latest)**
+
+You need a Mac with Apple Silicon, or a Windows PC (x64). There is no build for an Intel Mac or for Linux.
+
+1. Download the `.dmg` file for a Mac, or the `-win-x64-setup.exe` file for Windows.
+2. Open the file and install the app.
+3. Open the app. The first time, your computer blocks it:
+   - **Mac:** open **System Settings › Privacy & Security**, go down to the notice about the app, and click **Open Anyway**.
+   - **Windows:** on the "Windows protected your PC" screen, click **More info**, then **Run anyway**.
+4. Pick a folder.
+
+You do step 3 only one time. To update, install the newer version over the old one. The app does not update itself.
+
+Then try these three things:
+
+1. Right-click the sidebar and select **New Excalidraw drawing**.
+2. Press `⌘K` (`Ctrl+K` on Windows) and type the name of a board.
+3. Draw two frames on a board. Open the panel at the top left, select **Present**, and click **Start presentation**.
+
+## For developers
+
+The app is Electron, with a React renderer around a fork of Excalidraw and a bundled, offline draw.io. **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** tells how to build, test, and package it from source.
+
+The licence is [MIT](LICENSE). Yaseen Draw is built on a fork of [Excalidraw](https://excalidraw.com) (MIT). It bundles the [draw.io](https://github.com/jgraph/drawio) webapp (Apache-2.0), not changed. It is not affiliated with either project.

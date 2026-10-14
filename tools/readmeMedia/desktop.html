@@ -1,0 +1,68 @@
+<!doctype html>
+<!--
+  The made-up desktop every README picture of the app sits on: a calm wallpaper, a small menu bar, a
+  small Dock and one window frame — with a HOLE where the window's content goes. capture.mjs renders
+  this page to a PNG with a transparent background and lays it over the real app's own frames, so
+  nothing of the app is drawn here: only what the operating system would draw around it.
+
+  Query: w, h = the picture's size · win = x,y,width,height of the window · bar = the title bar's
+  height (0: none, the hole is the whole window) · chrome = 0 leaves out the menu bar and the Dock
+  (the tighter "how it works" pictures) · icon = the app icon's URL, for the Dock.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Made-up desktop</title>
+<style>
+  html, body { margin: 0; background: transparent; }
+  body { position: relative; overflow: hidden; font-family: -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  #wallpaper { position: absolute; inset: 0; background: linear-gradient(165deg, #b3c5f3 0%, #93aae8 48%, #7590dc 100%); overflow: hidden; }
+  .wave { position: absolute; border-radius: 50%; }
+  .wave.a { width: 150%; height: 130%; left: -75%; top: 48%; background: rgba(255, 255, 255, .13); }
+  .wave.b { width: 130%; height: 150%; left: 46%; top: -108%; background: rgba(255, 255, 255, .11); }
+  .wave.c { width: 120%; height: 110%; left: 38%; top: 68%; background: rgba(60, 80, 180, .12); }
+  #shadow { position: absolute; border-radius: 11px; box-shadow: 0 0 0 1px rgba(30, 40, 90, .22), 0 14px 38px rgba(30, 40, 100, .32); }
+  #bar { position: absolute; box-sizing: border-box; border-radius: 11px 11px 0 0; background: #eceef2; border-bottom: 1px solid #d5d8de; display: flex; align-items: center; gap: 7px; padding-left: 11px; }
+  #bar i { width: 11px; height: 11px; border-radius: 50%; background: #ff5f57; }
+  #bar i:nth-child(2) { background: #febc2e; }
+  #bar i:nth-child(3) { background: #28c840; }
+  #menu { position: absolute; left: 0; right: 0; top: 0; height: 26px; background: rgba(255, 255, 255, .6); display: flex; align-items: center; gap: 19px; padding: 0 16px; box-sizing: border-box; font-size: 13px; color: #1c1d22; }
+  #menu b { font-weight: 700; }
+  #menu .clock { margin-left: auto; font-weight: 500; }
+  #dock { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); height: 44px; padding: 0 9px; box-sizing: border-box; display: flex; align-items: center; gap: 9px; border-radius: 15px; background: rgba(255, 255, 255, .34); border: 1px solid rgba(255, 255, 255, .5); }
+  #dock span, #dock img { width: 29px; height: 29px; border-radius: 8px; display: block; position: relative; }
+  #dock .on::after { content: ''; position: absolute; left: 50%; bottom: -6px; width: 3px; height: 3px; margin-left: -1.5px; border-radius: 50%; background: rgba(20, 25, 60, .7); }
+  #dock .app { position: relative; width: 29px; height: 29px; }
+</style>
+</head>
+<body>
+<div id="wallpaper"><div class="wave a"></div><div class="wave b"></div><div class="wave c"></div></div>
+<div id="shadow"></div>
+<div id="bar"><i></i><i></i><i></i></div>
+<div id="menu"><b>Yaseen Draw</b><span>File</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span><span class="clock">Tue 13 Oct&nbsp;&nbsp;9:41</span></div>
+<div id="dock">
+  <span style="background:#3f8cf5"></span><span style="background:#f6b93b"></span>
+  <span class="app on"><img id="icon" alt=""></span>
+  <span style="background:#35c46a"></span><span style="background:#f2605b"></span><span style="background:#a274ee"></span><span style="background:#8e929c"></span>
+</div>
+<script>
+  const q = new URLSearchParams(location.search)
+  const [w, h] = [Number(q.get('w')), Number(q.get('h'))]
+  const [x, y, ww, wh] = q.get('win').split(',').map(Number)
+  const bar = Number(q.get('bar') ?? 0)
+  const r = 11
+  Object.assign(document.body.style, { width: `${w}px`, height: `${h}px` })
+  // The wallpaper, minus the window: an outer box and, inside it (even-odd), the rounded window.
+  const hole = `M${x + r} ${y} H${x + ww - r} a${r} ${r} 0 0 1 ${r} ${r} V${y + wh - r} a${r} ${r} 0 0 1 ${-r} ${r} H${x + r} a${r} ${r} 0 0 1 ${-r} ${-r} V${y + r} a${r} ${r} 0 0 1 ${r} ${-r} Z`
+  document.getElementById('wallpaper').style.clipPath = `path(evenodd, "M0 0 H${w} V${h} H0 Z ${hole}")`
+  Object.assign(document.getElementById('shadow').style, { left: `${x}px`, top: `${y}px`, width: `${ww}px`, height: `${wh}px` })
+  const barEl = document.getElementById('bar')
+  if (bar > 0) Object.assign(barEl.style, { left: `${x}px`, top: `${y}px`, width: `${ww}px`, height: `${bar}px` })
+  else barEl.remove()
+  if (q.get('chrome') === '0') {
+    document.getElementById('menu').remove()
+    document.getElementById('dock').remove()
+  } else document.getElementById('icon').src = q.get('icon')
+</script>
+</body>
+</html>
