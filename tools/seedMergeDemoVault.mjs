@@ -12,7 +12,7 @@
  *
  * `--vault` IS REQUIRED AND THE PATH IS WIPED (with its origin and Sam's clone) — the
  * `seedDemoVault.mjs` rule. `--profile` also writes an isolated Electron profile whose one window
- * is already on the vault (LAUNCH.md "Behaviour checks"), so no dialog is needed.
+ * is already on the vault (docs/LAUNCH.md "Behaviour checks"), so no dialog is needed.
  */
 import { cli, cloneAs, git, json, publish, refuseExisting, scene as sceneOf, wipe, write, writeProfile } from './lib/seedKit.mjs'
 

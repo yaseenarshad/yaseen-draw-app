@@ -225,7 +225,7 @@ export function cloneAs(origin, dir, name) {
   identity(dir, name)
 }
 
-// ---------------------------------------------------------------- isolated profile (LAUNCH.md "Behaviour checks")
+// ---------------------------------------------------------------- isolated profile (docs/LAUNCH.md "Behaviour checks")
 /**
  * One window of `yaseendraw.json` (docs/CONTRACTS.md "App state schema").
  * @type {(window: { id?: string, root: string | null, file?: string | null, tabs?: string[], sidebarCollapsed?: boolean, sidebarLens?: string, bounds?: { x: number, y: number, width: number, height: number } }) => object}

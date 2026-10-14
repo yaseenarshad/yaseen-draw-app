@@ -1,0 +1,39 @@
+<!doctype html>
+<!--
+  The link preview picture, 1280 × 640 (GitHub: Settings › General › Social preview): the icon, the
+  name, the line, and one REAL picture of the app at work — `shot`, which capture.mjs takes from the
+  app itself and passes in. The important part sits in the middle, clear of the edges a preview crops.
+  Query: icon, shot = URLs of the app icon and of the picture.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Yaseen Draw — link preview</title>
+<style>
+  html, body { margin: 0; }
+  body { width: 1280px; height: 640px; background: #131523; display: flex; align-items: center; font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; }
+  .text { margin-left: 84px; width: 470px; flex: none; }
+  #icon { width: 104px; height: 104px; display: block; }
+  h1 { margin: 34px 0 0; font-size: 66px; line-height: 1; font-weight: 800; letter-spacing: -1.6px; color: #fff; }
+  .line { margin: 22px 0 0; font-size: 34px; line-height: 1.2; font-weight: 600; letter-spacing: -.3px; color: #dfe1ea; }
+  .sub { margin: 8px 0 0; font-size: 23px; line-height: 1.3; font-weight: 500; color: #b9bccb; }
+  .more { margin: 24px 0 0; font-size: 21px; line-height: 1.35; font-weight: 700; color: #a5a1f7; }
+  #shot { width: 610px; margin-left: 46px; border-radius: 18px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .14), 0 24px 60px rgba(0, 0, 0, .5); display: block; }
+</style>
+</head>
+<body>
+<div class="text">
+  <img id="icon" alt="">
+  <h1>Yaseen Draw</h1>
+  <p class="line">Excalidraw, but better</p>
+  <p class="sub">(includes the tools needed<br>for knowledge work)</p>
+  <p class="more">Bold text, lists, icons, slides. Local files.<br>Synced with your GitHub.</p>
+</div>
+<img id="shot" alt="">
+<script>
+  const q = new URLSearchParams(location.search)
+  document.getElementById('icon').src = q.get('icon')
+  document.getElementById('shot').src = q.get('shot')
+</script>
+</body>
+</html>

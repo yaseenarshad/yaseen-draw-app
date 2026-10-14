@@ -40,8 +40,8 @@ nothing to do with each other. A bare `D3` would be unresolvable, so there are n
 | `tools/` | `packEngine.mjs` (bump the vendored engine), `packDrawio.mjs` (the pinned draw.io pack), `packDesktop.mjs` (electron-builder, then the lzma dmg: `lib/dmg.mjs`), `buildShareViewer.mjs`; the demo vaults — `seedDemoVault.mjs` (the stress-test vault the behaviour checks run against) and one `seed<Feature>DemoVault.mjs` each for Sort, Preview, Merge, Drawio, Share and Storage — all on `lib/seedKit.mjs` (the strict CLI parser, the PNG encoder, scene builders, git and the isolated profile); `fakeCloudflare.mjs` (the share demo's Cloudflare); `lib/excalidrawFonts.mjs` (the fonts lookup, `shared/excalidrawFonts.ts` restated for plain node); the pure halves live in `tools/lib/` beside their tests; `perf/` is the size gate, the perf harness and the pixel check (YAZ-2073, below) |
 | `e2e/` | the Playwright E2E suite (🔒 YAZ-2073 D17): `*.spec.ts` by feature area, `support/` for the launcher fixture, vault builders and the main-process hook that keeps OS hand-offs inside the test's sandbox |
 | `docs/` | this file, and `REGRESSION.md` — the hand-scenario list (stable IDs, ★ core) |
-| `thoughts/ledgers/` | continuity ledgers for in-flight work |
-| `thoughts/yaz-2073-scope/` | the speed project's `decisions.md` (what each "🔒 YAZ-2073 Dn" says, and whether it shipped, was parked or declined) and the research behind it (`research/`) |
+| `thoughts/ledgers/` | continuity ledgers for in-flight work (local only: `thoughts/` is in `.gitignore`) |
+| `thoughts/yaz-2073-scope/` | (local only) the speed project's `decisions.md` (what each "🔒 YAZ-2073 Dn" says, and whether it shipped, was parked or declined) and the research behind it (`research/`) |
 
 ### Scripts
 
@@ -56,9 +56,9 @@ nothing to do with each other. A bare `D3` would be unresolvable, so there are n
 | `npm run build` | `electron-vite build` into `desktop/out`, then `tools/buildShareViewer.mjs` into `share/dist/assets` (wiped first, gitignored) |
 | `npm run desktop:build` | build + electron-builder → `desktop/dist-app`: the arm64 `.app` and its lzma dmg; `desktop:build:win` makes the Windows installer |
 | `npm run perf:budget` | `tools/perf/measureBudget.mjs`, the size and integrity gate (YAZ-2073 1A): the packaged app's bytes against `tools/perf/budget.json`, plus what no unit test sees (Info.plist types and scheme, the ad-hoc seal, every lazy chunk shipped, the 13 font families, the draw.io files, the storage worker, bytes shipped twice). `perf:budget:ci` (`--out-only`) checks `desktop/out` alone, in CI |
-| `npm run perf -- <scenario…\|all>` | `tools/perf/run.mjs`, the perf harness (YAZ-2073 1B): the packaged app (`--dev`: `desktop/out`) on seeded fixtures in an isolated profile, driven over the DevTools protocol; per-metric median / p95 / noise as JSON against the `perf` ceilings. Local only — it opens windows. Scenarios and flags: `LAUNCH.md` |
+| `npm run perf -- <scenario…\|all>` | `tools/perf/run.mjs`, the perf harness (YAZ-2073 1B): the packaged app (`--dev`: `desktop/out`) on seeded fixtures in an isolated profile, driven over the DevTools protocol; per-metric median / p95 / noise as JSON against the `perf` ceilings. Local only — it opens windows. Scenarios and flags: `docs/LAUNCH.md` |
 | `npm run perf:pixels` | `tools/perf/exportPixels.mjs`, the no-pixel-change proof for an engine bump ("Packaging", below) |
-| `npm run e2e` | build, then the Playwright suite in `e2e/` against the BUILT app (`desktop/out`); `E2E_PACKAGED=1` with `npx playwright test -c e2e/playwright.config.ts` runs it against `desktop/dist-app` instead. The knobs (`E2E_WORKERS`, `E2E_SHOW`, `E2E_KEEP`) are in `LAUNCH.md` |
+| `npm run e2e` | build, then the Playwright suite in `e2e/` against the BUILT app (`desktop/out`); `E2E_PACKAGED=1` with `npx playwright test -c e2e/playwright.config.ts` runs it against `desktop/dist-app` instead. The knobs (`E2E_WORKERS`, `E2E_SHOW`, `E2E_KEEP`) are in `docs/LAUNCH.md` |
 
 ⚡ YAZ-2073 D17 amends 🔒 OD1 on YAZ-1805 ("no UI driver"): Yasin turned Playwright ON as the
 no-feature-loss guarantee for the speed project. `npm run e2e` is a local command, not a CI step.

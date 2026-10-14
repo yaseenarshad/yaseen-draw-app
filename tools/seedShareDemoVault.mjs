@@ -225,7 +225,7 @@ not seen — Settings flags it like board 12.
 | 13 | Frames and lots of text | Viewer "Download PNG" contains both frames and all text |
 `)
 
-// ---------------------------------------------------------------- isolated profile (LAUNCH.md recipe)
+// ---------------------------------------------------------------- isolated profile (docs/LAUNCH.md recipe)
 const first = path.join(VAULT, '01 Simple — shapes, arrows and text.excalidraw')
 writeProfile(PROFILE, VAULT, { theme: 'light', sidebarWidth: 340, lastOpened: now, file: first, tabs: [first] })
 

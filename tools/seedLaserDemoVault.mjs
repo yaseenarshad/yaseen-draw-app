@@ -10,7 +10,7 @@
  *
  * `--vault` IS REQUIRED AND THE PATH IS WIPED (the `seedDemoVault.mjs` rule). `--profile` also
  * writes an isolated Electron profile (`yaseendraw.json`) whose one window is already on the vault
- * (LAUNCH.md "Behaviour checks"), so no dialog is needed and the real profile is never read.
+ * (docs/LAUNCH.md "Behaviour checks"), so no dialog is needed and the real profile is never read.
  */
 import fs from 'node:fs'
 import { asset as assetIn, cli, elementKit, gradientPNG, refuseExisting, scene, stripesPNG, wipe, write as writeIn, writeProfile } from './lib/seedKit.mjs'
@@ -96,7 +96,7 @@ board('10 Busy board — 400 shapes', Array.from({ length: 400 }, (_, i) => rect
 
 console.log(`seeded ${VAULT}`)
 
-// ---------------------------------------------------------------- isolated profile (LAUNCH.md recipe)
+// ---------------------------------------------------------------- isolated profile (docs/LAUNCH.md recipe)
 if (PROFILE) {
   wipe(PROFILE)
   writeProfile(PROFILE, VAULT, { file: '00 READ ME — what to try.excalidraw', tabs: ['00 READ ME — what to try.excalidraw', '01 Simple diagram — mark it up.excalidraw'] })

@@ -125,7 +125,7 @@ export function writeBoardVault(vault, folders, perFolder, seed) {
 /**
  * An isolated profile (`YASEEN_DRAW_USER_DATA_DIR`) whose one window is already on `vault` with
  * `file` open — light theme unless asked, fixed bounds, previews on — so a launch needs no dialog and never
- * reads the real profile (LAUNCH.md "Behaviour checks").
+ * reads the real profile (docs/LAUNCH.md "Behaviour checks").
  */
 export function writeProfile(profile, vault, file, { theme = 'light' } = {}) {
   writeKitProfile(profile, vault, { id: 'perf-win', theme, settings: { hoverPreview: true }, sidebarWidth: 260, lastOpened: 1_790_000_000_000, file, tabs: [file], bounds: { x: 80, y: 60, width: 1280, height: 820 } })
