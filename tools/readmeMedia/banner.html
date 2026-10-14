@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  The README banner, 1600 × 340: the icon, the name, one line, and a small third line. Its own dark
+  The README banner, 1600 × 340: the icon, the name, the tag line (with its part in brackets below it), and a small last line. Its own dark
   background (rounded, transparent outside) reads on GitHub's light and dark pages alike. No picture
   of the app here — capture.mjs renders this page as it is. Query: icon = the app icon's URL.
 -->
@@ -14,9 +14,10 @@
   .card { position: relative; width: 1600px; height: 340px; border-radius: 34px; background: #131523; overflow: hidden; display: flex; align-items: center; }
   img { width: 126px; height: 126px; margin-left: 150px; flex: none; }
   .text { margin-left: 62px; }
-  h1 { margin: 0; font-size: 88px; line-height: 1; font-weight: 800; letter-spacing: -2.2px; color: #fff; }
-  .line { margin: 20px 0 0; font-size: 35px; font-weight: 500; letter-spacing: -.4px; color: #dfe1ea; }
-  .more { margin: 12px 0 0; font-size: 24px; font-weight: 700; letter-spacing: -.1px; color: #a5a1f7; }
+  h1 { margin: 0; font-size: 84px; line-height: 1; font-weight: 800; letter-spacing: -2.2px; color: #fff; }
+  .line { margin: 16px 0 0; font-size: 37px; font-weight: 600; letter-spacing: -.4px; color: #dfe1ea; }
+  .sub { margin: 6px 0 0; font-size: 26px; font-weight: 500; letter-spacing: -.2px; color: #b9bccb; }
+  .more { margin: 14px 0 0; font-size: 24px; font-weight: 700; letter-spacing: -.1px; color: #a5a1f7; }
   /* A few whiteboard shapes, as quiet as the wallpaper of a room. */
   svg { position: absolute; right: 60px; top: 46px; }
 </style>
@@ -26,7 +27,8 @@
   <img id="icon" alt="">
   <div class="text">
     <h1>Yaseen Draw</h1>
-    <p class="line">Excalidraw, with the tools knowledge work needs.</p>
+    <p class="line">Excalidraw, but better</p>
+    <p class="sub">(includes the tools needed for knowledge work)</p>
     <p class="more">Bold text, lists, icons, slides. Local files. Synced with your GitHub.</p>
   </div>
   <svg width="330" height="250" viewBox="0 0 330 250" fill="none" stroke="#454a9c" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">

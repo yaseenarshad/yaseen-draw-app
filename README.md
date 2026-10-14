@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/banner.png" alt="Yaseen Draw. Your whiteboards, as plain files in a folder on your own computer." width="100%">
+  <img src="docs/assets/banner.png" alt="Yaseen Draw. Excalidraw, but better (includes the tools needed for knowledge work)." width="100%">
 </p>
 
 <p align="center">
