@@ -21,7 +21,7 @@
 <h3 align="center">Find every whiteboard you ever made. Own every one of them.</h3>
 
 <p align="center">
-  <img src="docs/assets/hero.gif" alt="Yaseen Draw: open a board from a folder in the sidebar, draw on it, and change to a different board" width="100%">
+  <img src="docs/assets/hero.gif" alt="Yaseen Draw: open a board from a folder in the sidebar, draw on it, and change to a different board" width="720">
 </p>
 
 <p align="center">
