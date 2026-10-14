@@ -18,7 +18,7 @@
  * `--vault` IS REQUIRED AND THE PATH IS WIPED (with its origin and Sam's clone) — the
  * `seedDemoVault.mjs` rule; an existing path is refused unless `--force`. `--profile` also writes
  * an isolated Electron profile (`yaseendraw.json`) whose one window is already on the vault
- * (LAUNCH.md "Behaviour checks"), so no dialog is needed and the real profile is never read.
+ * (docs/LAUNCH.md "Behaviour checks"), so no dialog is needed and the real profile is never read.
  */
 import fs from 'node:fs'
 import os from 'node:os'
@@ -204,7 +204,7 @@ for (const rel of syncFiles) {
 
 console.log(`vault:  ${VAULT}\norigin: ${ORIGIN}\nSam:    ${SAM}`)
 
-// ---------------------------------------------------------------- isolated profile (LAUNCH.md recipe)
+// ---------------------------------------------------------------- isolated profile (docs/LAUNCH.md recipe)
 if (PROFILE) {
   writeProfile(PROFILE, VAULT)
   console.log(`profile ${PROFILE}`)

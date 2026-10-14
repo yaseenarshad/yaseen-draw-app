@@ -18,12 +18,12 @@ Add a scenario when a bug escapes both layers; mark it ★ only if it guards a s
 **The coverage tag** (last column everywhere): `A: spec` = an e2e spec (file name without
 `.spec.ts`) exercises the behaviour; `A (part): spec — rest` = it covers some of it and the rest is
 by hand; `M` = hand only. Only the e2e suite counts as A here — unit tests are listed in the
-[feature-safety-net](../thoughts/yaz-2073-scope/research/feature-safety-net.md) inventory, not in this file.
+`thoughts/yaz-2073-scope/research/feature-safety-net.md` (local notes, not in the repo) inventory, not in this file.
 
 **Setup.** Run the PACKAGED app (`npm run desktop:build`, then
 `desktop/dist-app/mac-arm64/Yaseen Draw.app/Contents/MacOS/Yaseen Draw`) with
 `YASEEN_DRAW_USER_DATA_DIR=<scratch profile>` against seeded vaults under a scratch folder — the
-`LAUNCH.md` › Verify recipe. Never Yasin's real profile or vault. Seeds: `tools/seedDemoVault.mjs`
+`docs/LAUNCH.md` › Verify recipe. Never Yasin's real profile or vault. Seeds: `tools/seedDemoVault.mjs`
 (stress vault), `seedDrawioDemoVault.mjs`, `seedMergeDemoVault.mjs`, `seedPreviewDemoVault.mjs`,
 `seedShareDemoVault.mjs` + `fakeCloudflare.mjs`, `seedSortDemoVault.mjs`, `seedStorageDemoVault.mjs`,
 `seedLaserDemoVault.mjs`.
@@ -144,7 +144,7 @@ packaged e2e run for the same reason.)
 
 ## Feature inventory coverage
 
-Every line of [feature-safety-net](../thoughts/yaz-2073-scope/research/feature-safety-net.md) §2 (the YAZ-2073 inventory), in its 12 groups. **F-IDs are stable**;
+Every line of `thoughts/yaz-2073-scope/research/feature-safety-net.md` (local notes, not in the repo) §2 (the YAZ-2073 inventory), in its 12 groups. **F-IDs are stable**;
 "By hand" names the H-list rows above (or an imported row below) that walk the rest.
 
 ### Documents & disk

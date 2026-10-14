@@ -82,7 +82,7 @@ npm run e2e       # build, then the Playwright suite (e2e/) against desktop/out
   packaged bundle (`npm run desktop:build` first). A bundle ignores `-r`, so the OS stubs are
   installed right after launch — by then the bundle has registered itself as the `yaseendraw://`
   handler, exactly as launching it by hand does (the installed app takes it back on its next launch).
-- The hand pass is [`docs/REGRESSION.md`](docs/REGRESSION.md): stable scenario IDs, ★ core, and
+- The hand pass is [`docs/REGRESSION.md`](REGRESSION.md): stable scenario IDs, ★ core, and
   the list of what the suite cannot see.
 - If `npm` isn't in the shell's PATH (agent shells often lack it), use its install location directly — e.g. `/opt/homebrew/bin/npm` (ARM mac), `/usr/local/bin/npm` (Intel mac), or the Volta/nvm/fnm install under `$HOME`.
 

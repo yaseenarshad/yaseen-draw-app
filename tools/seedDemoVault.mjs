@@ -19,7 +19,7 @@
  * one folder · two orphan assets, one older than the 24 h sweep window and one fresh.
  *
  * It writes NO Electron user-data profile: the app opens a vault through the folder picker or ⌘O,
- * and `yaseendraw.json`'s schema is the app's own business (see LAUNCH.md "Behaviour checks" for
+ * and `yaseendraw.json`'s schema is the app's own business (see docs/LAUNCH.md "Behaviour checks" for
  * the isolated-profile recipe).
  */
 import fs from 'node:fs'
