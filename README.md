@@ -41,17 +41,9 @@ Maybe you know this. Excalidraw is the fastest way to sketch an idea. But you wr
 - You want to show the board. You export pictures into a slide app.
 - You close the browser tab, and you hope that the board is there tomorrow.
 
-| | Excalidraw | Canva | Yaseen Draw |
-| -- | :--: | :--: | :--: |
-| **Desktop App (Mac and Windows)** | ❌<br><sub>Browser only</sub> | ✅ | ✅ |
-| **Sync Across Devices Included** | ❌<br><sub>Paid plan, $6 a month</sub> | ✅ | ✅<br><sub>Free, through GitHub</sub> |
-| **Format Text (Bold, Underline, Lists)** | ❌ | ✅ | ✅ |
-| **Icon Search Built In** | ❌ | ✅ | ✅ |
-| **Present Your Board as Slides** | ❌<br><sub>Paid plan, $6 a month</sub> | ✅ | ✅ |
-| **Local Files (Agent Native)** | ❌<br><sub>Browser storage</sub> | ❌<br><sub>Cloud</sub> | ✅ |
-| **Own Your Data (No Account, No Server)** | ✅ | ❌ | ✅ |
-| **Open Source** | ✅ | ❌ | ✅ |
-| **draw.io Diagrams in the Same App** | ❌ | ❌ | ✅ |
+<p align="center">
+  <img src="docs/assets/compare.png" width="100%" alt="Excalidraw, Canva and Yaseen Draw compared. Local files that an AI agent reads: only Yaseen Draw (Excalidraw uses browser storage, Canva the cloud). Own your data with no account and no server: Excalidraw and Yaseen Draw. Open source: Excalidraw and Yaseen Draw. Desktop app for Mac and Windows: Canva and Yaseen Draw (Excalidraw is browser only). Sync across devices included: Canva and Yaseen Draw, where it is free through GitHub (in Excalidraw it is in the paid plan, 6 dollars a month). Format text with bold, underline and lists: Canva and Yaseen Draw. Icon search built in: Canva and Yaseen Draw. Present your board as slides: Canva and Yaseen Draw (in Excalidraw it is in the paid plan). draw.io diagrams in the same app: only Yaseen Draw.">
+</p>
 
 <sub>"Excalidraw" is the free editor on excalidraw.com. The paid plan is Excalidraw+, at $6 a month for each user.</sub>
 

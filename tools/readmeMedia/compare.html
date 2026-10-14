@@ -1,0 +1,70 @@
+<!doctype html>
+<!--
+  The comparison picture of the README, 1600 × 900: Excalidraw, Canva and Yaseen Draw, one row for
+  each thing a reader gets. Same dark card as the banner (rounded, transparent outside), so it reads
+  on GitHub's light and dark pages alike. A designed page, no picture of the app — capture.mjs
+  renders it as it is. The rows live in ROWS below; README.md repeats them in the picture's alt text,
+  so change the two together. Query: icon = the app icon's URL.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Yaseen Draw — comparison</title>
+<style>
+  html, body { margin: 0; background: transparent; }
+  body { width: 1600px; height: 900px; font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  .card { position: relative; width: 1600px; height: 900px; border-radius: 34px; background: #131523; overflow: hidden; }
+  /* The column of the app: one lit panel behind its cells, top to bottom. */
+  .ours { position: absolute; left: 1250px; top: 26px; width: 290px; height: 848px; border-radius: 24px; background: rgba(105, 101, 219, .2); box-shadow: inset 0 0 0 2px #6965db; }
+  .grid { position: absolute; left: 60px; top: 30px; width: 1480px; display: grid; grid-template-columns: 630px 280px 280px 290px; }
+  .head { height: 120px; display: flex; align-items: center; justify-content: center; gap: 14px; font-size: 31px; font-weight: 700; letter-spacing: -.3px; color: #c3c6d6; }
+  .head.us { color: #fff; }
+  .head img { width: 46px; height: 46px; }
+  .name, .cell { height: 80px; border-top: 1px solid rgba(255, 255, 255, .09); }
+  .name { display: flex; align-items: center; font-size: 30px; font-weight: 650; letter-spacing: -.3px; color: #fff; }
+  .name small { margin-left: 12px; font-size: 24px; font-weight: 500; color: #9a9eb3; }
+  .cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
+  .cell.us { border-top-color: rgba(165, 161, 247, .28); }
+  .cell svg { width: 36px; height: 36px; display: block; }
+  .cell span { font-size: 20px; font-weight: 500; line-height: 1.1; color: #a3a7bb; }
+  .cell.us span { color: #cfcdfb; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="ours"></div>
+  <div class="grid" id="grid">
+    <div class="head"></div>
+    <div class="head">Excalidraw</div>
+    <div class="head">Canva</div>
+    <div class="head us"><img id="icon" alt="">Yaseen Draw</div>
+  </div>
+</div>
+<script>
+  const YES = '<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#22c55e"/><path d="M10.5 18.6 l5 5 l10 -10.6" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  const NO = '<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="rgba(248,113,113,.16)"/><path d="M12 12 l12 12 M24 12 l-12 12" fill="none" stroke="#f87171" stroke-width="3.6" stroke-linecap="round"/></svg>'
+  // [what the reader gets, its small print, Excalidraw, Canva, Yaseen Draw] — a cell is yes / no, or [yes / no, a note].
+  const ROWS = [
+    ['Local files', 'agent native', [false, 'Browser storage'], [false, 'Cloud'], true],
+    ['Own your data', 'no account, no server', true, false, true],
+    ['Open source', '', true, false, true],
+    ['Desktop app', 'Mac and Windows', [false, 'Browser only'], true, true],
+    ['Sync across devices included', '', [false, 'Paid plan, $6 a month'], true, [true, 'Free, through GitHub']],
+    ['Format text', 'bold, underline, lists', false, true, true],
+    ['Icon search built in', '', false, true, true],
+    ['Present your board as slides', '', [false, 'Paid plan, $6 a month'], true, true],
+    ['draw.io diagrams in the same app', '', false, false, true],
+  ]
+  const grid = document.getElementById('grid')
+  const add = (className, html) => { const el = document.createElement('div'); el.className = className; el.innerHTML = html; grid.append(el) }
+  for (const [name, small, ...cells] of ROWS) {
+    add('name', name + (small ? `<small>${small}</small>` : ''))
+    cells.forEach((cell, column) => {
+      const [yes, note] = Array.isArray(cell) ? cell : [cell, '']
+      add(column === 2 ? 'cell us' : 'cell', (yes ? YES : NO) + (note ? `<span>${note}</span>` : ''))
+    })
+  }
+  document.getElementById('icon').src = new URLSearchParams(location.search).get('icon')
+</script>
+</body>
+</html>

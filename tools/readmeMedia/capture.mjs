@@ -23,6 +23,7 @@
  *   version-history.png                                  1600 × 1040, on the desktop, the vault's sync on
  *   step-1-folder.png  step-2-draw.png  step-3-files.png 1000 × 625, a closer look on the same wallpaper
  *   banner.png (1600 × 340, banner.html)   social-preview.png (1280 × 640, social.html)
+ *   compare.png (1600 × 900, compare.html): the comparison table, its rows are in that page
  * and, only when `--only` names them (the page no longer uses them):
  *   browse.gif (1200 × 780)   two-tools.png  share.png (1600 × 1040)
  * The only things in them the app did not draw: the desktop, the pointer, the keycaps, and the one
@@ -586,6 +587,12 @@ const pictures = {
     } finally {
       await stage.close()
     }
+  },
+
+  /** The comparison with Excalidraw and Canva: a designed page (compare.html), no picture of the app. */
+  async compare() {
+    const big = await render('compare', { icon: ICON }, { width: 1600, height: 900, scale: 2 }, path.join(WORK, 'compare', 'compare@2x.png'))
+    png(big, path.join(OUT, 'compare.png'), { width: 1600, height: 900 })
   },
 
   /** The banner: a designed page (banner.html), no picture of the app. */
