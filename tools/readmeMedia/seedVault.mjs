@@ -3,7 +3,7 @@
  * USAGE: node tools/readmeMedia/seedVault.mjs --vault <dir> [--profile <dir>] [--force]
  *
  * The vault the README's pictures are taken in (lib/demoVault.mjs): everyday boards in
- * `Home/`, `Ideas/`, `Trips/` and `Work/` — nine Excalidraw drawings, two draw.io
+ * `Home/`, `Ideas/`, `Trips/` and `Work/` — ten Excalidraw drawings, two draw.io
  * diagrams — with a local git history (no origin, sync off) that gives the Product roadmap three versions.
  * `tools/readmeMedia/capture.mjs` builds its own copy; this script is for looking at the vault by hand.
  *

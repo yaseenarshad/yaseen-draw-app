@@ -18,10 +18,10 @@
   <a href="docs/GUIDE.md">Feature guide</a>
 </p>
 
-<h3 align="center">Find every whiteboard you ever made. Own every one of them.</h3>
+<h3 align="center">Write on a whiteboard like in a document. Own each board as a file.</h3>
 
 <p align="center">
-  <img src="docs/assets/hero.gif" alt="Yaseen Draw: open a board from a folder in the sidebar, draw on it, and change to a different board" width="720">
+  <img src="docs/assets/hero.gif" alt="Yaseen Draw: open a board from a folder, type two lines into a note, make the first line bold, turn the lines into a list, and put a colour behind the note with one key" width="720">
 </p>
 
 <p align="center">
@@ -29,22 +29,23 @@
   Free. No account. Works offline.
 </p>
 
-## Where is the board you made last month?
+## How is this different from Excalidraw?
 
-I draw a board for almost every idea and every client call. One day a client asked for a diagram from a month before. I knew that I drew it. I did not find it, so I drew it again. That day I started this app.
+I think in Excalidraw all day. But each time I wrote real notes on a board, I missed the basics: bold, a list, an icon. So I built them in. Then I made each board a file on my own computer, synced to my own GitHub.
 
-Maybe you know that moment. You need a board again, and:
+Maybe you know this. Excalidraw is the fastest way to sketch an idea. But you write on the board, too. And then:
 
-- It was in a browser tab. The tab is gone.
-- Or it is in a cloud app, behind a login and a monthly bill.
-- Or it is one of forty boards with the name "Untitled".
-- And your quick sketches are in one app, while your clean diagrams are in a different app.
+- You want one line in bold. There is no bold.
+- You want a list. You type each dash by hand.
+- You want an icon. You leave the board to look for one.
+- You want to show the board. You export pictures into a slide app.
+- You close the browser tab, and you hope that the board is there tomorrow.
 
-The board exists. But you cannot find it, and you do not own it.
+Yaseen Draw is Excalidraw with those tools built in. Each board is a plain file on your own computer, and it syncs to your own GitHub.
+
+The app is built on the open-source code of Excalidraw. The pen, the shapes and the hand-drawn look are the same.
 
 ## How it works
-
-Yaseen Draw keeps each board as one plain file, in a normal folder on your own computer.
 
 <table>
   <tr>
@@ -55,7 +56,7 @@ Yaseen Draw keeps each board as one plain file, in a normal folder on your own c
     </td>
     <td width="33%" valign="top">
       <img src="docs/assets/step-2-draw.png" alt="Step 2: draw on a board" width="100%"><br>
-      <b>2. Draw.</b><br>
+      <b>2. Draw and write.</b><br>
       The app saves each change while you work.
     </td>
     <td width="33%" valign="top">
@@ -66,43 +67,33 @@ Yaseen Draw keeps each board as one plain file, in a normal folder on your own c
   </tr>
 </table>
 
-If you know Obsidian, this is the same idea for whiteboards.
-
 ## What you can do
 
-### Find a board in seconds
+### Format text like in a document
 
-Your folders are in the sidebar. Click a board to open it, or `⌘`-click to open it in a new tab. Hold the pointer on a board to see a preview. Press `⌘K` and type a name to go to a board.
+Make a line bold, underlined, or struck through. Turn lines into a bulleted list or a numbered list. Set the exact size and the line spacing. Put a colour behind a note.
 
-**So what:** the board from last month is two keys away.
+**So what:** your board reads like a page, not like a pile of labels.
 
-<img src="docs/assets/browse.gif" alt="Open boards from the sidebar into tabs, see a preview, and find a board by name with Command K" width="100%">
+<img src="docs/assets/text.gif" alt="One text box: a bold line, an underlined line, a numbered list, a colour behind the text, and a larger size" width="100%">
 
-### Sketch and make clean diagrams in one app
+A style applies to a full line, or to the full text box. Bold shows best in the Normal font.
 
-Excalidraw is for a quick sketch while you think. draw.io is for the clean diagram that goes into a document. The two are in the same folder and the same window.
+### Colour and size with one key
 
-**So what:** you stop the search through two apps for one picture.
+Select a shape and press `R`. The shape is red. Press `⇧U` for a blue outline. Select a text and press a number key to set its size.
 
-<img src="docs/assets/two-tools.png" alt="A draw.io diagram open in Yaseen Draw, beside Excalidraw boards in the same sidebar" width="100%">
+**So what:** your hands stay on the keys, and your mind stays on the idea.
 
-### Share a board with one link
+<img src="docs/assets/keys.gif" alt="A box turns red with the R key and gets a blue outline with Shift U. A text changes size with the number keys." width="100%">
 
-Turn on sharing for a board. You get one link. A person opens it in a browser, with no account and no app. The link shows your changes about ten seconds after you stop drawing.
+### Add an icon without leaving the board
 
-The link runs on your own free Cloudflare account. Your boards do not go through a server of a different company.
+Press `⌘F`, type a word, and click a result. The icon is on your board. The search uses Iconify, and Pixabay if you add your own free key.
 
-**So what:** you send the link one time, and it is never out of date.
+**So what:** you stop the hunt through browser tabs for one small picture.
 
-<img src="docs/assets/share.png" alt="Sharing a board with a link" width="100%">
-
-### See each old version as a picture
-
-Open the version history of a board. You see each version drawn out. Green shows what you added, amber shows what you changed, and red shows what you removed. One click puts an old version back.
-
-**So what:** a wrong edit never costs you the board.
-
-<img src="docs/assets/version-history.png" alt="Version history of a board, with added, changed and removed shapes marked in colour" width="100%">
+<img src="docs/assets/images.gif" alt="The Images panel opens with Command F. A search for watermelon shows icons, and one click puts an icon on the board." width="100%">
 
 ### Present from the board
 
@@ -112,15 +103,50 @@ Each frame on a board is a slide. Click **Start presentation** and go through th
 
 <img src="docs/assets/present.gif" alt="Present mode goes through the frames of a board as slides" width="100%">
 
+### Keep each board as a file, synced to your own GitHub
+
+Your boards are files in folders on your computer. Turn on sync, and the folder goes to your own GitHub repo. It works like a cloud drive, but the drive is yours.
+
+Two computers can use the same folder. If the two change one drawing, the app merges it shape by shape. And the app keeps each old version as a picture: green shows what you added, amber shows what you changed, and red shows what you removed.
+
+**So what:** you get the backup and the history of a cloud drive, and the files stay on your disk.
+
+<img src="docs/assets/version-history.png" alt="Version history of a board, with added, changed and removed shapes marked in colour" width="100%">
+
 ### And the small things
 
-- **Two computers, no conflicts.** Sync backs up the folder to your own GitHub repo. If two computers change the same drawing, the app merges it shape by shape.
+- **Find a board in seconds.** Folders in the sidebar, boards in tabs, a preview when you hold the pointer on a board, and `⌘K` to go to a board by name.
+- **draw.io in the same app.** Clean diagrams are in the same folder and the same window as your sketches.
+- **Share a board with one link.** The link runs on your own free Cloudflare account, and it shows your changes about ten seconds after you stop drawing.
+- **A laser pointer that can keep its marks.** The marks fade, hold, or stay on the board.
+- **Smart shapes.** Arrows, braces and callouts with handles to adjust them.
+- **Exact numbers.** Set the exact line width and the exact corner radius. Give a picture a border and round corners.
 - **Your AI agent can draw.** A board is a plain file. An agent or a script writes the file, and the app shows the change at once.
-- **Git can read it.** Pictures are kept out of the drawing file, so the file stays small and a diff is readable.
-- **Nothing is locked in.** A `.excalidraw` file opens on excalidraw.com. A `.drawio` file opens in draw.io.
-- **Icon and image search**, reusable components, favorites, a laser pointer, PNG and SVG export, and a dark look.
 
 All of it is in the **[feature guide](docs/GUIDE.md)**.
+
+## Side by side
+
+"Excalidraw" here is the free editor on excalidraw.com, compared with its open-source code of July 2026.
+
+| | Excalidraw | Yaseen Draw |
+|---|---|---|
+| Bold, underline, strikethrough | No | Yes, for a line or a text box |
+| Bulleted and numbered lists | No | Yes |
+| Font size | Four sizes | Any size from 1 to 512 |
+| Line spacing | No control | Yes, from 0.8 to 3 |
+| A colour behind text | No | Yes |
+| Colour and size with one key | No | Yes |
+| Icon and image search | No | Yes |
+| Line width | Three widths | Any width from 0.5 to 100 |
+| Present the frames as slides | Not in the free editor | Yes |
+| Laser pointer | The marks fade | The marks fade, hold, or stay |
+| Where a board is kept | In your browser, until you save a file by hand | A file in your folder, saved while you work |
+| Folders, tabs, find by name | No | Yes |
+| Sync and old versions | Not in the free editor | Yes, with your own GitHub repo |
+| draw.io diagrams | No | Yes |
+
+Excalidraw has three things that this app does not have: live collaboration, AI that makes a diagram from text, and the public library of shapes.
 
 ## The numbers
 
@@ -150,8 +176,8 @@ No. Share links and sync use your own free Cloudflare and GitHub accounts. Cloud
 **Why does my computer warn me at the first start?**
 The app is not signed with a paid developer certificate. So macOS and Windows ask you to confirm one time. The steps are below.
 
-**How do I get my boards out?**
-They were never in. Each board is a file in your folder, in the format of Excalidraw or draw.io.
+**Do my boards still open in Excalidraw?**
+Yes. Each board is a `.excalidraw` file in your folder, in the format of Excalidraw. The extra styles of this app, such as bold and lists, are not part of Excalidraw. Expect plain text there.
 
 **Does it need the internet?**
 No. You draw, find, and present offline. Only share links, sync, and image search go online.
@@ -173,9 +199,11 @@ You do step 3 only one time. To update, install the newer version over the old o
 
 Then try these three things:
 
-1. Right-click the sidebar and select **New Excalidraw drawing**.
-2. Press `⌘K` (`Ctrl+K` on Windows) and type the name of a board.
-3. Draw two frames on a board. Open the panel at the top left, select **Present**, and click **Start presentation**.
+1. Press `T` and type three lines. Select the first line and press `⌘B`. Then click **List**.
+2. Select a shape and press `R`.
+3. Press `⌘F` and type "rocket".
+
+On Windows, use `Ctrl` in the place of `⌘`.
 
 ## For developers
 

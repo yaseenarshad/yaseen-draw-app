@@ -5,7 +5,7 @@
  * draws the same board at three moments, so the vault's git history has something to show in
  * Version history.
  */
-import { INK, MUTED, PALETTE, Sketch } from './sketch.mjs'
+import { CLEAN, INK, MUTED, PALETTE, Sketch } from './sketch.mjs'
 
 const title = (s, text, sub, x = 0, y = -120) => {
   s.text('title', x, y, text, 40)
@@ -172,6 +172,37 @@ export function birthdayParty() {
     for (let i = 0; i < n; i++) s.ellipse(`${id}-vote${i}`, x + 150 - i * 22, y + 82, 16, 16, { fill: PALETTE.red.stroke, stroke: PALETTE.red.stroke, strokeWidth: 1, rough: 0 })
   }
   s.margin()
+  return s
+}
+
+/** Where the note goes on the Picnic board: bare canvas right of the drawing — `[x, y]` on the board. */
+export const PICNIC_NOTE = [440, 100]
+/** The one word the size keys are shown on, and a point on the "Blanket" box. */
+export const PICNIC_WORD = [450, 140]
+export const PICNIC_BLANKET = [55, 282]
+/**
+ * Ideas / Picnic: a small drawing with a note beside it, as plain text — `'title'` its first line
+ * only (the board in the vault: the hero writes the rest), `'lines'` the five lines the formatting
+ * pictures start from, `'word'` the one word the size keys are shown on. The note is in the
+ * engine's "Normal" font, where bold reads at a glance. `view` is the canvas the board's margin is
+ * cut for (the close-up pictures use a smaller window, and a text's properties bar sits lower than
+ * a shape's).
+ */
+export function picnic({ note = 'title', view } = {}) {
+  const s = new Sketch()
+  s.text('title', 0, 0, 'Picnic', 40)
+  s.text('subtitle', 0, 54, 'Sunday · by the lake', 20, { color: MUTED })
+  s.ellipse('lake', 0, 104, 200, 86, { color: 'blue', label: 'Lake', size: 20 })
+  s.rect('trunk', 282, 176, 16, 44, { color: 'orange', sharp: true })
+  s.ellipse('tree', 240, 90, 100, 100, { color: 'green' })
+  s.rect('blanket', 0, 250, 110, 64, { color: 'gray', label: 'Blanket', size: 20 })
+  s.rect('basket', 126, 250, 110, 64, { color: 'orange', label: 'Basket', size: 20 })
+  s.rect('frisbee', 252, 250, 110, 64, { color: 'pink', label: 'Frisbee', size: 20 })
+  s.ellipse('sun', 760, -6, 60, 60, { color: 'yellow' })
+  if (note === 'title') s.text('note', ...PICNIC_NOTE, 'Picnic on Sunday', 30, { family: CLEAN })
+  if (note === 'lines') s.text('note', ...PICNIC_NOTE, 'Picnic on Sunday\nMeet at 11 by the lake\nBlanket\nLemonade\nFrisbee', 24, { family: CLEAN })
+  if (note === 'word') s.text('note', ...PICNIC_WORD, 'Sunny!', 28)
+  s.margin(view ? { view, inset: { top: 124, right: 30, bottom: 74, left: 30 } } : undefined)
   return s
 }
 

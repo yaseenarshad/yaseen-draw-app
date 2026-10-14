@@ -24,22 +24,25 @@ export const SIDEBAR_WIDTH = 250
 
 /**
  * A fresh vault, profile and app under `<work>/<name>/`. `open` and `tabs` are board keys
- * (lib/demoVault.mjs `BOARDS`); `root: null` starts on the Welcome screen instead.
+ * (lib/demoVault.mjs `BOARDS`); `welcome` starts on the Welcome screen instead; `view` is the page's
+ * size when it is not VIEW; `sync` gives the vault a local "GitHub" and switches its sync on;
+ * `prepare` may change the vault's files before the app starts.
  */
-export async function openStage({ work, name, open = null, tabs = open ? [open] : [], welcome = false, env = {}, show = false, prepare }) {
+export async function openStage({ work, name, open = null, tabs = open ? [open] : [], welcome = false, env = {}, show = false, prepare, view = VIEW, sidebarCollapsed = false, sync = false }) {
   const dir = path.join(work, name)
   fs.rmSync(dir, { recursive: true, force: true })
   const vault = path.join(dir, 'My Boards')
   const profile = path.join(dir, 'profile')
-  const boards = buildVault(vault)
+  const boards = buildVault(vault, { sync })
   prepare?.({ dir, vault, boards })
-  const bounds = { x: 40, y: 40, width: VIEW.width, height: VIEW.height + TITLE_BAR }
+  const bounds = { x: 40, y: 40, width: view.width, height: view.height + TITLE_BAR }
   writeProfile(profile, welcome ? null : vault, {
     theme: 'light',
     sidebarWidth: SIDEBAR_WIDTH,
     recents: welcome ? [] : undefined,
     file: open ? boards[open] : null,
     tabs: tabs.map((key) => boards[key]),
+    sidebarCollapsed,
     bounds,
   })
   const { app, page } = await launchApp({ work: dir, profile, env, show })
@@ -55,11 +58,11 @@ export async function openStage({ work, name, open = null, tabs = open ? [open] 
     await sleep(300)
     size = await measure()
   }
-  for (let tries = 0; tries < 4 && (size.width !== VIEW.width || size.height !== VIEW.height); tries++) {
+  for (let tries = 0; tries < 4 && (size.width !== view.width || size.height !== view.height); tries++) {
     await win.evaluate((w, [fx, fy]) => {
       const [cw, ch] = w.getContentSize()
       w.setContentSize(Math.round(cw * fx), Math.round(ch * fy))
-    }, [VIEW.width / size.width, VIEW.height / size.height])
+    }, [view.width / size.width, view.height / size.height])
     await sleep(400)
     size = await measure()
   }
@@ -79,9 +82,9 @@ export async function openStage({ work, name, open = null, tabs = open ? [open] 
     await page.reload()
     await page.waitForLoadState('domcontentloaded')
   }
-  if (size.width !== VIEW.width || size.height !== VIEW.height || size.scale !== 2) {
+  if (size.width !== view.width || size.height !== view.height || size.scale !== 2) {
     await quitApp(app)
-    throw new Error(`the page is ${size.width}×${size.height} at ${size.scale}×, not ${VIEW.width}×${VIEW.height} at 2×`)
+    throw new Error(`the page is ${size.width}×${size.height} at ${size.scale}×, not ${view.width}×${view.height} at 2×`)
   }
   await installOverlay(page)
   return { app, page, dir, vault, boards, pointer: new Pointer(page), close: () => quitApp(app) }
@@ -99,6 +102,7 @@ const OVERLAY_CSS = `
 #rm-keys { position: absolute; left: 24px; bottom: 64px; display: none; gap: 10px; align-items: center; padding: 12px 16px; border-radius: 16px; background: rgba(28,30,36,.88); box-shadow: 0 10px 30px rgba(0,0,0,.28); }
 #rm-keys.rm-on { display: flex; }
 #rm-keys.rm-right { left: auto; right: 36px; bottom: 36px; }
+#rm-keys.rm-center { left: 50%; bottom: 14px; transform: translateX(-50%); }
 .rm-key { min-width: 44px; height: 46px; padding: 0 13px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 9px; background: linear-gradient(#fdfdfd, #e9ecef); border-bottom: 3px solid #adb5bd; color: #1e1e1e; font-size: 23px; font-weight: 600; line-height: 1; }
 .rm-key-text { color: #fff; font-size: 19px; font-weight: 500; padding: 0 4px 0 6px; }
 #rm-box { position: absolute; display: none; border: 3px solid #f03e3e; border-radius: 12px; box-shadow: 0 0 0 4px rgba(240,62,62,.18); }
@@ -207,20 +211,22 @@ export class Pointer {
 
 /**
  * Shows keycaps (and an optional word after them) under the sidebar's tree — or, with `right`, in the
- * bottom-right corner of the page; `hideKeys` removes them.
+ * bottom-right corner of the page, or with `center` at the middle of its bottom edge; `hideKeys`
+ * removes them.
  */
-export async function showKeys(page, keys, text = '', { right = false } = {}) {
+export async function showKeys(page, keys, text = '', { right = false, center = false } = {}) {
   await page.evaluate(
-    ([caps, word, onRight]) => {
+    ([caps, word, onRight, inCenter]) => {
       const bar = document.getElementById('rm-keys')
       bar.classList.toggle('rm-right', onRight)
+      bar.classList.toggle('rm-center', inCenter)
       bar.replaceChildren(
         ...caps.map((cap) => Object.assign(document.createElement('span'), { className: 'rm-key', textContent: cap })),
         ...(word ? [Object.assign(document.createElement('span'), { className: 'rm-key-text', textContent: word })] : []),
       )
       bar.classList.add('rm-on')
     },
-    [keys, text, right],
+    [keys, text, right, center],
   )
 }
 export const hideKeys = (page) => page.evaluate(() => document.getElementById('rm-keys').classList.remove('rm-on'))
@@ -246,11 +252,11 @@ export const CANVAS = { x: SIDEBAR_WIDTH + 3, y: 30, width: VIEW.width - SIDEBAR
  * Where a point of a demo board lands in the page when the board has just been opened: the board's
  * own margin rectangle (lib/sketch.mjs `margin`) is what the app fits to the canvas.
  */
-export function sceneToPage(boardFile) {
+export function sceneToPage(boardFile, canvas = CANVAS) {
   const margin = JSON.parse(fs.readFileSync(boardFile, 'utf8')).elements.find((el) => el.id === 'margin')
-  const zoom = Math.min(CANVAS.width / margin.width, CANVAS.height / margin.height, 1)
-  const left = CANVAS.x + (CANVAS.width - margin.width * zoom) / 2
-  const top = CANVAS.y + (CANVAS.height - margin.height * zoom) / 2
+  const zoom = Math.min(canvas.width / margin.width, canvas.height / margin.height, 1)
+  const left = canvas.x + (canvas.width - margin.width * zoom) / 2
+  const top = canvas.y + (canvas.height - margin.height * zoom) / 2
   return (x, y) => [left + (x - margin.x) * zoom, top + (y - margin.y) * zoom]
 }
 

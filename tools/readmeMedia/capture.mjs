@@ -18,13 +18,18 @@
  * no real token, nothing leaves the Mac.
  *
  * What it writes (the names README.md refers to):
- *   hero.gif  browse.gif  present.gif                    1200 × 780, 20 fps, on the desktop
- *   two-tools.png  share.png  version-history.png        1600 × 1040, on the desktop
+ *   hero.gif  images.gif  present.gif                    1200 × 780, 20 fps, on the desktop
+ *   text.gif  keys.gif                                   1200 × 760, 20 fps, a smaller window seen closer, on the same wallpaper
+ *   version-history.png                                  1600 × 1040, on the desktop, the vault's sync on
  *   step-1-folder.png  step-2-draw.png  step-3-files.png 1000 × 625, a closer look on the same wallpaper
  *   banner.png (1600 × 340, banner.html)   social-preview.png (1280 × 640, social.html)
+ * and, only when `--only` names them (the page no longer uses them):
+ *   browse.gif (1200 × 780)   two-tools.png  share.png (1600 × 1040)
  * The only things in them the app did not draw: the desktop, the pointer, the keycaps, and the one
  * red box on two of the step pictures. With the default `--out`, the link preview is also copied to
  * `~/Downloads/yaseen-draw-app-social-preview.png`, for the upload GitHub only takes by hand.
+ * `images.gif` searches Iconify, so it needs the network (no account, no key); sync in
+ * `version-history.png` goes to a bare repository beside the vault, not to GitHub.
  *
  * `--work` IS REQUIRED AND IS REWRITTEN: a folder that exists and was not made by this script is
  * refused unless `--force`. `--only` takes the names above without their extension.
@@ -38,7 +43,8 @@ import { pathToFileURL } from 'node:url'
 import { _electron } from '@playwright/test'
 import { cli } from '../lib/seedKit.mjs'
 import { REPO, assertScratch, quitApp } from './lib/app.mjs'
-import { weekSlot } from './lib/boards.mjs'
+import { PICNIC_BLANKET, PICNIC_NOTE, PICNIC_WORD, picnic, weekSlot } from './lib/boards.mjs'
+import { boardText } from './lib/demoVault.mjs'
 import { gif, png, sizeOf } from './lib/media.mjs'
 import { CANVAS, Recorder, VIEW, boxAround, hideKeys, openStage, sceneToPage, showKeys, sleep, still } from './lib/stage.mjs'
 
@@ -56,6 +62,8 @@ fs.mkdirSync(WORK, { recursive: true })
 fs.writeFileSync(MARKER, '')
 fs.mkdirSync(OUT, { recursive: true })
 const ICON = pathToFileURL(path.join(REPO, 'desktop/build/icon.png')).href
+/** Which search result `images.gif` puts on the board: the first from one of these icon sets, else the first of all. */
+const IMAGE_PICK = /Twitter Emoji|Noto|Fluent|OpenMoji/
 
 // ---------------------------------------------------------------- designed pages (desktop, banner, link preview)
 /** One bare, invisible Electron window for the run's designed pages (lib/pageShot.cjs). */
@@ -96,14 +104,29 @@ async function desk(scale) {
   }
   return desks.get(scale)
 }
-/** A closer look: 1000 × 625 of the same wallpaper around one rounded piece of the app's page. */
+/** A closer look: the same wallpaper around one rounded piece of the app — 1000 × 625 for a picture, 1200 × 760 for a GIF. */
 const CARD = { width: 1000, height: 625, content: { x: 30, y: 28, width: 940, height: 569 } }
-let cardPng
-async function card() {
-  const { x, y, width, height } = CARD.content
-  cardPng ??= await render('desktop', { w: CARD.width, h: CARD.height, win: [x, y, width, height].join(','), bar: 0, chrome: 0 }, CARD, path.join(WORK, 'desktop', 'card.png'))
-  return { png: cardPng, content: CARD.content }
+const GIF_CARD = { width: 1200, height: 760, content: { x: 30, y: 35, width: 1140, height: 690 } }
+const cards = new Map()
+async function card(shape = CARD) {
+  if (!cards.has(shape)) {
+    const { x, y, width, height } = shape.content
+    const file = await render('desktop', { w: shape.width, h: shape.height, win: [x, y, width, height].join(','), bar: 0, chrome: 0 }, shape, path.join(WORK, 'desktop', `card-${shape.width}.png`))
+    cards.set(shape, { png: file, content: shape.content })
+  }
+  return cards.get(shape)
 }
+/**
+ * The window of the close-up GIFs: small, its sidebar folded away, so that the whole page — the
+ * properties bar from end to end — fills a card at 1.27× and a keycap is read at a glance.
+ */
+const CLOSE = { view: { width: 900, height: 545 }, canvas: { x: 0, y: 30, width: 900, height: 515 } }
+/** A close-up stage on the Picnic board with `note` already on it (lib/boards.mjs `picnic`). */
+const closeStage = (name, note) =>
+  openStage({
+    work: WORK, name, open: 'picnic', view: CLOSE.view, sidebarCollapsed: true,
+    prepare: ({ boards }) => fs.writeFileSync(boards.picnic, boardText(picnic({ note, view: CLOSE.canvas }))),
+  })
 /** The whole page of a 2× screenshot, set in the desktop at 1600 px. */
 const framed = async (shot, name) => png(shot, path.join(OUT, `${name}.png`), { desktop: await desk(4 / 3) })
 /** The part of a 2× screenshot `width` CSS px wide from (`x`, `y`), set in a card; its height follows the card's shape. */
@@ -132,53 +155,197 @@ async function diagramReady(page, label) {
 /** An application-menu item, by its id (desktop/src/main/menu.ts) — what its keyboard shortcut runs. */
 const menu = (app, id) => app.evaluate(({ Menu }, itemId) => Menu.getApplicationMenu()?.getMenuItemById(itemId)?.click(), id)
 
+/** Presses `combo` with its keycaps on screen: shown a moment before, gone a moment after. */
+async function shortcut(page, caps, combo, { before = 300, after = 650, center = false } = {}) {
+  await showKeys(page, caps, '', { center })
+  await sleep(before)
+  await page.keyboard.press(combo)
+  await sleep(after)
+  await hideKeys(page)
+}
+/** Types `lines` into the text being edited, Enter between them. */
+async function typeLines(page, lines, delay) {
+  for (const [i, line] of lines.entries()) {
+    if (i > 0) await page.keyboard.press('Enter')
+    await page.keyboard.type(line, { delay })
+  }
+}
+const listButton = (page) => page.getByTestId('textStyle-bullets').filter({ visible: true })
+
 async function record(stage, name, play, options) {
   const rec = new Recorder(stage.page, path.join(stage.dir, 'frames'))
   await rec.start()
   await play()
   const frames = await rec.stop()
-  const seconds = gif(frames, path.join(OUT, `${name}.gif`), { ...options, desktop: await desk(1) })
+  const seconds = gif(frames, path.join(OUT, `${name}.gif`), { ...options, desktop: options?.desktop ?? (await desk(1)) })
   return `${seconds.toFixed(1)} s`
 }
 
 // ---------------------------------------------------------------- the pictures
 const pictures = {
-  /** The main action: a folder of boards, open one, draw on it, open another. */
+  /** The main action: open a board from its folder, write in a note on it and format it like a document. */
   async hero() {
-    const stage = await openStage({ work: WORK, name: 'hero', open: 'soup' })
+    const stage = await openStage({ work: WORK, name: 'hero', open: 'week' })
     const { page, pointer, boards } = stage
     try {
       await drawingReady(page)
-      await pointer.place(620, 560)
+      await pointer.place(640, 520)
       return await record(stage, 'hero', async () => {
-        await sleep(350)
-        await pointer.clickOn(row(page, 'Home'), { ms: 500 })
-        await sleep(350)
-        await pointer.clickOn(row(page, 'Week plan'), { ms: 400 })
-        await drawingReady(page, 500)
-        // Sunday has room: a rectangle, a colour, a word.
-        const at = sceneToPage(boards.week)
-        const [sx, sy, sw, sh] = weekSlot(6, 1)
-        const [x1, y1] = at(sx, sy)
-        const [x2, y2] = at(sx + sw, sy + sh)
-        await pointer.clickOn(tool(page, 'rectangle'), { ms: 420 })
-        await pointer.move(x1, y1, 380)
-        await pointer.drag(x2, y2, 480)
-        await sleep(200)
-        await pointer.clickOn(page.getByTestId('color-top-pick-#ffec99').filter({ visible: true }), { ms: 380 })
-        await sleep(150)
-        await pointer.move((x1 + x2) / 2, (y1 + y2) / 2, 320)
+        await sleep(300)
+        await pointer.clickOn(row(page, 'Ideas'), { ms: 500 })
+        await sleep(250)
+        await pointer.clickOn(row(page, 'Picnic'), { ms: 380 })
+        await drawingReady(page, 400)
+        // The note has its first line. A double-click to write in it, and two more lines.
+        // (Not the T tool: its new text is 130 px at this zoom — a heading, not a note.)
+        const at = sceneToPage(boards.picnic)
+        const [x, y] = at(...PICNIC_NOTE)
+        await pointer.move(x + 150, y + 15, 550)
         await pointer.click({ count: 2 })
+        await page.locator('textarea.excalidraw-wysiwyg').waitFor()
+        await sleep(350) // the double-click selects the whole text a moment after the editor opens
+        await page.keyboard.press('Meta+ArrowDown')
+        await sleep(250)
+        await page.keyboard.press('Enter')
+        await typeLines(page, ['Bring the blanket', 'Buy lemonade'], 55)
+        await sleep(350)
+        // The first line bold; the two under it a list; a yellow fill behind it all.
+        await page.keyboard.press('Meta+ArrowUp')
+        await shortcut(page, ['⌘', 'B'], 'Meta+b', { before: 250, after: 500 })
+        await page.keyboard.press('ArrowDown')
+        await page.keyboard.press('Shift+ArrowDown')
+        await page.keyboard.press('Meta+Shift+ArrowRight')
         await sleep(200)
-        await page.keyboard.type('Picnic', { delay: 70 })
+        await pointer.clickOn(listButton(page), { ms: 450 })
+        await sleep(450)
+        await page.keyboard.press('Escape')
+        await sleep(150)
+        await shortcut(page, ['⇧', 'Y'], 'Shift+y', { before: 250, after: 550 })
+        await pointer.move(...at(610, 290), 350)
+        await pointer.click()
+        await sleep(300)
+      }, { hold: 1.8 })
+    } finally {
+      await stage.close()
+    }
+  },
+
+  /** Text, close up: bold, underline, a list (bulleted, then numbered), a bigger size, a fill. */
+  async text() {
+    const stage = await closeStage('text', 'lines')
+    const { page, pointer, boards } = stage
+    try {
+      await drawingReady(page)
+      const at = sceneToPage(boards.picnic, CLOSE.canvas)
+      const [x, y] = at(...PICNIC_NOTE)
+      await pointer.place(640, 470)
+      return await record(stage, 'text', async () => {
+        await sleep(400)
+        await pointer.move(x + 150, y + 16, 600)
+        await pointer.click({ count: 2 })
+        await page.locator('textarea.excalidraw-wysiwyg').waitFor()
+        await sleep(350) // the double-click selects the whole text a moment after the editor opens
+        await page.keyboard.press('Meta+ArrowUp')
+        await shortcut(page, ['⌘', 'B'], 'Meta+b', { before: 250, after: 500, center: true })
+        await page.keyboard.press('ArrowDown')
+        await shortcut(page, ['⌘', 'U'], 'Meta+u', { before: 250, after: 550, center: true })
+        // The last three lines: a bulleted list, then a numbered one.
+        await page.keyboard.press('ArrowDown')
+        await page.keyboard.press('Shift+ArrowDown')
+        await page.keyboard.press('Shift+ArrowDown')
+        await page.keyboard.press('Meta+Shift+ArrowRight')
         await sleep(200)
-        await pointer.move(...at(430, 372), 320)
+        await pointer.clickOn(listButton(page), { ms: 500 })
+        await sleep(650)
+        await pointer.click()
+        await sleep(650)
+        await page.keyboard.press('Escape')
+        await sleep(150)
+        // A fill behind the text (while the board still has the keyboard); then an exact size,
+        // typed into its field, and more room between the lines.
+        await shortcut(page, ['⇧', 'Y'], 'Shift+y', { before: 250, after: 550, center: true })
+        await pointer.clickOn(page.getByLabel('Exact font size').filter({ visible: true }).first(), { ms: 400 })
+        await page.keyboard.press('Meta+a')
+        await page.keyboard.type('32', { delay: 110 })
+        await page.keyboard.press('Enter')
+        await sleep(400)
+        await pointer.clickOn(page.getByRole('button', { name: 'Increase line spacing' }).filter({ visible: true }), { ms: 400 })
+        await sleep(300)
+        await pointer.click()
+        await sleep(400)
+        await pointer.move(...at(600, 50), 400)
+        await pointer.click()
+        await sleep(250)
+      }, { hold: 1.7, desktop: await card(GIF_CARD) })
+    } finally {
+      await stage.close()
+    }
+  },
+
+  /** One key: a colour letter fills a box, Shift with it colours the outline, a number sizes a text. */
+  async keys() {
+    const stage = await closeStage('keys', 'word')
+    const { page, pointer, boards } = stage
+    try {
+      await drawingReady(page)
+      const at = sceneToPage(boards.picnic, CLOSE.canvas)
+      await pointer.place(600, 440)
+      return await record(stage, 'keys', async () => {
+        await sleep(500)
+        await pointer.move(...at(...PICNIC_BLANKET), 650)
         await pointer.click()
         await sleep(450)
-        await pointer.clickOn(row(page, 'Garden layout'), { ms: 500 })
-        await drawingReady(page, 300)
-        await pointer.move(CANVAS.x + 520, CANVAS.y + 590, 300)
-      }, { hold: 1.6 })
+        await shortcut(page, ['R'], 'r', { after: 850, center: true })
+        await shortcut(page, ['⇧', 'U'], 'Shift+u', { after: 850, center: true })
+        const [x, y] = at(...PICNIC_WORD)
+        await pointer.move(x + 40, y + 18, 650)
+        await pointer.click()
+        await sleep(450)
+        for (const size of ['3', '6', '9']) await shortcut(page, [size], size, { after: 800, center: true })
+        await pointer.move(...at(600, 40), 450)
+        await pointer.click()
+        await sleep(300)
+      }, { hold: 1.8, desktop: await card(GIF_CARD) })
+    } finally {
+      await stage.close()
+    }
+  },
+
+  /** Images: ⌘F, a word, a click — the picture is on the board. Iconify answers over the network. */
+  async images() {
+    const stage = await openStage({ work: WORK, name: 'images', open: 'picnic', prepare: ({ boards }) => fs.writeFileSync(boards.picnic, boardText(picnic({ note: null }))) })
+    const { page, pointer, boards } = stage
+    try {
+      await drawingReady(page)
+      await pointer.place(820, 470)
+      return await record(stage, 'images', async () => {
+        await sleep(400)
+        await pointer.move(CANVAS.x + 640, CANVAS.y + 330, 450)
+        await pointer.click()
+        await shortcut(page, ['⌘', 'F'], 'Meta+f', { after: 500 })
+        await page.getByPlaceholder('Search graphics, icons, and logos').waitFor()
+        await sleep(300)
+        await page.keyboard.type('watermelon', { delay: 75 })
+        await sleep(250)
+        await page.keyboard.press('Enter')
+        const results = page.locator('.image-studio__card')
+        await results.first().locator('.image-studio__preview img, .image-studio__preview svg').first().waitFor({ timeout: 15_000 })
+        await sleep(900)
+        // A colourful one when the search has one (the first results are often black and white).
+        const emoji = results.filter({ hasText: IMAGE_PICK })
+        const pick = (await emoji.count()) > 0 ? emoji.first() : results.first()
+        await pointer.clickOn(pick.locator('.image-studio__add'), { ms: 700, at: [0.5, 0.4] })
+        await page.locator('.image-studio__adding').waitFor({ state: 'detached', timeout: 15_000 }).catch(() => {})
+        await sleep(800)
+        // It lands in the middle of the canvas, selected: a drag puts it where there is room.
+        const at = sceneToPage(boards.picnic)
+        await pointer.move(CANVAS.x + CANVAS.width / 2, CANVAS.y + CANVAS.height / 2, 550)
+        await pointer.drag(...at(640, 205), 700)
+        await sleep(300)
+        await pointer.move(...at(430, 40), 450)
+        await pointer.click()
+        await sleep(400)
+      }, { hold: 1.8 })
     } finally {
       await stage.close()
     }
@@ -396,12 +563,17 @@ const pictures = {
     }
   },
 
-  /** Version history: the board now, with what changed since the first version marked. */
+  /**
+   * Version history: the board now, with what changed since the first version marked. The vault's
+   * sync is on here — against a bare repository beside it, standing in for GitHub — so the chip
+   * reads as it does for someone who syncs.
+   */
   async 'version-history'() {
-    const stage = await openStage({ work: WORK, name: 'version-history', open: 'roadmap' })
+    const stage = await openStage({ work: WORK, name: 'version-history', open: 'roadmap', sync: true })
     const { page } = stage
     try {
       await drawingReady(page)
+      await page.getByRole('button', { name: 'Synced' }).waitFor({ timeout: 30_000 })
       await row(page, 'Work').click()
       await row(page, 'Product roadmap').click({ button: 'right' })
       await menuItem(page, 'Version history').click()
@@ -422,16 +594,37 @@ const pictures = {
     png(big, path.join(OUT, 'banner.png'), { width: 1600, height: 340 })
   },
 
-  /** The link preview: a designed page (social.html) around one real picture of the app at work. */
+  /**
+   * The link preview: a designed page (social.html) around one real picture of the app at work —
+   * the Picnic board with its note formatted (a bold line, an underlined one, a list, a fill).
+   */
   async 'social-preview'() {
-    const stage = await openStage({ work: WORK, name: 'at-work', open: 'soup' })
+    const stage = await closeStage('at-work', 'lines')
     const atWork = path.join(stage.dir, 'at-work.png')
     try {
-      await drawingReady(stage.page)
-      await row(stage.page, 'Home').click()
-      await stage.page.mouse.move(900, 660)
-      await sleep(500)
-      await closeUp(await still(stage.page, path.join(stage.dir, 'shot.png')), atWork, { x: 0, y: 0, width: 920 })
+      const { page, boards } = stage
+      await drawingReady(page)
+      const at = sceneToPage(boards.picnic, CLOSE.canvas)
+      const [x, y] = at(...PICNIC_NOTE)
+      await page.mouse.dblclick(x + 150, y + 16)
+      await page.locator('textarea.excalidraw-wysiwyg').waitFor()
+      await sleep(350) // the double-click selects the whole text a moment after the editor opens
+      // Line 1 bold, line 2 underlined, the last three a list; then a fill and a bigger size.
+      for (const combo of ['Meta+ArrowUp', 'Meta+b', 'ArrowDown', 'Meta+u', 'ArrowDown', 'Shift+ArrowDown', 'Shift+ArrowDown', 'Meta+Shift+ArrowRight']) {
+        await page.keyboard.press(combo)
+        await sleep(150)
+      }
+      await listButton(page).click()
+      await sleep(200)
+      await page.keyboard.press('Escape')
+      await sleep(200)
+      await page.keyboard.press('Shift+y')
+      await page.keyboard.press('5') // 32 px
+      await sleep(200)
+      await page.mouse.click(...at(600, 50))
+      await page.mouse.move(...at(300, 380))
+      await sleep(700)
+      png(await still(page, path.join(stage.dir, 'shot.png')), atWork, { desktop: await card() })
     } finally {
       await stage.close()
     }
@@ -444,7 +637,9 @@ const pictures = {
 }
 
 // ---------------------------------------------------------------- run
-const names = args.only ? args.only.split(',').map((name) => name.trim()) : Object.keys(pictures)
+/** Still made on request, no longer on the page. */
+const OFF_PAGE = ['browse', 'two-tools', 'share']
+const names = args.only ? args.only.split(',').map((name) => name.trim()) : Object.keys(pictures).filter((name) => !OFF_PAGE.includes(name))
 const unknown = names.filter((name) => !Object.hasOwn(pictures, name))
 if (unknown.length > 0) {
   console.error(`unknown picture: ${unknown.join(', ')} (there are: ${Object.keys(pictures).join(', ')})\n${USAGE}`)
