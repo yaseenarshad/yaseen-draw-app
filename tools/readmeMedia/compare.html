@@ -13,21 +13,23 @@
 <style>
   html, body { margin: 0; background: transparent; }
   body { width: 1600px; height: 900px; font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
-  .card { position: relative; width: 1600px; height: 900px; border-radius: 34px; background: #131523; overflow: hidden; }
-  /* The column of the app: one lit panel behind its cells, top to bottom. */
-  .ours { position: absolute; left: 1250px; top: 26px; width: 290px; height: 848px; border-radius: 24px; background: rgba(105, 101, 219, .2); box-shadow: inset 0 0 0 2px #6965db; }
-  .grid { position: absolute; left: 60px; top: 30px; width: 1480px; display: grid; grid-template-columns: 630px 280px 280px 290px; }
-  .head { height: 120px; display: flex; align-items: center; justify-content: center; gap: 14px; font-size: 31px; font-weight: 700; letter-spacing: -.3px; color: #c3c6d6; }
-  .head.us { color: #fff; }
-  .head img { width: 46px; height: 46px; }
-  .name, .cell { height: 80px; border-top: 1px solid rgba(255, 255, 255, .09); }
-  .name { display: flex; align-items: center; font-size: 30px; font-weight: 650; letter-spacing: -.3px; color: #fff; }
-  .name small { margin-left: 12px; font-size: 24px; font-weight: 500; color: #9a9eb3; }
+  /* The banner's dark card, with a glow where the app's column stands. */
+  .card { position: relative; width: 1600px; height: 900px; border-radius: 34px; overflow: hidden; background: radial-gradient(900px 700px at 1395px 450px, rgba(105, 101, 219, .38), transparent 70%), linear-gradient(135deg, #171933, #0e0f1d); }
+  /* The column of the app: one bright panel behind its cells, taller than the rows, so it stands in front. */
+  .ours { position: absolute; left: 1240px; top: 14px; width: 310px; height: 872px; border-radius: 28px; background: linear-gradient(180deg, #8380f5, #5a52e0); box-shadow: 0 0 0 1px rgba(255, 255, 255, .22) inset, 0 18px 70px rgba(105, 101, 219, .75); }
+  .grid { position: absolute; left: 60px; top: 30px; width: 1480px; display: grid; grid-template-columns: 630px 275px 275px 300px; }
+  .head { height: 120px; display: flex; align-items: center; justify-content: center; gap: 14px; font-size: 31px; font-weight: 700; letter-spacing: -.3px; color: #aeb2c6; }
+  .head.us { color: #fff; font-size: 34px; font-weight: 800; }
+  .head img { width: 50px; height: 50px; border-radius: 12px; box-shadow: 0 0 0 2px rgba(255, 255, 255, .55); }
+  .name, .cell { height: 80px; border-top: 1px solid rgba(255, 255, 255, .1); }
+  .name { display: flex; align-items: center; font-size: 32px; font-weight: 700; letter-spacing: -.4px; color: #fff; }
+  .name small { margin-left: 12px; font-size: 24px; font-weight: 500; letter-spacing: -.1px; color: #9a9eb3; }
   .cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
-  .cell.us { border-top-color: rgba(165, 161, 247, .28); }
-  .cell svg { width: 36px; height: 36px; display: block; }
-  .cell span { font-size: 20px; font-weight: 500; line-height: 1.1; color: #a3a7bb; }
-  .cell.us span { color: #cfcdfb; }
+  .cell.us { border-top-color: rgba(255, 255, 255, .26); }
+  .cell svg { width: 40px; height: 40px; display: block; }
+  .cell.us svg { width: 46px; height: 46px; filter: drop-shadow(0 4px 10px rgba(30, 27, 110, .45)); }
+  .cell span { font-size: 20px; font-weight: 600; line-height: 1.1; color: #fca5a5; }
+  .cell.us span { color: #fff; }
 </style>
 </head>
 <body>
@@ -41,8 +43,9 @@
   </div>
 </div>
 <script>
-  const YES = '<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#22c55e"/><path d="M10.5 18.6 l5 5 l10 -10.6" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-  const NO = '<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="rgba(248,113,113,.16)"/><path d="M12 12 l12 12 M24 12 l-12 12" fill="none" stroke="#f87171" stroke-width="3.6" stroke-linecap="round"/></svg>'
+  const YES = '<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#22c55e"/><path d="M10.5 18.6 l5 5 l10 -10.6" fill="none" stroke="#fff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  const NO = '<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#ef4444"/><path d="M12 12 l12 12 M24 12 l-12 12" fill="none" stroke="#fff" stroke-width="3.8" stroke-linecap="round"/></svg>'
+  const OURS = '<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#fff"/><path d="M10.5 18.6 l5 5 l10 -10.6" fill="none" stroke="#16a34a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
   // [what the reader gets, its small print, Excalidraw, Canva, Yaseen Draw] — a cell is yes / no, or [yes / no, a note].
   const ROWS = [
     ['Local files', 'agent native', [false, 'Browser storage'], [false, 'Cloud'], true],
@@ -61,7 +64,7 @@
     add('name', name + (small ? `<small>${small}</small>` : ''))
     cells.forEach((cell, column) => {
       const [yes, note] = Array.isArray(cell) ? cell : [cell, '']
-      add(column === 2 ? 'cell us' : 'cell', (yes ? YES : NO) + (note ? `<span>${note}</span>` : ''))
+      add(column === 2 ? 'cell us' : 'cell', (column === 2 ? OURS : yes ? YES : NO) + (note ? `<span>${note}</span>` : ''))
     })
   }
   document.getElementById('icon').src = new URLSearchParams(location.search).get('icon')
