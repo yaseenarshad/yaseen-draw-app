@@ -41,6 +41,22 @@ Maybe you know this. Excalidraw is the fastest way to sketch an idea. But you wr
 - You want to show the board. You export pictures into a slide app.
 - You close the browser tab, and you hope that the board is there tomorrow.
 
+| | Excalidraw | Canva | Yaseen Draw |
+| -- | :--: | :--: | :--: |
+| **Desktop App (Mac and Windows)** | ❌<br><sub>Browser only</sub> | ✅ | ✅ |
+| **Sync Across Devices Included** | ❌<br><sub>Paid plan</sub> | ✅ | ✅<br><sub>Free, through GitHub</sub> |
+| **Format Text (Bold, Underline, Lists)** | ❌ | ✅ | ✅ |
+| **Icon Search Built In** | ❌ | ✅ | ✅ |
+| **Present Your Board as Slides** | ❌<br><sub>Paid plan</sub> | ✅ | ✅ |
+| **Local Files (Agent Native)** | ❌<br><sub>Browser storage</sub> | ❌<br><sub>Cloud</sub> | ✅ |
+| **Own Your Data (No Account, No Server)** | ✅ | ❌ | ✅ |
+| **Open Source** | ✅ | ❌ | ✅ |
+| **draw.io Diagrams in the Same App** | ❌ | ❌ | ✅ |
+
+<sub>"Excalidraw" is the free editor on excalidraw.com. The paid plan is Excalidraw+.</sub>
+
+Excalidraw has the speed. Canva has the tools. Neither one gives you the file. You need one app.
+
 Yaseen Draw is Excalidraw with those tools built in. Each board is a plain file on your own computer, and it syncs to your own GitHub.
 
 The app is built on the open-source code of Excalidraw. The pen, the shapes and the hand-drawn look are the same.
@@ -125,29 +141,6 @@ Two computers can use the same folder. If the two change one drawing, the app me
 
 All of it is in the **[feature guide](docs/GUIDE.md)**.
 
-## Side by side
-
-"Excalidraw" here is the free editor on excalidraw.com, compared with its open-source code of July 2026.
-
-| | Excalidraw | Yaseen Draw |
-|---|---|---|
-| Bold, underline, strikethrough | No | Yes, for a line or a text box |
-| Bulleted and numbered lists | No | Yes |
-| Font size | Four sizes | Any size from 1 to 512 |
-| Line spacing | No control | Yes, from 0.8 to 3 |
-| A colour behind text | No | Yes |
-| Colour and size with one key | No | Yes |
-| Icon and image search | No | Yes |
-| Line width | Three widths | Any width from 0.5 to 100 |
-| Present the frames as slides | Not in the free editor | Yes |
-| Laser pointer | The marks fade | The marks fade, hold, or stay |
-| Where a board is kept | In your browser, until you save a file by hand | A file in your folder, saved while you work |
-| Folders, tabs, find by name | No | Yes |
-| Sync and old versions | Not in the free editor | Yes, with your own GitHub repo |
-| draw.io diagrams | No | Yes |
-
-Excalidraw has three things that this app does not have: live collaboration, AI that makes a diagram from text, and the public library of shapes.
-
 ## The numbers
 
 Each number is measured. None is an estimate.
@@ -178,6 +171,9 @@ The app is not signed with a paid developer certificate. So macOS and Windows as
 
 **Do my boards still open in Excalidraw?**
 Yes. Each board is a `.excalidraw` file in your folder, in the format of Excalidraw. The extra styles of this app, such as bold and lists, are not part of Excalidraw. Expect plain text there.
+
+**Can two people draw at the same time?**
+Not live. But two computers can use the same folder, and sync merges a drawing shape by shape. A share link shows a board to anyone.
 
 **Does it need the internet?**
 No. You draw, find, and present offline. Only share links, sync, and image search go online.
