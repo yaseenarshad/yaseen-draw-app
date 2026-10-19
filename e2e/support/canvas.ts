@@ -33,7 +33,6 @@ export function sceneAt(page: Page, x: number, y: number): Promise<{ x: number; 
       const el = [...document.querySelectorAll<HTMLElement>('.excalidraw')].find((e) => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden')
       if (el === undefined) throw new Error('no visible canvas')
       const key = Object.keys(el).find((k) => k.startsWith('__reactFiber$'))
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let fiber: any = key === undefined ? null : (el as any)[key]
       while (fiber !== null && !(fiber.stateNode?.state && typeof fiber.stateNode.state.offsetLeft === 'number' && fiber.stateNode.viewport)) fiber = fiber.return
       if (fiber === null) throw new Error('no engine instance behind the canvas')
