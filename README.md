@@ -1,3 +1,5 @@
+> **Legacy, read-only.** Yaseen Draw is replaced by [Yaseen Docs](https://github.com/yaseenarshad/yaseen-docs-app), which opens drawings and diagrams in tabs. This repo was archived on 2026-10-28.
+
 <p align="center">
   <img src="docs/assets/banner.png" alt="Yaseen Draw. Excalidraw, but better (includes the tools needed for knowledge work)." width="100%">
 </p>
